@@ -1,0 +1,17 @@
+Findings
+[P0] host/checkin returns before creating the status log, so the new ledger event path is unreachable/broken.
+In the pasted diff, the transaction returns at line 292, then the new reservationStatusLog.create starts at line 296. That code never runs, and result.statusLogId used later at line 325 will be missing. This likely fails typecheck or emits undefined idempotency keys. See /Users/totalpro/.codex/attachments/6c7b63eb-1ce3-4b79-9ccc-5b93b8e555d3/pasted-text.txt:292.
+[P0] transitionStatus appears syntactically corrupted by a duplicate reservationStatusLog.create.
+Line 390 still has await prisma.reservationStatusLog.create({, then line 394 adds const statusLog = await prisma.reservationStatusLog.create({. If that reflects the actual file, it will not compile. See /Users/totalpro/.codex/attachments/6c7b63eb-1ce3-4b79-9ccc-5b93b8e555d3/pasted-text.txt:390.
+[P0] Prisma schema appears to duplicate tableSession on CommissionAllocation.
+Lines 119-120 show two tableSession fields. Prisma will reject duplicate model fields. See /Users/totalpro/.codex/attachments/6c7b63eb-1ce3-4b79-9ccc-5b93b8e555d3/pasted-text.txt:119.
+[P1] INVU commission minting emits the wrong event type.
+A POS-backed commission mint is being recorded as ATTRIBUTION_ANCHOR_RESOLVED at line 485. That pollutes the attribution lifecycle with a financial/POS event. Add a proper event type such as POS_CHECK_CLOSED, ORDER_OBSERVED, PAYMENT_OBSERVED, or COMMISSION_CALCULATED. See /Users/totalpro/.codex/attachments/6c7b63eb-1ce3-4b79-9ccc-5b93b8e555d3/pasted-text.txt:482.
+[P1] Deduplication key can collide across systems.
+The unique index is only (sourceRecordId, idempotencyKey) at lines 69-70. If two connectors use the same external record ID and idempotency key format, they collide. Safer unique key: (sourceSystem, sourceConnector, sourceRecordId, idempotencyKey) plus the partial internal-event index for sourceRecordId IS NULL.
+[P1] “Canonical proof trail” is still best-effort only.
+Reservation and host-operation events are emitted after the primary write and swallowed on failure. That avoids blocking bookings, but it means the proof trail can silently miss exactly the events investors/admins need. See lines 239-260 and 319-338. Better pattern: write an outbox row inside the same transaction, then process with retry.
+[P2] #182 claims nullable FK to CapacityHold, but implementation only stores capacityHoldId.
+That is acceptable before #181, but the task wording should say “reserved future FK” or #181 must add the actual relation/index. Right now the done-state overclaims the schema.
+Verdict
+Do not accept this PR yet. The concept is good, but the pasted diff has likely compile-breaking issues plus one important semantic error around INVU event typing. Fix the P0s first, then add a real POS/commission event type before merging #182.

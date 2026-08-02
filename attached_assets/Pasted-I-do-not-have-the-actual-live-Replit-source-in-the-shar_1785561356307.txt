@@ -1,0 +1,59 @@
+I do not have the actual live Replit source in the shared local repo. I only have specs and pasted review bundles. The real app files like src/app/api/reservations/route.ts, HostOperationsBoard.tsx, capacityService.ts, etc. are not present locally. So yes: request the code from Replit before any “code red-team” can be final.
+Based on the screenshots and pasted #181 changes, I would not green-light the reservation/floor-control model yet.
+Critical Red-Team Findings
+[P0] Client reservation form still lacks visible date/time selection.
+The /r/INF-SOPHIA reservation window shows guest info and party size, but not the essential reservation controls above the fold: date, time, experience/space, and availability. This is urgent because every referrer QR depends on this flow.
+[P0] Floor control is not a floor/table control system yet.
+The host dashboard shows queue/status columns, but not an intuitive section/table/chair workflow. Restaurant owner/host must be able to create sections, create tables inside sections, set chair capacity, and assign reservations to actual tables.
+[P0] Bind-to-INVU must become a forced operational step.
+A seated reservation should show a clear “Bind INVU Table” notification/action. Only bound INVU tables/checks should be closable for referral payout proof. If unbound, the system should block close or mark as “cannot close payout loop.”
+[P1] Capacity by space is not enough.
+RestaurantSpace capacity is useful, but operationally hosts manage tables and chairs. Need hierarchy:
+Venue
+  → Section / Space
+    → Table
+      → Chair capacity
+      → INVU table binding
+      → active reservation / hold
+[P1] Host workflow must be fast and guided.
+The host should not hunt through drawers. Flow should be:
+Incoming reservation
+→ Confirm date/time/party size
+→ Select section
+→ Select table(s)
+→ Seat guest
+→ Prompt: Bind INVU table/check
+→ Bound
+→ Close eligible when INVU check closes
+Request To Replit
+Send this:
+Please provide the actual source files for the current live build, not pasted diffs:
+
+src/app/api/reservations/route.ts
+src/app/r/[code]/page.tsx or equivalent referral landing/reservation route
+src/components/reservations/*
+src/components/host/HostOperationsBoard.tsx
+src/server/spaces/capacityService.ts
+src/server/host/hostService.ts
+src/server/services/invu/*
+prisma/schema.prisma
+latest migrations
+relevant i18n files
+
+We need to red-team the real implementation for:
+1. client reservation date/time/space selection,
+2. floor sections/tables/chair capacity,
+3. reservation-to-table assignment,
+4. INVU table binding,
+5. close eligibility only for bound INVU tables/checks.
+Next Task I’d Create
+#195 — Floor/Table Control + INVU Binding Workflow
+Done looks like:
+Owner/admin can create sections, tables, and chair counts.
+Tables can be mapped/bound to INVU table identifiers.
+Client reservation flow includes date, time, party size, requested experience/space.
+Host can assign reservation to section/table from the dashboard.
+Seated but unbound reservations show a persistent “Bind INVU Table” warning.
+Only INVU-bound seated reservations can enter close/commission workflow.
+Attribution survives every table/space reassignment.
+This is the real operating layer. The schema is not the product. The host’s floor-control workflow is.

@@ -1,0 +1,5041 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+  LOCKED
+  ARCHIVED
+  BANNED
+  PASSWORD_RESET_REQUIRED
+}
+
+enum UserAdminAction {
+  USER_CREATED
+  USER_UPDATED
+  USER_SUSPENDED
+  USER_UNSUSPENDED
+  USER_LOCKED
+  USER_UNLOCKED
+  USER_ARCHIVED
+  USER_UNARCHIVED
+  USER_BANNED
+  PASSWORD_RESET_TRIGGERED
+  ROLE_ASSIGNED
+  ROLE_REMOVED
+  FORCE_LOGOUT
+  EMAIL_CHANGED
+  NOTES_UPDATED
+  STATUS_CHANGED
+  SEAT_INVITED
+  SEAT_REINVITED
+  SEAT_ACCEPTED
+  SEAT_REVOKED
+  SEAT_REMOVED
+  SEAT_COMMISSION_UPDATED
+}
+
+enum RoleKey {
+  VISITOR
+  ATTENDEE
+  INFLUENCER
+  PARTNER
+  INVESTOR
+  REFERRER
+  STAFF_OKU
+  STAFF_CATCH
+  ADMIN_COMMERCIAL
+  ADMIN_IR
+  ADMIN_HR
+  ADMIN_FINANCE
+  SUPERADMIN
+  RESTAURANT_HOST
+  STREETSIDE_HOST
+}
+
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+}
+
+enum BeneficiaryDocStatus {
+  NOT_REQUIRED
+  MISSING
+  RECEIVED
+  VERIFIED
+  REJECTED
+}
+
+enum BeneficiaryDocumentType {
+  PROOF_OF_ADDRESS
+  IDENTIFICATION
+  TAX_OR_RUC
+  SOURCE_OF_FUNDS
+  INCOME_CERTIFICATION
+}
+
+enum BeneficiaryDocScanStatus {
+  PENDING
+  CLEAN
+  REJECTED
+}
+
+enum BankReadinessStatus {
+  MISSING_INFO
+  READY_FOR_REVIEW
+  OKU_APPROVED
+  AWAITING_BANK_CONFIRMATION
+  BANK_READY
+  REJECTED
+  ON_HOLD
+}
+
+enum CommissionValidationMode {
+  ON_SEATED
+  ON_COMPLETED
+}
+
+enum VenueKey {
+  OKU
+  CATCH
+}
+
+enum SeriesHostType {
+  OKU
+  CATCH
+  INFLUENCER
+  PARTNER
+}
+
+enum SeriesStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  SOLD_OUT
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  SOLD_OUT
+  CANCELLED
+  COMPLETED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+}
+
+enum OrderType {
+  TICKET
+  EXPERIENCE
+  MEMBERSHIP
+  DINING
+  PRIVATE_BOOKING
+  EVENT
+  OTHER
+}
+
+enum OrderChannel {
+  DIRECT
+  REFERRER
+  INFLUENCER
+  PARTNER
+  ADMIN
+  QR
+  OTHER
+}
+
+enum OrderEventType {
+  ORDER_CREATED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  ORDER_CANCELLED
+  ORDER_REFUNDED
+  ORDER_REOPENED
+  TICKET_ISSUED
+  NOTE_ADDED
+  CONFIRMATION_SENT
+  STATUS_CHANGED
+  OTHER
+}
+
+enum PaymentProvider {
+  AUTHORIZE_NET
+  CYBERSOURCE
+  DEMO
+}
+
+enum PaymentStatus {
+  INITIATED
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  VOIDED
+}
+
+enum LedgerEntryType {
+  COMMISSION_EARNED
+  COMMISSION_REVERSED
+  COMMISSION_PAID
+}
+
+enum PayoutBatchStatus {
+  // Verification-layer states (Payout Verification Layer):
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  EXPORTED
+  // Legacy values kept for backward compatibility with pre-existing rows;
+  // not produced by new code paths.
+  OPEN
+  CLOSED
+}
+
+enum AttributionEventType {
+  CLICK
+  SIGNUP
+  PURCHASE
+}
+
+enum IRDocVisibility {
+  PRIVATE
+  APPROVED_INVESTORS
+}
+
+enum ApplicantStage {
+  NEW
+  REVIEW
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum SopDepartment {
+  FOH
+  BOH
+  BAR
+  EVENTS
+  COMMUNITY
+  MARKETING_PR
+  RESERVATIONS
+  MANAGEMENT
+}
+
+enum EventLogType {
+  ATTRIBUTION_CLICK
+  SIGNUP
+  CHECKOUT_INTENT_CREATED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  ORDER_REFUNDED
+  IR_DOC_DOWNLOADED
+  EXEC_INQUIRY_SUBMITTED
+  JOB_APPLICATION_SUBMITTED
+  EXPERIENCE_VIEWED
+  WAITLIST_JOINED
+  NEWSLETTER_JOINED
+  CHECKIN_COMPLETED
+}
+
+// ─── Experience enums ────────────────────────────────────────────────────────
+
+enum AvailableSeatsMode {
+  HIDDEN
+  EXACT
+  APPROXIMATE
+}
+
+enum AttendeeListMode {
+  HIDDEN
+  PUBLIC
+  BUYERS_ONLY
+  PARTIAL
+  VISIBLE_TO_PERMITTED_USERS
+  VISIBLE_TO_ALL_EVENT_VIEWERS
+}
+
+enum InviteAudienceMode {
+  NONE
+  ALL_USERS
+  PATRON_ONLY
+  FOUNDER_ONLY
+  PATRON_AND_FOUNDER
+  CUSTOM_SEGMENT
+  // INDIVIDUAL = a single-guest invite created by a partner / admin from
+  // the Partner Portal or admin attendee tools. Distinct from broadcasts.
+  INDIVIDUAL
+}
+
+enum InvitationStatus {
+  SENT
+  OPENED
+  DECLINED
+  RSVP_STARTED
+  RSVP_CONFIRMED
+  EXPIRED
+  REVOKED
+}
+
+enum InvitationResponseSource {
+  EMAIL
+  WEB
+}
+
+enum RegistrationStatus {
+  RSVP_CONFIRMED
+  REGISTERED
+  TICKETED
+  CHECKED_IN
+  CANCELLED
+}
+
+enum RegistrationSourceType {
+  INVITATION
+  DIRECT
+  MEMBERSHIP
+  REFERRAL
+}
+
+enum MembershipRuleMode {
+  NONE
+  MEMBERS_ONLY
+  MEMBERS_EARLY_ACCESS
+  MEMBERS_DISCOUNT
+}
+
+enum TicketVisibilityMode {
+  VISIBLE
+  HIDDEN
+  MEMBERS_ONLY
+  NEWSLETTER_ONLY
+  INVITE_ONLY
+}
+
+enum TicketTypeStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  SOLD_OUT
+}
+
+enum TicketStatus {
+  ISSUED
+  CHECKED_IN
+  CANCELLED
+  REFUNDED
+  VOIDED
+}
+
+enum PricingRuleType {
+  TIME_WINDOW
+  INVENTORY_THRESHOLD
+  MANUAL_OVERRIDE
+}
+
+enum InfluencerApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PayoutCycle {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum InfluencerInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum HostPaymentMethod {
+  CASH
+  TRANSFER
+  OTHER
+}
+
+enum ExperienceInfluencerRole {
+  FEATURED_HOST
+  GUEST_HOST
+  PARTNER_PERSONALITY
+  SPECIAL_GUEST
+}
+
+// ─── Event Privacy & Referrer Network enums ──────────────────────────────────
+
+enum SeriesVisibilityMode {
+  PUBLIC
+  PRIVATE_SHELL
+  PRIVATE_HIDDEN
+}
+
+enum AttributionSource {
+  INFLUENCER_HOST
+  EVENT_REFERRER_QR
+  EVENT_REFERRER_LINK
+  DIRECT
+  COMP_PLAN_REFERRER
+}
+
+enum EventPermissionType {
+  VIEW
+  BUY
+  VIEW_ATTENDEES
+  REFERRER
+  MANAGE_REFERRERS
+}
+
+enum EventPermissionStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum EventReferrerScopeType {
+  EVENT
+  SERIES
+}
+
+enum EventReferrerCommissionMode {
+  NONE
+  PERCENT_OF_INFLUENCER_COMMISSION
+  // Partner-anchored commission models. Partner pays the seat directly;
+  // platform tracks for reporting only.
+  PARTNER_FLAT_PER_ORDER
+  PARTNER_PER_SEAT
+  PARTNER_PERCENT_OF_TICKET
+  PARTNER_FLAT_PLUS_PER_SEAT
+  PARTNER_FLAT_PLUS_PERCENT
+}
+
+enum SubCommissionParentType {
+  INFLUENCER
+  PARTNER
+  // Streetside hosts are first-class referrers — employed by the
+  // restaurant rather than an external influencer/partner. The
+  // restaurant settles their commission off-platform (same payout
+  // structure as PARTNER), so OKU only writes a reporting row.
+  HOST
+}
+
+enum EventReferrerStatus {
+  INVITED
+  ACTIVE
+  REVOKED
+  ARCHIVED
+}
+
+enum SubCommissionPayoutStatus {
+  PENDING
+  PAID
+  WAIVED
+  NOT_ELIGIBLE
+}
+
+enum WaitlistSource {
+  EVENT_PAGE
+  COUNTDOWN
+  NEWSLETTER
+  SOLD_OUT_PAGE
+}
+
+enum WaitlistStatus {
+  ACTIVE
+  NOTIFIED
+  CONVERTED
+  EXPIRED
+  REMOVED
+}
+
+enum MembershipTier {
+  EXPLORER
+  INSIDER
+  PATRON
+  FOUNDER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELLED
+  PENDING_APPROVAL
+}
+
+enum SalePriorityMode {
+  PUBLIC_ONLY
+  MEMBERS_EARLY_ACCESS
+  PATRON_THEN_PUBLIC
+  FOUNDER_FIRST
+}
+
+enum FounderApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  DECLINED
+}
+
+enum CheckinMethod {
+  QR
+  MANUAL
+  ADMIN_OVERRIDE
+}
+
+// ─── Core models ────────────────────────────────────────────────────────────
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  name      String?
+  imageUrl  String?
+  phone     String?
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  lastLoginAt      DateTime?
+  forcedLogoutAt   DateTime?
+  suspendedAt      DateTime?
+  suspensionReason String?
+  lockedAt         DateTime?
+  lockReason       String?
+  internalNotes    String?
+  tags             String[]
+
+  roles        UserRole[]
+  auditLogs    UserAuditLog[] @relation("TargetUser")
+  adminActions UserAuditLog[] @relation("PerformedBy")
+  profile      UserProfile?
+
+  influencer          InfluencerProfile?
+  partner             PartnerProfile?
+  investor            InvestorProfile?
+  staff               StaffProfile?
+  membership          Membership?
+  founderApplications FounderMembershipApplication[]
+
+  orders       Order[]
+  tickets      Ticket[]
+  IRAccessLog  IRAccessLog[]
+  Notification Notification[]
+  waitlists    ExperienceWaitlist[]
+  newsletters  NewsletterSubscription[]
+  checkins     ExperienceCheckin[]      @relation("CheckedInBy")
+  referrer     Referrer?
+
+  eventPermissions         EventPermission[]         @relation("EventPermissionUser")
+  eventPermissionsGranted  EventPermission[]         @relation("EventPermissionGranter")
+  eventReferrerAssignments EventReferrerAssignment[] @relation("EventReferrerAssignedUser")
+  eventReferrersCreated    EventReferrerAssignment[] @relation("EventReferrerCreatedByUser")
+  restaurantHost           RestaurantHostProfile?
+  assignedChatSessions     HostChatSession[]         @relation("HostChatAssigned")
+
+  referralActor ReferralActor?
+
+  invitationsReceived EventInvitation[] @relation("InvitationRecipient")
+  invitationsCreated  EventInvitation[] @relation("InvitationCreator")
+  registrations       EventRegistrant[] @relation("UserRegistrations")
+
+  attendanceEvents            AttendanceEvent[]    @relation("UserAttendances")
+  recordedAttendances         AttendanceEvent[]    @relation("AttendanceRecordedBy")
+  checkInLogs                 CheckInLog[]         @relation("CheckInLogScannedBy")
+  linkedEntity                Entity?
+  sponsorApplicationsReviewed SponsorApplication[] @relation("SponsorApplicationReviewer")
+  sponsorAssignmentsCreated   SponsorAssignment[]  @relation("SponsorAssignmentCreator")
+
+  createdProfiles     Profile[]            @relation("ProfileCreatedBy")
+  updatedProfiles     Profile[]            @relation("ProfileUpdatedBy")
+  accountProfileLinks AccountProfileLink[]
+
+  streetsideScanConfig     StreetsideScanConfig?
+  blockArrivalScans        ReservationBlockArrival[] @relation("BlockArrivalScannedBy")
+  giftBagLogsGiven         GiftBagLog[]              @relation("GiftBagLogGivenBy")
+  influencerInvitesCreated InfluencerInvite[]        @relation("InfluencerInviteCreatedBy")
+  hostInfluencerContacts   HostInfluencerContact[]   @relation("HostInfluencerContacts")
+
+  delegateSeatsCreated  PartnerDelegateSeat[] @relation("DelegateSeatCreator")
+  delegateSeatsAccepted PartnerDelegateSeat[] @relation("DelegateSeatAcceptor")
+  eventAccessGrants     UserEventAccess[]
+
+  beneficiaryProfile          BeneficiaryProfile?
+  beneficiaryOkuApprovals     BeneficiaryProfile[]  @relation("BeneficiaryOkuApprover")
+  beneficiaryBankConfirms     BeneficiaryProfile[]  @relation("BeneficiaryBankConfirmer")
+  beneficiaryDocumentUploads  BeneficiaryDocument[] @relation("BeneficiaryDocumentUploader")
+}
+
+model Role {
+  key       RoleKey    @id
+  label     String
+  createdAt DateTime   @default(now())
+  userRoles UserRole[]
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleKey   RoleKey
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleKey], references: [key], onDelete: Cascade)
+
+  @@unique([userId, roleKey])
+  @@index([roleKey])
+}
+
+model UserProfile {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  language       String?
+  preferredVenue VenueKey?
+  marketingOptIn Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InfluencerProfile {
+  id                      String                   @id @default(cuid())
+  userId                  String                   @unique
+  handle                  String?
+  refCode                 String                   @unique
+  commissionRateBps       Int                      @default(1000)
+  approved                Boolean                  @default(false)
+  // Public profile fields (from spec)
+  displayName             String?
+  headline                String?
+  shortBio                String?
+  longBio                 String?
+  profileImageUrl         String?
+  coverImageUrl           String?
+  instagramUrl            String?
+  tiktokUrl               String?
+  youtubeUrl              String?
+  websiteUrl              String?
+  location                String?
+  whatsapp                String?
+  preferredLanguage       String?
+  isPublic                Boolean                  @default(true)
+  isVerified              Boolean                  @default(false)
+  approvalStatus          InfluencerApprovalStatus @default(PENDING)
+  payoutCycle             PayoutCycle              @default(MONTHLY)
+  minPayoutThresholdCents Int                      @default(2500)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  user                    User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series                  Series[]                        @relation("SeriesHost")
+  seriesAsCommercialOwner Series[]                        @relation("SeriesCommercialOwner")
+  ledgerEntries           LedgerEntry[]
+  Order                   Order[]
+  Attribution             Attribution[]
+  experienceInfluencer    ExperienceInfluencer[]
+  eventReferrersManaged   EventReferrerAssignment[]       @relation("CreatedByInfluencer")
+  eventReferrersParent    EventReferrerAssignment[]       @relation("ParentInfluencer")
+  subCommissionLedger     InfluencerSubCommissionLedger[]
+  entity                  Entity?
+}
+
+model InfluencerInvite {
+  id                String                 @id @default(cuid())
+  token             String                 @unique
+  invitedEmail      String
+  invitedName       String
+  commissionRateBps Int                    @default(1000)
+  status            InfluencerInviteStatus @default(PENDING)
+  seriesId          String?
+  createdByUserId   String
+  expiresAt         DateTime
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  series    Series? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  createdBy User    @relation("InfluencerInviteCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([token])
+  @@index([invitedEmail])
+}
+
+model HostInfluencerContact {
+  id                String            @id @default(cuid())
+  hostUserId        String
+  seriesId          String?
+  name              String
+  contactInfo       String?
+  agreedAmountCents Int               @default(0)
+  currency          String            @default("USD")
+  paymentMethod     HostPaymentMethod @default(CASH)
+  isPaid            Boolean           @default(false)
+  notes             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  host   User    @relation("HostInfluencerContacts", fields: [hostUserId], references: [id], onDelete: Cascade)
+  series Series? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+
+  @@index([hostUserId])
+  @@index([seriesId])
+}
+
+model PartnerProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  name      String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user                User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series              Series[]
+  delegateSeats       PartnerDelegateSeat[]
+  partnerReferrers    EventReferrerAssignment[]       @relation("PartnerReferrers")
+  subCommissionLedger InfluencerSubCommissionLedger[] @relation("PartnerSubCommissionLedger")
+}
+
+// ── Partner Delegate Seats ────────────────────────────────────────────────
+// Invite-first model: a partner creates a "seat" by email, the invitee
+// accepts the secure link, and a UserEventAccess grant is issued scoped
+// to a single Series OR a single Session. These seats are NOT operational
+// hosts — they do not interact with Restaurant/Streetside Host logic.
+
+enum PartnerDelegateRole {
+  // Partner can lead an entire series — all sessions in scope.
+  SERIES_CO_LEAD
+  // Partner can lead a single session only.
+  SESSION_CO_LEAD
+  // Focused on guest list and check-in.
+  GUEST_LIST_LEAD
+}
+
+enum PartnerDelegateSeatStatus {
+  INVITED
+  ACTIVE
+  EXPIRED
+  REVOKED
+  REMOVED
+}
+
+model PartnerDelegateSeat {
+  id              String  @id @default(cuid())
+  partnerId       String
+  createdByUserId String
+  // Exactly one of seriesId / sessionId is set — enforced in app layer
+  // (Prisma cannot express CHECK constraints).
+  seriesId        String?
+  sessionId       String?
+
+  invitedName  String?
+  invitedEmail String
+  roleCode     PartnerDelegateRole
+  status       PartnerDelegateSeatStatus @default(INVITED)
+
+  // Snapshot of permission bundle at invite time. Resolved from roleCode.
+  permissionsJson Json
+
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+
+  revokedAt       DateTime?
+  revokedByUserId String?
+
+  expiresAt DateTime?
+
+  lastInvitedAt DateTime?
+  inviteCount   Int       @default(1)
+
+  // Optional sales capability — when isReferrerEnabled is true, accepting
+  // the seat also mints an EventReferrerAssignment under this partner so
+  // the existing /r/[code] + QR + sub-commission pipeline kicks in.
+  // Partner pays the seat directly; platform tracks for reporting only.
+  isReferrerEnabled    Boolean                     @default(false)
+  commissionMode       EventReferrerCommissionMode @default(NONE)
+  flatAmountCents      Int?
+  perSeatAmountCents   Int?
+  percentageBps        Int?
+  referrerAssignmentId String?                     @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partner            PartnerProfile           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdBy          User                     @relation("DelegateSeatCreator", fields: [createdByUserId], references: [id])
+  acceptedBy         User?                    @relation("DelegateSeatAcceptor", fields: [acceptedByUserId], references: [id])
+  series             Series?                  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  session            Session?                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  referrerAssignment EventReferrerAssignment? @relation("SeatReferrerAssignment", fields: [referrerAssignmentId], references: [id], onDelete: SetNull)
+  invites            SeatInvite[]
+  accessGrants       UserEventAccess[]
+
+  @@index([partnerId, status])
+  @@index([invitedEmail])
+  @@index([seriesId])
+  @@index([sessionId])
+}
+
+model SeatInvite {
+  id          String @id @default(cuid())
+  seatId      String
+  // SHA-256 hex of the raw token (raw token only ever appears in the email link)
+  tokenHash   String @unique
+  sentToEmail String
+
+  sentAt     DateTime  @default(now())
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  seat PartnerDelegateSeat @relation(fields: [seatId], references: [id], onDelete: Cascade)
+
+  @@index([seatId])
+  @@index([sentToEmail])
+}
+
+model UserEventAccess {
+  id        String  @id @default(cuid())
+  userId    String
+  partnerId String
+  seriesId  String?
+  sessionId String?
+
+  seatId          String
+  roleCode        PartnerDelegateRole
+  // Permission snapshot at grant time. Updated via explicit re-grant only.
+  permissionsJson Json
+
+  status String @default("active") // "active" | "removed"
+
+  grantedAt DateTime  @default(now())
+  removedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seat    PartnerDelegateSeat @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  series  Series?             @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  session Session?            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seatId])
+  @@index([userId, status])
+  @@index([seriesId, status])
+  @@index([sessionId, status])
+}
+
+model InvestorProfile {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  approved      Boolean   @default(false)
+  ndaAcceptedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StaffProfile {
+  id         String        @id @default(cuid())
+  userId     String        @unique
+  venue      VenueKey
+  department SopDepartment
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sopAcks SopAcknowledgement[]
+}
+
+/// Banesco-targeted Beneficiary Verification profile.
+///
+/// **Important**: OKÜ is NOT the formal KYC/AML authority — Banesco performs
+/// formal KYC. This model captures the information OKÜ Finance needs to
+/// internally approve a beneficiary AND the bank-required information needed
+/// before a payout file can be released. Three concepts are intentionally
+/// kept separate:
+///   1. OKÜ approval        → `bankReadinessStatus` ∈ {OKU_APPROVED, ...}
+///   2. Bank readiness      → `bankReadinessStatus == BANK_READY`
+///   3. Payout eligibility  → derived (BANK_READY + no compliance hold)
+///
+/// Document upload is OUT OF SCOPE for P1; only structured status flags +
+/// admin notes are persisted. Uploads ship in a follow-up once Banesco's
+/// exact document requirements are confirmed.
+model BeneficiaryProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // ── Banesco bank coordinates (account # AES-256-GCM encrypted) ──
+  banescoAccountNumberEncrypted String?
+  banescoAccountLast4           String?
+  bankName                      String?
+  accountHolderName             String?
+  accountType                   BankAccountType?
+  currency                      String           @default("USD")
+  swiftBic                      String?
+
+  // ── Document status flags (no uploads in P1) ──
+  proofOfAddressStatus BeneficiaryDocStatus @default(MISSING)
+  identificationStatus BeneficiaryDocStatus @default(MISSING)
+  taxOrRucStatus       BeneficiaryDocStatus @default(MISSING)
+  sourceOfFundsStatus  BeneficiaryDocStatus @default(NOT_REQUIRED)
+
+  incomeCertificationRequired  Boolean   @default(false)
+  incomeCertificationExpiresAt DateTime?
+
+  // ── State machine + holds ──
+  bankReadinessStatus    BankReadinessStatus @default(MISSING_INFO)
+  complianceHoldReason   String?
+  adminVerificationNotes String?
+
+  /// Beneficiary preference: when true, suppress informational status-change
+  /// emails (READY_FOR_REVIEW, OKU_APPROVED, BANK_READY). Action-required
+  /// transitions (ON_HOLD, REJECTED) IGNORE this flag and always send.
+  statusEmailOptOut      Boolean @default(false)
+
+  // ── Audit trail (lightweight; full history goes to AuditLog) ──
+  okuApprovedAt   DateTime?
+  okuApprovedById String?
+  bankReadyAt     DateTime?
+  bankReadyById   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  okuApprovedBy User? @relation("BeneficiaryOkuApprover", fields: [okuApprovedById], references: [id])
+  bankReadyBy   User? @relation("BeneficiaryBankConfirmer", fields: [bankReadyById], references: [id])
+
+  documents BeneficiaryDocument[]
+
+  @@index([bankReadinessStatus])
+}
+
+/// Files uploaded by beneficiaries (or by Finance on their behalf) as
+/// supporting evidence for a `BeneficiaryDocStatus`. The status flag and the
+/// uploaded file are intentionally orthogonal: an admin still has to mark the
+/// document VERIFIED — uploads are only evidence. Files live in private
+/// object storage (`/<bucket>/private/beneficiary-docs/<profileId>/<uuid>`)
+/// and are never reachable through the public media proxy.
+model BeneficiaryDocument {
+  id          String                   @id @default(cuid())
+  profileId   String
+  docType     BeneficiaryDocumentType
+  filename    String
+  contentType String
+  sizeBytes   Int
+  /// Full GCS path including leading bucket segment, e.g.
+  /// `/replit-objstore-.../private/beneficiary-docs/<profileId>/<uuid>.pdf`
+  objectPath  String                   @unique
+  scanStatus  BeneficiaryDocScanStatus @default(PENDING)
+  scanMessage String?
+
+  uploadedById String
+  uploadedAt   DateTime  @default(now())
+  deletedAt    DateTime?
+
+  profile    BeneficiaryProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  uploadedBy User               @relation("BeneficiaryDocumentUploader", fields: [uploadedById], references: [id])
+
+  @@index([profileId, deletedAt])
+  @@index([profileId, docType])
+}
+
+model Membership {
+  id                   String           @id @default(cuid())
+  userId               String           @unique
+  tier                 MembershipTier   @default(PATRON)
+  status               MembershipStatus @default(ACTIVE)
+  startsAt             DateTime         @default(now())
+  renewsAt             DateTime?
+  cancelAtPeriodEnd    Boolean          @default(false)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  priceAnnualCents     Int?
+  currency             String           @default("USD")
+  avacaContributionBps Int              @default(1500)
+  approvedByUserId     String?
+  inviteCode           String?          @unique
+  benefitsJson         Json?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MembershipPlanConfig {
+  id                   String         @id @default(cuid())
+  tier                 MembershipTier @unique
+  displayName          String
+  tagline              String?
+  priceAnnualCents     Int
+  currency             String         @default("USD")
+  avacaContributionBps Int            @default(1500)
+  isPubliclyJoinable   Boolean        @default(true)
+  isInviteOnly         Boolean        @default(false)
+  maxActiveMembers     Int?
+  benefitsJson         Json?
+  active               Boolean        @default(true)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+model FounderMembershipApplication {
+  id                String                   @id @default(cuid())
+  userId            String?
+  fullName          String
+  email             String
+  phone             String?
+  company           String?
+  roleTitle         String?
+  reasonForInterest String
+  status            FounderApplicationStatus @default(SUBMITTED)
+  reviewedByUserId  String?
+  reviewNotes       String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// ─── Series / Experiences ────────────────────────────────────────────────────
+
+model Series {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  title       String
+  subtitle    String?
+  description String?
+  category    String?
+  venue       VenueKey?
+  hostType    SeriesHostType
+  status      SeriesStatus   @default(DRAFT)
+
+  influencerId    String?
+  partnerId       String?
+  // Optional partner revenue share, in basis points (10000 = 100%).
+  // Surfaced in the Partner Self-Service Portal Sales & Earnings panel.
+  // When null, the panel shows "share not configured".
+  partnerShareBps Int?
+
+  // Location
+  city         String?
+  country      String?
+  venueAddress String?
+  geoLat       Float?
+  geoLng       Float?
+
+  // Media
+  heroImageUrl String?
+  galleryJson  Json?
+
+  // Capacity
+  capacityTotal    Int @default(0)
+  capacityReserved Int @default(0)
+  capacitySold     Int @default(0)
+
+  // Visibility settings
+  availableSeatsMode AvailableSeatsMode @default(HIDDEN)
+  attendeeListMode   AttendeeListMode   @default(HIDDEN)
+  showCountdown      Boolean            @default(false)
+  countdownLabel     String?
+
+  // Release timing
+  publicReleaseAt DateTime?
+  earlyReleaseAt  DateTime?
+
+  // Privacy & Access Controls
+  seriesVisibilityMode        SeriesVisibilityMode @default(PUBLIC)
+  allowInviteOnlyAccess       Boolean              @default(false)
+  allowReferrerAccess         Boolean              @default(false)
+  commercialOwnerInfluencerId String?
+
+  // Features
+  newsletterCaptureEnabled Boolean            @default(false)
+  waitlistEnabled          Boolean            @default(true)
+  membershipRuleMode       MembershipRuleMode @default(NONE)
+  isFeatured               Boolean            @default(false)
+
+  // Membership gating (extended)
+  minMembershipTier          MembershipTier?
+  salePriorityMode           SalePriorityMode @default(PUBLIC_ONLY)
+  founderPriorityWindowHours Int?
+  patronPriorityWindowHours  Int?
+  isFounderOnly              Boolean          @default(false)
+
+  // Invitation engine
+  inviteAudienceMode         InviteAudienceMode @default(NONE)
+  inviteRequiresRegistration Boolean            @default(true)
+  inviteFlyerImageUrl        String?
+
+  // SEO
+  seoTitle       String?
+  seoDescription String?
+
+  communityUrl String?
+  startsAt     DateTime?
+  endsAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  influencer      InfluencerProfile? @relation("SeriesHost", fields: [influencerId], references: [id])
+  partner         PartnerProfile?    @relation(fields: [partnerId], references: [id])
+  commercialOwner InfluencerProfile? @relation("SeriesCommercialOwner", fields: [commercialOwnerInfluencerId], references: [id])
+
+  sessions               Session[]
+  ticketTypes            TicketType[]
+  Order                  Order[]
+  addons                 ExperienceAddon[]
+  experienceInfluencer   ExperienceInfluencer[]
+  waitlists              ExperienceWaitlist[]
+  analyticsDays          ExperienceAnalyticsDaily[]
+  eventPermissions       EventPermission[]
+  eventReferrers         EventReferrerAssignment[]
+  invitations            EventInvitation[]
+  registrants            EventRegistrant[]
+  seriesHosts            SeriesHost[]
+  sponsorshipSlots       SponsorshipSlot[]
+  profileAssignments     SeriesProfileAssignment[]
+  reservationBlocks      ReservationBlock[]
+  influencerInvites      InfluencerInvite[]
+  hostInfluencerContacts HostInfluencerContact[]
+  eventMenuLinks         EventMenuLink[]
+  delegateSeats          PartnerDelegateSeat[]
+  eventAccessGrants      UserEventAccess[]
+}
+
+// Join table for assigning influencers to experiences
+model ExperienceInfluencer {
+  id                  String                   @id @default(cuid())
+  seriesId            String
+  influencerProfileId String
+  roleLabel           ExperienceInfluencerRole @default(FEATURED_HOST)
+  sortOrder           Int                      @default(0)
+  isPubliclyVisible   Boolean                  @default(true)
+  createdAt           DateTime                 @default(now())
+
+  series     Series            @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  influencer InfluencerProfile @relation(fields: [influencerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, influencerProfileId])
+}
+
+model Session {
+  id                     String        @id @default(cuid())
+  seriesId               String
+  title                  String?
+  startsAt               DateTime
+  endsAt                 DateTime
+  capacity               Int
+  soldCount              Int           @default(0)
+  status                 SessionStatus @default(SCHEDULED)
+  overridesSeriesHost    Boolean       @default(false)
+  inheritsSeriesSponsors Boolean       @default(true)
+  giftBagEnabled         Boolean       @default(false)
+  streetsideEnabled      Boolean       @default(false)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  series             Series                     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  tickets            Ticket[]
+  Order              Order[]
+  checkins           ExperienceCheckin[]
+  attendanceEvents   AttendanceEvent[]
+  eventHosts         EventHost[]
+  sponsorshipSlots   SponsorshipSlot[]
+  profileAssignments SessionProfileAssignment[]
+  reservationBlocks  ReservationBlock[]
+  delegateSeats      PartnerDelegateSeat[]
+  eventAccessGrants  UserEventAccess[]
+
+  @@index([seriesId, startsAt])
+}
+
+model TicketType {
+  id           String  @id @default(cuid())
+  seriesId     String
+  name         String
+  description  String?
+  tierCode     String?
+  priceCents   Int
+  currency     String  @default("USD")
+  maxPerOrder  Int     @default(10)
+  minPerOrder  Int     @default(1)
+  typeCapacity Int?
+  soldCount    Int     @default(0)
+  displayOrder Int     @default(0)
+
+  // Availability windows
+  saleStartsAt DateTime?
+  saleEndsAt   DateTime?
+
+  // Access control
+  visibilityMode     TicketVisibilityMode @default(VISIBLE)
+  requiresMembership Boolean              @default(false)
+  earlyAccessOnly    Boolean              @default(false)
+
+  ticketStatus TicketTypeStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series              Series              @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  lineItems           OrderLineItem[]
+  pricingRules        TicketPricingRule[]
+  tickets             Ticket[]
+  intendedInvitations EventInvitation[]   @relation("InvitationIntendedTicketType")
+}
+
+model TicketPricingRule {
+  id            String          @id @default(cuid())
+  ticketTypeId  String
+  ruleType      PricingRuleType
+  conditionJson Json
+  actionJson    Json
+  priority      Int             @default(0)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@index([ticketTypeId, priority])
+}
+
+model ExperienceAddon {
+  id                   String   @id @default(cuid())
+  seriesId             String
+  name                 String
+  description          String?
+  priceCents           Int      @default(0)
+  currency             String   @default("USD")
+  capacity             Int?
+  soldCount            Int      @default(0)
+  requiresTicketTypeId String?
+  requiresMembership   Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  displayOrder         Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  series    Series          @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  lineItems OrderLineItem[]
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  userId    String
+  seriesId  String
+  sessionId String
+  status    OrderStatus @default(PENDING)
+
+  // Intelligence fields
+  orderType         OrderType    @default(TICKET)
+  channel           OrderChannel @default(DIRECT)
+  orderNumber       String?      @unique
+  fulfillmentStatus String?
+
+  subtotalCents   Int
+  feesCents       Int    @default(0)
+  taxCents        Int    @default(0)
+  totalCents      Int
+  discountCents   Int    @default(0)
+  commissionCents Int    @default(0)
+  netRevenueCents Int    @default(0)
+  currency        String @default("USD")
+
+  coversCount Int @default(1)
+
+  couponCode             String?
+  attributedInfluencerId String?
+  attributionId          String?
+
+  // Event referrer attribution (separate from CompensationPlan walk-in referrers)
+  attributedEventReferrerAssignmentId String?
+  // Unified attribution: ReferralAssignment captured the click that led to
+  // this order. Coexists with the legacy attributedEventReferrerAssignmentId
+  // during the migration window — both may be set for the same order.
+  attributedReferralAssignmentId      String?
+  attributionSource                   AttributionSource @default(DIRECT)
+
+  placedAt    DateTime?
+  paidAt      DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series  Series  @relation(fields: [seriesId], references: [id])
+  session Session @relation(fields: [sessionId], references: [id])
+
+  payment   Payment?
+  lineItems OrderLineItem[]
+  tickets   Ticket[]
+
+  attributedInfluencer              InfluencerProfile?              @relation(fields: [attributedInfluencerId], references: [id])
+  attribution                       Attribution?                    @relation(fields: [attributionId], references: [id])
+  attributedEventReferrerAssignment EventReferrerAssignment?        @relation(fields: [attributedEventReferrerAssignmentId], references: [id])
+  attributedReferralAssignment      ReferralAssignment?             @relation("OrderReferralAssignment", fields: [attributedReferralAssignmentId], references: [id])
+  LedgerEntry                       LedgerEntry[]
+  subCommissionLedger               InfluencerSubCommissionLedger[]
+  events                            OrderEvent[]
+  notes                             OrderNote[]
+  // Attribution session written at ticket-purchase time (TICKET_PURCHASE sessions only).
+  attributionSession                AttributionSession?             @relation("AttributionSessionOrder")
+
+  @@index([userId, createdAt])
+  @@index([seriesId])
+  @@index([sessionId])
+  @@index([orderNumber])
+  @@index([status, createdAt])
+  @@index([channel])
+  @@index([orderType])
+}
+
+model OrderLineItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  itemType       String  @default("ticket") // "ticket" | "addon"
+  ticketTypeId   String?
+  addonId        String?
+  nameSnapshot   String
+  qty            Int
+  unitPriceCents Int
+  totalCents     Int
+
+  order      Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType TicketType?      @relation(fields: [ticketTypeId], references: [id])
+  addon      ExperienceAddon? @relation(fields: [addonId], references: [id])
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id           String         @id @default(cuid())
+  orderId      String
+  eventType    OrderEventType @default(OTHER)
+  eventLabel   String
+  eventPayload Json?
+  performedBy  String?
+  createdAt    DateTime       @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model OrderNote {
+  id         String   @id @default(cuid())
+  orderId    String
+  body       String
+  authorId   String?
+  authorName String?
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model Ticket {
+  id                String       @id @default(cuid())
+  orderId           String
+  userId            String
+  sessionId         String
+  ticketTypeId      String?
+  code              String       @unique
+  attendeeName      String?
+  attendeeEmail     String?
+  isPubliclyVisible Boolean      @default(false)
+  ticketStatus      TicketStatus @default(ISSUED)
+  checkedInAt       DateTime?
+  checkedInById     String?
+  createdAt         DateTime     @default(now())
+
+  order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session         Session             @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  ticketType      TicketType?         @relation(fields: [ticketTypeId], references: [id])
+  checkins        ExperienceCheckin[]
+  registrant      EventRegistrant?
+  attendanceEvent AttendanceEvent?
+  checkInLogs     CheckInLog[]
+  checkInNotes    String?
+  checkInLocation String?
+  giftBagLogs     GiftBagLog[]
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model ExperienceCheckin {
+  id            String        @id @default(cuid())
+  ticketId      String
+  sessionId     String
+  checkedInById String
+  method        CheckinMethod @default(QR)
+  createdAt     DateTime      @default(now())
+
+  ticket      Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  session     Session @relation(fields: [sessionId], references: [id])
+  checkedInBy User    @relation("CheckedInBy", fields: [checkedInById], references: [id])
+
+  @@index([sessionId, createdAt])
+}
+
+model InventoryHold {
+  id           String   @id @default(cuid())
+  seriesId     String
+  ticketTypeId String
+  userId       String
+  quantity     Int
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([ticketTypeId, expiresAt])
+}
+
+model ExperienceWaitlist {
+  id        String         @id @default(cuid())
+  seriesId  String
+  email     String
+  userId    String?
+  source    WaitlistSource @default(EVENT_PAGE)
+  status    WaitlistStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@unique([seriesId, email])
+  @@index([seriesId, status])
+}
+
+model NewsletterSubscription {
+  id         String   @id @default(cuid())
+  email      String
+  userId     String?
+  segmentKey String   @default("general")
+  source     String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@unique([email, segmentKey])
+  @@index([segmentKey, isActive])
+}
+
+model ExperienceAnalyticsDaily {
+  id                String   @id @default(cuid())
+  seriesId          String
+  date              DateTime @db.Date
+  pageViews         Int      @default(0)
+  checkoutStarts    Int      @default(0)
+  ordersPaid        Int      @default(0)
+  ticketsSold       Int      @default(0)
+  addonUnitsSold    Int      @default(0)
+  grossRevenueCents Int      @default(0)
+  waitlistSignups   Int      @default(0)
+  newsletterSignups Int      @default(0)
+  memberPurchases   Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, date])
+  @@index([seriesId, date])
+}
+
+model Payment {
+  id          String          @id @default(cuid())
+  orderId     String          @unique
+  provider    PaymentProvider @default(AUTHORIZE_NET)
+  status      PaymentStatus   @default(INITIATED)
+  amountCents Int
+  currency    String          @default("USD")
+
+  authNetTransId String?
+  authNetRefId   String?
+
+  // Payments P5 — generic provider-agnostic fields. Filled for both
+  // Authorize.net and Cybersource. authNet* above remain populated for
+  // Authorize.net for backward compatibility with refund/void code paths
+  // that still read them.
+  gatewayTransactionId String?
+  gatewayReferenceId   String?
+  gatewayAuthCode      String?
+  gatewayResponseCode  String?
+  gatewayRawSafeJson   Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Attribution {
+  id           String   @id @default(cuid())
+  refCode      String?
+  influencerId String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  utmContent   String?
+  utmTerm      String?
+  landingPath  String?
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  influencer InfluencerProfile? @relation(fields: [influencerId], references: [id])
+  events     AttributionEvent[]
+  orders     Order[]
+}
+
+model AttributionEvent {
+  id            String               @id @default(cuid())
+  attributionId String
+  type          AttributionEventType
+  path          String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime             @default(now())
+
+  attribution Attribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+
+  @@index([attributionId, createdAt])
+}
+
+model LedgerEntry {
+  id            String          @id @default(cuid())
+  influencerId  String
+  orderId       String?
+  type          LedgerEntryType
+  amountCents   Int
+  currency      String          @default("USD")
+  note          String?
+  payoutBatchId String?
+  createdAt     DateTime        @default(now())
+
+  influencer  InfluencerProfile @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  order       Order?            @relation(fields: [orderId], references: [id])
+  payoutBatch PayoutBatch?      @relation(fields: [payoutBatchId], references: [id])
+
+  @@index([influencerId, createdAt])
+  @@index([payoutBatchId])
+}
+
+model PayoutBatch {
+  id         String            @id @default(cuid())
+  status     PayoutBatchStatus @default(DRAFT)
+  name       String?
+  notes      String?
+  currency   String            @default("USD")
+  totalCents Int               @default(0)
+  lineCount  Int               @default(0)
+  from       DateTime
+  to         DateTime
+  createdAt  DateTime          @default(now())
+  closedAt   DateTime?
+
+  // Maker/checker + export trail. All nullable until that step occurs.
+  createdById     String?
+  submittedAt     DateTime?
+  submittedById   String?
+  approvedAt      DateTime?
+  approvedById    String?
+  rejectedAt      DateTime?
+  rejectedById    String?
+  rejectionReason String?
+  exportedAt      DateTime?
+  exportedById    String?
+  exportFormat    String?
+  // Deterministic SHA-256 of the canonical export payload (recipient
+  // rows + totals + trace IDs). Lets auditors prove the file delivered
+  // to the bank matches what was approved, byte-for-byte.
+  exportFileHash  String?
+  exportPayload   String?   @db.Text
+
+  entries        LedgerEntry[]
+  // Sub-commission rows for event referrers included in this batch (Step 4
+  // reconciliation). These are paid by the influencer to their referrer, not
+  // by OKU, but the batch tracks when they were settled so the old sub-
+  // commission ledger can eventually be retired without orphaning history.
+  subCommissions InfluencerSubCommissionLedger[] @relation("SubCommissionPayoutBatch")
+
+  @@index([status])
+}
+
+model IRDocument {
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  visibility  IRDocVisibility @default(APPROVED_INVESTORS)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  versions IRDocumentVersion[]
+}
+
+model IRDocumentVersion {
+  id         String   @id @default(cuid())
+  documentId String
+  version    Int
+  fileKey    String
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+
+  document   IRDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  accessLogs IRAccessLog[]
+
+  @@unique([documentId, version])
+  @@index([documentId])
+}
+
+model IRAccessLog {
+  id           String   @id @default(cuid())
+  userId       String
+  docVersionId String
+  action       String
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  docVersion IRDocumentVersion @relation(fields: [docVersionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([docVersionId, createdAt])
+}
+
+model ExecutiveInquiry {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  company     String?
+  inquiryType String
+  message     String?
+  createdAt   DateTime @default(now())
+}
+
+model JobPost {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  department  String
+  location    String?
+  description String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  applications JobApplication[]
+}
+
+model JobApplication {
+  id        String         @id @default(cuid())
+  jobId     String
+  name      String
+  email     String
+  phone     String?
+  resumeUrl String?
+  notes     String?
+  stage     ApplicantStage @default(NEW)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  job JobPost @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, stage])
+}
+
+model SopDocument {
+  id         String        @id @default(cuid())
+  title      String
+  department SopDepartment
+  venue      VenueKey?
+  contentMd  String
+  version    Int           @default(1)
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  acknowledgements SopAcknowledgement[]
+}
+
+model SopAcknowledgement {
+  id             String   @id @default(cuid())
+  sopId          String
+  staffProfileId String
+  acknowledgedAt DateTime @default(now())
+
+  sop   SopDocument  @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  staff StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([sopId, staffProfileId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+}
+
+// Persisted point-in-time snapshot of getLaunchReadiness() (Task #131).
+// Used by /admin/launch-readiness to show a "Recent history" trend so
+// operators can spot gates that flip between pass/fail across deploys.
+// Rows older than 90 days are pruned best-effort on each persist call.
+model LaunchReadinessSnapshot {
+  id        String   @id @default(cuid())
+  overall   String   // "GO" | "NO_GO"
+  // Compact per-gate state: [{ name, status, severity }]. Stored as Json
+  // to keep the schema stable as gates evolve in getLaunchReadiness().
+  gates     Json
+  checkedAt DateTime @default(now())
+
+  @@index([checkedAt])
+}
+
+// Encrypted gateway credentials. Secrets are AES-256-GCM-encrypted with
+// APP_ENCRYPTION_KEY before write; only last4 hints are stored unmasked.
+// Never expose the *Encrypted fields to clients.
+model PaymentGatewayCredential {
+  id String @id @default(cuid())
+
+  provider       String  @default("AUTHORIZE_NET")
+  label          String  @default("Authorize.net Credit Card")
+  isActive       Boolean @default(true)
+  environment    String  @default("sandbox") // sandbox | production
+  connectionType String  @default("gateway_only") // gateway_only | all_in_one
+
+  apiLoginIdEncrypted     String?
+  transactionKeyEncrypted String?
+  signatureKeyEncrypted   String?
+
+  apiLoginIdLast4     String?
+  transactionKeyLast4 String?
+  signatureKeyLast4   String?
+
+  merchantProviderName String?
+  merchantIdLast4      String?
+  terminalIdLast4      String?
+
+  checkoutTitle       String  @default("Credit Card")
+  checkoutDescription String  @default("Pay securely using your credit card.")
+  enableGateway       Boolean @default(false)
+  displayCsc          Boolean @default(true)
+  transactionType     String  @default("charge") // charge | authorize_only
+  detailedDeclines    Boolean @default(true)
+  debugMode           String  @default("off") // off | errors | verbose
+  acceptedCardLogos   Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  @@unique([provider])
+}
+
+// Encrypted Cybersource (REST API) gateway credentials. Mirrors the
+// PaymentGatewayCredential pattern: secrets are AES-256-GCM-encrypted with
+// APP_ENCRYPTION_KEY before write; only last4 hints are stored unmasked.
+// Singleton — there is at most one row per provider; we use provider as the
+// natural unique key.
+model CybersourceGatewayCredential {
+  id String @id @default(cuid())
+
+  provider    String  @unique @default("CYBERSOURCE")
+  enabled     Boolean @default(false)
+  environment String  @default("test") // test | production
+
+  merchantIdEncrypted     String?
+  keyIdEncrypted          String?
+  sharedSecretEncrypted   String?
+  organizationIdEncrypted String?
+  portfolioIdEncrypted    String?
+
+  merchantIdLast4     String?
+  keyIdLast4          String?
+  sharedSecretLast4   String?
+  organizationIdLast4 String?
+  portfolioIdLast4    String?
+
+  // Non-secret display / behaviour
+  checkoutTitle                  String  @default("Credit Card")
+  checkoutDescription            String  @default("Pay securely using your credit card.")
+  acceptedCardLogos              Json?
+  cardSecurityCodeEnabled        Boolean @default(true)
+  detailedDeclineMessagesEnabled Boolean @default(true)
+  debugMode                      String  @default("OFF") // OFF | ERRORS_ONLY | VERBOSE
+
+  // Last test
+  lastTestStatus  String? // passed | failed
+  lastTestMessage String?
+  lastTestedAt    DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+}
+
+enum StoreStatus {
+  OPEN
+  CLOSED
+  TEST_MODE
+}
+
+enum DebugMode {
+  OFF
+  ERRORS_ONLY
+  VERBOSE
+}
+
+// Payments P4/P5/P5a — which provider /api/v1/checkout/confirm uses for new
+// charges. Both providers are real adapters (P5); selectability is driven by
+// per-provider readiness + last-passing test recency. Refund/void routing is
+// always by Payment.provider on the original record, never by this enum.
+//
+// NOTE for future tenant-aware refactors: do NOT change the schema default to
+// CYBERSOURCE. ReferrerOS markets must explicitly choose their active gateway
+// — the OKÜ Panama row is flipped to CYBERSOURCE by an idempotent seed step.
+enum ActiveCheckoutGateway {
+  AUTHORIZE_NET
+  CYBERSOURCE
+}
+
+// Singleton: always upsert with id = "global". Stores non-secret commerce
+// settings only — never API keys or secrets.
+model CommerceSettings {
+  id                           String                @id @default("global")
+  businessName                 String?
+  addressLine1                 String?
+  addressLine2                 String?
+  city                         String?
+  countryRegion                String?
+  currency                     String                @default("USD")
+  timezone                     String                @default("America/Panama")
+  storeStatus                  StoreStatus           @default(OPEN)
+  capacityManagementEnabled    Boolean               @default(true)
+  holdMinutes                  Int                   @default(15)
+  lowStockThreshold            Int                   @default(10)
+  soldOutThreshold             Int                   @default(0)
+  stockNotificationEmails      String[]              @default([])
+  hideSoldOutTicketTypes       Boolean               @default(false)
+  allowGuestCheckout           Boolean               @default(true)
+  requireAccountForMemberships Boolean               @default(true)
+  continueShoppingDestination  String                @default("/series")
+  emptyCartText                String?
+  checkoutSupportEmail         String?
+  cancellationPolicyText       String?
+  senderName                   String?
+  adminNotificationEmails      String[]              @default([])
+  debugMode                    DebugMode             @default(OFF)
+  activeCheckoutGateway        ActiveCheckoutGateway @default(AUTHORIZE_NET)
+  updatedById                  String?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+}
+
+model EventLog {
+  id        String       @id @default(cuid())
+  type      EventLogType
+  userId    String?
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+}
+
+// ─── Dynamic Hiring System — Phase 1 ────────────────────────────────────────
+
+enum OpportunityStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  CLOSED
+  ARCHIVED
+}
+
+enum OpportunityVisibility {
+  PUBLIC
+  INVITE_ONLY
+  INTERNAL_ONLY
+}
+
+enum EngagementType {
+  FULL_TIME
+  PART_TIME
+  SEASONAL
+  CONTRACT
+  CONSULTANT
+  FREELANCE
+  TALENT
+  INTERN
+  TEMPORARY
+}
+
+enum EmploymentCategory {
+  EMPLOYEE
+  INDEPENDENT_CONTRACTOR
+  CONSULTANT
+  PERFORMER
+  AGENCY
+  VENDOR
+}
+
+enum CompensationType {
+  SALARY
+  HOURLY
+  PER_SHIFT
+  PER_PROJECT
+  RETAINER
+  NEGOTIABLE
+}
+
+enum FormTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  HR_SCREEN
+  MANAGER_REVIEW
+  INTERVIEW_SCHEDULED
+  TRIAL_SHIFT
+  OFFER_PENDING
+  HIRED
+  REJECTED
+  WITHDRAWN
+  ARCHIVED
+}
+
+enum ApplicantType {
+  INDIVIDUAL
+  AGENCY
+  BUSINESS_ENTITY
+}
+
+enum DocumentType {
+  CV
+  ID_DOCUMENT
+  WORK_PERMIT
+  CERTIFICATION
+  PORTFOLIO
+  HEADSHOT
+  REEL
+  REFERENCE_LETTER
+  CONTRACT
+  OTHER
+}
+
+enum WorkflowEventType {
+  NOTE
+  STATUS_CHANGE
+  REVIEW
+  SCORE
+  INTERVIEW_REQUESTED
+  INTERVIEW_SCHEDULED
+  DOCUMENT_REQUESTED
+  DOCUMENT_RECEIVED
+  OFFER_REQUESTED
+  OFFER_SENT
+  REJECTION_SENT
+  HIRED
+  SYSTEM
+}
+
+model Opportunity {
+  id                      String                @id @default(cuid())
+  title                   String
+  slug                    String                @unique
+  brandKey                String?
+  locationKey             String?
+  department              String?
+  engagementType          EngagementType
+  employmentCategory      EmploymentCategory
+  compensationType        CompensationType?
+  compensationMin         Int?
+  compensationMax         Int?
+  currency                String?               @default("USD")
+  description             String?
+  responsibilities        Json?
+  requirements            Json?
+  preferredQualifications Json?
+  openingsCount           Int?
+  startDate               DateTime?
+  endDate                 DateTime?
+  status                  OpportunityStatus     @default(DRAFT)
+  visibility              OpportunityVisibility @default(PUBLIC)
+  formTemplateId          String
+  applicationPipelineId   String?
+  hiringManagerId         String?
+  ownerId                 String?
+
+  formTemplate FormTemplate            @relation(fields: [formTemplateId], references: [id])
+  pipeline     ApplicationPipeline?    @relation(fields: [applicationPipelineId], references: [id])
+  submissions  ApplicationSubmission[]
+  drafts       ApplicationDraft[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([visibility])
+  @@index([engagementType])
+  @@index([brandKey, locationKey])
+}
+
+model FormTemplate {
+  id             String             @id @default(cuid())
+  name           String
+  slug           String             @unique
+  category       String?
+  version        Int                @default(1)
+  status         FormTemplateStatus @default(DRAFT)
+  description    String?
+  schemaJson     Json
+  uiSchemaJson   Json?
+  validationJson Json?
+
+  opportunities Opportunity[]
+  submissions   ApplicationSubmission[]
+  drafts        ApplicationDraft[]
+  versions      FormTemplateVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+}
+
+model ApplicantProfile {
+  id                      String    @id @default(cuid())
+  fullName                String
+  email                   String
+  phone                   String?
+  dateOfBirth             DateTime?
+  nationality             String?
+  countryOfResidence      String?
+  governmentIdType        String?
+  governmentIdValue       String?
+  workAuthorizationStatus String?
+  emergencyContactName    String?
+  emergencyContactPhone   String?
+  profileJson             Json?
+  dataConsentAt           DateTime?
+  privacyPolicyVersion    String?
+
+  submissions ApplicationSubmission[]
+  drafts      ApplicationDraft[]
+  documents   ApplicationDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([fullName])
+}
+
+model ApplicationDraft {
+  id                 String            @id @default(cuid())
+  opportunityId      String
+  formTemplateId     String
+  applicantProfileId String?
+  userId             String?
+  source             String?
+  status             ApplicationStatus @default(DRAFT)
+  templateVersion    Int               @default(1)
+  prefillJson        Json?
+  answersJson        Json?
+
+  opportunity      Opportunity       @relation(fields: [opportunityId], references: [id])
+  formTemplate     FormTemplate      @relation(fields: [formTemplateId], references: [id])
+  applicantProfile ApplicantProfile? @relation(fields: [applicantProfileId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([opportunityId])
+  @@index([userId])
+}
+
+model ApplicationSubmission {
+  id                     String            @id @default(cuid())
+  opportunityId          String
+  formTemplateId         String
+  applicantProfileId     String
+  applicantType          ApplicantType     @default(INDIVIDUAL)
+  status                 ApplicationStatus @default(SUBMITTED)
+  source                 String?
+  templateVersion        Int               @default(1)
+  submissionDataJson     Json
+  normalizedSnapshotJson Json?
+  ownerId                String?
+  submittedAt            DateTime?
+  reviewedAt             DateTime?
+
+  opportunity      Opportunity      @relation(fields: [opportunityId], references: [id])
+  formTemplate     FormTemplate     @relation(fields: [formTemplateId], references: [id])
+  applicantProfile ApplicantProfile @relation(fields: [applicantProfileId], references: [id])
+
+  documents        ApplicationDocument[]
+  workflowEvents   ApplicationWorkflowEvent[]
+  stageTransitions ApplicationStageTransition[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([opportunityId, status])
+  @@index([applicantProfileId])
+  @@index([submittedAt])
+}
+
+model ApplicationDocument {
+  id                      String       @id @default(cuid())
+  applicationSubmissionId String?
+  applicantProfileId      String?
+  type                    DocumentType
+  fileUrl                 String
+  fileName                String
+  mimeType                String?
+  fileSizeBytes           Int?
+
+  applicationSubmission ApplicationSubmission? @relation(fields: [applicationSubmissionId], references: [id])
+  applicantProfile      ApplicantProfile?      @relation(fields: [applicantProfileId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([type])
+}
+
+model ApplicationPipeline {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  isDefault   Boolean @default(false)
+
+  stages        ApplicationPipelineStage[]
+  opportunities Opportunity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ApplicationPipelineStage {
+  id         String  @id @default(cuid())
+  pipelineId String
+  key        String
+  label      String
+  orderIndex Int
+  color      String?
+  isTerminal Boolean @default(false)
+  isDefault  Boolean @default(false)
+
+  pipeline ApplicationPipeline @relation(fields: [pipelineId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([pipelineId, key])
+  @@unique([pipelineId, orderIndex])
+}
+
+model ApplicationStageTransition {
+  id            String             @id @default(cuid())
+  applicationId String
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  actorId       String?
+  reason        String?
+  metadataJson  Json?
+
+  application ApplicationSubmission @relation(fields: [applicationId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([applicationId])
+}
+
+model ApplicationWorkflowEvent {
+  id            String            @id @default(cuid())
+  applicationId String
+  type          WorkflowEventType
+  payloadJson   Json?
+  actorId       String?
+
+  application ApplicationSubmission @relation(fields: [applicationId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+// ─── Visual Form Builder — Phase 1B ─────────────────────────────────────────
+
+model FormWidgetDefinition {
+  id                    String  @id @default(cuid())
+  key                   String  @unique
+  label                 String
+  category              String?
+  widgetType            String
+  description           String?
+  configSchemaJson      Json?
+  defaultPropsJson      Json?
+  defaultValidationJson Json?
+  rendererKey           String?
+  isSystem              Boolean @default(false)
+  isReusable            Boolean @default(true)
+  isComplianceLocked    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FormTemplateVersion {
+  id             String    @id @default(cuid())
+  formTemplateId String
+  versionNumber  Int
+  schemaJson     Json
+  uiSchemaJson   Json?
+  validationJson Json?
+  isPublished    Boolean   @default(false)
+  publishedAt    DateTime?
+
+  formTemplate FormTemplate @relation(fields: [formTemplateId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([formTemplateId, versionNumber])
+}
+
+model CustomFormWidget {
+  id                    String  @id @default(cuid())
+  name                  String
+  slug                  String  @unique
+  description           String?
+  widgetSchemaJson      Json
+  previewSchemaJson     Json?
+  defaultValidationJson Json?
+  createdById           String?
+  isActive              Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Restaurant Spaces & Capacity ─────────────────────────────────────────────
+
+enum CapacityHoldStatus {
+  ACTIVE
+  RELEASED
+  EXPIRED
+  OVERRIDDEN
+  CANCELLED
+}
+
+// ─── Reservation System ───────────────────────────────────────────────────────
+
+enum ZoneType {
+  FINE_DINING
+  NIGHTLIFE
+  TERRACE
+  PRIVATE
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  WAITLISTED
+  ACKNOWLEDGED
+  ARRIVED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  REQUEST_ONLY
+}
+
+enum ReservationSource {
+  UMBRELLA_SITE
+  OKU_SITE
+  CATCH_SITE
+  TERRACE_SITE
+  STREETSIDE_HOST
+  TAXI_DRIVER
+  TOUR_GUIDE
+  HOTEL_CONCIERGE
+  ADMIN
+  WALK_IN
+  QR_CODE
+}
+
+enum ReservationAddonType {
+  CORKAGE
+  CELEBRATION_DESSERT
+  CAKE_FEE
+  BOTTLE_SERVICE
+  ROMANTIC_SETUP
+  ACCESSIBILITY
+  DIETARY_NOTE
+  SPECIAL_REQUEST
+}
+
+enum ResCommunicationType {
+  EMAIL
+  SMS
+  INTERNAL
+  WHATSAPP
+}
+
+enum ResCommunicationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum ReferrerType {
+  STREETSIDE_HOST
+  TAXI_DRIVER
+  TOUR_GUIDE
+  HOTEL_CONCIERGE
+  PARTNER
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum HandoffStatus {
+  PENDING
+  ACKNOWLEDGED
+  GUEST_EN_ROUTE
+  GUEST_ARRIVED
+  SEATED
+  CLOSED
+  CANCELLED
+}
+
+enum ResWaitlistStatus {
+  ACTIVE
+  READY
+  SEATED
+  CANCELLED
+  NO_SHOW
+  EXPIRED
+}
+
+enum CompensationModelType {
+  COMMISSION_ONLY
+  COMMISSION_PLUS_HOURLY
+  HOURLY_ONLY
+  FIXED_SALARY
+  FIXED_SALARY_PLUS_COMMISSION
+  FLAT_PER_SEATED_PARTY
+  FLAT_PER_SEATED_COVER
+  CUSTOM
+}
+
+enum ConversionStage {
+  INITIATED
+  REFERRED_UPSTAIRS
+  ARRIVED
+  OFFERED
+  PATRONIZED
+  DECLINED
+  LOST
+}
+
+enum LossReasonType {
+  PREFERRED_SEATING_UNAVAILABLE
+  TERRACE_UNAVAILABLE
+  WAIT_TOO_LONG
+  TABLE_NOT_READY
+  GROUP_TOO_LARGE
+  NOT_ENOUGH_SEATS
+  NOT_INTERESTED_IN_MENU
+  PRICE_CONCERN
+  BAD_SERVICE
+  ELEVATOR_NOT_WORKING
+  CHANGED_MIND
+  WENT_ELSEWHERE
+  NO_RESPONSE
+  OTHER
+}
+
+enum BenefitType {
+  NONE
+  COMP_DRINK
+  COMP_MEAL
+  COMP_DINNER
+  DISCOUNT
+  CUSTOM
+}
+
+enum CommissionSuggestionStatus {
+  SUGGESTED
+  APPROVED
+  REJECTED
+  CONVERTED_TO_ENTRY
+}
+
+model Venue {
+  id                       String                   @id @default(cuid())
+  name                     String
+  slug                     String                   @unique
+  addressLine              String?
+  city                     String?
+  country                  String?
+  description              String?
+  commissionValidationMode CommissionValidationMode @default(ON_SEATED)
+
+  zones                  Zone[]
+  spaces                 RestaurantSpace[]
+  reservations           Reservation[]
+  waitlistEntries        ResWaitlistEntry[]
+  privateRequests        PrivateRequest[]
+  restaurantHostProfiles RestaurantHostProfile[]
+  chatSessions           HostChatSession[]
+  tableSessions          TableSession[]
+  invuCredential         InvuIntegrationCredential?
+  branchMappings         IntegrationBranchMapping[]
+  attributionSessions    AttributionSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A named physical dining space within a venue (OKÜ Dining Room, Catch Experience, Terrace, VIP).
+// Capacity is enforced using overlapping-window holds (CapacityHold) so concurrent reservations
+// that share time slots are counted correctly — not just exact-match windows.
+model RestaurantSpace {
+  id                 String   @id @default(cuid())
+  venueId            String
+  name               String
+  capacity           Int      // maximum simultaneous covers
+  reservable         Boolean  @default(true)
+  requiresApproval   Boolean  @default(false)
+  weatherSensitive   Boolean  @default(false)
+  sortOrder          Int      @default(0)
+  isActive           Boolean  @default(true)
+
+  venue            Venue            @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  capacityHolds    CapacityHold[]
+  requestedByReservations Reservation[] @relation("ReservationRequestedSpace")
+  assignedToReservations  Reservation[] @relation("ReservationAssignedSpace")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([venueId, name])
+  @@index([venueId])
+}
+
+// Tracks covers held in a RestaurantSpace for a given time window.
+// Overlap-aware: the capacity check counts all ACTIVE holds whose window
+// overlaps the new reservation's window (NOT just exact-match windows).
+model CapacityHold {
+  id            String              @id @default(cuid())
+  spaceId       String
+  reservationId String
+  startAt       DateTime
+  endAt         DateTime
+  partySize     Int
+  status        CapacityHoldStatus  @default(ACTIVE)
+  expiresAt     DateTime?           // set to endAt+buffer; EXPIRED sweep uses this
+
+  space       RestaurantSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  reservation Reservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ledgerEvents LedgerEvent[]  @relation("LedgerEventCapacityHold")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([spaceId, reservationId])
+  @@index([spaceId, status, startAt, endAt])
+  @@index([status, expiresAt])
+}
+
+model Zone {
+  id                 String   @id @default(cuid())
+  venueId            String
+  name               String
+  slug               String
+  zoneType           ZoneType
+  conceptKey         String
+  description        String?
+  capacityCovers     Int
+  sortOrder          Int      @default(0)
+  isBookable         Boolean  @default(true)
+  currentWaitMinutes Int?
+
+  venue               Venue                   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  tables              VenueTable[]
+  reservations        Reservation[]
+  waitlistEntries     ResWaitlistEntry[]
+  managerAssignments  ZoneManagerAssignment[]
+  attributionSessions AttributionSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([venueId, slug])
+  @@index([conceptKey])
+}
+
+model VenueTable {
+  id           String  @id @default(cuid())
+  zoneId       String
+  name         String
+  minPartySize Int
+  maxPartySize Int
+  seats        Int
+  mergeable    Boolean @default(false)
+  isVip        Boolean @default(false)
+  isActive     Boolean @default(true)
+  positionX    Float?
+  positionY    Float?
+
+  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([zoneId])
+}
+
+model ResGuestProfile {
+  id                  String  @id @default(cuid())
+  fullName            String
+  email               String
+  phone               String?
+  whatsapp            String?
+  preferredConceptKey String?
+  dietaryNotes        String?
+  accessibilityNotes  String?
+  celebrationNotes    String?
+  noShowCount         Int     @default(0)
+  guestTagsJson       Json?
+  preferencesJson     Json?
+
+  reservations    Reservation[]
+  waitlistEntries ResWaitlistEntry[]
+  privateRequests PrivateRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([phone])
+}
+
+model CompensationPlan {
+  id                String                @id @default(cuid())
+  name              String
+  appliesToType     String
+  modelType         CompensationModelType
+  commissionPercent Decimal?              @db.Decimal(6, 2)
+  hourlyRateCents   Int?
+  fixedSalaryCents  Int?
+  flatPerPartyCents Int?
+  flatPerCoverCents Int?
+  notes             String?
+  isActive          Boolean               @default(true)
+
+  referrers             Referrer[]
+  commissionSuggestions CommissionSuggestion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Referrer {
+  id               String       @id @default(cuid())
+  fullName         String
+  referrerType     ReferrerType
+  phone            String?
+  email            String?
+  whatsapp         String?
+  organizationName String?
+  referralCode     String       @unique
+  isActive         Boolean      @default(true)
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  compensationPlanId String?
+  compensationPlan   CompensationPlan? @relation(fields: [compensationPlanId], references: [id])
+
+  metadataJson Json?
+
+  attributions          ReservationAttribution[]
+  commissions           CommissionEntry[]
+  commissionSuggestions CommissionSuggestion[]
+  benefits              ReferralBenefit[]
+
+  referralActor       ReferralActor?
+  attributionSessions AttributionSession[] @relation("AttributionSessionLegacy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([referralCode])
+  @@index([referrerType])
+}
+
+model Reservation {
+  id             String            @id @default(cuid())
+  venueId        String
+  zoneId         String?
+  guestProfileId String?
+  source         ReservationSource
+  status         ReservationStatus @default(PENDING)
+
+  reservationDate     DateTime
+  partySize           Int
+  durationMinutes     Int?
+  conceptRequested    String?
+  occasion            String?
+  seatingPreference   String?
+  notes               String?
+  dietaryRestrictions String?
+  specialRequests     String?
+
+  bringOwnBottle     Boolean @default(false)
+  corkageBottleCount Int?
+  corkageFeeCents    Int?
+
+  celebrationDessert Boolean @default(false)
+  celebrationMessage String?
+
+  contactName      String
+  contactEmail     String
+  contactPhone     String?
+  contactWhatsapp  String?
+  confirmationCode String  @unique
+  sourceContext    String?
+
+  estimatedRevenueCents Int?
+  actualRevenueCents    Int?
+
+  assignedTableLabel       String?
+  assignedRestaurantHostId String?
+  commissionEligible       Boolean   @default(false)
+  commissionValidatedAt    DateTime?
+  arrivalConfirmedAt       DateTime?
+  // Partial-arrival headcount (Apr 28 2026). Null when the whole party
+  // arrived at once (most cases); set to N when only N of partySize
+  // showed up at the time of scan/check-in. Drives the closed-card
+  // headcount summary and the host's at-a-glance "3/5 arrived" pill.
+  arrivedHeadcount         Int?
+  seatedAt                 DateTime?
+
+  // Space-aware capacity (Task #181). The referrer/guest requests a space;
+  // the host may assign a different one. Attribution is keyed on the session,
+  // not the space — space reassignment NEVER touches referrer anchors.
+  requestedSpaceId String?
+  assignedSpaceId  String?
+
+  venue          Venue                  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  zone           Zone?                  @relation(fields: [zoneId], references: [id])
+  guestProfile   ResGuestProfile?       @relation(fields: [guestProfileId], references: [id])
+  assignedHost   RestaurantHostProfile? @relation(fields: [assignedRestaurantHostId], references: [id])
+  requestedSpace RestaurantSpace?       @relation("ReservationRequestedSpace", fields: [requestedSpaceId], references: [id])
+  assignedSpace  RestaurantSpace?       @relation("ReservationAssignedSpace", fields: [assignedSpaceId], references: [id])
+
+  addons                ReservationAddon[]
+  communications        ReservationCommunication[]
+  attributions          ReservationAttribution[]
+  handoffs              ReservationHandoff[]
+  commissions           CommissionEntry[]
+  commissionSuggestions CommissionSuggestion[]
+  benefits              ReferralBenefit[]
+  statusLogs            ReservationStatusLog[]
+  chatSessions          HostChatSession[]
+  tableSessions         TableSession[]
+  attributionSession    AttributionSession?        @relation("ReservationAttributionSession")
+  matchProofs           MatchProof[]
+  ledgerEvents          LedgerEvent[]              @relation("LedgerEventReservation")
+  capacityHolds         CapacityHold[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueId, reservationDate])
+  @@index([zoneId, reservationDate])
+  @@index([status])
+  @@index([contactEmail])
+  @@index([requestedSpaceId])
+  @@index([assignedSpaceId])
+}
+
+model ReservationAddon {
+  id              String               @id @default(cuid())
+  reservationId   String
+  addonType       ReservationAddonType
+  label           String
+  quantity        Int?
+  unitPriceCents  Int?
+  totalPriceCents Int?
+  notes           String?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([reservationId])
+}
+
+model ReservationAttribution {
+  id                 String            @id @default(cuid())
+  reservationId      String
+  referrerId         String?
+  sourceType         ReservationSource
+  sourceLabel        String?
+  commissionEligible Boolean           @default(false)
+  commissionStatus   CommissionStatus  @default(PENDING)
+  coversAttributed   Int?
+  conversionStage    ConversionStage   @default(INITIATED)
+  lossReason         LossReasonType?
+  lossReasonNotes    String?
+  patronizedAt       DateTime?
+  notes              String?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  referrer    Referrer?   @relation(fields: [referrerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reservationId])
+  @@index([referrerId])
+  @@index([conversionStage])
+}
+
+model ReservationHandoff {
+  id                 String        @id @default(cuid())
+  reservationId      String
+  sentByRole         String
+  sentByLabel        String?
+  receivedByHostId   String?
+  handoffStatus      HandoffStatus @default(PENDING)
+  estimatedArrivalAt DateTime?
+  actualArrivalAt    DateTime?
+  waitTimeMinutes    Int?
+  notes              String?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reservationId])
+  @@index([handoffStatus])
+}
+
+model CommissionEntry {
+  id            String           @id @default(cuid())
+  referrerId    String
+  reservationId String?
+  amountCents   Int
+  currency      String           @default("USD")
+  status        CommissionStatus @default(PENDING)
+  reason        String?
+  covers        Int?
+  conceptKey    String?
+
+  // Native v2 attribution: when set, the commission was attributed to a
+  // ReferralActor directly. Legacy rows (pre-v2) leave this null and are
+  // attributed via `referrerId → ReferralActor.legacyReferrerId`.
+  //
+  // WRITE CONTRACT: when minting a commission for a Referrer that has a
+  // linked ReferralActor (i.e. `Referrer.referralActor` is not null),
+  // writers MUST populate BOTH `referrerId` and `referralActorId`. Read
+  // surfaces resolve the earner via `commissionWhereForEarner` in
+  // `src/server/commissions/earnerScope.ts`, which OR's the two FKs and
+  // de-duplicates by row id — so dual-write is safe and is the canonical
+  // form. Single-FK writes are tolerated for back-compat but will UNDER-
+  // COUNT in any future surface that switches its primary lookup FK.
+  referralActorId String?
+  referralActor   ReferralActor? @relation(fields: [referralActorId], references: [id])
+
+  referrer    Referrer     @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([referrerId, status])
+  @@index([reservationId])
+  @@index([referralActorId, status])
+}
+
+model CommissionSuggestion {
+  id                   String                     @id @default(cuid())
+  reservationId        String
+  referrerId           String
+  compensationPlanId   String?
+  suggestedAmountCents Int
+  currency             String                     @default("USD")
+  rationaleJson        Json?
+  status               CommissionSuggestionStatus @default(SUGGESTED)
+  notes                String?
+
+  reservation      Reservation       @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  referrer         Referrer          @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+  compensationPlan CompensationPlan? @relation(fields: [compensationPlanId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One suggestion per (reservation, referrer) pair — prevents duplicate
+  // suggestions when the anchor retry job races with itself.
+  @@unique([reservationId, referrerId])
+  @@index([referrerId, status])
+  @@index([reservationId])
+}
+
+model ReferralBenefit {
+  id            String      @id @default(cuid())
+  referrerId    String
+  reservationId String?
+  benefitType   BenefitType
+  valueCents    Int?
+  notes         String?
+
+  referrer    Referrer     @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model ResWaitlistEntry {
+  id             String            @id @default(cuid())
+  venueId        String
+  zoneId         String?
+  guestProfileId String?
+  source         ReservationSource
+  status         ResWaitlistStatus @default(ACTIVE)
+
+  contactName          String
+  contactEmail         String?
+  contactPhone         String?
+  contactWhatsapp      String?
+  partySize            Int
+  conceptRequested     String?
+  occasion             String?
+  estimatedWaitMinutes Int?
+  notes                String?
+
+  venue        Venue            @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  zone         Zone?            @relation(fields: [zoneId], references: [id])
+  guestProfile ResGuestProfile? @relation(fields: [guestProfileId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueId, status])
+  @@index([zoneId, status])
+}
+
+model ReservationCommunication {
+  id            String                 @id @default(cuid())
+  reservationId String
+  type          ResCommunicationType
+  templateKey   String?
+  recipient     String?
+  subject       String?
+  bodySnapshot  String?
+  status        ResCommunicationStatus @default(PENDING)
+  sentAt        DateTime?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([reservationId])
+}
+
+model PrivateRequest {
+  id              String    @id @default(cuid())
+  venueId         String
+  guestProfileId  String?
+  contactName     String
+  contactEmail    String
+  contactPhone    String?
+  contactWhatsapp String?
+  partySize       Int
+  conceptKey      String?
+  occasion        String?
+  budgetNotes     String?
+  preferredDate   DateTime?
+  notes           String?
+  status          String    @default("pending")
+
+  venue        Venue            @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  guestProfile ResGuestProfile? @relation(fields: [guestProfileId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueId, status])
+}
+
+model ZoneManagerAssignment {
+  id            String  @id @default(cuid())
+  zoneId        String
+  managerLabel  String
+  managerUserId String?
+  isActive      Boolean @default(true)
+
+  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserAuditLog {
+  id                String          @id @default(cuid())
+  targetUserId      String
+  performedByUserId String
+  action            UserAdminAction
+  summary           String
+  previousValue     Json?
+  newValue          Json?
+  reason            String?
+  createdAt         DateTime        @default(now())
+
+  targetUser  User @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  performedBy User @relation("PerformedBy", fields: [performedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([targetUserId])
+  @@index([performedByUserId])
+}
+
+// ─── Event Permissions ────────────────────────────────────────────────────────
+// Controls who can view, buy, or manage a private/restricted series.
+
+model EventPermission {
+  id              String                @id @default(cuid())
+  seriesId        String
+  userId          String?
+  inviteEmail     String?
+  permissionType  EventPermissionType
+  grantedByUserId String
+  status          EventPermissionStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  series    Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user      User?  @relation("EventPermissionUser", fields: [userId], references: [id], onDelete: SetNull)
+  grantedBy User   @relation("EventPermissionGranter", fields: [grantedByUserId], references: [id])
+
+  @@index([seriesId, status])
+  @@index([userId])
+  @@index([inviteEmail])
+}
+
+// ─── Event Referrer Assignments ───────────────────────────────────────────────
+// Influencer-managed referrer network. Separate from CompensationPlan.
+
+model EventReferrerAssignment {
+  id                    String                      @id @default(cuid())
+  // XOR — exactly one of parentInfluencerId / parentPartnerId is set.
+  // Enforced in app layer (Prisma cannot express CHECK constraints).
+  parentInfluencerId    String?
+  parentPartnerId       String?
+  // Streetside hosts are referrers too — employed by the restaurant
+  // rather than externally. When this is set (and parentInfluencerId/
+  // parentPartnerId are not), the assignment represents a host's
+  // personal commission code. Commission is settled by the restaurant
+  // off-platform; OKU emits a reporting row only (same shape as
+  // partner-anchored seats).
+  parentHostProfileId   String?
+  createdByInfluencerId String?
+  createdByUserId       String?
+  seriesId              String?
+  scopeType             EventReferrerScopeType      @default(SERIES)
+  assignedUserId        String?
+  inviteEmail           String?
+  displayName           String
+  referralCode          String                      @unique
+  referralUrl           String?
+  qrCodeImageUrl        String?
+  isCommissionEligible  Boolean                     @default(false)
+  commissionMode        EventReferrerCommissionMode @default(NONE)
+  commissionShareBps    Int?
+  status                EventReferrerStatus         @default(INVITED)
+
+  commissionPayer           String  @default("OKU")
+  commissionEntityProfileId String?
+  assignedHostProfileId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parentInfluencer    InfluencerProfile?   @relation("ParentInfluencer", fields: [parentInfluencerId], references: [id])
+  parentPartner       PartnerProfile?      @relation("PartnerReferrers", fields: [parentPartnerId], references: [id])
+  createdByInfluencer InfluencerProfile?   @relation("CreatedByInfluencer", fields: [createdByInfluencerId], references: [id])
+  createdByUser       User?                @relation("EventReferrerCreatedByUser", fields: [createdByUserId], references: [id])
+  series              Series?              @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  assignedUser        User?                @relation("EventReferrerAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  delegateSeat        PartnerDelegateSeat? @relation("SeatReferrerAssignment")
+
+  commissionEntityProfile Profile?               @relation("EntityCommissionedReferrers", fields: [commissionEntityProfileId], references: [id], onDelete: SetNull)
+  assignedHostProfile     RestaurantHostProfile? @relation("HostReferrerAssignments", fields: [assignedHostProfileId], references: [id], onDelete: SetNull)
+  // Self-anchor for streetside hosts. The `assignedHostProfile` above
+  // is the recipient/operator; `parentHostProfile` is the commission
+  // anchor (typically the same host for personal codes).
+  parentHostProfile       RestaurantHostProfile? @relation("HostOwnedReferrers", fields: [parentHostProfileId], references: [id], onDelete: SetNull)
+
+  orders              Order[]
+  subCommissionLedger InfluencerSubCommissionLedger[]
+
+  referralActor ReferralActor?
+
+  // A streetside host has at most ONE personal commission code,
+  // ever. Postgres treats multiple NULLs as distinct, so this only
+  // constrains rows that actually use the host anchor (System 3).
+  // The provisioning helper handles the "exists but not active"
+  // case by reactivating, never by inserting a duplicate.
+  @@unique([parentHostProfileId])
+  @@index([seriesId, status])
+  @@index([parentInfluencerId])
+  @@index([referralCode])
+  @@index([commissionEntityProfileId])
+  @@index([assignedHostProfileId])
+}
+
+// ─── Influencer Sub-Commission Ledger ─────────────────────────────────────────
+// Tracks what influencers owe their event referrers.
+// This is NOT OKU's AP ledger. OKU only pays the influencer.
+
+model InfluencerSubCommissionLedger {
+  id                             String                    @id @default(cuid())
+  orderId                        String
+  seriesId                       String?
+  // Anchor: exactly one of parentInfluencerId / parentPartnerId is set
+  // (matches the parent on EventReferrerAssignment).
+  parentType                     SubCommissionParentType   @default(INFLUENCER)
+  parentInfluencerId             String?
+  parentPartnerId                String?
+  // Mirror of the parent on EventReferrerAssignment for host-anchored
+  // (streetside-employed) referrers. The restaurant settles payout
+  // off-platform; we record the amount here for reporting only.
+  parentHostProfileId            String?
+  eventReferrerAssignmentId      String
+  ticketAmountCents              Int
+  grossInfluencerCommissionCents Int
+  referrerShareCents             Int                       @default(0)
+  influencerRetainedCents        Int
+  currency                       String                    @default("USD")
+  // "INFLUENCER" or "PARTNER" — who pays the seat (off-platform).
+  payoutResponsibility           String                    @default("INFLUENCER")
+  payoutStatus                   SubCommissionPayoutStatus @default(NOT_ELIGIBLE)
+  // Frozen snapshot of the commission model at write time so future model
+  // edits never rewrite history.
+  commissionModelSnapshot        Json?
+  notes                          String?
+  createdAt                      DateTime                  @default(now())
+  // Step 4 reconciliation — once this row is included in a PayoutBatch, the
+  // batch id is written here so it can never be double-counted. The payout
+  // service reads PENDING rows with payoutBatchId=null to find unbatched work.
+  payoutBatchId                  String?
+
+  order                   Order                   @relation(fields: [orderId], references: [id])
+  parentInfluencer        InfluencerProfile?      @relation(fields: [parentInfluencerId], references: [id])
+  parentPartner           PartnerProfile?         @relation("PartnerSubCommissionLedger", fields: [parentPartnerId], references: [id])
+  parentHostProfile       RestaurantHostProfile?  @relation("HostSubCommissionLedger", fields: [parentHostProfileId], references: [id])
+  eventReferrerAssignment EventReferrerAssignment @relation(fields: [eventReferrerAssignmentId], references: [id])
+  payoutBatch             PayoutBatch?            @relation("SubCommissionPayoutBatch", fields: [payoutBatchId], references: [id])
+
+  @@index([orderId])
+  @@index([parentInfluencerId])
+  @@index([parentPartnerId])
+  @@index([parentHostProfileId])
+  @@index([eventReferrerAssignmentId])
+  @@index([payoutBatchId])
+}
+
+model RestaurantHostProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  displayName String
+  isActive    Boolean @default(true)
+  badgeColor  String?
+
+  venueId String?
+  venue   Venue?  @relation(fields: [venueId], references: [id])
+
+  parentProfileId String?
+  parentProfile   Profile? @relation("CompanySubHosts", fields: [parentProfileId], references: [id], onDelete: SetNull)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  // Assignments where THIS host is the recipient/operator (delegation
+  // from a partner/influencer seat).
+  referrerAssignments EventReferrerAssignment[]       @relation("HostReferrerAssignments")
+  // Assignments where THIS host is the commission anchor (their own
+  // personal streetside referral code).
+  ownedReferrers      EventReferrerAssignment[]       @relation("HostOwnedReferrers")
+  // Sub-commission reporting rows for host-anchored assignments (the
+  // restaurant settles payout off-platform; we record amounts here).
+  subCommissionLedger InfluencerSubCommissionLedger[] @relation("HostSubCommissionLedger")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueId])
+  @@index([parentProfileId])
+}
+
+model ReservationStatusLog {
+  id              String   @id @default(cuid())
+  reservationId   String
+  fromStatus      String?
+  toStatus        String
+  changedByUserId String?
+  changedByLabel  String?
+  lossReason      String?
+  lossReasonNotes String?
+  notes           String?
+  changedAt       DateTime @default(now())
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
+  @@index([changedAt])
+}
+
+// ─── Phase 1: Unified ReferralActor Foundation ────────────────────────────────
+// ReferralActor is the single abstraction for any entity that can refer guests.
+// It wraps legacy Referrer records and EventReferrerAssignments via compat links.
+// Existing FK relationships are preserved — this layer sits ABOVE them.
+
+enum ReferralActorType {
+  STREETSIDE_HOST
+  TAXI_DRIVER
+  UBER_DRIVER
+  TOUR_GUIDE
+  HOTEL_CONCIERGE
+  INFLUENCER_SUB_REFERRER
+  PROMOTER
+  PRIVATE_NETWORK
+  OTHER
+}
+
+enum ReferralActorStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ReferralScopeType {
+  GLOBAL
+  VENUE
+  SERIES
+  CAMPAIGN
+}
+
+/// Product line a ReferralAssignment promotes. Lets a single ReferralActor
+/// hold multiple, intent-bucketed offers (Restaurant tonight, Event next
+/// Friday, 12-month membership push). Orthogonal to scopeType — scopeType
+/// answers "where does this apply?" while offerType answers "what is the
+/// guest being invited to?".
+enum OfferType {
+  RESTAURANT
+  EVENT
+  SERIES
+  MEMBERSHIP
+  PRIVATE_DINING
+  PACKAGE
+}
+
+/// Lifecycle of a ReferralAssignment. Drives admin UI filters and share-surface
+/// visibility:
+///   - DRAFT     — created but not yet shareable (admin still configuring)
+///   - ACTIVE    — live, surfaces in the referrer wallet
+///   - PAUSED    — temporarily hidden, links still resolve (read-only)
+///   - RETIRED   — permanently ended, demoted to "Past activity"
+enum ReferralAssignmentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  RETIRED
+}
+
+enum ReferralCompensationMode {
+  NONE
+  PERCENT_OF_TRANSACTION
+  PERCENT_OF_PARENT_COMMISSION
+  FLAT_PER_COVER
+  FLAT_PER_PARTY
+}
+
+/// Extensible operator-type definitions. Each row is either a built-in type
+/// seeded from the `ReferralActorType` enum (isBuiltin=true, with
+/// `legacyEnumValue` populated) or a custom type created by an admin
+/// (isBuiltin=false, `legacyEnumValue` defaults to OTHER for backward compat
+/// with code paths still keyed off the enum).
+model ReferralActorTypeDef {
+  id               String                   @id @default(cuid())
+  /// Stable slug used as the FK target on ReferralActor (e.g. "streetside-host", "yacht-captain").
+  code             String                   @unique
+  /// Display label shown in dropdowns (English; can be localized in i18n keys later).
+  label            String
+  description      String?
+  /// Optional emoji or icon name for visual differentiation in pickers.
+  icon             String?
+  /// True for the 9 seeded enum-derived types; false for admin-created customs.
+  isBuiltin        Boolean                  @default(false)
+  /// Mapping back to the legacy ReferralActorType enum so downstream code that
+  /// still reads `ReferralActor.actorType` keeps working. Custom types use OTHER.
+  legacyEnumValue  ReferralActorType
+  /// Default compensation knobs prefilled in the AddOperatorModal when picked.
+  defaultCompMode  ReferralCompensationMode @default(PERCENT_OF_TRANSACTION)
+  defaultRateBps   Int?
+  defaultFlatCents Int?
+  /// Default platform RBAC role granted when a User is created from this type
+  /// (null = no role auto-grant, modal stays in REFERRER fallback).
+  defaultRbacRole  String?
+  /// Display order in the picker (lower = earlier).
+  sortOrder        Int                      @default(100)
+  isActive         Boolean                  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+
+  actors ReferralActor[]
+
+  @@index([isActive, sortOrder])
+}
+
+model ReferralActor {
+  id               String                @id @default(cuid())
+  actorType        ReferralActorType
+  /// Slug pointing into ReferralActorTypeDef. Optional during the migration
+  /// window; new creates always set both this and the legacy `actorType`.
+  actorTypeCode    String?
+  actorTypeDef     ReferralActorTypeDef? @relation(fields: [actorTypeCode], references: [code])
+  displayName      String
+  organizationName String?
+  phone            String?
+  email            String?
+  whatsapp         String?
+  status           ReferralActorStatus   @default(ACTIVE)
+  metadataJson     Json?
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  legacyReferrerId String?   @unique
+  legacyReferrer   Referrer? @relation(fields: [legacyReferrerId], references: [id])
+
+  legacyEventReferrerAssignmentId String?                  @unique
+  legacyEventReferrerAssignment   EventReferrerAssignment? @relation(fields: [legacyEventReferrerAssignmentId], references: [id])
+
+  assignments         ReferralAssignment[]
+  links               ReferralLink[]
+  commissions         CommissionEntry[]
+  attributionSessions AttributionSession[] @relation("AttributionSessionActor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([actorType, status])
+  @@index([userId])
+}
+
+model ReferralAssignment {
+  id              String        @id @default(cuid())
+  referralActorId String
+  referralActor   ReferralActor @relation(fields: [referralActorId], references: [id], onDelete: Cascade)
+
+  scopeType ReferralScopeType @default(GLOBAL)
+  scopeId   String?
+
+  /// Product line this assignment promotes (RESTAURANT/EVENT/SERIES/
+  /// MEMBERSHIP/PRIVATE_DINING/PACKAGE). Drives intent-bucketing on the
+  /// referrer mobile share surface (Today/This week/Restaurants/Events).
+  /// Nullable during the migration window for legacy assignments.
+  offerType OfferType?
+  /// Optional FK target tied to offerType (e.g. Series.id when
+  /// offerType=EVENT|SERIES, Venue.id when RESTAURANT, MembershipPlan.id
+  /// when MEMBERSHIP). Validated at the service layer — no Prisma FK so
+  /// a single column can address multiple parent tables.
+  offerId   String?
+  /// Optional human label cached at write-time (e.g. "OKÜ Friday Sept 12 –
+  /// Sunset Set"). Lets the share surface render fast without N+1 lookups.
+  offerLabel String?
+  /// Optional time window the offer is valid for, used to bucket into
+  /// Today/This week/Past on the share surface.
+  offerStartAt DateTime?
+  offerEndAt   DateTime?
+
+  parentEntityType String?
+  parentEntityId   String?
+
+  isCommissionEligible Boolean                  @default(false)
+  compensationMode     ReferralCompensationMode @default(NONE)
+  rateBps              Int?
+  flatAmountCents      Int?
+
+  legacyCompensationPlanId String?
+
+  /// New canonical commission-plan reference for this assignment. Optional
+  /// FK-less column to keep the model usable across legacy plan rows that
+  /// may have been deleted; service layer dereferences when present.
+  commissionPlanId String?
+
+  /// Optional pre-rendered QR payload (data URL or short opaque string)
+  /// cached at write-time so the share surface can render the QR without
+  /// re-encoding per request. The canonicalCode below remains the source
+  /// of truth — qrPayload is a render cache only.
+  qrPayload String?
+
+  isActive Boolean @default(true)
+
+  /// Lifecycle status (DRAFT/ACTIVE/PAUSED/RETIRED). Coexists with the
+  /// older boolean `isActive` for backward compatibility — service layer
+  /// keeps them in sync (status=ACTIVE ⇔ isActive=true).
+  status ReferralAssignmentStatus @default(ACTIVE)
+
+  /// Provenance: who created this assignment? `createdByUserId` is the
+  /// auth subject (admin or partner), and `creatorRole` records WHICH
+  /// surface they came from so audit reconstruction can tell apart an
+  /// admin-issued assignment from a partner self-service one.
+  /// Optional FK-less columns to avoid cascade complexity across roles.
+  createdByUserId String?
+  creatorRole     String?
+
+  /// Optional canonical assignment-level code mirroring the primary
+  /// ReferralLink.code for fast lookup / QR rendering on the share surface.
+  /// The unique source of truth for resolution is still ReferralLink.code
+  /// (so partners can rotate links), but storing the canonical code here
+  /// lets `/r/[code]` shortcuts and admin lists render without a join.
+  canonicalCode String? @unique
+
+  links ReferralLink[]
+  attributedOrders Order[] @relation("OrderReferralAssignment")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([referralActorId])
+  @@index([scopeType, scopeId])
+  @@index([isActive])
+  @@index([status])
+  @@index([createdByUserId])
+  @@index([offerType, offerStartAt])
+  @@index([referralActorId, isActive, offerStartAt])
+}
+
+model ReferralLink {
+  id                   String  @id @default(cuid())
+  referralActorId      String
+  referralAssignmentId String?
+
+  referralActor      ReferralActor       @relation(fields: [referralActorId], references: [id], onDelete: Cascade)
+  referralAssignment ReferralAssignment? @relation(fields: [referralAssignmentId], references: [id])
+
+  code          String  @unique
+  url           String?
+  qrCodeDataUrl String?
+
+  clickCount    Int       @default(0)
+  lastClickedAt DateTime?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([referralActorId])
+  @@index([code])
+}
+
+// ─── Event Invitation Engine ──────────────────────────────────────────────────
+
+model EventInvitation {
+  id              String                    @id @default(cuid())
+  seriesId        String
+  recipientUserId String?
+  recipientEmail  String
+  recipientName   String?
+  audienceSegment InviteAudienceMode
+  status          InvitationStatus          @default(SENT)
+  inviteToken     String                    @unique @default(cuid())
+  responseSource  InvitationResponseSource?
+
+  sentAt          DateTime  @default(now())
+  openedAt        DateTime?
+  respondedAt     DateTime?
+  declinedAt      DateTime?
+  rsvpStartedAt   DateTime?
+  rsvpConfirmedAt DateTime?
+
+  flyerImageUrl   String?
+  createdByUserId String
+
+  // Partner / admin single-guest invitations: indicates intent for the
+  // invitee to receive a comp ticket on RSVP, against a specific ticket
+  // type. Issuance still happens on the RSVP path (out of scope for the
+  // first portal iteration); these fields capture the partner's choice
+  // so admins can honor it at check-in or via a follow-up auto-issue.
+  isCompInvite         Boolean @default(false)
+  intendedTicketTypeId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series             Series           @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  recipientUser      User?            @relation("InvitationRecipient", fields: [recipientUserId], references: [id])
+  createdBy          User             @relation("InvitationCreator", fields: [createdByUserId], references: [id])
+  intendedTicketType TicketType?      @relation("InvitationIntendedTicketType", fields: [intendedTicketTypeId], references: [id])
+  registrant         EventRegistrant?
+
+  @@index([seriesId])
+  @@index([recipientUserId])
+  @@index([inviteToken])
+  @@index([status])
+}
+
+model EventRegistrant {
+  id                 String                 @id @default(cuid())
+  seriesId           String
+  userId             String
+  invitationId       String?                @unique
+  registrationStatus RegistrationStatus     @default(RSVP_CONFIRMED)
+  sourceType         RegistrationSourceType @default(INVITATION)
+  ticketId           String?                @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series     Series           @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user       User             @relation("UserRegistrations", fields: [userId], references: [id])
+  invitation EventInvitation? @relation(fields: [invitationId], references: [id])
+  ticket     Ticket?          @relation(fields: [ticketId], references: [id])
+
+  @@unique([seriesId, userId])
+  @@index([seriesId])
+  @@index([userId])
+}
+
+// ── UGC TRANSLATION LAYER ────────────────────────────────────────────────────
+
+enum ContentTranslationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  STALE
+}
+
+model ContentTranslation {
+  id             String                   @id @default(cuid())
+  entityType     String
+  entityId       String
+  fieldName      String
+  sourceLocale   String                   @default("en")
+  targetLocale   String
+  sourceText     String                   @db.Text
+  sourceTextHash String
+  translatedText String                   @db.Text
+  status         ContentTranslationStatus @default(PENDING)
+  provider       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([entityType, entityId, fieldName, targetLocale])
+  @@index([entityType, entityId])
+  @@index([status])
+  @@index([targetLocale])
+  @@index([entityType, targetLocale, status])
+}
+
+// ── CHECK-IN + ATTENDANCE SYSTEM ────────────────────────────────────────────
+
+enum AttendanceStatus {
+  ARRIVED
+  SEATED
+  COMPLETED
+  LEFT_EARLY
+  NO_SHOW
+}
+
+enum OutcomeType {
+  COMPLETED
+  LEFT_EARLY
+  NO_SHOW
+  DISSATISFIED
+  UNKNOWN
+}
+
+enum OutcomeReasonCode {
+  WAIT_TIME
+  SERVICE
+  PRICE
+  EXPERIENCE
+  UNKNOWN
+}
+
+enum CheckInResult {
+  VALID
+  INVALID
+  ALREADY_CHECKED_IN
+  EXPIRED
+}
+
+model AttendanceEvent {
+  id               String           @id @default(cuid())
+  ticketId         String           @unique
+  sessionId        String
+  userId           String
+  status           AttendanceStatus @default(ARRIVED)
+  arrivalTime      DateTime         @default(now())
+  seatedTime       DateTime?
+  departureTime    DateTime?
+  durationMinutes  Int?
+  recordedByUserId String
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  ticket     Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  session    Session            @relation(fields: [sessionId], references: [id])
+  user       User               @relation("UserAttendances", fields: [userId], references: [id])
+  recordedBy User               @relation("AttendanceRecordedBy", fields: [recordedByUserId], references: [id])
+  outcome    AttendanceOutcome?
+
+  @@index([sessionId, status])
+  @@index([userId])
+  @@index([sessionId, arrivalTime])
+}
+
+model AttendanceOutcome {
+  id                String            @id @default(cuid())
+  attendanceEventId String            @unique
+  outcomeType       OutcomeType
+  reasonCode        OutcomeReasonCode @default(UNKNOWN)
+  notes             String?
+  createdAt         DateTime          @default(now())
+
+  attendanceEvent AttendanceEvent @relation(fields: [attendanceEventId], references: [id], onDelete: Cascade)
+}
+
+model CheckInLog {
+  id              String        @id @default(cuid())
+  ticketId        String?
+  scannedCode     String
+  valid           Boolean
+  result          CheckInResult
+  scannedByUserId String?
+  deviceInfo      String?
+  createdAt       DateTime      @default(now())
+
+  ticket    Ticket? @relation(fields: [ticketId], references: [id])
+  scannedBy User?   @relation("CheckInLogScannedBy", fields: [scannedByUserId], references: [id])
+
+  @@index([scannedCode])
+  @@index([ticketId, createdAt])
+  @@index([createdAt])
+}
+
+// ── Entity-Based Host System ──────────────────────────────────────────────────
+
+enum EntityType {
+  PERSON
+  COMPANY
+}
+
+enum HostRole {
+  PRIMARY_HOST
+  CO_HOST
+  SPONSOR
+  BRAND_PARTNER
+}
+
+model Entity {
+  id               String     @id @default(cuid())
+  type             EntityType @default(PERSON)
+  displayName      String
+  /// Lightweight free-text classification (Hotel, Taxi Fleet, Tour Operator,
+  /// Promoter Group, Restaurant, etc.). Used by the Referral Organization
+  /// Resolver to label new approved entities created from the unresolved
+  /// queue. Kept off `EntityType` enum to avoid affecting host/sponsor
+  /// pickers. NULL on legacy rows.
+  organizationKind String?
+  logoUrl          String?
+  description      String?
+  websiteUrl       String?
+  instagramUrl     String?
+  twitterUrl       String?
+
+  linkedUserId              String? @unique
+  linkedInfluencerProfileId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  linkedUser              User?              @relation(fields: [linkedUserId], references: [id])
+  linkedInfluencerProfile InfluencerProfile? @relation(fields: [linkedInfluencerProfileId], references: [id])
+
+  seriesHosts         SeriesHost[]
+  eventHosts          EventHost[]
+  sponsorApplications SponsorApplication[]
+  sponsorDeals        SponsorDeal[]
+  sponsorAssignments  SponsorAssignment[]
+
+  @@index([type])
+}
+
+model SeriesHost {
+  id                 String   @id @default(cuid())
+  seriesId           String
+  entityId           String
+  role               HostRole @default(PRIMARY_HOST)
+  isFrontFacing      Boolean  @default(true)
+  commissionShareBps Int?
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, entityId])
+  @@index([seriesId, sortOrder])
+}
+
+model EventHost {
+  id                 String   @id @default(cuid())
+  sessionId          String
+  entityId           String
+  role               HostRole @default(PRIMARY_HOST)
+  isFrontFacing      Boolean  @default(true)
+  commissionShareBps Int?
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  entity  Entity  @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, entityId])
+  @@index([sessionId, sortOrder])
+}
+
+// ── Sponsorship Marketplace + Placement Engine ────────────────────────────────
+
+enum SponsorshipSlotCategory {
+  TITLE
+  BEVERAGE
+  SPIRITS
+  CULINARY
+  LUXURY
+  WELLNESS
+  REAL_ESTATE
+  MEDIA
+  EXPERIENCE
+  OTHER
+}
+
+enum SponsorshipScopeType {
+  SERIES
+  EVENT
+  PRIVATE_DINING
+  CURATED_TABLE
+}
+
+enum SponsorshipSlotStatus {
+  OPEN
+  FILLED
+  SUSPENDED
+}
+
+enum SponsorApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum SponsorDealPaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum SponsorPlacementType {
+  EMAIL_HEADER
+  CHECK_IN_SCREEN
+  EVENT_PAGE
+  TICKET_PDF
+  INVITATION
+  DIGITAL_MENU
+  SOCIAL_STORY
+  SIGNAGE
+  WELCOME_CARD
+  BRAND_MOMENT
+}
+
+model SponsorshipSlot {
+  id        String  @id @default(cuid())
+  seriesId  String?
+  sessionId String?
+
+  scopeType       SponsorshipScopeType
+  title           String
+  category        SponsorshipSlotCategory
+  description     String?
+  benefits        Json?
+  deliverables    Json?
+  audienceProfile String?
+  exclusivityNote String?
+
+  isExclusive     Boolean @default(true)
+  maxSponsors     Int     @default(1)
+  askPriceCents   Int?
+  floorPriceCents Int?
+
+  isPublished Boolean               @default(false)
+  status      SponsorshipSlotStatus @default(OPEN)
+
+  availableFrom DateTime?
+  availableTo   DateTime?
+  sortOrder     Int       @default(0)
+  internalNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series       Series?              @relation(fields: [seriesId], references: [id])
+  session      Session?             @relation(fields: [sessionId], references: [id])
+  applications SponsorApplication[]
+  deals        SponsorDeal[]
+
+  @@index([seriesId])
+  @@index([sessionId])
+  @@index([status, isPublished])
+  @@index([category])
+}
+
+model SponsorApplication {
+  id       String  @id @default(cuid())
+  slotId   String?
+  entityId String?
+
+  brandName    String
+  contactName  String
+  contactEmail String
+  contactPhone String?
+  websiteUrl   String?
+
+  brandStatement String?
+  campaignGoals  String?
+  budgetCents    Int?
+
+  status           SponsorApplicationStatus @default(PENDING)
+  reviewNotes      String?
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slot       SponsorshipSlot? @relation(fields: [slotId], references: [id])
+  entity     Entity?          @relation(fields: [entityId], references: [id])
+  reviewedBy User?            @relation("SponsorApplicationReviewer", fields: [reviewedByUserId], references: [id])
+  deal       SponsorDeal?
+
+  @@index([status])
+  @@index([slotId])
+}
+
+model SponsorDeal {
+  id            String  @id @default(cuid())
+  applicationId String  @unique
+  slotId        String?
+  entityId      String?
+
+  agreedPriceCents Int
+  paymentStatus    SponsorDealPaymentStatus @default(UNPAID)
+  paidTotalCents   Int                      @default(0)
+
+  termsAgreedAt      DateTime?
+  activationDeadline DateTime?
+
+  internalNotes String?
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application SponsorApplication @relation(fields: [applicationId], references: [id])
+  slot        SponsorshipSlot?   @relation(fields: [slotId], references: [id])
+  entity      Entity?            @relation(fields: [entityId], references: [id])
+  payments    SponsorPayment[]
+  placements  SponsorPlacement[]
+
+  @@index([paymentStatus])
+  @@index([isActive])
+}
+
+model SponsorPayment {
+  id          String   @id @default(cuid())
+  dealId      String
+  amountCents Int
+  paidAt      DateTime
+  method      String?
+  reference   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  deal SponsorDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+model SponsorPlacement {
+  id            String               @id @default(cuid())
+  dealId        String
+  placementType SponsorPlacementType
+  label         String?
+  assetUrl      String?
+  altText       String?
+  linkUrl       String?
+  impressions   Int                  @default(0)
+  clicks        Int                  @default(0)
+  isActive      Boolean              @default(true)
+  activatedAt   DateTime?
+  expiresAt     DateTime?
+  notes         String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  deal SponsorDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, isActive])
+  @@index([placementType, isActive])
+}
+
+// ── Sponsor Placement Engine ──────────────────────────────────────────────────
+
+model SponsorTier {
+  id           String  @id @default(cuid())
+  key          String  @unique
+  label        String
+  displayOrder Int     @default(0)
+  description  String?
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  assignments SponsorAssignment[]
+}
+
+enum SponsorAssignmentScopeType {
+  SERIES
+  EVENT
+}
+
+enum LogoVariant {
+  FULL_COLOR
+  MONO_LIGHT
+  MONO_DARK
+}
+
+model SponsorAssignment {
+  id        String                     @id @default(cuid())
+  entityId  String
+  scopeType SponsorAssignmentScopeType
+  scopeId   String
+
+  tierId    String
+  sortOrder Int    @default(0)
+
+  logoUrl             String?
+  logoVariant         LogoVariant @default(FULL_COLOR)
+  displayNameOverride String?
+  websiteUrl          String?
+
+  isActive          Boolean @default(true)
+  showOnEventPage   Boolean @default(true)
+  showOnTicket      Boolean @default(true)
+  showOnEmail       Boolean @default(true)
+  showOnCheckInView Boolean @default(false)
+
+  notes           String?
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entity    Entity      @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  tier      SponsorTier @relation(fields: [tierId], references: [id])
+  createdBy User?       @relation("SponsorAssignmentCreator", fields: [createdByUserId], references: [id])
+
+  @@index([scopeType, scopeId, isActive])
+  @@index([tierId, sortOrder])
+}
+
+// ── Profiles + Accounts Architecture ─────────────────────────────────────────
+// Phase 1 additive tables — existing Entity/User tables remain intact
+
+enum ProfileType {
+  PERSON
+  COMPANY
+}
+
+enum ProfileStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum AccountProfileRelationship {
+  OWNER
+  MANAGER
+  MEMBER
+  REPRESENTATIVE
+  HOST
+  EDITOR
+  VIEWER
+  BILLING_CONTACT
+}
+
+enum ProfileRelationshipType {
+  MEMBER_OF
+  REPRESENTS
+  OWNS
+  SUBSIDIARY_OF
+  PARTNER_OF
+  HOSTED_BY
+  MANAGED_BY
+  BRAND_OF
+}
+
+enum SeriesAssignmentRole {
+  HOST
+  CO_HOST
+  MC
+  PRESENTER
+  PARTNER
+  SPONSOR
+  CURATOR
+  REFERRER_ORG
+}
+
+model Profile {
+  id          String      @id @default(cuid())
+  profileType ProfileType
+  displayName String
+  legalName   String?
+  slug        String?     @unique
+
+  primaryCategory String?
+  categories      String[] @default([])
+
+  bio              String?
+  shortDescription String?
+
+  email        String?
+  phone        String?
+  websiteUrl   String?
+  instagramUrl String?
+  twitterUrl   String?
+
+  avatarUrl     String?
+  logoUrl       String?
+  coverImageUrl String?
+
+  publicVisible        Boolean @default(false)
+  compensationEligible Boolean @default(false)
+  assignableToSeries   Boolean @default(true)
+  assignableToSessions Boolean @default(true)
+
+  status   ProfileStatus @default(ACTIVE)
+  metadata Json          @default("{}")
+
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  createdBy User? @relation("ProfileCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy User? @relation("ProfileUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  accountLinks          AccountProfileLink[]
+  compensationSettings  ProfileCompensationSettings?
+  parentRelationships   ProfileRelationship[]        @relation("ParentProfile")
+  childRelationships    ProfileRelationship[]        @relation("ChildProfile")
+  seriesAssignments     SeriesProfileAssignment[]
+  sessionAssignments    SessionProfileAssignment[]
+  subHosts              RestaurantHostProfile[]      @relation("CompanySubHosts")
+  commissionedReferrers EventReferrerAssignment[]    @relation("EntityCommissionedReferrers")
+
+  @@index([profileType])
+  @@index([status])
+  @@index([primaryCategory])
+  @@index([publicVisible])
+}
+
+model AccountProfileLink {
+  id        String @id @default(cuid())
+  userId    String
+  profileId String
+
+  relationshipType       AccountProfileRelationship
+  canManage              Boolean                    @default(false)
+  isPrimary              Boolean                    @default(false)
+  isPublicRepresentative Boolean                    @default(false)
+
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId, relationshipType])
+  @@index([userId])
+  @@index([profileId])
+}
+
+model ProfileRelationship {
+  id               String                  @id @default(cuid())
+  parentProfileId  String
+  childProfileId   String
+  relationshipType ProfileRelationshipType
+
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  parentProfile Profile @relation("ParentProfile", fields: [parentProfileId], references: [id], onDelete: Cascade)
+  childProfile  Profile @relation("ChildProfile", fields: [childProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([parentProfileId, childProfileId, relationshipType])
+  @@index([parentProfileId])
+  @@index([childProfileId])
+}
+
+model SeriesProfileAssignment {
+  id             String               @id @default(cuid())
+  seriesId       String
+  profileId      String
+  assignmentRole SeriesAssignmentRole
+  displayOrder   Int                  @default(0)
+  isPrimary      Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+
+  series  Series  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, profileId, assignmentRole])
+  @@index([seriesId])
+  @@index([profileId])
+}
+
+model SessionProfileAssignment {
+  id             String               @id @default(cuid())
+  sessionId      String
+  profileId      String
+  assignmentRole SeriesAssignmentRole
+  displayOrder   Int                  @default(0)
+  isPrimary      Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, profileId, assignmentRole])
+  @@index([sessionId])
+  @@index([profileId])
+}
+
+model ProfileCompensationSettings {
+  id                 String  @id @default(cuid())
+  profileId          String  @unique
+  compensationPlanId String?
+  payoutEnabled      Boolean @default(false)
+  payoutMethod       String?
+  payoutMetadata     Json    @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model HostChatSession {
+  id            String   @id @default(cuid())
+  guestToken    String   @unique @default(cuid())
+  guestName     String
+  guestPhone    String?
+  guestEmail    String?
+  language      String   @default("en")
+  status        String   @default("OPEN")
+  reservationId String?
+  venueId       String
+  hostUserId    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  messages    HostChatMessage[]
+  venue       Venue             @relation(fields: [venueId], references: [id])
+  host        User?             @relation("HostChatAssigned", fields: [hostUserId], references: [id])
+  reservation Reservation?      @relation(fields: [reservationId], references: [id])
+
+  @@index([venueId, status])
+  @@index([guestToken])
+}
+
+model HostChatMessage {
+  id         String   @id @default(cuid())
+  sessionId  String
+  senderRole String
+  content    String
+  createdAt  DateTime @default(now())
+
+  session HostChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+// ─── Streetside scan permissions & event check-in ────────────────────────────
+
+model StreetsideScanConfig {
+  id                       String   @id @default(cuid())
+  userId                   String?  @unique
+  isGlobalDefault          Boolean  @default(false)
+  canScanMembers           Boolean  @default(true)
+  canScanTickets           Boolean  @default(false)
+  canScanReservationBlocks Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isGlobalDefault])
+}
+
+model ReservationBlock {
+  id             String   @id @default(cuid())
+  seriesId       String
+  sessionId      String?
+  groupLabel     String
+  expectedCount  Int
+  qrCode         String   @unique @default(cuid())
+  giftBagEnabled Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  series   Series                    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  session  Session?                  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  arrivals ReservationBlockArrival[]
+
+  @@index([seriesId])
+  @@index([sessionId])
+  @@index([qrCode])
+}
+
+model ReservationBlockArrival {
+  id              String   @id @default(cuid())
+  blockId         String
+  partySize       Int      @default(1)
+  scannedByUserId String
+  arrivedAt       DateTime @default(now())
+
+  block     ReservationBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  scannedBy User             @relation("BlockArrivalScannedBy", fields: [scannedByUserId], references: [id])
+
+  @@index([blockId])
+}
+
+model GiftBagLog {
+  id             String   @id @default(cuid())
+  ticketId       String?
+  blockArrivalId String?
+  sessionId      String?
+  givenByUserId  String
+  quantity       Int      @default(1)
+  createdAt      DateTime @default(now())
+
+  ticket  Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  givenBy User    @relation("GiftBagLogGivenBy", fields: [givenByUserId], references: [id])
+
+  @@unique([ticketId])
+  @@unique([blockArrivalId])
+  @@index([sessionId])
+}
+
+// ─── INVU Integration ─────────────────────────────────────────────────────────
+
+enum ApiUserType {
+  API_ADMINISTRATOR
+  API_BASIC
+}
+
+enum InvuCredentialStatus {
+  CONNECTED
+  EXPIRED
+  FAILED
+  NEEDS_REAUTH
+  DISCONNECTED
+}
+
+enum SyncScopeType {
+  CLOSED_ORDERS
+  INVOICE_TOTALS
+  PAYMENTS
+  CLIENTS
+  CREDIT_NOTES
+  REVERSALS
+  ORDER_TOTALS
+  MANUAL_TEST
+  ALL
+}
+
+enum SyncRunStatus {
+  STARTED
+  SUCCESS
+  PARTIAL_FAILURE
+  FAILED
+}
+
+enum MatchMethod {
+  AUTO
+  MANUAL
+  UNMATCHED
+}
+
+enum TableSessionStatus {
+  PENDING_REVIEW
+  MATCHED
+  DISPUTED
+  CLOSED
+}
+
+enum EarnerType {
+  REFERRER
+  HOST
+  PARTNER
+  INFLUENCER
+  OTHER
+}
+
+enum CommissionAllocationStatus {
+  PENDING
+  APPROVED
+  PAID
+  DISPUTED
+  REVERSED
+}
+
+model InvuIntegrationCredential {
+  id                   String               @id @default(cuid())
+  venueId              String               @unique
+  apiUsernameEncrypted String
+  apiPasswordEncrypted String
+  accessTokenEncrypted String?
+  accessTokenMasked    String?
+  accessTokenIssuedAt  DateTime?
+  accessTokenExpiresAt DateTime?
+  tokenLastRotatedAt   DateTime?
+  apiUserType          ApiUserType          @default(API_BASIC)
+  apiUserExpiresAt     DateTime?
+  branchScoped         Boolean              @default(false)
+  status               InvuCredentialStatus @default(DISCONNECTED)
+  lastAuthSucceededAt  DateTime?
+  lastAuthFailedAt     DateTime?
+  lastAuthError        String?
+  isEnabled            Boolean              @default(true)
+  createdByUserId      String?
+  updatedByUserId      String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  venue          Venue                      @relation(fields: [venueId], references: [id])
+  branchMappings IntegrationBranchMapping[]
+
+  @@index([venueId])
+  @@index([status])
+}
+
+model IntegrationBranchMapping {
+  id                   String    @id @default(cuid())
+  venueId              String
+  credentialId         String
+  invuBranchId         String
+  invuBranchLabel      String?
+  isSyncEnabled        Boolean   @default(false)
+  syncIntervalMinutes  Int       @default(15)
+  syncScopeJson        Json      @default("{\"closedOrders\":true,\"invoiceTotals\":true,\"payments\":true,\"clients\":false,\"creditNotes\":true,\"reversals\":true,\"orderTotals\":true}")
+  lastSuccessfulSyncAt DateTime?
+  lastFailedSyncAt     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  venue      Venue                     @relation(fields: [venueId], references: [id])
+  credential InvuIntegrationCredential @relation(fields: [credentialId], references: [id])
+  syncRuns   IntegrationSyncRun[]
+
+  @@index([venueId])
+  @@index([credentialId])
+}
+
+model IntegrationSyncRun {
+  id                String        @id @default(cuid())
+  credentialId      String
+  venueId           String?
+  branchMappingId   String?
+  scopeType         SyncScopeType @default(MANUAL_TEST)
+  triggeredByUserId String?
+  status            SyncRunStatus @default(STARTED)
+  ordersPulledCount Int           @default(0)
+  matchedCount      Int           @default(0)
+  unmatchedCount    Int           @default(0)
+  errorCount        Int           @default(0)
+  checkpointStart   DateTime?
+  checkpointEnd     DateTime?
+  startedAt         DateTime      @default(now())
+  finishedAt        DateTime?
+  syncedAt          DateTime?
+  summaryJson       Json?
+
+  branchMapping IntegrationBranchMapping? @relation(fields: [branchMappingId], references: [id])
+  errors        IntegrationSyncError[]
+
+  @@index([credentialId, startedAt])
+  @@index([credentialId])
+  @@index([branchMappingId])
+  @@index([status])
+}
+
+model IntegrationSyncError {
+  id               String   @id @default(cuid())
+  syncRunId        String
+  errorCode        String?
+  errorMessage     String
+  errorContextJson Json?
+  createdAt        DateTime @default(now())
+
+  syncRun IntegrationSyncRun @relation(fields: [syncRunId], references: [id])
+
+  @@index([syncRunId])
+}
+
+model TableSession {
+  id                  String             @id @default(cuid())
+  reservationId       String?
+  invuOrderId         String?
+  invuOrderJson       Json?
+  venueId             String
+  tableLabel          String?
+  openedAt            DateTime?
+  closedAt            DateTime?
+  grossCents          Int                @default(0)
+  discountCents       Int                @default(0)
+  taxCents            Int                @default(0)
+  tipCents            Int                @default(0)
+  refundCents         Int                @default(0)
+  netRevenueCents     Int                @default(0)
+  commissionableCents Int                @default(0)
+  trustScore          Float              @default(0.0)
+  matchMethod         MatchMethod        @default(UNMATCHED)
+  status              TableSessionStatus @default(PENDING_REVIEW)
+  reviewedAt          DateTime?
+  syncRunId           String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Deterministic trust chain (Task #55)
+  attributionSessionId   String?                     @unique
+  bookingCode            String?                     @unique
+  invuReferenceWritten   Boolean                     @default(false)
+  invuReferenceWrittenAt DateTime?
+  invuReferenceField     String?
+  openedInvuOrderId      String?
+  matchTier              MatchTier?
+  matchStatus            DeterministicMatchStatus    @default(UNMATCHED)
+  matchConfidence        Float                       @default(0)
+  matchProofId           String?                     @unique
+  syncStatus             InvuSyncStatus              @default(NOT_SEEN)
+  commissionEligibility  CommissionEligibilityStatus @default(NOT_ELIGIBLE)
+
+  reservation        Reservation?           @relation(fields: [reservationId], references: [id])
+  venue              Venue                  @relation(fields: [venueId], references: [id])
+  allocations        CommissionAllocation[]
+  attributionSession AttributionSession?    @relation("AttributionToTableSession", fields: [attributionSessionId], references: [id])
+  matchProof         MatchProof?            @relation(fields: [matchProofId], references: [id])
+  manualOverride     ManualMatchOverride?
+  invuOrders         InvuOrderNormalized[]  @relation("TableSessionInvuOrders")
+
+  @@index([venueId])
+  @@index([venueId, closedAt])
+  @@index([reservationId])
+  @@index([invuOrderId])
+  @@index([status])
+  @@index([matchMethod])
+  @@index([matchStatus])
+  @@index([syncStatus])
+  @@index([commissionEligibility])
+  @@index([openedInvuOrderId])
+}
+
+model CommissionAllocation {
+  id                     String                     @id @default(cuid())
+  tableSessionId         String
+  earnerType             EarnerType
+  earnerRefId            String
+  amountCents            Int
+  currency               String                     @default("USD")
+  status                 CommissionAllocationStatus @default(PENDING)
+  commissionRuleSnapshot Json
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  tableSession TableSession  @relation(fields: [tableSessionId], references: [id])
+  ledgerEvents LedgerEvent[] @relation("LedgerEventCommissionAllocation")
+
+  // Hard idempotency guard for auto-minting. Re-minting after a REVERSED
+  // allocation requires an explicit admin flow that first deletes the old
+  // row, which preserves the trust-chain invariant that no two live
+  // allocations can ever exist for the same (session, earner) pair.
+  @@unique([tableSessionId, earnerType, earnerRefId])
+  @@index([tableSessionId])
+  @@index([earnerType, earnerRefId])
+  @@index([status])
+}
+
+// ─── INVU Sync Engine — Raw, Normalized & Review Queue ────────────────────────
+
+enum InvuPayloadType {
+  CLOSED_ORDER
+  INVOICE_TOTAL
+  PAYMENT_SUMMARY
+  CREDIT_NOTE
+  ORDER_TOTAL
+}
+
+enum InvuOrderStatusCanonical {
+  OPEN
+  CLOSED
+  VOIDED
+  CREDITED
+  PARTIALLY_CREDITED
+  UNKNOWN
+}
+
+enum ReviewIssueType {
+  NO_MATCH
+  LOW_CONFIDENCE_MATCH
+  MULTIPLE_MATCHES
+  PAYMENT_MISMATCH
+  CREDIT_NOTE_AMBIGUITY
+  MISSING_TABLE
+  DUPLICATE_ORDER
+  FULL_DISCOUNT
+  OTHER
+}
+
+enum ReviewQueueStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+model InvuOrderRaw {
+  id               String          @id @default(cuid())
+  syncRunId        String
+  venueId          String
+  branchMappingId  String?
+  externalOrderRef String?
+  invuOrderId      String?
+  payloadType      InvuPayloadType
+  payloadJson      Json
+  payloadChecksum  String
+  pulledAt         DateTime
+  createdAt        DateTime        @default(now())
+
+  @@index([syncRunId])
+  @@index([invuOrderId])
+  @@index([venueId, pulledAt])
+}
+
+model InvuOrderNormalized {
+  id                String                   @id @default(cuid())
+  syncRunId         String
+  rawRecordId       String                   @unique
+  venueId           String
+  branchMappingId   String?
+  payloadType       InvuPayloadType          @default(CLOSED_ORDER)
+  invuOrderId       String?
+  publicOrderNumber String?
+  tableLabel        String?
+  tableIdRaw        String?
+  customerName      String?
+  guestCount        Int?
+  openedAt          DateTime?
+  closedAt          DateTime?
+  statusRaw         String?
+  statusCanonical   InvuOrderStatusCanonical
+  grossCents        Int                      @default(0)
+  discountCents     Int                      @default(0)
+  taxCents          Int                      @default(0)
+  tipCents          Int                      @default(0)
+  refundCents       Int                      @default(0)
+  netRevenueCents   Int                      @default(0)
+  currency          String                   @default("USD")
+  normalizedJson    Json
+  // Task #55: deterministic reference fields parsed off the INVU payload.
+  externalReference String?
+  bookingCodeRef    String?
+  // Bound table session (split-check rollup target).
+  tableSessionId    String?
+  tableSession      TableSession?            @relation("TableSessionInvuOrders", fields: [tableSessionId], references: [id])
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([syncRunId])
+  @@index([invuOrderId])
+  @@index([venueId, closedAt])
+  @@index([tableSessionId])
+  @@index([bookingCodeRef])
+}
+
+model IntegrationReviewQueue {
+  id                    String            @id @default(cuid())
+  venueId               String
+  syncRunId             String?
+  reservationId         String?
+  tableSessionId        String?
+  invuOrderNormalizedId String?
+  issueType             ReviewIssueType
+  status                ReviewQueueStatus @default(OPEN)
+  confidenceScore       Float?
+  summary               String
+  detailJson            Json?
+  assignedToUserId      String?
+  resolvedAt            DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([venueId, status])
+  @@index([tableSessionId])
+  @@index([reservationId])
+}
+
+// ─── Task #55: Deterministic INVU Trust Chain ────────────────────────────────
+
+enum AttributionSessionKind {
+  RESERVATION
+  WALKIN
+  // A ticket was purchased via an event-referrer QR / link. The session has
+  // no reservationId; it carries orderId instead. Status is set to
+  // VERIFIED_POS_SALE at creation (the payment is already confirmed).
+  TICKET_PURCHASE
+}
+
+enum MatchTier {
+  TIER1_DETERMINISTIC
+  TIER2_OPERATIONAL
+  // TIER2_PASSIVE — table+open-time match against an OKÜ AttributionSession
+  // that the host seated but never explicitly bound to an INVU order. Same
+  // shape as TIER2_OPERATIONAL (deterministic-enough to AUTO_MATCH) but with
+  // a lower confidence (0.85) and a PASSIVE_CORRELATION binding type, so an
+  // auditor can always tell the host did NOT manually confirm.
+  TIER2_PASSIVE
+  TIER3_HEURISTIC_REVIEW
+  MANUAL_OVERRIDE
+}
+
+enum DeterministicMatchStatus {
+  UNMATCHED
+  AUTO_MATCHED
+  REVIEW_PENDING
+  MANUALLY_OVERRIDDEN
+  REJECTED
+}
+
+enum InvuSyncStatus {
+  NOT_SEEN
+  OPEN
+  CLOSED
+  VOIDED
+}
+
+enum CommissionEligibilityStatus {
+  NOT_ELIGIBLE
+  ELIGIBLE_AUTO
+  ELIGIBLE_REVIEW
+  OVERRIDE_LOCKED
+}
+
+enum OperationalBindingType {
+  TABLE_OPEN_BINDING
+  MANUAL_ADMIN_BIND
+  REFERENCE_WRITTEN_BACK
+  // PASSIVE_CORRELATION — synthetic binding stamped by the Tier-2.5
+  // matcher when an OKÜ TableSession opened at table T at time T uniquely
+  // matches an INVU order opened at the same table within ±5 min, with no
+  // host typing required. Treated identically to TABLE_OPEN_BINDING by the
+  // commission pipeline (deterministic, but lower trust score because it
+  // was inferred not declared).
+  PASSIVE_CORRELATION
+}
+
+enum MatchProofType {
+  DETERMINISTIC_REFERENCE
+  DETERMINISTIC_BOOKING_CODE
+  OPERATIONAL_BINDING
+  HEURISTIC
+  MANUAL_OVERRIDE
+}
+
+// Attribution lifecycle for QR/host bookings (Task: close attribution loop).
+// CAPTURED        — diner scanned a per-actor QR (?ref=<code>) and the booking
+//                   was created server-side; no table assigned yet.
+// SEATED          — host has seated the party; tableLabel + tableSession known.
+// POS_BIND_INTENT_RECORDED — local OperationalBinding written; OKÜ has captured
+//                   the host's intent that this booking is sitting at INVU
+//                   order #X. This is now the terminal pre-verification state
+//                   (POS_REFERENCE_WRITTEN was retired Apr 28 2026 — vendor
+//                   confirmed no API path to inject external references into
+//                   INVU orders).
+// VERIFIED_POS_SALE — INVU sync resolved the closed/paid sale to this session;
+//                     commission allocations become eligible (the only mint gate).
+// BOUND_TO_POS    — DEPRECATED. Predates the bind/intent split (Bucket D in
+//                   docs/invu-execution-roadmap.md). Retained for one release
+//                   cycle so old rows + replay buffers don't trip on a missing
+//                   value; no new writers should produce it. Drop after the
+//                   first clean reporting window post-rollout.
+// CANCELED / EXPIRED — terminal failure states (no-show, walk-out, TTL).
+enum AttributionSessionStatus {
+  CAPTURED
+  SEATED
+  POS_BIND_INTENT_RECORDED
+  BOUND_TO_POS
+  VERIFIED_POS_SALE
+  CANCELED
+  EXPIRED
+}
+
+// Where the attribution session originated. Drives downstream UI labels and
+// commission policy. QR_RESERVATION is the ?ref= public-reservation path
+// added with this loop closure; HOST_CHECKIN/HOST_WALKIN are the legacy
+// host-initiated paths; MANUAL_ADMIN is admin tooling override.
+// TICKET_PURCHASE — ticket sold online via an event-referrer code; pairs
+// with kind=TICKET_PURCHASE and orderId on the session.
+enum AttributionSessionSource {
+  QR_RESERVATION
+  HOST_CHECKIN
+  HOST_WALKIN
+  MANUAL_ADMIN
+  DIRECT
+  TICKET_PURCHASE
+}
+
+// Anchor lifecycle for attribution sessions. Separates "where did this come
+// from" (source) from "was the referrer chain fully written" (anchorStatus).
+//  - ANCHORED:            the session was fully attributed at booking time.
+//  - PENDING_ATTRIBUTION: the referral branch threw after a referrer context
+//                         was resolved; the correct source is preserved and the
+//                         failure reason is in anchorLastError. A background
+//                         retry job will attempt to complete the anchoring.
+//  - FAILED_REVIEW:       the retry job exhausted its retries; an admin must
+//                         manually resolve using the preserved referrer context.
+enum AnchorStatus {
+  ANCHORED
+  PENDING_ATTRIBUTION
+  FAILED_REVIEW
+}
+
+model AttributionSession {
+  id                String                 @id @default(cuid())
+  kind              AttributionSessionKind
+  venueId           String
+  reservationId     String?                @unique
+  // For TICKET_PURCHASE sessions: the confirmed order that produced this
+  // session. Mutually exclusive with reservationId — exactly one will be
+  // non-null depending on kind. The @unique constraint ensures a single
+  // attribution session per order (race-safe).
+  orderId           String?                @unique
+  walkinContactName String?
+  walkinPartySize   Int?
+  walkinNotes       String?
+  bookingCode       String                 @unique
+  tableLabel        String?
+  zoneId            String?
+  hostUserId        String?
+  hostProfileId     String?
+  referralActorId   String?
+  legacyReferrerId  String?
+  // Proof-chain context — which exact ReferralLink produced the booking.
+  // Written at booking time on the success path; preserved on PENDING_ATTRIBUTION
+  // so the retry job and admin can re-anchor without losing the original context.
+  referralLinkId    String?
+  openedAt          DateTime               @default(now())
+  closedAt          DateTime?
+  createdByUserId   String?
+
+  // Attribution loop lifecycle. `source` defaults to HOST_CHECKIN so legacy
+  // rows backfill to the most common origin; new code MUST pass an explicit
+  // source. `status` defaults to CAPTURED at insert and is advanced through
+  // SEATED → BOUND_TO_POS → VERIFIED_POS_SALE by the host/INVU pipelines.
+  // Denormalized invuOrderId/bindMethod let the host card render bind state
+  // without a join to OperationalBinding (the source of truth there is still
+  // OperationalBinding; these mirror the latest successful claim).
+  source      AttributionSessionSource @default(HOST_CHECKIN)
+  status      AttributionSessionStatus @default(CAPTURED)
+  seatedAt    DateTime?
+  boundAt     DateTime?
+  verifiedAt  DateTime?
+  invuOrderId String?
+  bindMethod  String?
+
+  // Anchor tracking fields (Task #180). Defaults to ANCHORED so all existing
+  // rows are treated as fully attributed. New rows written in the referral
+  // branch set PENDING_ATTRIBUTION when the write fails after a referrer
+  // context was resolved; the retry worker flips to ANCHORED or FAILED_REVIEW.
+  anchorStatus        AnchorStatus @default(ANCHORED)
+  anchorRetryCount    Int          @default(0)
+  anchorLastError     String?
+  anchorLastAttemptAt DateTime?
+  anchorResolvedAt    DateTime?
+
+  venue        Venue                @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  reservation  Reservation?         @relation("ReservationAttributionSession", fields: [reservationId], references: [id])
+  // Ticket-purchase back-relation (TICKET_PURCHASE sessions only).
+  order        Order?               @relation("AttributionSessionOrder", fields: [orderId], references: [id])
+  zone         Zone?                @relation(fields: [zoneId], references: [id])
+  tableSession TableSession?        @relation("AttributionToTableSession")
+  bindings     OperationalBinding[]
+  matchProofs  MatchProof[]
+
+  // Wired up so the host UI can render the attributing actor's display name
+  // straight off the session — no second roundtrip needed. Both sides are
+  // optional because a HOST_CHECKIN session has neither, and a QR_RESERVATION
+  // session may carry only one of the two depending on whether the actor
+  // came in through the new ReferralActor chain or the legacy Referrer table.
+  referralActor  ReferralActor? @relation("AttributionSessionActor", fields: [referralActorId], references: [id])
+  legacyReferrer Referrer?      @relation("AttributionSessionLegacy", fields: [legacyReferrerId], references: [id])
+  ledgerEvents   LedgerEvent[]  @relation("LedgerEventAttributionSession")
+
+  @@index([venueId, openedAt])
+  @@index([referralActorId])
+  @@index([hostUserId])
+  @@index([zoneId])
+  @@index([status])
+  @@index([source])
+  @@index([orderId])
+  @@index([anchorStatus])
+  @@index([referralLinkId])
+}
+
+model OperationalBinding {
+  id                   String                 @id @default(cuid())
+  attributionSessionId String
+  invuOrderId          String
+  bindingType          OperationalBindingType
+  boundByUserId        String?
+  supportingDataJson   Json
+  createdAt            DateTime               @default(now())
+
+  attributionSession AttributionSession @relation(fields: [attributionSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([invuOrderId, attributionSessionId])
+  @@unique([invuOrderId], name: "OperationalBinding_invuOrderId_global_key")
+  @@index([attributionSessionId])
+}
+
+model MatchProof {
+  id                    String         @id @default(cuid())
+  matchProofType        MatchProofType
+  matchTier             MatchTier
+  confidence            Float
+  attributionSessionId  String?
+  reservationId         String?
+  invuOrderNormalizedId String?
+  invuOrderId           String?
+  bookingCode           String?
+  sourceField           String?
+  supportingDataJson    Json
+  createdByUserId       String?
+  createdAt             DateTime       @default(now())
+
+  attributionSession AttributionSession? @relation(fields: [attributionSessionId], references: [id])
+  reservation        Reservation?        @relation(fields: [reservationId], references: [id])
+  tableSessions      TableSession[]
+
+  @@index([attributionSessionId])
+  @@index([invuOrderId])
+  @@index([reservationId])
+  @@index([matchTier])
+}
+
+model ManualMatchOverride {
+  id                 String   @id @default(cuid())
+  tableSessionId     String   @unique
+  performedByUserId  String
+  reason             String
+  previousMatchProof Json?
+  createdAt          DateTime @default(now())
+
+  tableSession TableSession @relation(fields: [tableSessionId], references: [id], onDelete: Cascade)
+}
+
+// ─── Venue Menus (DB-backed source of truth) ───────────────────────────────
+// Mirrors the legacy types in src/data/venues/menus.ts. Translatable fields
+// are stored as Json holding { en, es, pt }. Plain string fallback supported.
+
+enum VenueMenuType {
+  FOOD
+  DRINKS
+}
+
+model VenueMenuRecord {
+  id           String            @id @default(cuid())
+  venueSlug    String // matches Venue.slug or static "oku"|"catch"|"terrace"
+  menuType     VenueMenuType
+  menuTitle    Json // { en, es, pt } | string
+  intro        Json?
+  pdfUrl       String?
+  sortOrder    Int               @default(0)
+  isPublished  Boolean           @default(true)
+  // House menu = the venue's standing menu shown on the venue page.
+  // Event-only duplicates set isHouseMenu=false so they don't leak to
+  // venue-wide listings. House-menu uniqueness per (venueSlug, menuType)
+  // is enforced at the application layer because Prisma cannot express
+  // partial unique indexes portably.
+  isHouseMenu  Boolean           @default(true)
+  // When this menu was created by duplicating another, link to the source
+  // for traceability ("derived from House Food Menu on 2026-04-23").
+  parentMenuId String?
+  parent       VenueMenuRecord?  @relation("MenuLineage", fields: [parentMenuId], references: [id], onDelete: SetNull)
+  copies       VenueMenuRecord[] @relation("MenuLineage")
+
+  sections   MenuSectionRecord[]
+  eventLinks EventMenuLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueSlug, menuType])
+  @@index([venueSlug])
+  @@index([parentMenuId])
+}
+
+// Many-to-many between Series (events) and VenueMenuRecord. A single
+// "Tasting Menu Vol 3" can be reused across multiple events, and one event
+// can carry multiple menus (e.g. food + drinks).
+model EventMenuLink {
+  id        String   @id @default(cuid())
+  seriesId  String
+  menuId    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  series Series          @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  menu   VenueMenuRecord @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, menuId])
+  @@index([seriesId])
+  @@index([menuId])
+}
+
+model MenuSectionRecord {
+  id          String @id @default(cuid())
+  menuId      String
+  title       Json // { en, es, pt } | string
+  subtitle    Json?
+  description Json?
+  sortOrder   Int    @default(0)
+
+  menu  VenueMenuRecord  @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  items MenuItemRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([menuId])
+}
+
+model MenuItemRecord {
+  id          String   @id @default(cuid())
+  sectionId   String
+  name        Json // { en, es, pt } | string
+  description Json?
+  price       String?
+  dietary     String[] @default([])
+  tags        String[] @default([])
+  sortOrder   Int      @default(0)
+  isAvailable Boolean  @default(true)
+
+  section MenuSectionRecord @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sectionId])
+}
+
+// ─── ProofPay — Canonical Ledger Events ─────────────────────────────────────
+// A shared event vocabulary for attribution, reservation, and capacity events.
+// Every material state change in the platform should emit a LedgerEvent so
+// admins, investors, and referrers can read the same proof of what happened.
+// Deduplication is ingest-time: when the same (sourceRecordId, idempotencyKey)
+// arrives again, the existing row's duplicateCount is incremented and
+// lastDuplicateAt is updated — no separate error row is written.
+
+enum LedgerEventType {
+  // Referral lifecycle
+  REFERRAL_SCANNED
+
+  // Reservation lifecycle
+  RESERVATION_REQUESTED
+  RESERVATION_CONFIRMED
+  RESERVATION_MODIFIED
+  RESERVATION_CANCELLED
+  RESERVATION_NO_SHOW
+  GUEST_ARRIVED
+  GUEST_SEATED
+
+  // Capacity lifecycle
+  CAPACITY_HOLD_CREATED
+  CAPACITY_HOLD_RELEASED
+  CAPACITY_WARNING_SHOWN
+  CAPACITY_OVERRIDDEN_BY_HOST
+
+  // Attribution anchor lifecycle
+  ATTRIBUTION_ANCHOR_PENDING
+  ATTRIBUTION_ANCHOR_RESOLVED
+  ATTRIBUTION_ANCHOR_FAILED
+
+  // POS / financial events
+  // Emitted when an INVU (or equivalent POS) check closes and triggers
+  // commission minting. Distinct from attribution lifecycle events so
+  // the two concerns remain independently queryable.
+  POS_CHECK_CLOSED
+}
+
+enum ConfidenceClass {
+  // POS-sourced event: verified by INVU or equivalent payment system
+  VERIFIED_POS_EVENT
+  // Partner-reported event: trusted third-party source (no POS verification)
+  PARTNER_REPORTED_EVENT
+  // Customer-claimed event: guest self-reported (lowest automated trust)
+  CUSTOMER_CLAIMED_EVENT
+  // Flagged for manual review by an admin before any downstream action
+  MANUAL_REVIEW_EVENT
+  // Derived or interpolated — no direct evidence, used for analytics only
+  ESTIMATED_EVENT
+}
+
+model LedgerEvent {
+  id              String           @id @default(cuid())
+  eventType       LedgerEventType
+  sourceSystem    String           // e.g. "invu", "reservations_api", "host_ops"
+  sourceConnector String?          // e.g. "invu_v2", "resend", null for internal
+  sourceRecordId  String?          // external ID from the originating system (nullable for internal events)
+  idempotencyKey  String           // deterministic key; callers must mint this before calling emitLedgerEvent
+  occurredAt      DateTime
+  receivedAt      DateTime         @default(now())
+  confidenceClass ConfidenceClass
+  rawPayloadRef   String?          // reference to blob storage or a JSON snapshot
+  auditTraceId    String?          // cross-system correlation ID (e.g. X-Request-ID)
+
+  // Deduplication counters — updated in-place when the same event arrives again
+  duplicateCount    Int       @default(0)
+  lastDuplicateAt   DateTime?
+
+  // Nullable FKs to domain entities — set whichever apply to this event
+  attributionSessionId   String?
+  reservationId          String?
+  capacityHoldId         String?
+  commissionAllocationId String?
+
+  // Payload snapshot (JSONB) — structured fields extracted from rawPayloadRef
+  // for fast querying without full blob retrieval
+  payload Json?
+
+  attributionSession   AttributionSession?   @relation("LedgerEventAttributionSession", fields: [attributionSessionId], references: [id], onDelete: SetNull)
+  reservation          Reservation?          @relation("LedgerEventReservation", fields: [reservationId], references: [id], onDelete: SetNull)
+  capacityHold         CapacityHold?         @relation("LedgerEventCapacityHold", fields: [capacityHoldId], references: [id], onDelete: SetNull)
+  commissionAllocation CommissionAllocation? @relation("LedgerEventCommissionAllocation", fields: [commissionAllocationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Unique deduplication index for external-source events (sourceRecordId IS NOT NULL).
+  // Including sourceSystem prevents cross-connector collision: two different external
+  // systems that happen to use the same recordId + idempotencyKey format do not collide.
+  // sourceConnector is intentionally excluded — it is nullable and PostgreSQL NULL!=NULL
+  // semantics would silently skip deduplication when connector is absent.
+  // Internal (null-sourceRecordId) events are deduplicated by the partial unique index
+  // in the migration: CREATE UNIQUE INDEX ... WHERE sourceRecordId IS NULL.
+  @@unique([sourceSystem, sourceRecordId, idempotencyKey], name: "LedgerEvent_dedup_key")
+  @@index([eventType])
+  @@index([idempotencyKey])
+  @@index([attributionSessionId])
+  @@index([reservationId])
+  @@index([capacityHoldId])
+  @@index([commissionAllocationId])
+  @@index([occurredAt])
+  @@index([confidenceClass])
+}

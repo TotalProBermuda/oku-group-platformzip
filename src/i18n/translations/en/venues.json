@@ -1,0 +1,78 @@
+{
+  "backToGroup": "OKÜ Hospitality Group",
+  "ourRestaurants": "Our Restaurants",
+  "restaurantsSubtitle": "Three distinct dining experiences under one roof — each with its own identity, cuisine, and atmosphere.",
+  "reserveArrow": "Reserve a Table →",
+  "viewProfile": "View Profile",
+  "cuisine": "Cuisine",
+  "covers": "Covers",
+  "setting": "Setting",
+  "hours": "Hours",
+  "dress": "Dress",
+  "about": "About",
+  "theMenu": "The Menu",
+  "drinkMenu": "Drink Menu",
+  "scroll": "Scroll",
+  "photography": "Photography © OKÜ Hospitality Group",
+  "theKitchen": "The Kitchen",
+  "atTheBar": "At the Bar",
+  "theSpace": "The Space",
+  "seats": "seats",
+  "oku": {
+    "headline": "Intimate Fine Dining",
+    "tagline": "White linen. Candlelight. Structured service for 27.",
+    "tag": "Fine Dining",
+    "description": "OKÜ is our flagship dining room — an intimate, chef-driven experience rooted in modern Mediterranean cuisine. The room seats 27 and every table feels like a private affair.",
+    "heroLine1": "Intimate.",
+    "heroLine2": "Deliberate.",
+    "heroLine3": "27 covers.",
+    "cuisine": "Modern Mediterranean",
+    "setting": "Indoor · Air-conditioned",
+    "dresscode": "Smart casual to formal",
+    "about": [
+      "Named after the group it anchors, OKÜ is a study in restraint. Crisp white linen, hand-blown glassware, and a kitchen that believes simplicity is the highest form of sophistication.",
+      "The menu changes with the season — drawing from producers across the Mediterranean. Iberian cured meats, Sicilian citrus, Aegean olive oils — composed into tasting menus that feel inevitable rather than constructed.",
+      "The dining room holds 27. The lighting is always exactly right."
+    ],
+    "sushiBarHeading": "The Sushi Counter",
+    "sushiBarBody": "At the heart of OKÜ sits an intimate sushi counter. Each day the chefs prepare fresh cuts from whole fish selected by our suppliers — tuna, salmon, octopus — displayed in the illuminated case for guests to see before they order.",
+    "cocktailHeading": "Crafted\nwith intention.",
+    "cocktailBody": "Each cocktail on the OKÜ list is a small thesis — built around a single idea. A Japanese umami element expressed through sesame and yuzu. A botanical study in foam and edible flowers. A spirit-forward evening drink that reveals itself slowly over ice.",
+    "spaceHeading": "Three walls.\nOne story.",
+    "spaceBody": "The fish-scale wall. The koi panel. The sushi counter. These are not décor choices — they are the identity of the room. Each element was sourced, designed, or built specifically for this space."
+  },
+  "catch": {
+    "headline": "Boho-Caribbean Nightlife",
+    "tagline": "Sharing plates, live DJs, and Caribbean energy.",
+    "tag": "Nightlife Dining",
+    "description": "CATCH is where dining meets the night. Caribbean-inspired sharing plates, a curated cocktail programme, and a rotating DJ booth make every evening an event in itself.",
+    "heroLine1": "The night",
+    "heroLine2": "starts here.",
+    "heroLine3": "",
+    "cuisine": "Caribbean-inspired sharing plates",
+    "setting": "Indoor / Outdoor hybrid",
+    "dresscode": "Smart casual",
+    "about": [
+      "CATCH was built for the hours after 9. For tables that linger, for rounds that become three, for the moment a dinner becomes a night.",
+      "The menu is designed for sharing — Caribbean-inspired plates that arrive in waves, each one an excuse to stay a little longer. The DJ booth rotates every Thursday through Saturday with local and international talent.",
+      "Rattan fixtures, exposed concrete, warm lighting. A space that's simultaneously casual and magnetic."
+    ]
+  },
+  "terrace": {
+    "headline": "Open-Air Rooftop Dining",
+    "tagline": "Patterned tile. Evening breeze. The city below.",
+    "tag": "Rooftop",
+    "description": "The Terrace is Gold House's open-air crown — 42 covers beneath the Panama sky, surrounded by hand-painted tile and lantern light. Pan-American sharing plates, crafted cocktails, and uninterrupted sunset views.",
+    "heroLine1": "The city",
+    "heroLine2": "at your feet.",
+    "heroLine3": "",
+    "cuisine": "Pan-American sharing plates",
+    "setting": "Open-air rooftop",
+    "dresscode": "Casual to smart casual",
+    "about": [
+      "The Terrace sits on the roof of Gold House and opens every evening to the Panama sky. Hand-painted Moroccan tile runs underfoot. Wrought-iron lanterns line the perimeter. Bougainvillea climbs the south wall.",
+      "The kitchen sends out Pan-American sharing plates — ceviches, anticuchos, wood-fired flatbreads — designed to be eaten slowly, over conversation, as the city transitions from day to night below.",
+      "At 42 covers, it is our largest space, and also our most beloved."
+    ]
+  }
+}

@@ -1,0 +1,134 @@
+Implement Privacy & Compliance P0 for beneficiary, payout, and financial data.
+
+Goal:
+Ensure OKÜ’s payout, beneficiary verification, and financial workflows comply with Panama’s Law 81 personal data protection framework and are designed to make users feel safe.
+
+Context:
+OKÜ collects personal, financial, and bank-readiness information for referrers, influencers, partners, hosts, vendors, and staff incentives. Banking/KYC-related fields are high-risk and must be protected with stronger controls than ordinary profile data.
+
+Legal framing:
+Panama Law 81 and Executive Decree 285 require lawful, transparent, proportional, secure, purpose-limited processing of personal data, with data subject rights and accountability. Do not treat OKÜ as the bank’s KYC authority. OKÜ records beneficiary verification and bank-readiness; Banesco remains responsible for formal banking/KYC requirements.
+
+Implement:
+
+1. Data classification
+Create a documented data classification map:
+- PUBLIC
+- INTERNAL
+- FINANCIAL
+- RESTRICTED_COMPLIANCE
+
+Classify beneficiary bank data, ID/tax/RUC, source-of-funds status, compliance notes, and document statuses as RESTRICTED_COMPLIANCE.
+
+2. Field-level access control
+Restrict restricted compliance fields:
+- SUPERADMIN: full access
+- ADMIN_FINANCE: review access
+- ADMIN_COMMERCIAL: readiness summary only
+- earners: own masked data only
+- staff/hosts: no access
+
+3. Sensitive data protection
+- Encrypt bank account, ID, tax/RUC fields using APP_ENCRYPTION_KEY.
+- Block saves if APP_ENCRYPTION_KEY is missing.
+- Never return raw sensitive values after save.
+- Mask all sensitive values in UI.
+- Never write raw sensitive data to AuditLog, error logs, analytics, or Sentry/error capture.
+
+4. Sensitive access audit
+Create audit events for:
+- beneficiary.sensitive.viewed
+- beneficiary.sensitive.updated
+- beneficiary.profile.submitted
+- beneficiary.profile.approved
+- beneficiary.profile.rejected
+- beneficiary.profile.hold
+- payout.bank_export.generated
+Do not include raw sensitive values in metadata.
+
+5. Privacy notices
+Add clear notices before beneficiary data collection:
+“OKÜ uses this information only to verify payout eligibility and process bank transfers. Sensitive values are encrypted and shown only in masked form after saving.”
+
+Add admin warning:
+“Restricted compliance data. Access to this record is logged.”
+
+6. Data subject request workflow
+Create /admin/privacy/requests:
+Request types:
+- ACCESS
+- RECTIFICATION
+- CANCELLATION
+- OPPOSITION
+- PORTABILITY
+- DEACTIVATION
+- BANK_DETAIL_CORRECTION
+
+Statuses:
+- RECEIVED
+- VERIFYING_REQUESTER
+- IN_REVIEW
+- COMPLETED
+- DENIED
+
+Allow admin to log requests and outcomes.
+
+7. Vendor / processor register
+Create /admin/privacy/vendors:
+Track:
+- vendor name
+- purpose
+- data categories shared
+- country/location
+- DPA/contract status
+- retention notes
+- risk level
+
+Seed entries:
+- Replit/hosting
+- database provider
+- Resend
+- Cybersource
+- Banesco
+- object storage if used
+- error monitoring if used
+
+8. Retention policy metadata
+Create retention categories for:
+- accounts
+- bookings/orders/tickets
+- payment references
+- beneficiary profiles
+- bank details
+- rejected verification records
+- audit logs
+- future uploaded documents
+
+Do not auto-delete yet unless already safe. Show policy metadata and prepare for future deletion workflows.
+
+9. UI trust layer
+Add safety cards on beneficiary/referrer/partner payout screens:
+- Bank payouts only
+- Encrypted sensitive fields
+- Masked after save
+- Finance review required
+- Audit trail enabled
+
+10. Security guardrails
+- Rate-limit beneficiary profile endpoints.
+- Require authenticated session.
+- Require server-side permission checks.
+- No restricted fields in client bundles.
+- No restricted fields in search indexes.
+- No restricted fields in CSV exports except bank export adapters explicitly allowed for finance.
+
+Acceptance:
+- Restricted payout/KYC fields are encrypted and masked.
+- Users see clear privacy notices before submitting bank data.
+- Finance/admin access to sensitive data is role-gated and audit-logged.
+- Admin has a privacy request register.
+- Admin has a vendor/processor register.
+- No raw bank/ID/tax data appears in AuditLog or API responses.
+- Existing payout and commission logic is unchanged.
+- Existing checkout/payment gateway logic is unchanged.
+- Dev compile passes.

@@ -1,0 +1,1234 @@
+
+
+Share
+Here is the clean technical brief.
+
+1) What we are trying to do with the API
+
+We are not trying to move commission logic into INVU.
+
+We are trying to make sure that the reservation’s source attribution survives all the way through the restaurant journey so that, when the check closes in INVU, OKÜ can say with certainty:
+
+this closed ticket came from this reservation
+that reservation came from this referrer
+therefore this referrer is owed commission on the net total before tax
+
+So the API job is:
+
+capture source in OKÜ → carry that source reference into INVU → pull the closed ticket back out of INVU → compute commission in OKÜ
+
+That is the whole purpose of the two-way sync.
+
+2) The exact two-way sync endpoints needed
+A. OKÜ → INVU: open/bind the restaurant service to the reservation
+
+This is the forward sync that makes the “magic” happen.
+
+1. Authenticate
+
+POST https://api6.invupos.com/invuApiPos/userAuth
+
+INVU’s public docs say the API uses the AUTHORIZATION header after you obtain a token, and the API user must be created by branch, not centrally. They also recommend rotating the token every 15 days.
+
+2. Create the order in INVU
+
+POST https://api6.invupos.com/invuApiPos/index.php?r=citas/add
+
+This is the key write endpoint in the public docs. The documented body fields include:
+
+cliente
+descripcion
+cerrar_orden
+invitados
+pagos
+comentario
+num_cita
+items
+id_tipo_integracion
+tipo_orden_obj
+What OKÜ should write into that order
+
+Use the documented writable fields like this:
+
+num_cita = OKÜ booking code
+comentario = compact deterministic trust string
+descripcion = human-readable summary for staff
+
+Recommended pattern:
+
+num_cita: OKU-2026-69ZPJ58Q
+comentario: OKU|RES:r_9082|TS:ts_12345|REF:Carlos01|EARNER:REFERRER
+descripcion: Carlos01 referral | 19:00 | Table T9 | OKÜ
+
+That gives OKÜ a deterministic reference to search later without asking INVU to understand your commission model.
+
+B. INVU → OKÜ: read service state and closed revenue back
+
+This is the return sync.
+
+3. Read open orders
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/ordenesAllAdv/fini/{start_date}/ffin/{end_date}/tipo/{order_status}/grouping/{grouping}
+
+The public docs explicitly show:
+
+tipo=0 = open orders
+tipo=1 = closed orders
+tipo=2 = complete credit notes
+tipo=3 = deleted orders
+tipo=4 = partial credit notes
+dates must be Epoch
+range cannot exceed one month
+
+This endpoint is how OKÜ should confirm:
+
+the order exists
+it is open
+it later closes
+and whether credit-note states affect commission.
+4. Search one specific order/invoice by booking code
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/view/id/{id}/tipo/{search_type}
+
+The public docs say:
+
+search by num_cita uses tipo=0
+search by id uses tipo=1
+
+This is your best deterministic point lookup if you store the OKÜ booking code in num_cita.
+
+5. Confirm closed totals
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/OrdenesAllTotales/fini/{start_date}/ffin/{end_date}/tipo/{order_status}
+
+The public docs say this returns totals for orders and supports the same status filtering pattern, including open, closed, deleted, and credit-note states.
+
+6. Confirm payments
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/TotalesPagosFechas/fini/{start_date}/ffin/{end_date}
+
+This returns payments and payment methods in a date range.
+
+7. Confirm order totals by date
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/totalporfecha/fini/{start_date}/ffin/{end_date}
+
+This returns totals for orders in a date range.
+
+3) The exact minimum end-to-end loop
+
+If you strip it down to essentials, the platform needs only this loop:
+
+OKÜ creates the reservation and source attribution
+OKÜ creates a unique booking code
+OKÜ writes that booking code into INVU using num_cita when the order is opened
+OKÜ later reads the open/closed order back from INVU
+OKÜ searches and reconciles by num_cita first
+OKÜ computes commission on the net before tax after refunds/credit notes
+
+That is the practical closed loop.
+
+4) What is still missing publicly from INVU
+
+INVU’s product clearly supports:
+
+table layout / mesas
+creating orders by table selection
+table service
+table identifiers
+order types that ask for table service
+
+But the public API docs do not publicly document:
+
+a table-layout endpoint
+an “open this specific table” endpoint
+a reservation object
+a “bind reservation to table” endpoint
+webhook registration for table/open/close events
+
+That is the real gap.
+
+So today, the safest public-doc implementation is:
+
+use citas/add to create the order
+carry the reservation identity in num_cita / comentario / descripcion
+query back using ordenesAllAdv, view, and totals endpoints
+
+If INVU privately exposes the same table-state endpoints OpenTable uses, that would make the bind more native, but those endpoints are not publicly documented.
+
+5) Commission earner personas
+Current commission earner personas
+
+Your current model supports these earner types:
+
+REFERRER
+HOST
+This should mean commercial/streetside host, not the in-restaurant maître d’/front-desk host unless you intentionally pay both.
+PARTNER
+INFLUENCER
+OTHER
+Future persona model
+
+All future earner types should fit the same category by using a normalized earner model:
+
+earner_type
+earner_id
+earner_display_name
+commission_rule_id
+commission_status
+
+That lets you add future types without changing the trust chain, for example:
+
+concierge
+promoter
+affiliate
+hotel desk
+event lead
+brand ambassador
+
+They all remain commission earners, just with different earner_type values.
+
+6) How the commission earner actually refers clients and sells tickets
+Portal mechanism
+
+Each commission earner gets a portal that generates:
+
+a referral code
+a QR code
+a tracked form URL
+optionally a ticket sale URL
+Technical anchor
+
+Every link/QR should carry immutable source parameters, for example:
+
+https://okuhospitalitygroup.com/reserve?ref=Carlos01&earnerType=REFERRER&campaign=gold-house
+
+or for tickets:
+
+https://okuhospitalitygroup.com/tickets/event-001?ref=Carlos01&earnerType=REFERRER
+
+What the portal actually does
+
+The earner portal needs to expose:
+
+GET /portal/referrals
+unique QR image generation
+unique referral links
+form link copy/share
+click/scan analytics
+reservations created
+ticket sales created
+seated sessions
+closed revenue
+approved commissions
+paid commissions
+Technical data flow
+
+When someone scans or clicks:
+
+landing page reads ref, earnerType, and optional campaign params
+backend resolves them to a real earner_id
+backend creates a pending attribution record
+browser stores attribution context in cookie/session/local storage
+when the reservation or ticket form is submitted, the attribution is silently attached
+customer never has to manually type the referrer
+
+That is how attribution “passes through without the customer doing anything.”
+
+7) What the customer/attendee experiences
+Step 1: scan QR or open tracked link
+
+The customer sees a clean branded OKÜ landing page.
+
+Step 2: landing page content
+
+That page should be:
+
+venue-specific
+date/time aware if relevant
+optionally event-specific
+branded to OKÜ, not to the earner personally
+What the page does behind the scenes
+
+It silently binds:
+
+earner_id
+earner_type
+campaign_id
+source_channel = qr | form | link
+landing_session_id
+Step 3: reservation form
+
+The guest fills in:
+
+name
+phone
+email
+date
+requested time
+covers
+optional occasion
+optional notes
+
+The guest does not need to:
+
+enter the referrer code
+pick the earner
+identify the campaign manually
+
+That attribution is already attached invisibly.
+
+Step 4: confirmation page
+
+After submission, the customer gets a unique confirmation code.
+
+Important engineering correction
+
+That confirmation code should be the external immutable business key for the reservation/session, not the raw database primary key for the customer.
+
+Use:
+
+internal DB primary key: UUID / numeric ID
+public business key: booking_code
+
+Why:
+
+the same customer may book many times
+the booking code belongs to the reservation/session
+customer identity should have its own customer_id
+
+So the confirmation code should be the primary external key from reservation → seating → INVU → closed ticket.
+
+8) What happens when the guest arrives at the restaurant
+Restaurant host workflow
+
+This is the in-restaurant host, not the external commission earner.
+
+The restaurant host uses the OKÜ Hospitality Group webapp to:
+
+search the reservation
+mark the guest ARRIVED
+then SEATED
+assign or confirm the table
+At that exact moment, OKÜ must automatically create
+reservation_id
+booking_code
+attribution_session_id
+table_session_id
+frozen snapshot of:
+earner_id
+earner_type
+referrer_code
+host_user_id
+zone
+table_label
+
+This is the moment the trust chain becomes operational.
+
+Then what should happen
+
+Once the host assigns the table:
+
+OKÜ should be able to open/bind the order into INVU
+OKÜ must send the booking code and attribution reference into the INVU order
+server continues service in INVU as normal
+
+Because all tables are charted and numbered in INVU’s table layout and INVU supports table-linked order creation operationally, the bind should anchor to the same numbered table/session context. INVU’s help docs explicitly describe creating an order “by table selection” in the Table Layout, and settings allow table identifiers and table service mode.
+
+9) The core commission rule
+
+The primary point of this API is:
+
+trust optimization of commission owed to the referrer, calculated as a percentage of the reservation’s net total before taxes
+
+So OKÜ should compute:
+
+commissionable_base = closed subtotal - discounts - refunds/credit notes - excluded items
+
+Then:
+
+referrer_commission = commissionable_base × commission_rate
+
+That logic stays entirely in OKÜ.
+
+10) Current state of the INVU API
+What is clearly public and usable now
+
+The public docs clearly expose:
+
+branch-scoped auth via userAuth and AUTHORIZATION header
+create order via citas/add with num_cita, comentario, descripcion, etc.
+list sales with status filters for open, closed, deleted, and credit-note states
+totals per invoice
+payments by date
+order totals by date
+search invoice by num_cita or id
+What you already have
+
+From your implementation notes, you are already:
+
+receiving closed checks
+and even seeing open checks
+
+That is consistent with the public status model because tipo=0 is open and tipo=1 is closed.
+
+What is not publicly documented enough
+
+The public API docs do not give you:
+
+a reservation CRUD model
+a reservation-to-table bind endpoint
+a mesa/table open endpoint
+a table status webhook model
+the OpenTable-style private integration contract
+
+That is why you can see orders, but you still cannot eliminate the human gap with public docs alone.
+
+11) The exact gap you want to close
+
+The biggest risk today is:
+
+You cannot link the reservation to the table autonomously enough before the sale closes.
+
+That means:
+
+the booking exists
+the referrer exists
+INVU order exists
+but the exact reservation-to-table link still depends too much on human behavior
+
+That is the gap.
+
+12) The API solution to close that gap
+The safest current solution using public endpoints
+
+At SEATED, OKÜ must automatically do all of this before any POS action:
+
+create table_session_id
+freeze attribution snapshot
+generate booking_code
+assign the chosen table
+call citas/add
+pass:
+num_cita = booking_code
+comentario = deterministic trust string
+descripcion = readable summary
+
+Then later OKÜ reads back:
+
+ordenesAllAdv for open/closed states
+view by num_cita
+totals and payment endpoints
+Why this works
+
+Because the reservation identity survives into the POS record, so OKÜ no longer needs to guess after close.
+
+13) The exact deterministic trust string
+
+Use this pattern:
+
+OKU|RES:{reservation_id}|BOOK:{booking_code}|TS:{table_session_id}|REF:{referrer_code}|EARNER:{earner_type}
+
+Example:
+
+OKU|RES:r_9082|BOOK:OKU-2026-69ZPJ58Q|TS:ts_12345|REF:Carlos01|EARNER:REFERRER
+
+Write it into comentario.
+Use num_cita for the clean short booking code.
+
+That gives you:
+
+a short lookup key
+a richer audit trail key
+deterministic post-close reconciliation
+14) What OpenTable likely has that you need from INVU privately
+
+You are right that OpenTable has an INVU integration pattern. Publicly, OpenTable describes POS integration as connecting reservation/table data and automating table-status behavior, but the exact INVU-specific field contract is not public.
+
+So the likely private pieces you would want from INVU are:
+
+table/mesa API
+open-table / occupied-table event API
+reservation reference field mapping
+webhook or push events for:
+order opened
+order closed
+credit note created
+table freed
+
+If INVU gives you that privately, then you can reduce the host’s role even further.
+If not, the public-doc solution above is still enough to complete the trust chain.
+
+15) The one-sentence brief for the API developer
+
+Build the OKÜ ↔ INVU integration so that every reservation carries a deterministic booking/session/referrer reference into the INVU order at seating time, and every open/closed/credited INVU check can be matched back to that reservation in OKÜ for commission calculation on the net before tax.
+
+Thank you for sharing this comprehensive technical brief! This is a well-structured plan for implementing a two-way API integration between OKÜ and INVU to maintain attribution tracking throughout the restaurant journey.
+
+Let me summarize the key points I understand:
+
+Core Objective
+Create a seamless attribution chain: Referrer → Reservation → INVU Order → Closed Check → Commission Calculation
+
+Key Technical Flow
+At Reservation: Capture source attribution with booking code
+At Seating: Write attribution data into INVU via citas/add endpoint
+During Service: INVU handles normal POS operations
+At Close: Read back closed check data for commission calculation
+Critical Data Elements
+num_cita: Clean booking code (e.g., "OKU-2026-69ZPJ58Q")
+comentario: Deterministic trust string with all attribution data
+descripcion: Human-readable summary for staff
+Main Gap to Address
+The "human behavior" dependency between reservation → table assignment → POS order creation. Your solution is to automate this binding at the "SEATED" moment.
+
+A few questions to help refine the implementation:
+
+Timeline: What's your target implementation timeline for this integration?
+
+Error Handling: How should the system handle cases where the INVU order creation fails after a guest is seated?
+
+Testing: Do you have access to an INVU sandbox environment for testing the API endpoints?
+
+Commission Rules: Are commission rates fixed per earner type, or do they vary by restaurant, time period, or other factors?
+
+This looks like a solid foundation for eliminating attribution gaps while keeping commission logic in OKÜ where it belongs. Is there a specific aspect of the implementation you'd like to dive deeper into?
+
+INVU ↔ OKÜ Attribution Loop — Technical Spec (v2, exhaustive)
+Audience: OKÜ Hospitality Group platform engineers. Read every section. There are no optional sections. Status: Authoritative. Reflects the current state of this build (not the vendor brief, which describes a target state). Owners: Reservations / POS Integration squad.
+⚠️ Read-this-first contract. When this doc says GREEN, the connection is wired and verified in production code paths. YELLOW means the function exists but is an intentional no-op stub. RED means the connection is documented in the vendor brief but is not implemented in this build. Do not assume any RED endpoint is live just because the brief lists it.
+
+Table of Contents
+What this is, in one sentence
+The end-to-end loop (essentials only)
+The Earner model (every type, in depth)
+The Universal Earner Key — (EarnerType, earnerRefId)
+Adding a new earner type — step-by-step
+Internal data model — the trust chain
+The deterministic trust string
+INVU API — connection-by-connection inventory
+The earner portal (referral surface)
+Guest experience — what happens on the ground
+Restaurant host workflow (in-venue)
+Commission rule (single source of truth)
+Trust, gaps, and unresolved items in this build
+What to ask INVU for privately
+Implementation checklist (squad-facing)
+File map
+Glossary (resolve before arguing)
+
+1. What this is, in one sentence
+We are not moving commission logic into INVU. We are making sure the source attribution of every reservation survives all the way through the restaurant journey so that, when an INVU check closes, OKÜ can prove:
+This closed ticket came from this reservation, that reservation came from this earner, therefore this earner is owed commission on the net total before tax.
+The API's only job is trust optimization of commission owed, calculated as a percentage of the closed reservation's net total before tax.
+
+2. The end-to-end loop (essentials only)
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ 1. Guest scans QR / clicks tracked link                         │
+  │    → ?ref=Carlos01&earnerType=REFERRER                          │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ 2. OKÜ creates Reservation + AttributionSession (CAPTURED)      │
+  │    + booking_code (public business key)                         │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ 3. Guest arrives → Restaurant Host marks SEATED + table         │
+  │    → AttributionSession transitions to SEATED                   │
+  │    → Snapshot frozen: earner, host, zone, table                 │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ 4. OKÜ → INVU: write reference (CURRENTLY: local only — see §8) │
+  │    → AttributionSession transitions to BOUND_TO_POS             │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ 5. INVU → OKÜ: poll closed orders (citas/ordenesAllAdv tipo=1)  │
+  │    → 3-tier deterministic match (booking_code → binding → heur) │
+  │    → AttributionSession transitions to VERIFIED_POS_SALE        │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ 6. OKÜ mints CommissionAllocation rows on net subtotal-pre-tax  │
+  │    Gated on: AUTO_MATCHED + (TIER1 or TIER2). TIER3 never mints.│
+  └─────────────────────────────────────────────────────────────────┘
+That is the whole purpose of the two-way sync. Every other endpoint is in service of this loop.
+
+3. The Earner model (every type, in depth)
+Read carefully — the canonical enum is EarnerType in prisma/schema.prisma (line 3752). Every commission-bearing surface in this build resolves to one of these five values.
+enum EarnerType {
+ REFERRER     // Independent commercial actor — the dominant earner type today.
+ HOST         // External commercial / streetside host. NOT the in-restaurant maître d'.
+ PARTNER      // Business entity (hotel, agency, brand) that resells / co-promotes.
+ INFLUENCER   // Social audience holder driving event/dining tickets.
+ OTHER        // Escape hatch — used only with explicit admin tagging. Avoid for new flows.
+}
+These five values are joined to a separate subject-record id (earnerRefId) to form a unique earner. Together they make the universal key (see §4).
+3.1 REFERRER — the dominant earner today
+Subject record: Referrer table (prisma/schema.prisma) — also resolvable through the newer ReferralActor table when present.
+Sub-typing inside REFERRER lives in two parallel enums:
+enum ReferrerType {           // Legacy — used by Referrer rows
+ STREETSIDE_HOST
+ TAXI_DRIVER
+ TOUR_GUIDE
+ HOTEL_CONCIERGE
+ PARTNER                     // Note: this PARTNER is a *flavour of REFERRER*, not the PARTNER EarnerType.
+}
+enum ReferralActorType {      // Newer — used by ReferralActor rows
+ STREETSIDE_HOST
+ TAXI_DRIVER
+ UBER_DRIVER
+ TOUR_GUIDE
+ HOTEL_CONCIERGE
+ INFLUENCER_SUB_REFERRER     // Bridge into the INFLUENCER earner tree
+ PROMOTER
+ PRIVATE_NETWORK
+ OTHER
+}
+Resolution priority (commission minting service):
+AttributionSession.referralActorId → ReferralActor.id
+AttributionSession.legacyReferrerId → Referrer.id
+Reservation.attributions[0].referrerId → Referrer.id (legacy fallback)
+Where earnerType = REFERRER rows are minted:
+src/server/services/invu/commissionMintingService.ts (auto, on AUTO_MATCHED + TIER1/TIER2)
+src/app/api/v1/host/bookings/[id]/close/route.ts line 179 (host-driven close)
+src/lib/invu/creditNotes.ts (negative allocation on credit-note reversal)
+Default rate when no compensation plan resolves: 5% (constant FALLBACK_COMMISSION_PCT in commissionMintingService.ts).
+3.2 HOST — the external streetside / commercial host
+Subject record: RestaurantHostProfile (preferred via hostProfileId) or a User with role STREETSIDE_HOST resolved through AccountProfileLink.
+Naming hazard: The HOST EarnerType is the external commercial host who hands out QR codes (Dani, Felix, Isla, Maya in the seed). The restaurant host / maître d' who marks guests ARRIVED and SEATED is not an earner unless explicitly opted in. They operate the OKÜ host webapp; their job is to make the trust chain become operational at SEATED.
+Resolution priority (commission minting service):
+AttributionSession.hostProfileId → RestaurantHostProfile.id (preferred)
+AttributionSession.hostUserId → look up profile via AccountProfileLink
+Reservation.assignedRestaurantHostId (legacy / Tier-3)
+Where earnerType = HOST rows are minted:
+commissionMintingService.ts (auto)
+src/app/api/v1/host/bookings/[id]/close/route.ts line 159 (host-driven close)
+Aggregator buckets (/api/v1/admin/revenue/events):
+HOST → bucket.hostCents
+Important: a single closed table session can mint both a HOST and a REFERRER allocation if both subjects are present. The @@unique([tableSessionId, earnerType, earnerRefId]) constraint prevents duplicates within (and across) earner types.
+3.3 PARTNER — business entity
+Subject record: organisation row keyed by earnerRefId. The EventReferrerCommissionMode enum has the partner-anchored modes:
+enum EventReferrerCommissionMode {
+ NONE
+ PERCENT_OF_INFLUENCER_COMMISSION
+ PARTNER_FLAT_PER_ORDER
+ PARTNER_PER_SEAT
+ PARTNER_PERCENT_OF_TICKET
+ PARTNER_FLAT_PLUS_PER_SEAT
+ PARTNER_FLAT_PLUS_PERCENT
+}
+Payment model: PARTNER allocations in this build use the PARTNER_* modes above, which are partner-paid-direct (the partner cuts the cheque to its own seat). Platform tracks for reporting only — see the SubCommissionParentType { INFLUENCER, PARTNER } enum and the partner-paid disclaimers.
+Aggregator buckets (/api/v1/admin/revenue/events):
+PARTNER → bucket.partnerCents
+Practical note: historically a row with ReferrerType = PARTNER (legacy) and an EarnerType = REFERRER allocation appears. Do not rewrite legacy data. The aggregator handles both shapes.
+3.4 INFLUENCER — audience-holder
+Subject record: influencer entity keyed by earnerRefId. Also has its own sub-tree via INFLUENCER_SUB_REFERRER (ReferralActorType) for promoters working under an influencer.
+Aggregator buckets (/api/v1/admin/revenue/events):
+INFLUENCER → bucket.referrerCents (intentionally bucketed with REFERRER for revenue rollups; the type is preserved on the row).
+Approval workflow: see enum InfluencerApprovalStatus. Allocations for INFLUENCER may pass through an additional approval gate before payout.
+3.5 OTHER — escape hatch
+Use only when an admin manually tags an allocation that does not fit the four canonical types. Do not introduce new code paths that auto-mint OTHER. If a new persona is recurring, add it as a new EarnerType value (see §5).
+
+4. The Universal Earner Key — (EarnerType, earnerRefId)
+This is the single answer to "how do we identify all current and future earners?"
+// The universal earner key — used as a Map/object key, an SQL composite,
+// and a uniqueness constraint. If you need ONE thing to identify an
+// earner across the platform, use this exact pair.
+type EarnerKey = `${EarnerType}::${string}`;
+//                  ^^^^^^^^^^^^   ^^^^^^
+//                  EarnerType     earnerRefId  (the subject record id)
+Why the type prefix is mandatory:
+earnerRefId is just a cuid that resolves against different tables depending on type (Referrer, RestaurantHostProfile, partner org, influencer entity).
+Without the EarnerType prefix you cannot dereference the id.
+The schema enforces this at the storage layer:
+model CommissionAllocation {
+ // ...
+ earnerType  EarnerType
+ earnerRefId String
+ // ...
+ @@unique([tableSessionId, earnerType, earnerRefId])
+ @@index([earnerType, earnerRefId])
+}
+This shape appears verbatim throughout the platform — search-and-replace at your peril.
+Surface
+Where it appears
+CommissionAllocation row
+prisma/schema.prisma line 3919
+Aggregator grouping key
+src/app/api/v1/admin/revenue/obligations/route.ts:93
+Mint service
+src/server/services/invu/commissionMintingService.ts
+Credit-note reversal
+src/lib/invu/creditNotes.ts:63
+Admin "no commission" override
+…/integrations/invu/review-queue/[id]/mark-no-commission
+Admin reverse
+…/admin/revenue/allocations/[id]/reverse
+Earner display lookup
+…/admin/revenue/review and …/sessions/[id]/details
+
+Display name resolution rule (mandatory for any UI surfacing earners):
+// 1. Build the key.
+const key: EarnerKey = `${a.earnerType}::${a.earnerRefId}`;
+// 2. Resolve the subject by type.
+//    Two parallel lookups by id, then merge into a single map.
+const referrers = await prisma.referrer.findMany({
+ where: { id: { in: earnerIds } },
+ select: { id: true, fullName: true },
+});
+const profiles = await prisma.restaurantHostProfile.findMany({
+ where: { id: { in: earnerIds } },
+ select: { id: true, displayName: true },
+});
+const nameById = new Map<string, string>();
+referrers.forEach(r => nameById.set(r.id, r.fullName));
+profiles .forEach(p => nameById.set(p.id, p.displayName));
+// 3. Fallback string is mandatory — never render an empty cell.
+const display = nameById.get(a.earnerRefId)
+            ?? `${a.earnerType} ${a.earnerRefId.slice(-6)}`;
+This is the exact pattern used in /api/v1/admin/revenue/obligations/route.ts and /admin/revenue/review/route.ts. Reuse it; do not invent new display logic.
+
+5. Adding a new earner type — step-by-step
+If a real-world persona keeps appearing as OTHER, promote it. Concrete future candidates: CONCIERGE, PROMOTER, AFFILIATE, HOTEL_DESK, EVENT_LEAD, BRAND_AMBASSADOR.
+Do not skip steps — half-installed types corrupt the aggregator.
+Schema: add the value to EarnerType in prisma/schema.prisma (line 3752). Run npx prisma db push --skip-generate && npx prisma generate. The enum value is purely additive — Postgres handles it without table rewrite.
+Decide the subject record. Pick (or create) the table whose id will be stored as earnerRefId. Document it in this file's §3.
+Resolution: extend commissionMintingService.ts with the new resolution path (priority: AttributionSession → fallback). Mint allocations only when an AUTO_MATCHED + TIER1|TIER2 session is closed.
+Display name: add the lookup to every route in §4's table. Search for nameById in src/app/api/v1/admin/revenue/**/* — every occurrence must include the new subject table.
+Aggregator buckets: decide which revenue bucket the new type rolls up into in src/app/api/v1/admin/revenue/events/route.ts (around line 115). Default to a new bucket; do not silently merge into referrerCents.
+Credit-note reversal: confirm src/lib/invu/creditNotes.ts correctly negates allocations of the new type — it already keys on earnerType, but the mint side must produce a deterministic key.
+Backfill (if applicable): if real rows have been mis-tagged as OTHER, write an idempotent SQL backfill script under scripts/.
+UI: add the type to any filter dropdowns and chip colour maps (search EarnerType in src/components/**).
+Update this doc. A new earner type without a §3.x sub-section is a documentation regression.
+
+6. Internal data model — the trust chain
+Every public-facing identifier in this loop has one job. Don't reuse them.
+Identifier
+Type
+Purpose
+Reservation.id
+Internal cuid
+DB primary key. Never exposed to guests or INVU.
+booking_code
+Public string
+The external immutable business key for the reservation.
+customer_id
+Internal cuid
+Belongs to the guest. One customer can have many bookings.
+AttributionSession.id
+Internal cuid
+The trust-chain row. One per reservation (after this round).
+tableSessionId
+Internal cuid
+The seating event. Anchor for INVU num_cita.
+EarnerKey
+Composite
+${EarnerType}::${earnerRefId} (see §4). The earner's identity.
+
+Rule: the confirmation code shown to the guest === booking_code, and that string is what we write into INVU's num_cita. It is not a database primary key, and it must remain stable for the life of the reservation.
+6.1 AttributionSession lifecycle (this build, exact enums)
+enum AttributionSessionStatus {
+ CAPTURED          // Created on public reservation POST when ?ref resolves
+ SEATED            // Restaurant host marked SEATED + assigned table
+ BOUND_TO_POS      // booking_code written into INVU (currently local-only — see §8)
+ VERIFIED_POS_SALE // INVU close arrived + AUTO_MATCHED at TIER1 or TIER2
+ CANCELED          // Terminal: no-show, walk-out, or admin cancel
+ EXPIRED           // Terminal: TTL elapsed without progressing
+}
+enum AttributionSessionSource {
+ QR_RESERVATION    // Public ?ref= path (the loop closed in this round)
+ HOST_CHECKIN      // Restaurant host check-in flow
+ HOST_WALKIN       // Streetside host books on the spot
+ MANUAL_ADMIN      // Admin tooling override / dispute resolution
+}
+Transition rules (enforce these in code; do not mutate status freely):
+CAPTURED ──► SEATED ──► BOUND_TO_POS ──► VERIFIED_POS_SALE
+  │           │             │                  │
+  ├──────────┼─────────────┼──► CANCELED       │
+  │           │             │                  │
+  └──────────┼─────────────┴──► EXPIRED        │
+             │                                  │
+             └──── (cannot regress) ────────────┘
+Never downgrade status (e.g. VERIFIED_POS_SALE → SEATED).
+EXPIRED and CANCELED are absorbing states.
+The mint gate is VERIFIED_POS_SALE plus AUTO_MATCHED plus tier in {TIER1_DETERMINISTIC, TIER2_OPERATIONAL}. TIER3_HEURISTIC_REVIEW never mints automatically.
+
+7. The deterministic trust string
+Write this exact pattern wherever this build later wires a real citas/add body (see §8.2 — currently RED):
+OKU|RES:{reservation_id}|BOOK:{booking_code}|TS:{table_session_id}|REF:{referrer_code}|EARNER:{earner_type}
+Example:
+OKU|RES:r_9082|BOOK:OKU-2026-69ZPJ58Q|TS:ts_12345|REF:Carlos01|EARNER:REFERRER
+Why this exact shape:
+OKU| prefix → cheap regex filter when scanning INVU comments at scale.
+Pipe-delimited, key-prefixed → stable to parse even if INVU truncates trailing chars.
+All values are short, ASCII-safe, and free of characters INVU's UI escapes.
+Every field appears even when empty (use -) so the parser is positional-safe.
+The BOOK: field MUST match the exact regex OKU-\d{4}-[A-Z0-9]{8} — that is what the Tier-1 matcher (BOOKING_CODE_RE in invuMatchService.ts) extracts from observations.
+num_cita carries the short key (booking_code); comentario carries the rich key (the trust string above); descripcion carries the human summary for floor staff (e.g. Carlos01 referral | 19:00 | Table T9 | OKÜ).
+
+8. INVU API — connection-by-connection inventory
+This is the section the dev team must memorise before touching anything. It documents what is wired in this build, where the code lives, and what is missing.
+Legend:
+🟢 GREEN — implemented, called from production code paths, tested.
+🟡 YELLOW — function exists but is an intentional no-op stub awaiting a vendor URL or feature-flag flip.
+🔴 RED — described in the vendor brief but not implemented in this codebase.
+8.1 🟢 Auth — POST /invuApiPos/userAuth
+Status: GREEN. Live and exercised on every credential save.
+Code:
+src/server/services/invu/invuAuthService.ts (canonical: stores encrypted credentials, status, masked token).
+src/lib/invu/client.ts authenticate() (used by the worker re-auth path).
+Storage: InvuIntegrationCredential per venue, fields:
+apiUsernameEncrypted, apiPasswordEncrypted, accessTokenEncrypted (AES via invuEncryptionService).
+accessTokenMasked (e.g. ***ab12cd) for admin display.
+accessTokenIssuedAt, accessTokenExpiresAt, tokenLastRotatedAt.
+apiUserType (ApiUserType enum) and apiUserExpiresAt (vendor-side user expiry).
+branchScoped boolean — INVU users are branch-scoped by vendor policy.
+status: InvuCredentialStatus (CONNECTED, FAILED, DISCONNECTED, …).
+lastAuthSucceededAt, lastAuthFailedAt, lastAuthError.
+Trust: encrypted at rest; never logged in plaintext; revocation path exists (revokeToken in client.ts).
+Gap: no scheduled token-rotation job exists. Rotation only happens when an admin re-saves credentials (authenticateInvu). Vendor recommends rotation every 15 days. TODO is an unaddressed risk — see §13.
+8.2 🔴 Forward write — POST …?r=citas/add
+Status: RED. Not called anywhere in this build.
+What exists instead: src/server/services/invu/invuReferenceWriter.ts (writeReferenceToInvu).
+Writes the booking_code into the local TableSession row (invuReferenceWritten, invuReferenceWrittenAt, invuReferenceField).
+Records intent in recordIntegrationAudit("INVU_REFERENCE_WRITE_ATTEMPTED", …).
+HTTP push is gated behind feature flag INVU_REFERENCE_WRITE_ENABLED. The flag is off in dev and there is no production cutover yet.
+The header comment on the file calls this out explicitly: "The current INVU sandbox does not expose a public PATCH endpoint for these fields."
+Field strategy (already designed; only the HTTP call is missing):
+Primary: observations (per-order free text, present on every INVU order).
+Fallback: customer_note.
+Local-only: keep the binding in OperationalBinding; mark invuReferenceWritten=false. Match Tier-2 then becomes the highest deterministic tier reachable.
+Caller: src/app/api/v1/host/table-open-bind/route.ts line 193 (already invokes the writer; the writer just doesn't call out yet).
+Implication for the trust loop today: BOUND_TO_POS reflects the local binding state, not a confirmed INVU write. Every closed sale therefore relies on OperationalBinding for Tier-2 deterministic match unless the booking_code accidentally appears in a manually-edited INVU comment.
+8.3 🟢 Closed-orders read — GET …?r=citas/ordenesAllAdv/fini/{epoch}/ffin/{epoch}/tipo/1/grouping/1
+Status: GREEN. The single most important read in this build.
+Code: src/lib/invu/client.ts getClosedOrders() (line 110).
+Driver: worker/jobs/invu-sync.ts → src/server/services/invu/invuSyncService.ts → runInvuSyncForAllEnabledVenues().
+Cadence: master tick every 15 min; per-mapping cadence configurable via IntegrationBranchMapping.syncIntervalMinutes (default 15, with 30 s slack).
+Data shape returned (storeRawAndNormalize in invuNormalizationService.ts): per-order rows with total, subtotal, impuesto, propinas, status, plus the free-text fields used for booking-code extraction.
+Constraints (vendor-imposed):
+All dates are Unix epoch seconds (toEpochSeconds).
+Range cannot exceed one month. The worker chunks on its own; do not extend windows manually.
+INVU groups results by Punto de Venta on the auth account, so the branchId arg is informational only — the API returns rows for whatever branch the credential is scoped to.
+Trust: results normalised → aggregated → matched 3-tier. Tier-1 deterministic match looks for the booking-code regex OKU-\d{4}-[A-Z0-9]{8} in externalReference / bookingCodeRef / observations.
+8.4 🟡 Satellite reads — invoice totals, payments, credit notes, order totals
+Status: YELLOW. Functions exist, are wired into the aggregation pipeline, and return [] (intentional no-op). They log a single info message per process via logSatelliteNoOpOnce().
+Code (all in src/lib/invu/client.ts):
+getInvoiceTotals(token, branchId, fromDate, toDate) → []
+getPayments(token, branchId, fromDate, toDate) → []
+getCreditNotes(token, branchId, fromDate, toDate) → []
+getOrderTotals(token, branchId, fromDate, toDate) → []
+Why stubbed (verbatim from the file header): "The vendor has four additional endpoints (invoice totals, payment breakdowns, credit notes, order totals) that would let the trust layer reconcile post-hoc voids and split payments. Their URLs are not yet published. Until then, these functions are intentional no-ops."
+Compensating behaviour: invuAggregationService.ts falls back to order-level fields on citas/ordenesAllAdv (total, subtotal, impuesto, propinas). This is sufficient for first-pass commission minting but cannot detect post-hoc voids that arrive after the order was already closed and synced.
+Cutover plan: when INVU publishes the URLs, replace each function body with a real callInvuList(...) — no other call-site changes are needed; the aggregation pipeline already merges results.
+8.5 🔴 Point lookup by booking code — GET …?r=citas/view/id/{id}/tipo/{0=num_cita, 1=invoice id}
+Status: RED. Not wired.
+Why we want it: deterministic single-order lookup keyed on num_cita would let the dispute-resolution UI re-fetch a specific INVU record without scanning a date range.
+Compensating behaviour today: the worker scans citas/ordenesAllAdv with a date window; matches arrive only on the next sync tick.
+Risk: debugging a single missing match requires either (a) waiting for the next sync, or (b) running scripts/test-invu-closed-orders.ts manually with a custom window.
+8.6 🔴 Webhooks (orders / tables / credit notes)
+Status: RED. INVU does not publicly document webhooks. None are subscribed.
+Compensating behaviour: polling, every 15 min by default.
+Operational consequence: end-to-end latency from "INVU close" to VERIFIED_POS_SALE is up to one sync interval (15 min default).
+8.7 🔴 Table-state APIs (mesa / open-table / bind-reservation)
+Status: RED. Not publicly documented; not implemented.
+Compensating behaviour: the restaurant host opens the order on the right table by hand. The trust chain still works because OperationalBinding (Tier-2) anchors the binding locally.
+Why this is the biggest gap: this is the only step of the loop that still depends on a human getting it right. See §13 and §14.
+8.8 Field semantics gotcha — tipo
+tipo is the same query-parameter name with different value semantics on different endpoints. Memorise this table; do not write helper code that assumes one meaning across endpoints:
+Endpoint
+tipo semantics
+citas/ordenesAllAdv
+0 open · 1 closed · 2 complete credit notes · 3 deleted · 4 partial CN
+citas/OrdenesAllTotales
+Same status semantics as ordenesAllAdv
+citas/view/id/{id}/tipo/{X}
+0 search by num_cita · 1 search by INVU invoice id
+
+
+9. The earner portal (referral surface)
+Every commission earner gets a portal at /portal/referrals exposing:
+Unique referral links (with QR images generated server-side).
+Form-link copy/share affordance.
+Click/scan analytics.
+Reservations created.
+Ticket sales created.
+Seated sessions.
+Closed revenue.
+Approved commissions.
+Paid commissions.
+9.1 Link shape (canonical)
+Reservations:
+https://okuhospitalitygroup.com/reserve?ref=Carlos01&earnerType=REFERRER&campaign=gold-house
+Tickets:
+https://okuhospitalitygroup.com/tickets/event-001?ref=Carlos01&earnerType=REFERRER
+The earnerType param must be one of the five EarnerType values (case-sensitive enum value). Anything else falls through to OTHER and will not auto-mint.
+9.2 Click → attribution flow
+Landing page reads ref, earnerType, optional campaign.
+Backend resolves ref → real earner_id via the 3-tier resolver in src/server/referrals/referralActorService.ts (ReferralActor → ReferralLink → Referrer legacy).
+Backend creates a pending AttributionSession (source: QR_RESERVATION, status: CAPTURED).
+When the reservation form is submitted, attribution is silently attached. The guest never types or sees the referrer code.
+
+10. Guest experience — what happens on the ground
+10.1 Scan QR / open link
+Branded OKÜ landing page (venue-aware, optionally event-aware). Branded to OKÜ, not to the earner personally.
+10.2 Silent bind
+Backend attaches:
+earner_id
+earner_type (one of EarnerType)
+campaign_id
+source_channel ∈ {qr, form, link}
+landing_session_id
+10.3 Reservation form
+Guest enters: name, phone, email, date, requested time, covers, optional occasion, optional notes. Nothing about referrers. Ever.
+10.4 Confirmation
+Guest receives the unique booking_code. This is the immutable external key from reservation → seating → INVU → closed ticket.
+
+11. Restaurant host workflow (in-venue)
+The restaurant host uses the OKÜ host webapp to:
+Search reservation.
+Mark ARRIVED.
+Mark SEATED and assign/confirm the table.
+At the moment of SEATED, OKÜ automatically materialises:
+reservation_id (already existed)
+booking_code (already existed)
+attribution_session_id (transitions CAPTURED → SEATED, or minted fresh as HOST_CHECKIN/HOST_WALKIN if no prior session)
+tableSessionId
+Frozen snapshot of: earner_id, earner_type, referrer_code, host_user_id, zone, table_label
+This is the moment the trust chain becomes operational. Immediately after, the table-open-bind route writes the local OperationalBinding and calls writeReferenceToInvu (which is currently local-only — see §8.2).
+
+12. Commission rule (single source of truth)
+commissionable_base = closed_subtotal
+                   − discounts
+                   − refunds_and_credit_notes
+                   − excluded_items
+earner_commission   = commissionable_base × commission_rate
+The base is net before tax. Tax is never commissionable.
+Refunds and credit notes (tipo=2, tipo=4 on ordenesAllAdv) are subtracted at reconciliation time. In this build the credit-notes endpoint is YELLOW (§8.4), so detection relies on the order-level total regressing on the next sync.
+Excluded items are configured per venue (e.g. service-charge passthroughs).
+This logic stays entirely in OKÜ. INVU is a source of truth for revenue, never for commission.
+Default rate when no compensation plan resolves: 5% (FALLBACK_COMMISSION_PCT in commissionMintingService.ts). Override via CompensationPlan.commissionPercent.
+Mint gate: attributionSession.status === VERIFIED_POS_SALE AND match.tier IN (TIER1_DETERMINISTIC, TIER2_OPERATIONAL) AND match.status === AUTO_MATCHED. TIER3_HEURISTIC_REVIEW never auto-mints.
+
+13. Trust, gaps, and unresolved items in this build
+13.1 What we trust today (✅)
+Trust claim
+Why we trust it
+QR ?ref= produces a QR_RESERVATION / CAPTURED session
+Live SQL verification done in this round (Dani, Felix codes).
+Restaurant-host check-in transitions CAPTURED → SEATED
+host/checkin/route.ts covers both transition and fresh-mint paths.
+Table-open-bind writes OperationalBinding (Tier-2 anchor)
+host/table-open-bind/route.ts runs in the same tx as the table claim.
+INVU close polling → 3-tier match → VERIFIED_POS_SALE
+invuMatchService.ts deterministic Tier-1/Tier-2; Tier-3 routes to review.
+Commission minting is idempotent across re-runs
+@@unique([tableSessionId, earnerType, earnerRefId]) on CommissionAllocation.
+Earner display lookup is type-aware (Referrer + RestaurantHostProfile)
+Two parallel findMany calls merged into a single nameById map.
+INVU credentials encrypted at rest
+invuEncryptionService AES; only masked tokens ever logged.
+Aggregator buckets revenue per earner type
+events/route.ts REFERRER+INFLUENCER → referrerCents, HOST → hostCents, PARTNER → partnerCents.
+
+13.2 Gaps (⚠️)
+Gap
+Compensating behaviour
+Risk
+citas/add not wired (§8.2). BOUND_TO_POS is local-only.
+Tier-2 OperationalBinding carries the load.
+If a host opens the order on the wrong table, only Tier-3 heuristic can recover, which never auto-mints.
+Satellite reads (invoice/payment/credit-notes/order-totals) all return [] (§8.4).
+Order-level totals on ordenesAllAdv used as the source.
+Post-hoc voids and split-payment edge cases may not be reflected until the order-level total updates.
+No webhooks (§8.6). End-to-end latency = sync interval.
+Polling at 15 min default cadence.
+Up to 15 min delay from INVU close → VERIFIED_POS_SALE → commission minting.
+No INVU table-state API (§8.7).
+Human host opens the right table.
+The biggest single failure mode of the loop. Mitigated only by training and by the OKÜ host webapp UX.
+No scheduled token rotation (§8.1). Vendor recommends every 15 days.
+Manual re-save by admin.
+Token can silently expire; next sync tick will fail and surface as lastAuthError.
+Streetside hosts' phone view (/host/streetside) and /api/v1/host/bookings do not include attributionSession.referralActor / legacyReferrer (out of scope this round).
+Operations Board renders correctly.
+Streetside hosts cannot see referrer names on their own dashboards yet.
+No retroactive AttributionSession for pre-loop reservations (e.g. "Jane").
+UI renders "—".
+Historical reporting shows attribution only for bookings made after this round.
+INVU_REFERENCE_WRITE_ENABLED exists but is off in dev and has no production cutover plan documented.
+Local-only binding (above).
+Cutover is a one-line env flip + an HTTP call body — but no one has tested the HTTP call body itself.
+
+13.3 Unresolved items requiring vendor input (🚫)
+Item
+What we need from INVU
+Public PATCH endpoint for observations / customer_note
+The exact route and request body so we can flip INVU_REFERENCE_WRITE_ENABLED=true.
+Published URLs for invoice / payment / credit-note / order-totals
+The four URLs the satellite stubs in client.ts are waiting for.
+Webhook subscription model (orders, credit notes, tables)
+A push channel — anything from a configurable HTTP webhook to a polling-with-cursor endpoint.
+Table / mesa API (open, occupied, freed)
+Anything resembling the OpenTable integration surface so we can bind reservation→table without a human in the loop.
+Confirmed semantics for id_tipo_integracion to identify OKÜ orders
+Lets us filter ordenesAllAdv to OKÜ-originated orders only on the read side.
+Per-branch apiUserExpiresAt semantics
+The vendor told us users expire; we need a programmatic way to detect imminent expiry before the next sync fails.
+
+
+14. What to ask INVU for privately
+If we get private (OpenTable-style) access, the following endpoints close the remaining gaps in §13.3 and let us delete the entire YELLOW + RED columns of §8:
+A mesa / table API (list, status, open).
+An open-table / occupied-table event API.
+An explicit reservation-reference field mapping (so we don't have to pack everything into observations).
+Webhooks for: order opened, order closed, credit note created, table freed.
+A documented PATCH for observations / customer_note.
+Confirmed id_tipo_integracion value reserved for OKÜ.
+
+15. Implementation checklist (squad-facing)
+ Schema: AttributionSession carries source, status, seatedAt, boundAt, verifiedAt, invuOrderId, bindMethod, plus relations to referralActor and legacyReferrer.
+ Public POST /api/reservations: opens QR_RESERVATION / CAPTURED session when ?ref= resolves.
+ Streetside host backfill: EventReferrerAssignment rows present for every active streetside host so their SIDE-* codes resolve.
+ Host UI (Operations Board): renders referrer name through three-tier fallback (session.referralActor → session.legacyReferrer → legacy attributions[0]).
+ 3-tier match: invuMatchService.ts Tier-1 (booking code regex) / Tier-2 (operational binding) / Tier-3 (heuristic, review-only).
+ Commission minting: commissionMintingService.ts resolves earner per §3 and gates on AUTO_MATCHED + TIER1|TIER2.
+ Worker: worker/jobs/invu-sync.ts master tick every 15 min with per-mapping cadence (slack-protected).
+ Encryption + audit: credentials encrypted at rest; every reference-write attempt audited via recordIntegrationAudit.
+ citas/add HTTP push: flip INVU_REFERENCE_WRITE_ENABLED and replace the stub body in invuReferenceWriter.ts with a real call. Test against sandbox first.
+ Satellite reads: replace each YELLOW stub in client.ts with a real callInvuList(...) once URLs land.
+ Streetside host phone view + /api/v1/host/bookings: roll the attributionSession.referralActor / legacyReferrer include out so streetside hosts see attribution on their own dashboards.
+ Token rotation cron: scheduled job that re-auths every venue's credentials every ≤ 14 days (one day before vendor's recommended 15-day cap).
+ Webhook listener (when available): receive order.closed / creditnote.created and short-circuit the polling loop.
+ Backfill historical reservations: synthesize AttributionSession rows for pre-loop bookings that have a legacy ReservationAttribution.referrerId.
+ Document any new earner type per §5 (do not skip the doc step — it's part of the contract).
+
+16. File map
+Concern
+Path
+Public reservation POST
+src/app/api/reservations/route.ts
+Host queue read
+src/server/host/hostService.ts
+Host "me" feed
+src/app/api/v1/host/me/route.ts
+Host bookings feed
+src/app/api/v1/host/bookings/route.ts
+Host check-in
+src/app/api/v1/host/checkin/route.ts
+Host table-open-bind (calls reference writer)
+src/app/api/v1/host/table-open-bind/route.ts
+Host close (manual mint path)
+src/app/api/v1/host/bookings/[id]/close/route.ts
+Host Operations Board UI
+src/components/host/HostOperationsBoard.tsx
+Streetside host page
+src/app/host/streetside/page.tsx
+Reservation wizard
+src/components/reservations/ReservationWizard.tsx
+INVU low-level HTTP client
+src/lib/invu/client.ts
+INVU auth + credential lifecycle
+src/server/services/invu/invuAuthService.ts
+INVU credential encryption
+src/server/services/invu/invuEncryptionService.ts
+INVU sync orchestrator (per-venue cadence)
+src/server/services/invu/invuSyncService.ts
+INVU normalization (raw → typed rows)
+src/server/services/invu/invuNormalizationService.ts
+INVU 3-tier match
+src/server/services/invu/invuMatchService.ts
+INVU aggregation → TableSession
+src/server/services/invu/invuAggregationService.ts
+INVU reference writer (booking-code → INVU)
+src/server/services/invu/invuReferenceWriter.ts
+INVU closed-orders pull
+src/server/services/invu/invuClosedOrdersService.ts
+INVU trust score
+src/server/services/invu/invuTrustScoreService.ts
+Commission minting
+src/server/services/invu/commissionMintingService.ts
+Credit-note reversal
+src/lib/invu/creditNotes.ts
+Identity / AttributionSession creation
+src/server/services/invu/identityService.ts
+Referral actor resolver (3-tier)
+src/server/referrals/referralActorService.ts
+Worker entrypoint
+worker/index.ts
+Worker job — INVU sync
+worker/jobs/invu-sync.ts
+Admin: revenue obligations (earner roll-up)
+src/app/api/v1/admin/revenue/obligations/route.ts
+Admin: revenue review queue
+src/app/api/v1/admin/revenue/review/route.ts
+Admin: revenue events bucketing
+src/app/api/v1/admin/revenue/events/route.ts
+Schema
+prisma/schema.prisma
+
+
+17. Glossary (resolve before arguing)
+Term
+Means
+Earner
+Anyone who can be paid commission. Identified by the (EarnerType, earnerRefId) composite key (§4). One of REFERRER, HOST, PARTNER, INFLUENCER, OTHER.
+Streetside host
+External commercial host with a referral code. Is an earner (EarnerType = HOST).
+Restaurant host
+In-venue maître d' / front-desk operator. Is not an earner by default.
+booking_code
+Public business key. Same string in OKÜ DB, in the guest's confirmation, and in INVU num_cita. Matches regex OKU-\d{4}-[A-Z0-9]{8}.
+Trust string
+The `OKU
+num_cita
+INVU field name — quite literally "appointment number". We use it as our booking key.
+tipo
+INVU's order-status query param. Values vary by endpoint — see §8.8.
+tableSessionId
+The seating event id. The anchor for both OperationalBinding and INVU writes.
+OperationalBinding
+Local row that captures the host's "I opened INVU order X for table Y" intent. Tier-2 deterministic match anchor when citas/add is unavailable.
+TIER1 / TIER2 / TIER3
+Match confidence tiers in invuMatchService.ts. Only TIER1 + TIER2 auto-mint; TIER3 always routes to manual review.
+GREEN / YELLOW / RED
+Connection status in §8. GREEN = wired and verified. YELLOW = stub awaiting URL or flag flip. RED = not in this build.
+
+
+
+
+
+I've read through this comprehensive technical specification for the INVU ↔ OKÜ Attribution Loop. This is a detailed documentation of a reservation-to-commission tracking system that connects OKÜ's hospitality platform with INVU's POS system.
+
+Here's my understanding of the key components:
+
+System Overview
+The system tracks the complete journey from when a guest scans a QR code (with referral attribution) through to commission payment when their restaurant bill closes in INVU.
+
+Key Components:
+Earner Types: 5 main categories (REFERRER, HOST, PARTNER, INFLUENCER, OTHER) with specific resolution logic for each
+
+Trust Chain: Uses a deterministic matching system across 3 tiers:
+
+TIER1: Direct booking code match
+TIER2: Operational binding match
+TIER3: Heuristic matching (requires manual review)
+Attribution Session Lifecycle: Tracks reservations through states from CAPTURED → SEATED → BOUND_TO_POS → VERIFIED_POS_SALE
+
+Commission Calculation: Based on net subtotal before tax, with configurable rates per earner type
+
+Current Status:
+Most core functionality is implemented (GREEN)
+Some features are stubbed awaiting vendor URLs (YELLOW)
+Several features documented but not implemented (RED)
+The documentation is thorough about gaps, risks, and what's needed from INVU to complete the integration.
+
+Is there a specific aspect of this system you'd like me to help explain further or work with?
+
+is it undertood that upon reservation that the restaurant host is incapable of seeing the "Refferred by" tag, and the info is not carrying through to the invu system nor is it returning with an anchor to the reserver (attendee/customer) for the sake of attributing the commission to that specific booking for the referrers qrcode/form with unique referrer id, therefore creating a trust loop of commission and attribution?
+
+I understand you're describing a technical issue with a restaurant reservation system where referral tracking is breaking down. Let me break down what you're outlining:
+
+The Problem:
+
+When a reservation is made through a referrer's QR code/form (with unique referrer ID)
+The "Referred by" tag/data isn't visible to the restaurant host
+This referral information isn't being passed to the inventory/POS system
+There's no persistent link back to the original reserver that would allow proper commission attribution
+This breaks the trust loop between referrer → booking → commission tracking
+Why this matters:
+
+Referrers can't get credited/compensated for successful bookings they generated
+No way to verify or audit that referrals are being properly attributed
+Creates distrust in the referral program since attribution is invisible/unreliable
+Potential solutions might include:
+
+Ensuring referral data persists through the entire booking flow
+Making referral source visible in the restaurant's booking interface
+Creating unique booking IDs that maintain the referrer connection
+Implementing proper API integration between the referral system and restaurant POS
+Adding confirmation/tracking mechanisms for referrers to see their successful attributions
+Is this the technical challenge you're facing? Are you looking for advice on how to fix this attribution chain?
+
+Yes, this is exactly the challenge I am facing and I am looking for advice on how to fix this attribution chain. 
+
+Here's a comprehensive approach to fix your attribution chain:
+
+1. Data Flow Architecture
+Create a persistent referral tracking system:
+
+Generate a unique booking_reference_id that contains both the referral ID and booking details
+Store referral data in a separate attribution table that survives the entire customer journey
+Implement webhook integration between your referral system and restaurant POS/booking system
+2. Technical Implementation
+Frontend (QR Code/Form):
+
+text
+
+Collapse
+
+
+ Copy
+
+- Capture referrer_id + timestamp when customer scans QR
+- Pass this as hidden fields through entire booking flow
+- Use URL parameters or session storage to maintain data
+Backend Attribution Table:
+
+text
+
+Collapse
+
+
+ Copy
+
+- referral_id (unique referrer identifier)
+- booking_id (restaurant booking reference)
+- customer_contact_info
+- reservation_datetime
+- status (pending/confirmed/completed)
+- commission_amount
+- attribution_timestamp
+3. Restaurant Integration Points
+Make referral visible to hosts:
+
+Add "Referral Source" field to reservation display
+Include referrer name/ID in booking confirmation emails
+Create restaurant dashboard showing referral-driven bookings
+POS System Integration:
+
+API integration to send booking confirmations back to attribution system
+Real-time status updates (no-show, completed, cancelled)
+Revenue data for commission calculation
+4. Trust & Verification Layer
+For Referrers:
+
+Real-time dashboard showing their referred bookings
+Email notifications when their referrals convert
+Transparent commission tracking with payment status
+For Restaurants:
+
+Clear reporting on referral-driven revenue
+Easy commission reconciliation tools
+Opt-in/opt-out controls for referral programs
+5. Implementation Priority
+Phase 1: Fix the data persistence (attribution table + booking ID linking)
+Phase 2: Restaurant visibility (host interface updates)
+Phase 3: Automated commission tracking and payouts
+Phase 4: Advanced analytics and optimization tools
+Would you like me to dive deeper into any of these specific areas, or do you have questions about the technical implementation of particular components?
+
+Can you dive deeper, giving exact and specifc technical information of each component relevant? tell me what you need from me if anything. 
+
+I'll provide detailed technical specifications for each component. I need some information from you first:
+
+Information Needed:
+Current Tech Stack:
+
+Frontend framework? (React, Vue, vanilla JS?)
+Backend language/framework? (Node.js, Python/Django, PHP, etc.)
+Database type? (MySQL, PostgreSQL, MongoDB?)
+Restaurant booking system vendor? (OpenTable, Resy, custom?)
+Current Data Flow:
+
+How are QR codes currently generated?
+What data is currently captured in reservation forms?
+Do you have API access to the restaurant booking system?
+Integration Constraints:
+
+Can you modify the restaurant's booking interface?
+Do you control the entire booking flow or just the referral entry point?
+What's your hosting environment?

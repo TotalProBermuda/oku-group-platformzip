@@ -1,0 +1,70 @@
+Payments Sandbox Test Plan
+
+1. Checkout success
+- Go to a public ticket/series checkout page.
+- Use Authorize.net sandbox card: 4111 1111 1111 1111.
+- Use any future expiry date and valid CVV.
+- Expected:
+  - Order.status = PAID
+  - Payment.status = SUCCEEDED
+  - Payment.authNetTransId is present
+  - Tickets are issued
+  - Confirmation email is queued/sent
+  - Audit/order event shows payment success
+
+2. Checkout decline
+- Use sandbox decline card: 4222 2222 2222 2222, or the project’s documented decline trigger.
+- Expected:
+  - Order is not marked PAID
+  - Payment is not marked SUCCEEDED
+  - Inventory/capacity hold is released
+  - User sees a clear decline message
+  - No tickets are issued
+
+3. Refund success
+- Open Admin → Orders.
+- Select a paid sandbox order.
+- Issue full refund.
+- Expected:
+  - Authorize.net refund call succeeds
+  - Order.status = REFUNDED
+  - Payment.status = REFUNDED
+  - Capacity is released
+  - Commission reversal is written
+  - AuditLog contains gateway refund response / txid
+  - OrderEvent contains ORDER_REFUNDED
+
+4. Failed refund protection
+- Attempt refund on an order without authNetTransId, or mock/remove gateway transaction id in sandbox data.
+- Expected:
+  - Refund is rejected
+  - Order.status is unchanged
+  - Payment.status is unchanged
+  - No capacity release
+  - No commission reversal
+  - AuditLog records refund failure
+
+5. Partial refund
+- Issue a partial refund for less than order total.
+- Expected:
+  - Gateway refund succeeds
+  - Order.status = PARTIALLY_REFUNDED
+  - Payment.status should either support PARTIALLY_REFUNDED or preserve SUCCEEDED with refund event history
+  - AuditLog records amount refunded
+  - Tickets/capacity behavior is clear and intentional
+
+6. Void / cancel paid order
+- Attempt to cancel a paid order before settlement if sandbox supports void.
+- Expected:
+  - Gateway void succeeds before DB mutation
+  - Order.status = CANCELLED
+  - Payment.status = VOIDED
+  - AuditLog records void response
+- If void fails:
+  - Order/payment remain unchanged
+
+7. Confirmation email
+- Complete a paid sandbox order.
+- Expected:
+  - Email sends via Resend from verified sender
+  - Email includes correct

@@ -1,0 +1,175 @@
+Implement Payments P2 — Refunds & Website Order Controls.
+
+Context:
+Payments P1 is complete. /admin/payments can now store encrypted Authorize.net credentials and test the gateway.
+
+Now finish the operational layer for website purchases only.
+
+Scope:
+This applies only to website checkout orders:
+- tickets
+- series/events
+- memberships
+- future online products/merchandise
+
+Do NOT include POS/INVU table payments in this refund workflow. POS/table payments remain under INVU reconciliation.
+
+1. /admin/payments → Refunds & Voids tab
+
+Add a polished operational view, not just static text.
+
+Include:
+- Search input
+- Recent refundable orders list
+- Refund/void eligibility badges
+- Recent refund/void audit trail
+- Clear explanatory copy
+
+Search should support:
+- order number
+- order id
+- guest name
+- guest email
+- Authorize.net transaction id
+- ticket code, if practical with existing relations
+
+Table columns:
+- Order
+- Guest
+- Type
+- Status
+- Provider
+- Amount
+- Paid date
+- Eligibility
+- Action
+
+Eligibility rules:
+- PAID + AUTHORIZE_NET + authNetTransId → Refund eligible
+- PAID + AUTHORIZE_NET + void-supported/pre-settlement if code supports it → Void eligible
+- DEMO provider → Demo only, no gateway action
+- Missing authNetTransId → Blocked: Missing gateway transaction id
+- REFUNDED → Already refunded
+- PARTIALLY_REFUNDED → Partial refund history / remaining amount if available
+- CANCELLED → Cancelled
+
+Copy:
+“Refunds and voids here apply only to website checkout orders. POS/table payments are reconciled through INVU.”
+
+Actions:
+- Open order
+- Refund, if eligible and existing refund flow supports it
+- Void, if eligible and existing void flow supports it
+- If action is not directly implemented here, link into the existing OrderDrawer action and show why.
+
+2. API
+
+Add or extend:
+GET /api/v1/admin/payments/orders
+
+Query params:
+- q
+- status
+- provider
+- eligibility
+- limit
+
+Return safe data:
+- orderId
+- orderNumber
+- guest name/email
+- orderType
+- orderStatus
+- paymentProvider
+- paymentStatus
+- amountCents
+- paidAt
+- authNetTransId masked or last chars only
+- eligibility
+- blockedReason
+
+Never return secrets.
+
+3. Recent audit
+
+In Refunds & Voids tab, show last 10 payment operation audit events:
+- refund success
+- refund failure
+- void success
+- void failure
+- gateway test
+- gateway credential update
+
+Columns:
+- action
+- order if applicable
+- amount if applicable
+- actor
+- timestamp
+- result
+
+No secrets.
+
+4. OrderDrawer Payment tab polish
+
+Improve the existing OrderDrawer Payment tab.
+
+If provider is DEMO:
+- Show badge: Demo payment
+- Copy: “No gateway transaction exists for this order.”
+
+If provider is AUTHORIZE_NET:
+- Show badge: Authorize.net
+- Show transaction id / ref id
+- Show payment status
+- Show amount
+- Show paid date
+
+Add:
+- Link/button: Open payment controls
+  href: /admin/payments?tab=refunds
+- Make Refund action easier to find for eligible paid website orders.
+- If refund blocked, show reason:
+  “Missing gateway transaction id”
+  “Already refunded”
+  “Demo payment”
+  etc.
+
+5. UX / styling
+
+Keep it premium and operational:
+- Use one clean panel per tab.
+- No nested card clutter.
+- Search row at top.
+- Table should be scannable.
+- Eligibility badges should use:
+  green = eligible
+  amber = warning/manual review
+  red = blocked
+  gray = not applicable
+- Empty state:
+  “No refundable website orders found.”
+- Loading state should not shift layout badly.
+- Mobile should remain usable.
+
+6. Security
+
+- SUPERADMIN only.
+- No secrets returned.
+- No gateway mutation unless existing refund/void route is called.
+- Do not create a new refund engine if one already exists.
+- Use existing gateway-first refund/void routes.
+
+7. Build
+
+Run:
+- npm run build
+- Architect review
+
+Acceptance:
+- Superadmin can search website orders from /admin/payments → Refunds & Voids.
+- Superadmin can see which orders are refund/void eligible.
+- Demo/POS/INVU payments are clearly separated from website gateway payments.
+- OrderDrawer Payment tab clearly distinguishes DEMO vs AUTHORIZE_NET.
+- Payment actions are easier to find.
+- Build passes.

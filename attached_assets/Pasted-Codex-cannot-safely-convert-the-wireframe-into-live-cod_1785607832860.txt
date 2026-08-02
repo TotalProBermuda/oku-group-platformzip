@@ -1,0 +1,144 @@
+Codex cannot safely convert the wireframe into live code from the local workspace because the actual Replit app source is not available there.
+
+Please produce a complete, current source/context bundle for the reservation ecosystem so Codex can review for conflicts, avoid duplicate modules, and convert the wireframe into the existing architecture.
+
+IMPORTANT:
+Do not send only a summary or pasted diff.
+Send actual current file contents or a structured file bundle.
+The goal is to determine exactly what should be reused, extended, deprecated, or newly built.
+
+Please include:
+
+1. PUBLIC QR / GUEST BOOKING FLOW
+- src/app/r/[referralCode]/page.tsx
+- src/components/booking/GuestBookingForm.tsx
+- src/components/booking/*
+- src/app/api/reservations/route.ts
+- GET /api/v1/spaces/available route
+- any reservation confirmation / pending approval components
+- any reservation status constants/enums used by the guest flow
+
+2. REFERRER / PROFILE DASHBOARDS
+- referrer dashboard route
+- influencer dashboard route
+- partner dashboard route
+- shared PureReferrerConsole or equivalent
+- role/profile configuration for taxi, influencer, partner, generic referrer
+- QR generation utilities
+- WhatsApp share utilities
+- src/server/referrals/myReferralsSource.ts
+- src/server/referrals/referralActorService.ts
+
+3. RESTAURANT HOST / FLOOR OPERATIONS
+- src/app/host/dashboard/*
+- src/app/host/operations/*
+- src/components/host/HostOperationsBoard.tsx
+- all host booking-card components
+- host check-in / arrival / seated / closed routes
+- host assign-space route
+- host utilisation route
+- src/server/host/hostService.ts
+
+4. CAPACITY / SPACES
+- src/server/spaces/capacityService.ts
+- RestaurantSpace CRUD routes/components
+- CapacityHold lifecycle code
+- scheduled expiry worker / BullMQ queue code
+- any capacity warning / override logic
+- any tests for capacity overlap and concurrency
+
+5. SUPERADMIN / ADMIN
+- src/app/admin/*
+- AdminNav
+- venue setup pages
+- spaces/sections management pages
+- any table/floor/table-capacity pages if they exist
+- role/user/permission management pages
+- admin API routes for venue, spaces, tables, permissions
+
+6. INVU INTEGRATION
+- src/server/services/invu/*
+- commission minting service
+- any INVU table/check binding code if it exists
+- any routes that close reservations/checks
+- payout proof / commission allocation routes
+- mark-paid route
+
+7. DATABASE / MIGRATIONS / SEED
+- prisma/schema.prisma
+- latest migrations for #180, #181, #182, #194
+- seed script
+- seeded OKÜ venue/spaces
+- seeded host users
+- seeded superadmin user
+- seeded referrer/influencer/partner/taxi profiles
+
+8. I18N
+- EN/ES/PT translation files for:
+  - guest QR booking
+  - referrer dashboard
+  - host dashboard
+  - host operations
+  - superadmin
+  - reservation statuses
+  - capacity warnings
+  - pending approval
+  - INVU binding warnings
+
+9. TESTS
+- reservation API tests
+- GuestBookingForm tests
+- availability API tests
+- capacityService tests
+- host operations tests
+- permission tests
+- referrer dashboard tests
+- Playwright/e2e tests for /r/[referralCode]
+
+Also produce a CONFLICT MAP in this exact format:
+
+| Product Area | Existing Files | Existing Functionality | Proposed Wireframe Feature | Reuse / Extend / Deprecate / New | Risk of Duplication |
+|---|---|---|---|---|---|
+
+Cover these product areas:
+- Referrer QR console
+- Guest QR booking flow
+- Availability API
+- Reservation API
+- Restaurant spaces
+- Capacity holds
+- Host dashboard
+- Host operations board
+- Table/floor control
+- INVU binding
+- Close/commission proof
+- Superadmin venue setup
+- Superadmin spaces/sections
+- Superadmin table builder
+- Roles/permissions
+- i18n
+- Audit ledger
+
+Finally answer these architecture questions:
+
+1. Which component owns the QR guest booking UI?
+2. Which API creates reservations?
+3. Which service checks availability?
+4. Which service creates/releases capacity holds?
+5. Which component owns the host booking card?
+6. Which route assigns a reservation to a space?
+7. Does any table/chair model already exist?
+8. Does any INVU table/check binding model already exist?
+9. Can a seated unbound reservation currently be closed?
+10. Which role can create spaces?
+11. Which role can assign spaces/tables?
+12. Which role can override capacity?
+13. Which role can bind INVU tables/checks?
+14. Which role can close reservations?
+15. Where is referrer attribution created?
+16. Where is attribution shown back to the referrer?
+17. Which modules are already complete from #181/#194?
+18. Which modules are missing and should become #195/#196/#197?
+
+Do not implement yet.
+First return the source/context bundle, conflict map, and architecture answers so Codex can confirm the wireframe implementation plan will not duplicate or conflict with existing code.

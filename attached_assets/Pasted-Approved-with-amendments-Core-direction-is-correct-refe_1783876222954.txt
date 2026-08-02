@@ -1,0 +1,60 @@
+Approved with amendments.
+
+Core direction is correct:
+- /referrer/dashboard must become actor-first.
+- Legacy Referrer rows remain backward-compatible fallback only.
+- Admin needs an explicit Resolve Referrer Profile action.
+- Organization/entity resolution remains separate.
+- Commission eligibility remains separate.
+
+Required amendments before implementation:
+
+1. Do not create duplicate actors.
+For mode: "create", first check:
+- ReferralActor.userId === user.id
+- ReferralActor matching user email/phone
+- legacy Referrer.userId === user.id
+- existing ReferralLink/code tied to any candidate actor
+Only create a new actor when no safe existing actor can be linked.
+
+2. Link mode must guard against stealing actors.
+mode: "link" should only allow linking an actor where:
+- actor.userId is null, OR
+- actor.userId already equals this user.id
+Never overwrite another user’s actor link without a separate merge/admin override flow.
+
+3. Actor-first dashboard must not require a legacy Referrer row.
+If ReferralActor.userId === user.id and the actor owns an active ReferralLink, /referrer/dashboard should render the console even if Referrer is null.
+
+4. Missing active ReferralLink should be diagnosed separately.
+A user may have:
+User → ReferralActor but no active ReferralLink.
+That should display “Actor linked, no active referral code” in admin, with an admin action to create/activate a ReferralLink.
+Do not show generic “No Referrer Profile” for this case.
+
+5. Commission eligibility must not be inferred.
+Resolving the referrer profile only grants identity and activity visibility.
+Money modules must still require commission eligibility / assignment / rule.
+
+6. Audit log must record before/after.
+For each resolve action, log:
+- admin user id
+- target user id
+- actor id
+- previous actor.userId
+- new actor.userId
+- mode: link/create/link_existing/create_link
+- whether a referral link was created or reused
+Do not log credentials or sensitive PII.
+
+7. Dashboard profile shape should include source.
+Return something like:
+profileSource: "actor" | "legacy"
+This helps debug future identity issues and prevents silent fallback confusion.
+
+Acceptance additions:
+- Taxi, concierge, hotel concierge, tour guide, promoter accounts with ReferralActor.userId linked can open /referrer/dashboard.
+- If actor exists but no ReferralLink, admin sees that specific gap and can create/reuse a link.
+- Legacy-only referrers still work.
+- No duplicate actor or duplicate active code is created for the same user.
+- No actor already linked to another user is reassigned silently.

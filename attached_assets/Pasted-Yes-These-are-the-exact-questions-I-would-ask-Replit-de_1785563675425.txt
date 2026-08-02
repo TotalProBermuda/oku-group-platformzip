@@ -1,0 +1,97 @@
+Yes. These are the exact questions I would ask Replit/dev before green-lighting #194.
+Status Questions
+What is the exact route/component for the QR guest booking page?
+Example: /r/[code], ReferralLandingPage, ReserveForm.
+
+When scanning /r/INF-SOPHIA, what final booking URL/state should the guest see?
+
+Is the current form intentionally hardcoding reservation date to “tomorrow”? Where?
+
+Is there currently any field for reservation time in the frontend state?
+
+Does POST /api/reservations accept reservationDate, reservationTime, requestedSpaceId, and partySize today?
+
+Does the API persist requestedSpaceId, or is the frontend selection only visual right now?
+
+Does the API create a CapacityHold during booking, or only after host confirmation?
+
+Does the booking flow currently call any availability endpoint before submission?
+
+Is there an existing endpoint for available spaces/time slots, or must one be created?
+
+Are OKÜ / Catch / Terrace buttons mapped to real RestaurantSpace.id values, or just labels?
+
+Product Flow Questions
+11. Should guests select date first, then party size, then experience/space, then time?
+Should the guest see only available time slots, or can they request unavailable/pending slots?
+
+For requiresApproval spaces, should the confirmation say “Request received” instead of “Reservation confirmed”?
+
+What is the default service duration per reservation?
+   Example: 90 minutes, 120 minutes, configurable by venue/space.
+
+Should capacity be checked at the space level only for v1, or table level now?
+
+What should happen if the requested space is unavailable but another space has capacity?
+
+Should guests be allowed to select “No preference”?
+
+Should Terrace show weather-sensitive copy even before weather enforcement exists?
+
+Referrer / Attribution Questions
+19. Is referralCode preserved from QR scan through final reservation creation?
+Does attribution survive if the guest changes date/time/space before submitting?
+
+Does the referrer feed show the reservation immediately after submission?
+
+Does the referrer feed show requested space or assigned space?
+
+What happens if attribution fails during reservation creation now: PENDING_ATTRIBUTION or silent DIRECT?
+
+Host Workflow Questions
+24. Where does a new QR reservation appear in the host dashboard?
+Can the host see requested date, time, party size, source referrer, and requested space in one card?
+
+Can the host approve, reject, or modify the requested reservation?
+
+Can the host assign a different space than requested?
+
+Does host reassignment preserve attribution?
+
+Does confirming a reservation create or update a capacity hold?
+
+Does cancellation/no-show/completion release the hold?
+
+Testing Questions
+31. What seeded referrer codes should be tested?
+   Minimum: INF-SOPHIA, taxi, partner, generic referrer.
+What seeded spaces exist in the test DB?
+   OKÜ Dining Room, Catch Experience, Terrace, VIP.
+
+What exact date/time test data should simulate available capacity?
+
+What test should simulate over-capacity?
+
+What test should simulate requiresApproval?
+
+What test proves requestedSpaceId is persisted?
+
+What test proves CapacityHold overlap logic works?
+
+What test proves attribution is preserved after booking?
+
+What test proves EN/ES/PT labels render without raw keys?
+
+What test proves mobile usability at 390px width?
+
+Launch Gate
+Ask Replit to answer with evidence, not prose:
+Please provide:
+1. Screenshots or recordings of /r/INF-SOPHIA on mobile showing date, time, party size, space, and submit.
+2. The frontend files for the QR booking page.
+3. The reservation API request/response shape.
+4. DB proof that reservationDate, reservationTime, requestedSpaceId, referralCode, and AttributionSession are persisted.
+5. A completed QA matrix for EN/ES/PT, desktop/mobile, available/unavailable capacity, and all seeded referrer profiles.
+The main launch question is simple:
+Can a guest scan any referrer QR, choose a real date/time/space, submit a reservation, preserve attribution, and appear correctly in the host dashboard?
+Until that answer is proven end to end, this is not launch-ready.

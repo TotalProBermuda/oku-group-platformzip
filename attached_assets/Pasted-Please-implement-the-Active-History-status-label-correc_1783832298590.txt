@@ -1,0 +1,54 @@
+Please implement the Active/History status-label correction, but with one important amendment:
+
+Do NOT treat SEATED as “Closed” or “Completed” for referrer-facing language.
+
+For all pure referrer surfaces, use the same governed protocol:
+
+1. Active / Upcoming
+- Non-terminal referral with service date today or future.
+- Future reservations must appear immediately after QR/link booking.
+- Label: Active or Upcoming.
+
+2. In Service
+- ARRIVED or SEATED.
+- These are live operational states, not completed states.
+- Label: In Service / Seated.
+
+3. Past — Awaiting Close
+- Service date is in the past in America/Panama time, but reservation status is still non-terminal, e.g. CONFIRMED or PENDING.
+- Do not call this completed.
+- This means the restaurant/host/POS has not finalized the outcome yet.
+
+4. Completed / Closed
+- Only use Completed/Closed when the reservation actually reaches a terminal completed/closed status, or when POS/check-close evidence confirms the visit closed.
+- Completed must never mean “old reservation.”
+
+5. Lost
+- CANCELLED or NO_SHOW.
+- Keep this separate from Completed.
+
+6. Revenue / payout language
+- If check/POS revenue is not closed yet, show something like “Awaiting close” or “Pending revenue evidence.”
+- If revenue is verified, show verified spend / accrued commission.
+- Do not show paid/unpaid unless it comes from the payout ledger.
+
+Immediate fix:
+- Replace the hardcoded “Completed Today” section on `/host/streetside`.
+- Split the current finalBookings section into:
+  - In Service, if status is ARRIVED or SEATED
+  - Past — Awaiting Close, if service date has passed but status is still non-terminal
+  - Completed, only for actual completed/closed rows
+  - Lost, for CANCELLED / NO_SHOW
+
+Cross-surface fix:
+- Apply the same classification labels in `MyReferralsFeed` / PureReferrerConsole so streetside, referrer, influencer, partner, taxi/concierge/tour-guide/promoter, and future referrer-capable roles all interpret Active/History consistently.
+- Partner-specific business modules can remain separate, but referral status language must stay governed and shared.
+
+Acceptance criteria:
+- A CONFIRMED past reservation never appears under “Completed Today.”
+- Future-dated reservations appear immediately in Active/Upcoming.
+- SEATED appears as In Service or Seated, not Completed.
+- Past non-terminal rows appear as Past — Awaiting Close.
+- Completed means actual completed/closed only.
+- Labels are i18n-safe in EN/ES/PT.
+- No schema, payout, ledger, or INVU write-back changes in this task.

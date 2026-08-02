@@ -1,0 +1,233 @@
+After P5, Cybersource is no longer just configured. It becomes a real website payment processor.
+
+
+
+
+
+19:30
+Yes - both of them need to be real website payment processor
+19:33
+
+
+Exactly. Then the product requirement is:
+
+Authorize.net and Cybersource must both be real website payment processors, with one active processor selected for checkout at a time.
+
+The right build is not “Cybersource special case.” It is a real Payment Gateway Runtime Layer.
+
+Give Replit this:
+
+Implement Payments P5 — Real Payment Gateway Runtime Layer.
+
+Goal:
+Both Authorize.net and Cybersource must be real website payment processors. Superadmin can configure both, test both, and select which one is active for website checkout.
+
+Scope:
+Website commerce only:
+- experience tickets
+- series/event tickets
+- memberships if they use the existing website checkout flow
+- manual/admin comp tickets remain no-payment
+
+Do not include:
+- POS/INVU table payments
+- partner payout payments
+- commission payout rails
+- RFID
+- external ticketing sync
+
+Core rule:
+Only one active checkout gateway at a time:
+- AUTHORIZE_NET
+- CYBERSOURCE
+
+Configuration:
+Authorize.net:
+- already has editable encrypted credentials
+- must be usable for real checkout charge/capture
+- must support refund/void for its own payments
+
+Cybersource:
+- already has editable encrypted credentials
+- must be usable for real checkout charge/capture
+- must support refund/void for its own payments where gateway supports it
+
+Runtime architecture:
+Create a shared payment provider layer instead of hardcoding checkout to Authorize.net.
+
+Add provider interface:
+
+PaymentProviderAdapter:
+- provider: AUTHORIZE_NET | CYBERSOURCE
+- getStatus()
+- testConnection()
+- charge(params)
+- refund(params)
+- void(params)
+
+Normalized charge input:
+- amountCents
+- currency
+- orderId or invoiceNumber
+- opaque/card token/payment token from checkout
+- billing details if currently collected
+- customer email/name
+- metadata
+
+Normalized charge result:
+- ok
+- provider
+- transactionId
+- referenceId
+- authCode
+- responseCode
+- message
+- rawSafeResponse
+- failureCode
+- failureMessage
+
+Normalized refund result:
+- ok
+- provider
+- refundTransactionId
+- originalTransactionId
+- amountCents
+- message
+- rawSafeResponse
+
+Normalized void result:
+- ok
+- provider
+- voidTransactionId
+- originalTransactionId
+- message
+- rawSafeResponse
+
+Active gateway:
+Add a single source of truth:
+- activeCheckoutGateway: AUTHORIZE_NET | CYBERSOURCE
+
+Use CommerceSettings if appropriate, or a dedicated PaymentRuntimeSettings singleton if cleaner.
+
+Superadmin UI:
+In /admin/payments:
+- show “Active checkout gateway”
+- allow Superadmin to select Authorize.net or Cybersource
+- show each provider status:
+  - configured
+  - test passed
+  - enabled
+  - production/test mode
+  - checkout eligible / not eligible
+- audited on change
+
+Activation guard:
+Cannot activate a gateway unless:
+- credentials are saved and decryptable
+- test connection has passed
+- required runtime adapter exists
+- gateway is enabled
+- production activation is explicitly confirmed
+
+Checkout integration:
+Update the current website checkout confirmation flow so it calls the active provider adapter instead of directly calling Authorize.net.
+
+Do not duplicate order/ticket/inventory logic.
+
+Current flow should remain:
+- hold/capacity exists
+- charge gateway
+- on success create/update Order as PAID
+- create Payment row
+- issue Ticket rows
+- enqueue receipt email
+- enqueue post-payment events
+- write OrderEvent/AuditLog
+- on failure release hold/capacity and return clear error
+
+Payment persistence:
+Ensure Payment can store provider-specific references for both providers.
+
+If existing Payment fields are Authorize.net-specific:
+- keep them for backward compatibility
+- add generic fields:
+  - gatewayTransactionId
+  - gatewayReferenceId
+  - gatewayAuthCode
+  - gatewayResponseCode
+  - gatewayRawSafeJson
+- continue filling authNetTransId/authNetRefId for Authorize.net if existing code depends on them
+- fill generic fields for both providers
+
+Refund/void:
+Refund and void must route by Payment.provider, not activeCheckoutGateway.
+
+Rules:
+- AUTHORIZE_NET payment refunds through Authorize.net
+- CYBERSOURCE payment refunds through Cybersource
+- DEMO payment is blocked
+- missing gateway transaction id is blocked
+- provider mismatch is blocked
+- gateway failure must not mutate Order/Payment
+- successful refund updates Order/Payment/tickets/capacity exactly as current refund flow expects
+
+Admin UX:
+Refunds & Voids tab should show:
+- Provider
+- Gateway transaction id
+- Eligibility
+- Action
+- Blocked reason
+
+Eligibility examples:
+- Refund possible
+- Void possible
+- Demo only
+- Missing gateway transaction id
+- Provider not configured
+- Adapter unavailable
+- Already refunded
+- Payment failed
+
+Security:
+- no raw credentials in browser
+- no CVV/card number stored
+- no raw shared secret in logs
+- all gateway calls server-side
+- audit active gateway changes, charge failures, refunds, voids
+
+Sandbox acceptance:
+Authorize.net:
+- set credentials
+- test connection passes
+- activate Authorize.net
+- complete sandbox checkout
+- order paid
+- payment provider AUTHORIZE_NET
+- tickets issued
+- receipt sent
+- refund works
+
+Cybersource:
+- set credentials
+- test connection passes
+- activate Cybersource
+- complete sandbox checkout
+- order paid
+- payment provider CYBERSOURCE
+- tickets issued
+- receipt sent
+- refund/void works where supported
+
+Regression:
+- demo orders still clearly marked demo
+- demo refund blocked
+- staff QR scan works for Authorize.net-paid and Cybersource-paid tickets
+- existing /admin/orders drawer still works
+- /admin/payments Transactions and Refunds tabs show both providers correctly
+- POS/INVU payments are not mixed into website payments
+
+Build:
+- dev compile passes
+- run npm run build externally if the Replit agent cannot keep it alive
+That is the right architecture: two configured gateways, one active checkout gateway, provider-based refund routing, and shared downstream order/ticket/receipt behavior.

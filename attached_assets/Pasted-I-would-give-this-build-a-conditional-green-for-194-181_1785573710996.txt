@@ -1,0 +1,97 @@
+I would give this build a conditional green for #194/#181 foundation, but not a full launch green-light until the connected UX is proven end to end on mobile.
+What Looks Good
+The key P0 guest-flow blocker appears addressed:
+Guest QR flow now has date selection.
+Time slots exist.
+Space selector exists.
+Availability API exists: GET /api/v1/spaces/available.
+reservationDate is now guest-selected, not hardcoded tomorrow.
+requestedSpaceId is persisted.
+Attribution was left untouched.
+EN/ES/PT copy was added.
+That is the right direction.
+Remaining Red-Team Risks
+[P0] Need proof that the QR mobile flow is actually usable.
+The report says the Reserve tab works, but we need screenshots/video at 390px mobile showing the complete flow:
+Scan QR → Reserve → Date → Time → Party Size → Space → Guest Info → Submit → Confirmation
+If date/time/space sit too low in the form, the booking party may still miss them.
+[P0] Host dashboard must show the new booking context immediately.
+When a guest submits, the host card must show:
+reservation date/time
+party size
+requested space
+referrer/source
+availability/over-capacity signal
+quick action: confirm / modify / assign table
+If the host still only sees a generic queue item, the system is not operationally ready.
+[P0] Space availability is not table/floor readiness.
+The new API returning 4 spaces is good, but restaurant service needs:
+Space → Table → Chairs → Assigned reservation → INVU binding
+Space-level capacity prevents obvious overbooking, but it does not yet give the host a true floor-control workflow.
+[P0] INVU binding remains the commission-proof gate.
+This build does not appear to solve:
+seated reservation needs “Bind INVU Table” notification
+unbound seated reservation cannot be closed into commission proof
+wrong INVU binding recovery
+INVU table/check ID stored against reservation
+That should be the next P0 after guest booking.
+[P1] Availability must match reservation duration.
+The availability endpoint must use overlapping windows, not just date/time slot labels. Confirm the chosen time slot maps to a real service window, e.g. 7:00–9:00. Otherwise 7:00 and 8:00 can overbook the same seats.
+[P1] Requires-approval spaces need distinct UX.
+If Catch, Terrace, or VIP requires host approval, the guest confirmation should say:
+“Request received” / “Pending confirmation”
+not:
+“Reservation confirmed.”
+[P1] No-space / full-capacity state must be beautiful and useful.
+If no space can fit the party, do not dead-end the guest. Offer:
+choose another time
+choose another date
+request host review
+WhatsApp the restaurant
+[P1] Profile sync still needs matrix testing.
+This must work from every QR source:
+Sophia influencer
+taxi referrer
+partner
+generic referrer
+newly created referrer
+The destination flow should be identical except for profile-specific branding/source attribution.
+Launch Gate
+Before launch, ask Replit for this evidence:
+Please provide final QA evidence for:
+
+1. /r/INF-SOPHIA mobile 390px full booking flow
+2. Taxi QR mobile full booking flow
+3. Partner QR mobile full booking flow
+4. Generic referrer QR mobile full booking flow
+5. EN/ES/PT screenshots with no raw keys
+6. Reservation DB row showing reservationDate and requestedSpaceId
+7. Host dashboard card showing requested date/time/space/referrer
+8. Capacity unavailable state
+9. requiresApproval pending state
+10. Attribution preserved in referrer feed after booking
+My verdict:
+#194 can be considered functionally built if the above evidence passes.
+The full reservation ecosystem is not launch-ready until #195 table/floor control and #196 INVU binding close-gate are built.
+
+
+3:39
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Ask for approval

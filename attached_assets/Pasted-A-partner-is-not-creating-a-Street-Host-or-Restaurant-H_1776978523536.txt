@@ -1,0 +1,229 @@
+A partner is not creating a Street Host or Restaurant Host.
+
+They are creating a session/series-specific delegated lead for their own event.
+
+That is much more like:
+
+a company inviting a Head of Marketing to co-lead one launch
+a wine brand inviting a sommelier to run one dinner series
+a corporate organizer inviting a guest-list lead to manage one executive session
+
+So the system should model this as:
+
+Partner Admin creates
+Event Leadership Seat
+scoped only to:
+one session, or
+one series
+with limited delegated permissions
+Therefore: no true logic conflict with Street Host / Restaurant Host
+
+There is only a conflict if devs implement it badly.
+
+Because these are different categories:
+
+Street Host
+
+Operational front-of-house acquisition role
+
+Restaurant Host
+
+Operational in-venue seating/reception role
+
+Partner-created Event Lead / Co-Lead
+
+Temporary delegated collaborator for a specific partner-owned event context
+
+So the correct architecture is:
+
+keep Street Host and Restaurant Host untouched
+add a separate seat model for partner-created event leads
+Rename it to avoid confusion
+
+I would strongly consider not calling these “hosts” in the data model.
+
+“Host” is already overloaded.
+
+Use one of these instead:
+
+event_lead_seat
+event_delegate_seat
+session_colead_seat
+partner_delegate_seat
+
+Best practical option:
+
+Partner Delegate Seat
+
+Then the seat can carry a display label like:
+
+Co-Lead
+Session Lead
+Guest List Lead
+Brand Representative
+Event Coordinator
+
+This avoids conflict with restaurant host logic.
+
+Canonical model
+Existing internal ops roles
+street_host
+restaurant_host
+New partner-created seat family
+partner_delegate
+Delegate seat subtypes
+series_co_lead
+session_co_lead
+guest_list_lead
+brand_rep
+vip_relations_lead
+
+That is much cleaner than introducing another top-level host.
+
+Scope rule
+
+The most important rule:
+
+A partner delegate only exists inside the scope in which they were invited.
+
+So:
+
+invited to a series → can work across that series
+invited to a session → can only work in that session
+
+They should not gain:
+
+venue-wide host access
+restaurant-wide reservation access
+general street-host tools
+unrelated events access
+How to think about it
+
+This is basically delegated event command, not hospitality floor staffing.
+
+So the platform should support:
+
+Partner Admin
+
+Owns the event commercially and structurally
+
+Can:
+
+invite delegates
+assign scope
+assign permission bundle
+revoke access
+Delegate
+
+Helps run the event within the assigned scope
+
+Can:
+
+do only what the partner delegated
+see only what is relevant to that session/series
+
+That is the whole model.
+
+Recommended permission bundles
+
+For your use case, I would make the partner choose from bundles like:
+
+Series Co-Lead
+
+For someone helping lead the whole series
+
+Can:
+
+view all sessions in that series
+view attendees for all sessions in that series
+manage guest list for that series
+check in guests for sessions in that series
+view limited sales summary if allowed
+
+Cannot:
+
+edit pricing
+edit settlement/payout
+edit platform configuration
+Session Co-Lead
+
+For one night / one session
+
+Can:
+
+view that session
+manage guests for that session
+check in guests for that session
+
+Cannot:
+
+see unrelated sessions
+see broader partner account settings
+edit commercial settings
+Guest List Lead
+
+Can:
+
+invite and manage guests
+track confirmations
+assist with arrivals
+
+Cannot:
+
+edit event structure
+manage other delegates unless specifically allowed
+The design principle Replit needs to follow
+
+Add this as a hard rule:
+
+Partner-created collaborator seats are not operational host roles. They are delegated event-access seats scoped only to the specific series or session for which they were invited.
+
+And:
+
+Existing Street Host and Restaurant Host logic must remain isolated and must not be reused as the permission basis for partner delegates.
+
+Suggested terminology for the brief
+
+Instead of “Create Co-Host,” I would use:
+
+Invite Co-Lead
+Add Delegate
+Invite Session Lead
+Invite Series Co-Lead
+
+Best UX option:
+Invite Co-Lead
+
+Best backend naming:
+partner_delegate_seat
+
+That gives you clean UX and clean architecture.
+
+Best implementation rule set
+Partner delegates should:
+be invite-first
+be tied to one session or one series
+inherit only delegate permissions
+never become venue ops hosts
+never see restaurant host tools
+never affect event pricing/date/ticket structure unless explicitly designed later
+Street/Restaurant hosts should:
+remain part of internal operational flow
+not be created by partner invite flow
+not be mixed with delegate seats
+Final answer
+
+So no, this is not really a role conflict in concept.
+
+It is a classification issue:
+
+You are not adding another restaurant host type.
+You are adding partner-delegated event leadership seats.
+
+That means the system should separate:
+
+internal operational hosts
+from
+partner-invited event delegates
+
+That separation will keep the logic clean.

@@ -1,0 +1,92 @@
+Foodie.bm — Platform Definition
+Part 1: The Platform
+Foodie.bm is Bermuda's restaurant discovery, reservations, and loyalty engine. It connects four distinct users — diners, restaurant owners, referrers, and a platform administrator — through a shared data layer that tracks every meaningful interaction from first search to table checkout.
+
+What diners get:
+
+A browsable, filterable directory of Bermuda restaurants with real menus, galleries, hours, and live booking availability
+Online reservations with check-in codes for verified visits
+A loyalty club (Bronze → Silver → Gold → Platinum) that earns points on every verified booking, review, and community post
+A saved restaurants list and personalized community feed
+A personal dashboard showing upcoming/past reservations and points history
+What powers the platform:
+
+A platform-wide event stream that records every impression, click, booking, check-in, and conversion — this is the analytics backbone used by owners, the referrer system, and the admin control centre
+A community layer that gates review and photo-posting behind verified visits, keeping content trustworthy
+A campaign engine that lets restaurants buy visibility, drive bookings on slow nights, and reward loyal diners with points multipliers
+Current restaurant count: 27 Bermuda restaurants (r1–r27), 2 claimed (Bonefish, Waterlot Inn), 25 unclaimed with active FOMO claim banners
+
+Demo personas:
+
+Account	Role	Portal
+diner@demo.bm	Jade Clark, Gold tier	/dashboard
+owner@bonefish.bm	Marcus Webb	/owner
+owner@waterlot.bm	Charlotte Reid	/owner
+referrer@demo.bm	Priya Sood, PRIYA-BM	/referrer
+admin@foodie.bm	Super Admin	/admin
+Part 2: Restaurant Ownership Functionality
+When an owner claims their listing (via the 3-step claim modal + $200/month subscription), they get access to a full management suite at /owner:
+
+Overview tab
+Stat cards for profile views, total bookings, revenue impact, and active campaigns. Conversion funnel (viewed → menu click → booked). Diner insights (new vs. returning, top booking times). Campaign ROI summary.
+
+Campaign tools
+Self-service ad platform with four campaign types:
+
+Boost — floats the restaurant in search and discovery
+Experience — promotes a specific event (chef nights, tastings, live music)
+Points Multiplier — 2× or 3× points on quiet nights to fill seats
+CRM Messaging — direct push/email to past diners or club members
+Placement options include Homepage Featured row, Search Results, Discovery Tiles, Events Feed, Push Notifications, and Weekly Digest. Pricing models: flat rate, CPC, CPM, per-send. Real-time impression/click/booking/revenue tracking with pause, resume, and duplicate controls.
+
+Reservations tab
+Lookup by check-in code (e.g. ABC123). Mark guests as Checked In / Complete / No Show. Filter by status. Guest notes, party size, occasion details all visible.
+
+Menu CMS
+Create multiple menus (Dinner, Lunch, Drinks). Organize into sections. Add items with price, description, dietary tags. "86'd" toggle to remove items in real-time without deleting them.
+
+Gallery CMS
+Upload and categorize photos (Food, Drinks, Interior, Exterior, Events). Feature toggle to pin photos to the top of the public profile.
+
+Profile editor
+Name, description, cuisine types, address, phone, website, price range, reservations-on/off toggle.
+
+Billing tab
+Plan status (Trial / Pro / Cancelled) with countdown. Usage meters — media uploads (50 limit free / unlimited Pro), active campaigns (2 limit free / unlimited Pro), push sends (100 limit free / 1,000 Pro). Spend summary for current month vs. projected. Billing history table. Cancel / reactivate controls.
+
+Onboarding checklist
+Step-by-step guide shown post-claim (add menu items, upload photos, set hours, run first campaign).
+
+Part 3: Referrer System — Current State & Gaps
+What exists today
+
+Any user can become a referrer (influencer, concierge, travel agent, or restaurant partner). They get a unique referral code (e.g. PRIYA-BM), a shareable link, and a dashboard at /referrer showing:
+
+Total attributed bookings, earnings this month, all-time earnings, pending payout
+Top restaurants by commission
+Full attribution table (guest name, party size, booking value, commission, status: pending/confirmed/paid)
+Partner settings (type, commission rate, bio)
+The default commission is 5% of booking value, hardcoded at the platform level. Attribution is linked to the reservation at booking time via referral code.
+
+What is missing — the gap the restaurant-driven system must fill
+
+Gap	Current Reality	What It Should Become
+Commission control	Fixed 5% platform-wide, no restaurant input	Each restaurant sets its own rates — standard dining commission, event commission, happy hour rate, VIP experience rate. Owners configure this in their dashboard per referrer or per tier
+Commission anchor	Booking value is an estimated field	Commission anchored to actual table checkout value from the restaurant's POS — what was truly spent, including upsells, drinks, desserts. This is the trust layer
+POS integrations	None	APIs for the most-used POS systems in Bermuda (Lightspeed, Square, Toast, Aloha, potentially island-specific systems). Restaurant admin connects their POS; Foodie pulls real checkout totals for every attributed table
+Events	"Experience" exists only as a campaign type owned by the platform	Foodie Events — a first-class object created and owned by the restaurant. Each event has its own ticketing, capacity, date/time, pricing tiers, and referral commission structure. Referrers drive ticket sales, not just table reservations
+Hosts & Subhosts	Single ownerId per restaurant	A hierarchical host model: the restaurant is the Host, which appoints named Subhosts (e.g. a Fairmont concierge team, a travel agency, a local influencer collective). Each subhost can have their own rate, their own event access, and their own payout schedule. The restaurant controls who has access and at what level
+Referrer trust score	None	As POS data accumulates, each referrer builds a trust score based on actual verified spend vs. claimed bookings — this informs which referrers unlock higher commission tiers
+Check-in → commission trigger	Disconnected	Staff check-in at the restaurant triggers the POS attribution window. When the table closes in the POS, the commission moves from pending → confirmed automatically. No manual confirmation needed
+Referrer-facing event tools	None	Referrers see available Foodie Events per restaurant, get a unique event referral link, and track ticket attributions separately from dining attributions
+The flow as it should work:
+
+Restaurant creates a Foodie Event (e.g. "Wahoo & Wine Chef's Night, April 24") with capacity, ticket price, and a custom referrer commission (e.g. 8%)
+Restaurant appoints Subhosts — concierge at Hamilton Princess, travel agent from a UK agency, a local food blogger — each with their own referral link for that event
+Guest books via subhost link → reservation created with referrerId + eventId + hostId attached
+Guest arrives → staff check-in triggers POS attribution window
+Table closes in POS → actual spend is pulled via POS API → commission calculated on real total, not estimate
+Commission moves to confirmed → payable to the subhost on the restaurant's configured payout schedule
+Restaurant sees every subhost's performance per event in their owner dashboard; referrer sees it in their partner hub
+This architecture makes the referrer system restaurant-first rather than platform-first, which is the critical design shift. The platform sets the floor (minimum standards, payment processing, trust scoring), but each restaurant controls the ceiling.
+

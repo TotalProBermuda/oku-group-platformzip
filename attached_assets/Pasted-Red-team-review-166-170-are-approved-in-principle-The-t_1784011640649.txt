@@ -1,0 +1,61 @@
+Red-team review: #166–#170 are approved in principle. The task sequence is now coherent and mostly ProofPay-safe.
+
+Recommended dispatch order:
+1. #166 shared dedupe service
+2. #167 operator/admin API paths
+3. #168 event/ticket/influencer/partner paths
+4. #169 streetside/seed/migration paths
+5. #170 admin merge-conflict surface
+
+Final amendments before build:
+
+#166
+P1 — Verify AuditLog.actorId sentinel.
+The plan says actorId uses resolved actor id/candidateActorId, or sentinel "system:referral-actor-dedupe" when no resolvedByUserId exists. Before implementation, confirm AuditLog.actorId is not a FK to User or otherwise constrained. If constrained, use the exact system/sentinel pattern already used by retentionWorker.ts.
+
+P1 — “Every outcome writes AuditLog” can become noisy.
+Keep it if intentional, but ensure non-mutating `dedupe_found` logs include `mutated:false` and `provisioningPath`, and consider whether high-volume read-only provisioning calls will create too much audit noise. If volume is a concern, only log dedupe_found when the caller requested provisioning/create, not ordinary lookups.
+
+P1 — Legacy Referrer row pickup must preserve old code safely.
+When step 4 picks up a legacy Referrer with referralCode and no actor, the service should try to create/reactivate a ReferralLink using that legacy referralCode if unique. If taken, return a clear reason and generate a new code only if that behavior is acceptable.
+
+#167
+P1 — “same email twice returns 409” may conflict with desired idempotency.
+If the same admin/operator calls create twice for the same user/email and the actor is already linked to that same user, expected behavior should be idempotent found_existing_linked, not merge_required 409.
+409 should be reserved for “candidate actor belongs to a different user.”
+Update test language:
+- same email, same user → found_existing_linked / no duplicate
+- same email, different user → 409 merge_required / no duplicate
+
+#168
+P1 — Event bridge matching must be exact.
+Already noted, but enforce in tests: eventId alone is never enough. Need direct actor/person/email/phone/code evidence.
+
+#169
+P1 — Smoke duplicate checks by email/phone need normalized fields.
+If normalized email/phone are not stored columns, the smoke scripts must normalize in memory before grouping, or use SQL expressions carefully. Do not compare raw phone strings.
+
+#170
+P1 — “Create separate” needs an explicit override path in #166.
+#170 depends on `overrideContext` support in findOrLinkReferralActor, but #166 does not currently list overrideContext in the service input/result. Either:
+- add overrideContext support to #166 now, or
+- make #170 create-separate defer to a later task.
+Do not introduce override behavior only in #170 without service-level support and tests.
+
+P1 — Link resolution must identify incoming user.
+The read API must include the incoming/triggering user id from the merge_required audit metadata. If #166 merge_required metadata does not include incomingUserId/input.userId, #170 cannot safely show both sides or execute “link.”
+
+Add to #166 merge_required metadata:
+- incomingUserId / targetUserId
+- candidateActorId
+- candidateActorUserId if present
+- matchField
+- provisioningPath
+
+General acceptance:
+- No commission eligibility changes.
+- No entity/org resolution changes.
+- No attribution, payout, or ledger changes.
+- Actor owned by another user always becomes merge_required.
+- Inactive links are reused before new codes.
+- All mutation paths return 409 for merge_required consistently.

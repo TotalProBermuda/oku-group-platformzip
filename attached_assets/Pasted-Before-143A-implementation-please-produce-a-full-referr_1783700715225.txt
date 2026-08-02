@@ -1,0 +1,106 @@
+Before #143A implementation, please produce a full referrer module inventory.
+
+Goal:
+Give Codex a complete picture of each current referrer-facing surface so we can decide exactly what becomes shared Pure Referrer Console, what remains role-specific, and what Partner Portal keeps as enhanced business tooling.
+
+Please audit each surface:
+
+1. Streetside host
+Route:
+- /host/streetside
+Files:
+- page/component files
+- API routes used
+Modules/widgets:
+- Guest QR
+- Host Form
+- Active
+- Menu
+- scanner/event/member tools if present
+Data sources:
+- referral feed
+- QR/referral identity
+- menu data
+- event/gift-bag data
+Actions:
+- read-only
+- mutations
+- server permissions
+What should become shared:
+What should stay streetside-specific:
+What should be removed/hidden for pure referrers:
+
+2. Legacy/generic referrer
+Route:
+- /referrer/dashboard
+Files:
+- page/component files
+- API routes used
+Modules/widgets:
+- Share
+- QR
+- Bookings
+- Earnings
+- Profile
+Data sources:
+Actions:
+What should become shared:
+What should stay specific:
+
+3. Influencer/creator
+Route:
+- /influencer/dashboard
+Files:
+- page/component files
+- API routes used
+Modules/widgets:
+- campaign/share tools
+- referral feed
+- payouts/trust summaries
+Data sources:
+Actions:
+What should become shared:
+What should remain optional influencer module:
+
+4. Partner portal
+Route:
+- /partner/dashboard
+Files:
+- page/component files
+- API routes used
+Modules/widgets:
+- referral feed
+- share/QR tools
+- events
+- guest lists
+- co-hosts
+- campaign reporting
+- payout/trust
+Data sources:
+Actions:
+What should become shared referrer core:
+What must remain Partner-specific:
+What must not be standardized:
+
+5. Legacy event-referrer/ticketing surface
+Route:
+- /influencer/referrer-dashboard
+Files:
+- page/component files
+- API routes used
+Data sources:
+Actions:
+Should remain out of scope or be migrated later?
+
+For each surface, please provide:
+- current component tree
+- current API/data flow
+- current permission/mutation capabilities
+- whether it uses getMyReferrals
+- whether it uses legacy feed logic
+- UI modules that map cleanly to Pure Referrer Console
+- UI modules that are role-specific
+- risk level to migrate
+- recommended migration order
+
+Do not implement yet. Return the inventory and recommendations first.

@@ -1,0 +1,81 @@
+Please audit and explain the Active/History/Completed logic across all referrer-facing surfaces, not only streetside.
+
+Current concern:
+On /host/streetside, the Active tab shows:
+- Active: 0
+- Seated: 0
+- Lost: 0
+- message: “No active bookings”
+- section label: “Completed Today”
+- rows underneath are still status “Confirmed” and show ~45h old timestamps
+
+This is confusing. A confirmed booking from ~45h ago should not be labeled “Completed Today” unless it was actually completed today.
+
+Please answer:
+
+1. Streetside logic
+- What query/source provides these rows?
+- How are Active, Seated, Lost counts computed?
+- What statuses count as Active?
+- What statuses count as Seated?
+- What statuses count as Lost?
+- What logic places a row under “Completed Today”?
+- Is “Completed Today” based on reservation status, service date, createdAt, or local Panama day?
+- Why are Confirmed rows showing under Completed Today?
+
+2. Future reservations
+- If a guest books today for a future date, where does it appear?
+- Does it appear immediately in Active?
+- Does it remain visible until its service window passes?
+- Is it grouped by “Upcoming,” “Today,” or something else?
+- Does this behavior match getMyReferrals/statusPolicy?
+
+3. Past reservations
+- When a reservation’s service date passes but status is still Confirmed, where does it go?
+- Does it become History, Expired, Past, Completed, or something else?
+- Should it require restaurant confirmation/completion before being called completed?
+- What is the cutoff timezone? Confirm Panama time.
+
+4. All referrer surfaces
+Please compare behavior across:
+- /host/streetside
+- /referrer/dashboard
+- /influencer/dashboard
+- /partner/dashboard
+- /influencer/referrer-dashboard for ticket referrers
+
+For each:
+- Does it use /api/v1/me/referrals?
+- Does it use getMyReferrals?
+- Does it use statusPolicy?
+- Does it use the same Active/History split?
+- Are labels consistent?
+- Are future reservations shown immediately?
+- Are past non-terminal reservations labeled correctly?
+
+5. Desired product logic
+For all pure referrers, the language should be proof/referral oriented, not restaurant-ops oriented.
+
+Recommended grouping:
+- Active / Upcoming:
+  future or current referred reservations that have not reached a terminal outcome
+- In Service / Visited:
+  arrived/seated if visible and relevant
+- History:
+  completed, cancelled, no-show, expired service-window, or past reservations
+- Pending Close:
+  guest visited but check/revenue evidence not closed yet
+- Verified Revenue:
+  check closed / ticket paid / revenue evidence exists
+- Awaiting Payout Ledger:
+  commission accrued but not canonically paid
+
+Please recommend corrected labels for streetside and all pure referrer surfaces.
+
+6. Acceptance criteria
+- No Confirmed row should appear under “Completed Today.”
+- Future-dated QR reservations appear immediately and stay visible until service window or terminal outcome.
+- Past non-terminal reservations should be labeled “Past” or “Expired,” not “Completed.”
+- “Completed” should mean actual completed/closed state, not simply old.
+- All pure referrer surfaces should use consistent Active/History logic from the governed source.
+- Labels should be EN/ES/PT i18n-safe.

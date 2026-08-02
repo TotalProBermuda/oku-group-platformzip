@@ -1,0 +1,9 @@
+{
+  "required": "Este campo es obligatorio",
+  "invalidEmail": "Por favor, introduzca una dirección de correo electrónico válida",
+  "invalidPhone": "Por favor, introduzca un número de teléfono válido",
+  "minLength": "Debe tener al menos {n} caracteres",
+  "maxLength": "No debe tener más de {n} caracteres",
+  "submitError": "Algo salió mal. Por favor, inténtelo de nuevo.",
+  "success": "Enviado correctamente"
+}

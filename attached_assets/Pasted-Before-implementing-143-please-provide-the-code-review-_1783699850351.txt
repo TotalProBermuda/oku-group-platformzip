@@ -1,0 +1,67 @@
+Before implementing #143, please provide the code review package/spec-to-diff plan so Codex can review it.
+
+Please include:
+
+1. Proposed file changes
+List every file you intend to create/edit/delete, including:
+- new shared console components
+- route/page migrations
+- API changes
+- i18n files
+- permission/middleware changes
+- any schema changes, if any
+
+2. Component architecture
+Show the proposed component tree for:
+- PureReferrerConsole
+- QR module
+- Activity module
+- Earnings/money module
+- Profile/Menu module
+- Partner Portal embedding the shared core
+
+3. Data flow
+Explain exactly which routes call:
+- GET /api/v1/me/referrals
+- getMyReferrals()
+- statusPolicy
+- shared QR/referral identity logic
+
+Confirm no pure-referrer surface reads a separate referral feed.
+
+4. Permission model
+Show how pure referrers remain read-only:
+- no INVU bind
+- no open table
+- no status mutation
+- no venue-wide visibility
+- server-side 403 on direct mutation attempts
+
+5. Migration sequence
+Do not big-bang.
+Please propose the safest order:
+- extract shared modules first
+- migrate legacy /referrer/dashboard first
+- then streetside as themed variant
+- then influencer/partner embedding
+- leave Partner business tools intact
+
+6. Open questions
+Answer these before coding:
+- Should concierge/taxi/tour-guide/promoter use the existing REFERRER login role with actorTypeCode differentiation? My preference: yes, use REFERRER login role for now, do not add new RoleKey values unless truly needed.
+- Should we keep existing routes and render the shared console inside them? My preference: yes, keep existing routes for launch stability.
+- Should Partner Portal remain enhanced? Yes: shared referral core + partner modules.
+- Should legacy event-referrer ticketing surface remain out of scope? My preference: yes, document as separate ticketing-attribution surface for now.
+- Should /api/v1/referrer/dashboard be kept temporarily? Yes, as compatibility or phased migration, but it must not fork referral truth.
+
+7. Validation plan
+Include tests/manual checks for:
+- streetside QR tab clean, no stats above QR
+- Active tab contains stats above list
+- same Active/History behavior across pure referrers
+- no operational controls for pure referrers
+- partner portal retains partner tools
+- i18n EN/ES/PT parity
+- typecheck/build
+
+Do not implement yet. Return the proposed code plan and any uncertain files/risks first.

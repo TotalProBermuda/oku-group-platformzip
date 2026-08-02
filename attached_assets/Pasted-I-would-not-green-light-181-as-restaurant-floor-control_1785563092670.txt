@@ -1,0 +1,31 @@
+I would not green-light #181 as “restaurant floor control”. It is a useful section-capacity foundation, but it does not yet satisfy the urgent operating workflow you described.
+Critical Findings
+[P0] No table/chair/INVU binding model exists.
+The pasted #181 model adds RestaurantSpace and CapacityHold, but the host/owner cannot create actual tables, chair counts, or bind those tables to INVU table IDs. That means it manages space-level covers, not a real floor. See [pasted-text.txt (line 192)](/Users/totalpro/.codex/attachments/f2baee83-24b2-4ba5-9d36-0b38ca41970a/pasted-text.txt:192).
+[P0] The client QR reservation flow is still not covered.
+The urgent /r/INF-SOPHIA issue is date/time/space selection in the guest reservation window. #181 adds backend fields like requestedSpaceId / assignedSpaceId, but I do not see proof that the client-facing reservation form exposes date, time, experience/space, and availability clearly. This cannot be green-lit without the real src/app/r/[code] route and reservation form code.
+[P0] “Only bound INVU tables can be closed” is not implemented here.
+There is no visible close gate tied to an INVU-bound table/check. A seated reservation needs a persistent Bind INVU Table action, and closing/commission proof should be blocked or marked incomplete until the reservation is bound to an INVU table/check.
+[P1] createCapacityHold can still violate one-hold-per-reservation under concurrency.
+It locks by spaceId, but not by reservationId, and the DB uniqueness is only spaceId + reservationId. Two concurrent assignments for the same reservation into different spaces can create two active holds. See [pasted-text.txt (line 3658)](/Users/totalpro/.codex/attachments/f2baee83-24b2-4ba5-9d36-0b38ca41970a/pasted-text.txt:3658) and [pasted-text.txt (line 228)](/Users/totalpro/.codex/attachments/f2baee83-24b2-4ba5-9d36-0b38ca41970a/pasted-text.txt:228).
+[P1] Hold expiry can race with reassignment.
+expireStaleHolds finds stale active holds, then updates by id without reservation/space locks or a conditional expiresAt guard. A hold refreshed or reassigned during that gap can be expired incorrectly. See [pasted-text.txt (line 3961)](/Users/totalpro/.codex/attachments/f2baee83-24b2-4ba5-9d36-0b38ca41970a/pasted-text.txt:3961).
+[P1] Capacity warning audit is inconsistent.
+createCapacityHold emits CAPACITY_WARNING_SHOWN, but the assignSpace override path appears to emit CAPACITY_OVERRIDDEN_BY_HOST without always emitting the warning event first. For investor-grade auditability, warning shown and override accepted should both be durable events. See [pasted-text.txt (line 3942)](/Users/totalpro/.codex/attachments/f2baee83-24b2-4ba5-9d36-0b38ca41970a/pasted-text.txt:3942).
+What Replit Should Do Next
+Treat #181 as section-capacity v1 only, then create a P0 task:
+#195 — Floor/Table Control + INVU Binding Workflow
+Done looks like:
+Owner/admin can create Sections/Spaces.
+Owner/admin can create Tables inside each section with chairCapacity.
+Tables can store optional invuTableId.
+Client QR reservation flow includes date, time, party size, requested experience/space.
+Host dashboard lets staff assign a reservation to section/table quickly.
+Seated but unbound reservations show a persistent Bind INVU Table warning.
+Only INVU-bound reservations/checks can enter close/commission proof flow.
+Attribution survives all section/table/INVU reassignments.
+The real operating truth is this:
+RestaurantSpace protects capacity. RestaurantTable runs the floor. INVU binding closes the proof loop.`
+
+
+0:36

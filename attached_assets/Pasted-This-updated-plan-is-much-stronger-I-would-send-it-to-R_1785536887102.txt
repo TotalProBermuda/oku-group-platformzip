@@ -1,0 +1,47 @@
+This updated plan is much stronger. I would send it to Replit with only a few tightening changes.
+The main thing I’d correct: the dependency order should be #182 foundation first or parallel-first, not after #180. Since #180 and #181 both need event emission, you want the lightweight LedgerEvent schema/emitter in place before the two feature tasks start wiring stubs that later get replaced.
+Recommended Order
+#182 canonical event foundation  
+#180 PENDING_ATTRIBUTION recovery  
+#181 space-aware capacity model
+Or, if Replit can parallelize:
+Start #182 first.
+Let #180 and #181 proceed only after emitLedgerEvent() exists.
+Final Red-Team Notes
+#180 is good. I’d add one field: anchorLastError.
+Without this, admin review will know a session failed but not why.
+Add to AttributionSession:
+anchorStatus
+anchorRetryCount
+anchorLastError
+anchorLastAttemptAt
+anchorResolvedAt
+For failed sessions, do not only store the preserved context. Store the actual failure reason.
+#182 is now properly scoped. Good cut.
+But I would add two event types now because #181 references them:
+CAPACITY_WARNING_SHOWN
+CAPACITY_OVERRIDDEN_BY_HOST
+Right now they are in #181 done-look-like, but missing from the #182 event enum list.
+Also make deduplication nullable-safe. Many local/manual events may not have an external sourceRecordId. Dedup should work when both sourceRecordId and idempotencyKey exist, but internal app events should generate a deterministic idempotency key, for example:
+reservation:{reservationId}:status:{newStatus}:{timestamp/version}
+capacity_hold:{holdId}:created
+attribution_session:{sessionId}:anchor_pending
+#181 is solid, but add status enum for CapacityHold.
+Suggested:
+ACTIVE
+RELEASED
+EXPIRED
+OVERRIDDEN
+CANCELLED
+Also, capacity should be computed by overlapping time windows, not exact service-window match. Otherwise 7:00-9:00 and 8:00-10:00 reservations can overbook the same space.
+One More Important Addition
+Add a migration/seed step for OKÜ spaces:
+OKÜ Dining Room: 27
+Catch Experience: 24
+Terrace: 42
+VIP: 10
+Otherwise the feature ships but hosts start with no capacity model configured.
+Send To Replit With This Addition
+Add this instruction at the top:
+“Implement #182 foundation first so #180 and #181 use the real event writer, not temporary stubs. If sequencing requires stubs, replace them before closing the sprint.”
+That keeps the sprint from creating another half-wired layer.

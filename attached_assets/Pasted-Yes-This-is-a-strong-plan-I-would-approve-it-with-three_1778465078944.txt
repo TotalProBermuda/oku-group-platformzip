@@ -1,0 +1,79 @@
+Yes. This is a strong plan. I would approve it, with three important refinements before Replit executes.
+
+What Is Good
+
+The plan correctly separates:
+
+Cybersource = OKÜ Panama live checkout
+Authorize.net = retained provider for future ReferrerOS markets
+Banesco bulk payouts = separate outbound treasury workflow, pending bank format
+Refund/void = always by original Payment.provider
+That is exactly the architecture we want.
+
+It also correctly identifies the main launch bug:
+
+readiness still thinks Authorize.net is the blocker even though Cybersource is the active Panama gateway.
+
+That must be fixed.
+
+Refinement 1 — Be Careful With Schema Default
+
+The plan says:
+
+Change the schema default for CommerceSettings.activeCheckoutGateway to CYBERSOURCE
+
+That is fine for OKÜ Panama, but dangerous for future ReferrerOS multi-tenant logic if the model later becomes global.
+
+I would adjust the instruction:
+
+If CommerceSettings is currently a singleton for OKÜ only, set the default to CYBERSOURCE.
+
+If CommerceSettings is already tenant-aware or is expected to become tenant-aware soon, do not globally default every tenant to CYBERSOURCE. Instead, set the OKÜ Panama/global singleton row to CYBERSOURCE through an idempotent seed/update and document that future tenants must explicitly choose their active gateway.
+Why: future U.S. tenants may want Authorize.net. We do not want a hidden global default that makes every tenant Cybersource forever.
+
+Refinement 2 — Test-Connection Gate Should Be Time-Bound
+
+The plan says require most recent test connection passed. Good.
+
+But I would add:
+
+A passing test connection should be considered valid only if it occurred within the last 7 days for test mode and within the last 24 hours before switching into production mode.
+Why: a successful test from weeks ago should not greenlight production checkout after credentials, bank setup, or environment changed.
+
+If that feels too strict for launch, make it:
+
+For this task, require any most recent passing test. Add a TODO/status note for time-bound recency before production cutover.
+Refinement 3 — Metadata Should Not Include actorId Twice
+
+The plan says AuditLog metadata contains { before, after, environment, productionConfirmAcknowledged: true, actorId }.
+
+Usually AuditLog already has actorId as a column. If so, metadata should not need actorId.
+
+I would modify:
+
+AuditLog row must set actorId in the AuditLog.actorId column. Metadata should include before, after, environment, productionConfirmAcknowledged, and no raw secrets. Include actorId in metadata only if existing project audit conventions already duplicate it.
+This keeps audit data clean.
+
+One More Guardrail I Would Add
+
+Add this:
+
+If Cybersource charge/refund/void adapters already exist from P5, verify they are real network-backed implementations, not stubs. If any Cybersource money-movement method is still stubbed, activation to production must be blocked with:
+"Cybersource selected but live money movement adapter is incomplete."
+This matters. Settings/test connection are not enough. If OKÜ Panama is live Cybersource, the real charge path must exist.
+
+My Recommended Edit To The Plan
+
+Before executing, tell Replit:
+
+Approve this plan with the following amendments:
+
+1. Only default the existing OKÜ/global CommerceSettings singleton to CYBERSOURCE. Do not create a hidden global default that would force future ReferrerOS tenants to Cybersource if the model is or becomes tenant-aware.
+
+2. Require a passing gateway test before activation. If practical, require the passing test to be recent; otherwise leave an explicit TODO/status note that production cutover requires a fresh same-day test.
+
+3. Confirm Cybersource charge/refund/void adapters are real network-backed implementations. If any money-movement method is stubbed, block production activation with "Cybersource selected but live money movement adapter is incomplete."
+
+4. AuditLog must set actorId on the AuditLog row. Metadata must include before, after, environment, productionConfirmAcknowledged, and no raw secrets. Only duplicate actorId inside metadata if existing audit conventions require it.
+
+5. Keep Banesco beneficiary/bulk payouts explicitly out of scope.

@@ -1,0 +1,461 @@
+Here is the clean technical brief.
+
+1) What we are trying to do with the API
+
+We are not trying to move commission logic into INVU.
+
+We are trying to make sure that the reservation’s source attribution survives all the way through the restaurant journey so that, when the check closes in INVU, OKÜ can say with certainty:
+
+this closed ticket came from this reservation
+that reservation came from this referrer
+therefore this referrer is owed commission on the net total before tax
+
+So the API job is:
+
+capture source in OKÜ → carry that source reference into INVU → pull the closed ticket back out of INVU → compute commission in OKÜ
+
+That is the whole purpose of the two-way sync.
+
+2) The exact two-way sync endpoints needed
+A. OKÜ → INVU: open/bind the restaurant service to the reservation
+
+This is the forward sync that makes the “magic” happen.
+
+1. Authenticate
+
+POST https://api6.invupos.com/invuApiPos/userAuth
+
+INVU’s public docs say the API uses the AUTHORIZATION header after you obtain a token, and the API user must be created by branch, not centrally. They also recommend rotating the token every 15 days.
+
+2. Create the order in INVU
+
+POST https://api6.invupos.com/invuApiPos/index.php?r=citas/add
+
+This is the key write endpoint in the public docs. The documented body fields include:
+
+cliente
+descripcion
+cerrar_orden
+invitados
+pagos
+comentario
+num_cita
+items
+id_tipo_integracion
+tipo_orden_obj
+What OKÜ should write into that order
+
+Use the documented writable fields like this:
+
+num_cita = OKÜ booking code
+comentario = compact deterministic trust string
+descripcion = human-readable summary for staff
+
+Recommended pattern:
+
+num_cita: OKU-2026-69ZPJ58Q
+comentario: OKU|RES:r_9082|TS:ts_12345|REF:Carlos01|EARNER:REFERRER
+descripcion: Carlos01 referral | 19:00 | Table T9 | OKÜ
+
+That gives OKÜ a deterministic reference to search later without asking INVU to understand your commission model.
+
+B. INVU → OKÜ: read service state and closed revenue back
+
+This is the return sync.
+
+3. Read open orders
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/ordenesAllAdv/fini/{start_date}/ffin/{end_date}/tipo/{order_status}/grouping/{grouping}
+
+The public docs explicitly show:
+
+tipo=0 = open orders
+tipo=1 = closed orders
+tipo=2 = complete credit notes
+tipo=3 = deleted orders
+tipo=4 = partial credit notes
+dates must be Epoch
+range cannot exceed one month
+
+This endpoint is how OKÜ should confirm:
+
+the order exists
+it is open
+it later closes
+and whether credit-note states affect commission.
+4. Search one specific order/invoice by booking code
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/view/id/{id}/tipo/{search_type}
+
+The public docs say:
+
+search by num_cita uses tipo=0
+search by id uses tipo=1
+
+This is your best deterministic point lookup if you store the OKÜ booking code in num_cita.
+
+5. Confirm closed totals
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/OrdenesAllTotales/fini/{start_date}/ffin/{end_date}/tipo/{order_status}
+
+The public docs say this returns totals for orders and supports the same status filtering pattern, including open, closed, deleted, and credit-note states.
+
+6. Confirm payments
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/TotalesPagosFechas/fini/{start_date}/ffin/{end_date}
+
+This returns payments and payment methods in a date range.
+
+7. Confirm order totals by date
+
+GET https://api6.invupos.com/invuApiPos/index.php?r=citas/totalporfecha/fini/{start_date}/ffin/{end_date}
+
+This returns totals for orders in a date range.
+
+3) The exact minimum end-to-end loop
+
+If you strip it down to essentials, the platform needs only this loop:
+
+OKÜ creates the reservation and source attribution
+OKÜ creates a unique booking code
+OKÜ writes that booking code into INVU using num_cita when the order is opened
+OKÜ later reads the open/closed order back from INVU
+OKÜ searches and reconciles by num_cita first
+OKÜ computes commission on the net before tax after refunds/credit notes
+
+That is the practical closed loop.
+
+4) What is still missing publicly from INVU
+
+INVU’s product clearly supports:
+
+table layout / mesas
+creating orders by table selection
+table service
+table identifiers
+order types that ask for table service
+
+But the public API docs do not publicly document:
+
+a table-layout endpoint
+an “open this specific table” endpoint
+a reservation object
+a “bind reservation to table” endpoint
+webhook registration for table/open/close events
+
+That is the real gap.
+
+So today, the safest public-doc implementation is:
+
+use citas/add to create the order
+carry the reservation identity in num_cita / comentario / descripcion
+query back using ordenesAllAdv, view, and totals endpoints
+
+If INVU privately exposes the same table-state endpoints OpenTable uses, that would make the bind more native, but those endpoints are not publicly documented.
+
+5) Commission earner personas
+Current commission earner personas
+
+Your current model supports these earner types:
+
+REFERRER
+HOST
+This should mean commercial/streetside host, not the in-restaurant maître d’/front-desk host unless you intentionally pay both.
+PARTNER
+INFLUENCER
+OTHER
+Future persona model
+
+All future earner types should fit the same category by using a normalized earner model:
+
+earner_type
+earner_id
+earner_display_name
+commission_rule_id
+commission_status
+
+That lets you add future types without changing the trust chain, for example:
+
+concierge
+promoter
+affiliate
+hotel desk
+event lead
+brand ambassador
+
+They all remain commission earners, just with different earner_type values.
+
+6) How the commission earner actually refers clients and sells tickets
+Portal mechanism
+
+Each commission earner gets a portal that generates:
+
+a referral code
+a QR code
+a tracked form URL
+optionally a ticket sale URL
+Technical anchor
+
+Every link/QR should carry immutable source parameters, for example:
+
+https://okuhospitalitygroup.com/reserve?ref=Carlos01&earnerType=REFERRER&campaign=gold-house
+
+or for tickets:
+
+https://okuhospitalitygroup.com/tickets/event-001?ref=Carlos01&earnerType=REFERRER
+
+What the portal actually does
+
+The earner portal needs to expose:
+
+GET /portal/referrals
+unique QR image generation
+unique referral links
+form link copy/share
+click/scan analytics
+reservations created
+ticket sales created
+seated sessions
+closed revenue
+approved commissions
+paid commissions
+Technical data flow
+
+When someone scans or clicks:
+
+landing page reads ref, earnerType, and optional campaign params
+backend resolves them to a real earner_id
+backend creates a pending attribution record
+browser stores attribution context in cookie/session/local storage
+when the reservation or ticket form is submitted, the attribution is silently attached
+customer never has to manually type the referrer
+
+That is how attribution “passes through without the customer doing anything.”
+
+7) What the customer/attendee experiences
+Step 1: scan QR or open tracked link
+
+The customer sees a clean branded OKÜ landing page.
+
+Step 2: landing page content
+
+That page should be:
+
+venue-specific
+date/time aware if relevant
+optionally event-specific
+branded to OKÜ, not to the earner personally
+What the page does behind the scenes
+
+It silently binds:
+
+earner_id
+earner_type
+campaign_id
+source_channel = qr | form | link
+landing_session_id
+Step 3: reservation form
+
+The guest fills in:
+
+name
+phone
+email
+date
+requested time
+covers
+optional occasion
+optional notes
+
+The guest does not need to:
+
+enter the referrer code
+pick the earner
+identify the campaign manually
+
+That attribution is already attached invisibly.
+
+Step 4: confirmation page
+
+After submission, the customer gets a unique confirmation code.
+
+Important engineering correction
+
+That confirmation code should be the external immutable business key for the reservation/session, not the raw database primary key for the customer.
+
+Use:
+
+internal DB primary key: UUID / numeric ID
+public business key: booking_code
+
+Why:
+
+the same customer may book many times
+the booking code belongs to the reservation/session
+customer identity should have its own customer_id
+
+So the confirmation code should be the primary external key from reservation → seating → INVU → closed ticket.
+
+8) What happens when the guest arrives at the restaurant
+Restaurant host workflow
+
+This is the in-restaurant host, not the external commission earner.
+
+The restaurant host uses the OKÜ Hospitality Group webapp to:
+
+search the reservation
+mark the guest ARRIVED
+then SEATED
+assign or confirm the table
+At that exact moment, OKÜ must automatically create
+reservation_id
+booking_code
+attribution_session_id
+table_session_id
+frozen snapshot of:
+earner_id
+earner_type
+referrer_code
+host_user_id
+zone
+table_label
+
+This is the moment the trust chain becomes operational.
+
+Then what should happen
+
+Once the host assigns the table:
+
+OKÜ should be able to open/bind the order into INVU
+OKÜ must send the booking code and attribution reference into the INVU order
+server continues service in INVU as normal
+
+Because all tables are charted and numbered in INVU’s table layout and INVU supports table-linked order creation operationally, the bind should anchor to the same numbered table/session context. INVU’s help docs explicitly describe creating an order “by table selection” in the Table Layout, and settings allow table identifiers and table service mode.
+
+9) The core commission rule
+
+The primary point of this API is:
+
+trust optimization of commission owed to the referrer, calculated as a percentage of the reservation’s net total before taxes
+
+So OKÜ should compute:
+
+commissionable_base = closed subtotal - discounts - refunds/credit notes - excluded items
+
+Then:
+
+referrer_commission = commissionable_base × commission_rate
+
+That logic stays entirely in OKÜ.
+
+10) Current state of the INVU API
+What is clearly public and usable now
+
+The public docs clearly expose:
+
+branch-scoped auth via userAuth and AUTHORIZATION header
+create order via citas/add with num_cita, comentario, descripcion, etc.
+list sales with status filters for open, closed, deleted, and credit-note states
+totals per invoice
+payments by date
+order totals by date
+search invoice by num_cita or id
+What you already have
+
+From your implementation notes, you are already:
+
+receiving closed checks
+and even seeing open checks
+
+That is consistent with the public status model because tipo=0 is open and tipo=1 is closed.
+
+What is not publicly documented enough
+
+The public API docs do not give you:
+
+a reservation CRUD model
+a reservation-to-table bind endpoint
+a mesa/table open endpoint
+a table status webhook model
+the OpenTable-style private integration contract
+
+That is why you can see orders, but you still cannot eliminate the human gap with public docs alone.
+
+11) The exact gap you want to close
+
+The biggest risk today is:
+
+You cannot link the reservation to the table autonomously enough before the sale closes.
+
+That means:
+
+the booking exists
+the referrer exists
+INVU order exists
+but the exact reservation-to-table link still depends too much on human behavior
+
+That is the gap.
+
+12) The API solution to close that gap
+The safest current solution using public endpoints
+
+At SEATED, OKÜ must automatically do all of this before any POS action:
+
+create table_session_id
+freeze attribution snapshot
+generate booking_code
+assign the chosen table
+call citas/add
+pass:
+num_cita = booking_code
+comentario = deterministic trust string
+descripcion = readable summary
+
+Then later OKÜ reads back:
+
+ordenesAllAdv for open/closed states
+view by num_cita
+totals and payment endpoints
+Why this works
+
+Because the reservation identity survives into the POS record, so OKÜ no longer needs to guess after close.
+
+13) The exact deterministic trust string
+
+Use this pattern:
+
+OKU|RES:{reservation_id}|BOOK:{booking_code}|TS:{table_session_id}|REF:{referrer_code}|EARNER:{earner_type}
+
+Example:
+
+OKU|RES:r_9082|BOOK:OKU-2026-69ZPJ58Q|TS:ts_12345|REF:Carlos01|EARNER:REFERRER
+
+Write it into comentario.
+Use num_cita for the clean short booking code.
+
+That gives you:
+
+a short lookup key
+a richer audit trail key
+deterministic post-close reconciliation
+14) What OpenTable likely has that you need from INVU privately
+
+You are right that OpenTable has an INVU integration pattern. Publicly, OpenTable describes POS integration as connecting reservation/table data and automating table-status behavior, but the exact INVU-specific field contract is not public.
+
+So the likely private pieces you would want from INVU are:
+
+table/mesa API
+open-table / occupied-table event API
+reservation reference field mapping
+webhook or push events for:
+order opened
+order closed
+credit note created
+table freed
+
+If INVU gives you that privately, then you can reduce the host’s role even further.
+If not, the public-doc solution above is still enough to complete the trust chain.
+
+15) The one-sentence brief for the API developer
+
+Build the OKÜ ↔ INVU integration so that every reservation carries a deterministic booking/session/referrer reference into the INVU order at seating time, and every open/closed/credited INVU check can be matched back to that reservation in OKÜ for commission calculation on the net before tax.

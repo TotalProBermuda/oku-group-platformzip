@@ -1,0 +1,49 @@
+Important permission/design issue:
+
+The streetside host view currently shows “Bind INVU Order” and “Open table in INVU.” A streetside host/referrer should NOT be able to bind a reservation to an INVU order or perform restaurant-operational actions.
+
+Please assess and fix the permission model:
+
+1. What actions can a STREETSIDE_HOST currently perform from /host/streetside?
+   - Can they bind an INVU order?
+   - Can they open an INVU table?
+   - Can they mark Arrived / Lost?
+   - Can they change reservation status?
+   - Which API routes enforce this server-side, not just in the UI?
+
+2. For the streetside/referrer role, desired access is read-only referral visibility:
+   - show only reservations created through that user’s dedicated QR/referral code
+   - show guest name, party size, reservation time/date, venue/concept, and current host-controlled status
+   - show attribution/referrer label if useful
+   - do NOT allow binding INVU orders
+   - do NOT allow opening/creating INVU tables
+   - do NOT allow manually changing check/revenue evidence
+   - do NOT allow viewing reservations they did not refer
+
+3. Revenue/checkout visibility logic:
+   Please explain where the referrer will see total customer spend after check close.
+   It should NOT come from streetside manual binding.
+   Preferred logic:
+   - Restaurant host/admin or INVU sync binds/matches the reservation to a TableSession.
+   - INVU close/payment evidence updates TableSession revenue.
+   - CommissionAllocation accrues for the referrer.
+   - Phase 1 UI may show “Pending close” or “Awaiting payout ledger.”
+   - Phase 2 payout-ledger bridge shows canonical paid/unpaid.
+   - Streetside/referrer can view verified spend and commission status only after the system/restaurant side has evidence.
+
+4. Please remove or hide from STREETSIDE_HOST:
+   - Bind INVU Order
+   - Open table in INVU
+   - any operational table/check controls
+
+5. Confirm server-side authorization:
+   Even if the UI is hidden, STREETSIDE_HOST must be blocked from calling bind/update/order/table APIs directly unless they also have a separate restaurant-host/admin permission.
+
+Acceptance:
+- Log in as sidehost@oku.local.
+- Active tab shows only bookings from Diego’s QR.
+- No Bind INVU Order UI.
+- No Open table in INVU UI.
+- No ability to bind through direct API call as STREETSIDE_HOST.
+- Restaurant host/admin can still bind/match/check-close.
+- Once table/check closes through restaurant/admin/INVU evidence, streetside/referrer sees read-only spend + commission state from the shared referral money source.

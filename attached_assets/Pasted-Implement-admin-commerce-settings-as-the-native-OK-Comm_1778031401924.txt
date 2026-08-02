@@ -1,0 +1,289 @@
+Implement /admin/commerce/settings as the native OKÜ Commerce Settings control panel.
+
+This must feel like a premium Superadmin operations interface, not a plain developer form. Think WooCommerce settings structure, but visually adapted to OKÜ: calm, editorial, spacious, easy to scan, and operationally clear.
+
+Do not modify /admin/payments except for shared nav if needed.
+
+ROUTE
+- /admin/commerce/settings
+
+ADMIN NAV
+- Add “Commerce” as a SUPERADMIN-only nav item.
+- Commerce points to /admin/commerce/settings.
+
+SCHEMA
+Add CommerceSettings singleton model for non-secret settings only.
+Do not store secrets in this model.
+Use id = "global" or equivalent singleton pattern.
+
+Fields:
+- businessName
+- addressLine1
+- addressLine2
+- city
+- countryRegion
+- currency
+- timezone
+- storeStatus: OPEN / CLOSED / TEST_MODE
+- capacityManagementEnabled
+- holdMinutes
+- lowStockThreshold
+- soldOutThreshold
+- stockNotificationEmails
+- hideSoldOutTicketTypes
+- allowGuestCheckout
+- requireAccountForMemberships
+- continueShoppingDestination
+- emptyCartText
+- checkoutSupportEmail
+- cancellationPolicyText
+- senderName
+- adminNotificationEmails
+- debugMode: OFF / ERRORS_ONLY / VERBOSE
+- updatedById
+- timestamps
+
+API
+- GET /api/v1/admin/commerce/settings
+- PATCH /api/v1/admin/commerce/settings
+
+Security:
+- SUPERADMIN only.
+- Validate input with zod.
+- All changes write AuditLog with before/after.
+- Do not display or store raw secrets.
+
+PAGE UX / VISUAL DESIGN
+
+Overall page:
+- H1: Commerce Settings
+- Subtitle: Store identity, ticket inventory, checkout behavior, email defaults, and integration health.
+- Width should follow existing admin-shell container. Do not make the page full-bleed.
+- Use a two-column desktop layout:
+  - left: vertical tab/sidebar list
+  - right: settings form panel
+- On mobile, tabs become horizontal scroll tabs above the form.
+- Do not use nested cards. One main panel per active tab is enough.
+- Keep all form rows aligned and calm, similar to WooCommerce, but visually cleaner.
+
+Top summary strip:
+Add a compact status strip under the title with 3-4 pills:
+- Store status: Open / Closed / Test Mode
+- Checkout: Guest enabled / Account required
+- Inventory: Capacity managed / Manual
+- Email: Configured / Missing sender
+
+Style:
+- Pills should be small, rounded but not bubbly.
+- Use OKÜ red only for primary action and critical state.
+- Use muted beige/off-white backgrounds sparingly.
+- Avoid large gradient blocks.
+
+Tabs:
+Tabs:
+1. General
+2. Inventory
+3. Checkout
+4. Emails
+5. Integrations
+6. Advanced
+
+Tab UX:
+- Active tab has OKÜ red underline or left border.
+- Each tab has a short helper sentence under the label on desktop:
+  General — Business identity and operating status
+  Inventory — Ticket holds, capacity, and sold-out rules
+  Checkout — Guest flow and cancellation messaging
+  Emails — Sender and admin notification defaults
+  Integrations — Payment, email, POS, and worker health
+  Advanced — Debugging, demo mode, and audit posture
+
+FORM STYLE REQUIREMENTS
+
+Use reusable field row components:
+- SettingSection
+- SettingRow
+- TextInput
+- SelectInput
+- ToggleInput
+- StatusBadge
+
+Each SettingRow should have:
+- left side: label + helper text
+- right side: control
+- max control width around 520px
+- rows separated by subtle 1px border
+- labels should be bold enough to scan
+- helper text should be muted and concise
+
+Buttons:
+- Primary button: Save changes
+- Secondary button: Reset changes
+- Sticky save bar at bottom of settings panel only when unsaved changes exist.
+- Save bar text: Unsaved changes
+- Save button shows loading state: Saving…
+- After save, show small confirmation toast: Commerce settings saved.
+
+Inputs:
+- Use consistent height, border radius 8px max.
+- Focus state should use OKÜ red or existing primary variable.
+- Textareas should have min-height and not resize layout awkwardly.
+- Avoid huge empty inputs.
+
+GENERAL TAB
+Fields:
+- businessName
+- addressLine1
+- addressLine2
+- city
+- countryRegion
+- currency
+- timezone
+- storeStatus
+
+UX:
+- Store status should be a segmented control, not a dropdown:
+  Open | Closed | Test Mode
+- If Closed selected, show a soft warning note:
+  Guests may not be able to complete checkout while the store is closed.
+- Currency and timezone can be dropdowns.
+
+INVENTORY TAB
+Fields:
+- capacityManagementEnabled
+- holdMinutes
+- lowStockThreshold
+- soldOutThreshold
+- stockNotificationEmails
+- hideSoldOutTicketTypes
+
+UX:
+- capacityManagementEnabled and hideSoldOutTicketTypes are toggles.
+- holdMinutes, lowStockThreshold, soldOutThreshold are compact number inputs.
+- Add helper copy:
+  Hold tickets temporarily while a guest completes checkout.
+  Notify the team before a session sells out.
+- Add a small preview summary:
+  “Tickets will be held for X minutes. Low stock begins at Y. Sold out begins at Z.”
+
+CHECKOUT TAB
+Fields:
+- allowGuestCheckout
+- requireAccountForMemberships
+- continueShoppingDestination
+- emptyCartText
+- checkoutSupportEmail
+- cancellationPolicyText
+
+UX:
+- Guest checkout and membership account requirement are toggles.
+- continueShoppingDestination should be a select:
+  /series
+  /restaurants
+  /membership
+  custom
+- If custom selected, show URL input.
+- cancellationPolicyText should be textarea.
+- This tab should use hospitality language, not generic cart language.
+
+EMAILS TAB
+Fields:
+- senderName
+- adminNotificationEmails
+- show Resend configured/missing status from existing payments/status readiness logic
+
+UX:
+- Show Resend status badge at top.
+- Show sender email from env/status if available, but do not expose secrets.
+- Do not let the user edit RESEND_API_KEY here.
+- Include a disabled/secondary “Send test email” link or button only if the existing payments API can be reused safely. Otherwise show “Test from Payments”.
+
+INTEGRATIONS TAB
+Show status rows:
+- Authorize.net
+- Resend
+- INVU
+- Redis / Worker
+
+UX:
+- This is read-only in this task.
+- Each row:
+  - name
+  - purpose
+  - status badge
+  - action link
+- Authorize.net action link: /admin/payments
+- INVU action link: /admin/integrations/invu
+- Redis/Worker: show warning if REDIS_URL missing, but not blocker.
+
+ADVANCED TAB
+Fields:
+- debugMode
+- demoMode warning
+- webhook status
+- audit logging status
+
+UX:
+- debugMode should be select:
+  Off
+  Errors only
+  Verbose
+- If verbose selected, show warning:
+  Verbose logs must never expose card data, secrets, or guest payment details.
+- Demo mode should be read-only status from env.
+- Audit logging should show enabled if AuditLog table/API writes are available.
+
+CSS / COMPONENT REQUIREMENTS
+
+Prefer CSS module or local component styles, but keep consistent with existing admin styling.
+
+Create:
+src/components/admin/commerce/CommerceSettingsPanel.tsx
+
+Optional:
+src/components/admin/commerce/commerce-settings.css
+or use existing global admin classes if preferred.
+
+Required CSS class concepts:
+- commerce-settings
+- commerce-settings__header
+- commerce-settings__status-strip
+- commerce-settings__layout
+- commerce-settings__tabs
+- commerce-settings__tab
+- commerce-settings__tab-active
+- commerce-settings__panel
+- commerce-settings__section-header
+- commerce-settings__row
+- commerce-settings__row-copy
+- commerce-settings__control
+- commerce-settings__savebar
+- commerce-settings__badge
+- commerce-settings__badge-ok
+- commerce-settings__badge-warning
+- commerce-settings__badge-error
+
+Visual polish:
+- Panel background: white or existing layer variable.
+- Border: 1px solid var(--color-border).
+- Border radius: 8px.
+- Row padding: around 18px 20px.
+- Section gap: 24px.
+- No heavy shadows.
+- No giant cards.
+- No decorative gradients.
+- Text must not overflow on mobile.
+- Controls must be usable at 375px mobile width.
+
+ACCEPTANCE
+- /admin/commerce/settings feels like a polished WooCommerce-style settings page adapted to OKÜ.
+- It is easier to use than a plain form.
+- Tabs work without full page reload if client component is used.
+- Unsaved changes are obvious.
+- Save success and save failure are clear.
+- No generic shipping/download language.
+- No unrelated product CRUD in this task.
+- No raw secrets displayed or stored.
+- AuditLog records changes.
+- npm run db:push --force passes.
+- npm run build passes.

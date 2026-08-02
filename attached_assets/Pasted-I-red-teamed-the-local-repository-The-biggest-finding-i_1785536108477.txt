@@ -1,0 +1,32 @@
+I red-teamed the local repository. The biggest finding is structural: I do not see the live OKU/Replit booking app source in this checkout. The repo has ProofPay/OKU specs and a separate somerset-proposal-portal Next app, but the actual files referenced by the ProofPay amendment, like src/app/api/reservations/route.ts, are not present locally. So this is a red-team of the repository as it exists, with special attention to the booking/capacity model.
+Findings
+[P0] Booking flow is missing the reservation-control layer investors and restaurants will care about.
+The current spec models referral events, attribution, POS observation, and payout, but it does not yet define a serious reservation lifecycle: date/time, party size, requested space, assigned space, capacity hold, turn duration, host confirmation, modification, cancellation, no-show, seating, and release of capacity. See [trust-circle-integration.md (line 88)](/Users/totalpro/Documents/New project/oku-referrer-platform/specs/trust-circle-integration.md:88) and [referrer-trust-loop-technical-amendment.md (line 201)](/Users/totalpro/Documents/New project/oku-referrer-platform/specs/referrer-trust-loop-technical-amendment.md:201).
+Given your floor plan context, OKÜ has materially different spaces: OKÜ ~27, Catch Experience ~24, Terrace ~42, VIP ~10. Without space-aware capacity holds, a referrer can drive demand the host cannot actually seat.
+[P0] The referrer feed appears vulnerable to time-window failure.
+The amendment already flags that mySubmissions filters by createdAt >= now - 8h, which means future reservations can disappear from the referrer’s active bookings even though the restaurant sees them. That is a trust-killer: the referrer thinks the system lost their booking. See [referrer-trust-loop-technical-amendment.md (line 23)](/Users/totalpro/Documents/New project/oku-referrer-platform/specs/referrer-trust-loop-technical-amendment.md:23).
+Fix should be Panama-local service-window logic, not created-at logic.
+[P1] Attribution can silently downgrade to DIRECT, which can erase commission trust.
+The spec says attribution failures currently downgrade to direct traffic. That is dangerous for referrer confidence and payout disputes. See [referrer-trust-loop-technical-amendment.md (line 58)](/Users/totalpro/Documents/New project/oku-referrer-platform/specs/referrer-trust-loop-technical-amendment.md:58).
+Better control: mark as PENDING_ATTRIBUTION, preserve the scan/session evidence, and retry or require host/admin reconciliation.
+[P1] Referrer views are reading from drifting sources of truth.
+The amendment says streetside reads AttributionSession.referralActor, while the dashboard reads legacy ReservationAttribution and CommissionEntry. That means the same booking can exist in one view and vanish in another. See [referrer-trust-loop-technical-amendment.md (line 41)](/Users/totalpro/Documents/New project/oku-referrer-platform/specs/referrer-trust-loop-technical-amendment.md:41).
+Investor-grade fix: one shared server projection for “my referrals,” keyed from canonical AttributionSession.
+[P1] Dining commissions do not appear to reach the payout ledger.
+The spec flags that CommissionAllocation is minted from INVU dining sessions, while LedgerEntry/PayoutBatch only handles website orders. That leaves dining referrals visible but unpaid. See [referrer-trust-loop-technical-amendment.md (line 82)](/Users/totalpro/Documents/New project/oku-referrer-platform/specs/referrer-trust-loop-technical-amendment.md:82).
+The trust loop only closes when CommissionAllocation -> LedgerEntry -> PayoutBatch is canonical.
+[P1] Host booking management needs explicit operational controls.
+For restaurants, the flow should support: confirm/decline, assign space, move time, adjust party size, split/merge tables, waitlist, block terrace/weather closures, mark arrived, mark seated, no-show, cancel, and preserve referral attribution through every modification. The current event list does not include those booking-management states. See [trust-circle-integration.md (line 246)](/Users/totalpro/Documents/New project/oku-referrer-platform/specs/trust-circle-integration.md:246).
+[P2] The actual Next app present has PII/security concerns.
+In somerset-proposal-portal, access records store full signature image data, IP, user agent, token hash, and personal info. See [route.ts (line 69)](/Users/totalpro/Documents/New project/somerset-proposal-portal/app/api/proposal-access/route.ts:69) and [proposalAccessStore.ts (line 27)](/Users/totalpro/Documents/New project/somerset-proposal-portal/lib/proposalAccessStore.ts:27). Email helpers also log message bodies with PII. See [email.ts (line 20)](/Users/totalpro/Documents/New project/somerset-proposal-portal/lib/email.ts:20).
+If this app is investor-facing, tighten logging, cap signature payload size, and avoid storing raw signature data unless legally necessary.
+[P2] Rate limiting is incomplete and spoofable in the Next app.
+Failed attempts are recorded only for invalid passcodes, not malformed spam. See [route.ts (line 54)](/Users/totalpro/Documents/New project/somerset-proposal-portal/app/api/proposal-access/route.ts:54). IP extraction trusts x-forwarded-for without a proxy trust boundary. See [security.ts (line 21)](/Users/totalpro/Documents/New project/somerset-proposal-portal/lib/security.ts:21). Phase-one email requests have no visible rate limit. See [route.ts (line 6)](/Users/totalpro/Documents/New project/somerset-proposal-portal/app/api/request-phase-one/route.ts:6).
+Booking Model I’d Require
+Minimum schema/control layer:
+RestaurantSpace: id, name, capacity, reservable, requiresApproval, weatherSensitive
+Reservation: serviceDate, startAt, endAt, partySize, requestedSpaceId, assignedSpaceId, status, referralSessionId, timezone
+CapacityHold: spaceId, startAt, endAt, partySize, status, expiresAt
+Events: reservation_requested, reservation_confirmed, reservation_modified, reservation_cancelled, guest_arrived, guest_seated, no_show, capacity_hold_created, capacity_hold_released.
+For the referrer, keep it simple: they should submit guest info, party size, requested date/time, preferred space, and notes. For the restaurant, make it operational: host confirms availability, assigns space/table, controls capacity, and every change preserves attribution.
+Verification note: I tried to run typecheck in somerset-proposal-portal, but dependencies were not installed and the runtime could not fetch @types/react from npm due network/DNS failure.

@@ -1,0 +1,69 @@
+Please treat this as a systemic referrer identity provisioning bug, not a Taxi-only issue.
+
+Observed:
+- Streetside host profiles work.
+- Taxi, concierge, tour guide, hotel concierge, and other non-streetside referrer accounts show “No Referrer Profile” on /referrer/dashboard.
+- Marking organizations as sole proprietor or resolving Entities does not fix it.
+
+Root hypothesis:
+Only streetside hosts currently get the full governed identity chain:
+User → ReferralActor → ReferralLink / QR → AttributionSession feed
+
+Other referrer types may exist as:
+- free-text assignments
+- legacy Referrer rows
+- EventReferrerAssignment rows
+- organization claims
+- actor records without userId
+- referral codes not attached to the logged-in user
+
+But /referrer/dashboard appears to require a user-linked profile, so these accounts fail lookup.
+
+Please audit all referrer-capable types:
+- TAXI_DRIVER
+- HOTEL_CONCIERGE
+- CONCIERGE
+- TOUR_GUIDE
+- PROMOTER
+- PARTNER_REFERRER
+- LEGACY_REFERRER
+- INFLUENCER_SUB_REFERRER
+- any other actorTypeCode that should access /referrer/dashboard
+
+For each type, verify:
+1. Does a User account exist?
+2. Does a ReferralActor exist?
+3. Does ReferralActor.userId point to the User.id?
+4. Does the actor own an active ReferralLink/code?
+5. Does /referrer/dashboard lookup this actor?
+6. Does /api/v1/me/referrals resolve ownership through this actor?
+7. Does the admin system expose a way to link or provision the profile?
+
+Required fix:
+Create one governed provisioning/linking path for all pure referrer-capable users, modeled after the streetside fix but not streetside-specific.
+
+Provisioning should:
+- create or reuse a ReferralActor for the user
+- attach ReferralActor.userId to the User.id
+- create or reuse an active ReferralLink/code
+- preserve actorTypeCode, organization claim, sole-proprietor/entity resolution
+- avoid duplicate actors/codes
+- write audit logs
+- not infer commission eligibility from role alone
+
+Admin tooling:
+Add a “Resolve Referrer Profile” or “Link User to Referrer Profile” admin action for unresolved referrer accounts.
+
+This action should support:
+- link User to existing ReferralActor
+- create governed ReferralActor + ReferralLink for User
+- merge/dedupe duplicate actors if needed
+- show why a profile is unresolved
+
+Acceptance:
+- Taxi, concierge, hotel concierge, tour guide, promoter, and legacy referrer users can open /referrer/dashboard and see their profile if they have a governed ReferralActor.
+- Streetside continues to work unchanged.
+- Organization resolution remains separate from profile linking.
+- Commission eligibility remains separate from profile linking.
+- No role-specific dashboard lookup forks are added.
+- All referrer-capable roles use the same governed User → ReferralActor → ReferralLink → AttributionSession path.

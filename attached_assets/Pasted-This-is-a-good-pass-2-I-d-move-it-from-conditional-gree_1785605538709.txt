@@ -1,0 +1,39 @@
+This is a good pass-2. I’d move it from conditional green to near green, but I would still hold final launch approval until mobile screenshots and one end-to-end DB/host/referrer proof pass are shown.
+What Improved
+The three reviewer asks were addressed in the right places:
+requiresApproval=true now creates PENDING_APPROVAL, not CONFIRMED.
+Guest copy changes based on approval requirement.
+Full-capacity state gives the guest useful next actions instead of a dead end.
+Host card now shows requested space directly in the card row.
+EN/ES/PT parity check passed.
+That is materially better. It now behaves more like a reservation system and less like a static lead form.
+Remaining Red-Team Risks
+[P1] Frontend pending copy trusts local space state.
+The API returns pendingApproval, but the form reportedly decides copy from local selectedSpace.requiresApproval. Use the API response as the source of truth after submit. Otherwise stale client state could show “Booking submitted” when the server actually created PENDING_APPROVAL.
+[P1] Full-capacity fallback must not block “host review” logic.
+For premium hospitality, “full” should not always mean “impossible.” Add or confirm a fourth path:
+Request host review / Join waitlist / Ask concierge.
+WhatsApp helps, but a trackable in-system fallback is better for ProofPay’s ledger.
+[P1] Status naming must be consistent across host filters.
+If the API creates PENDING_APPROVAL, make sure host dashboard counts and filters include it. If the board only expects PENDING, CONFIRMED, ARRIVED, etc., pending approval reservations could disappear from the working queue.
+[P1] Capacity and approval logic need to combine cleanly.
+If a space is both available and requiresApproval, it should be selectable with clear copy:
+“Request this space” rather than “Reserve this space.”
+If it is unavailable and requiresApproval, the UI needs to clarify whether the guest can still request review.
+[P2] WhatsApp fallback number should be configurable.
+Hardcoding 50764316090 is okay for a pilot, but this should become venue config before multi-market rollout.
+Required Evidence Before Green-Light
+Ask Replit for:
+Please provide evidence for pass-2 QA:
+
+1. /r/INF-SOPHIA mobile screenshot showing date, time, party size, space selector.
+2. Submit to normal space → response status CONFIRMED, pendingApproval=false.
+3. Submit to requiresApproval space → response status PENDING_APPROVAL, pendingApproval=true.
+4. Guest confirmation screen shows pending approval copy based on API response.
+5. Host dashboard shows the PENDING_APPROVAL booking in queue.
+6. Host card shows requested space badge without opening drawer.
+7. Full-capacity state screenshot with Try different time/date + WhatsApp.
+8. EN/ES/PT screenshots showing no raw keys.
+9. Referrer feed still shows the booking and attribution is preserved.
+Verdict: good build pass, not final launch proof yet.
+The next true operating blockers remain #195 table/floor control and #196 INVU binding close gate.

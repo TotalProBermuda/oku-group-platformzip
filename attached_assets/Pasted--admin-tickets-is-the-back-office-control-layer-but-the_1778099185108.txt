@@ -1,0 +1,289 @@
+/admin/tickets is the back-office control layer, but the real launch-critical UX is /staff/check-in on a phone. It needs to feel as smooth and immediate as the referrer QR interface: big target, clear state, no clutter, works one-handed, fast recovery when scan fails.
+
+Also, you’re right on permissions: this should be assignable to Administrators and Restaurant Hosts, not only Superadmin.
+
+Use this revised task:
+
+Implement Ticket Operations P0 — Mobile-first QR check-in + website ticket control.
+
+The QR check-in experience must be as smooth and mobile-first as the Referrer QR interface. Door staff will likely use a phone camera at the venue entrance. The interface must be fast, simple, and resilient under pressure.
+
+Scope:
+Website-issued tickets only:
+- tickets created from paid website orders
+- manually issued comp/admin tickets
+
+Do not include:
+- POS/INVU table payments
+- restaurant table sessions
+- RFID wristbands
+- external ticketing integrations
+- two-way sync with payment gateway
+
+Core workflow:
+Website checkout → paid order → ticket issued → QR code scanned at door → ticket marked checked-in.
+
+Check-in is one-way internal state:
+- QR scan updates Ticket / ExperienceCheckin / CheckInLog / AttendanceEvent.
+- It does not update Authorize.net.
+- It does not update INVU.
+- It does not affect commissions except where existing ticket/order attribution already exists.
+
+ROLES / PERMISSIONS
+
+Add explicit permission:
+- admin:tickets:read
+- admin:tickets:write
+- tickets:checkin
+
+Permission rules:
+- SUPERADMIN: all ticket permissions
+- ADMIN_COMMERCIAL or general ADMIN role if present: admin:tickets:read, admin:tickets:write, tickets:checkin
+- RESTAURANT_HOST: tickets:checkin
+- STAFF_OKU if appropriate: tickets:checkin
+- STREETSIDE_HOST only if product owner confirms; otherwise do not grant by default
+
+Important:
+Do not require Superadmin for staff scanning.
+Restaurant hosts must be able to use /staff/check-in.
+
+ROUTES
+
+Back-office:
+- /admin/tickets
+  Superadmin/Admin ticket search, detail drawer, manual issue, export.
+
+Staff/mobile:
+- /staff/check-in
+  Mobile-first scanner interface for authorized hosts/admins.
+
+Existing API:
+- /api/v1/checkin/validate
+  Keep and reuse.
+- Add/extend APIs only as needed.
+
+MOBILE-FIRST STAFF CHECK-IN UX
+
+/staff/check-in must be redesigned/polished as the primary venue door experience.
+
+Design goals:
+- mobile-first
+- one-handed use
+- high contrast
+- fast scan feedback
+- minimal text
+- large action buttons
+- works at venue entrance in poor lighting
+- no admin console clutter
+- no large tables
+- no desktop-first layout
+
+/staff/check-in layout:
+
+1. Top bar
+- OKÜ logo
+- current role/user
+- selected session/event
+- small status dot: Ready / Camera off / Offline / Error
+
+2. Session selector
+- If host has multiple sessions today, show a compact selector.
+- Default to today’s active/upcoming session.
+- Show:
+  - event/series name
+  - session time
+  - checked-in count / total tickets
+
+3. Scanner hero
+- Large camera scan area.
+- Rounded but not playful.
+- Primary action:
+  - Start scanning
+  - Pause scanner
+  - Resume scanner
+- Torch button if supported.
+- Camera switch button if supported.
+- Manual code entry button.
+
+4. Scan result state
+After scan, show a full-width result panel:
+
+Success:
+- green state
+- “Checked in”
+- guest name
+- ticket type
+- party/session
+- timestamp
+- haptic/audio feedback if easy and safe
+
+Already checked in:
+- amber state
+- “Already checked in”
+- original check-in time
+- guest name
+- staff can dismiss and continue scanning
+
+Invalid / refunded / cancelled:
+- red state
+- clear reason
+- no check-in mutation
+- staff can dismiss and continue scanning
+
+5. Manual fallback
+- Search/input ticket code, guest name, or email.
+- Show matching ticket.
+- Manual check-in button if permitted.
+- Must write CheckInLog with method ADMIN_OVERRIDE or MANUAL.
+
+6. Recent scans
+- Last 5 scan attempts only.
+- Compact chips:
+  - guest
+  - result
+  - time
+- No large table.
+
+7. Offline / poor connectivity behavior
+For P0:
+- Do not implement offline queue unless already easy.
+- Show clear “Connection required” state.
+- Disable scan mutation if API unavailable.
+- Avoid pretending offline check-ins are saved.
+
+8. Accessibility
+- Buttons minimum 44px height.
+- Text legible on phone.
+- No tiny icon-only controls without labels.
+- Result states should not rely on color only.
+
+STAFF CHECK-IN API SAFETY
+
+On QR scan:
+- Look up Ticket.code.
+- Confirm ticket exists.
+- Confirm ticket belongs to selected session or warn if different session.
+- Confirm order is PAID OR ticket is valid comp/manual-issued.
+- Confirm ticket is not refunded/cancelled.
+- Confirm not already checked in.
+- On success:
+  - update Ticket.checkedInAt
+  - update Ticket.checkedInById
+  - create ExperienceCheckin
+  - create AttendanceEvent if existing pattern supports it
+  - write CheckInLog result VALID
+- On failure:
+  - write CheckInLog with INVALID / EXPIRED / ALREADY_CHECKED_IN / CANCELLED / REFUNDED as applicable
+  - do not mutate Ticket checked-in fields
+
+BACK-OFFICE /ADMIN/TICKETS
+
+1. Ticket search
+Search by:
+- ticket code / QR payload
+- order number
+- guest name
+- guest email
+- series/event
+- session date
+
+2. Ticket table
+Columns:
+- ticket code
+- guest
+- order
+- series/event
+- session
+- ticket type
+- ticket status
+- checked-in state
+- payment/order state
+- action
+
+3. Ticket detail drawer
+Show:
+- QR code / QR payload
+- order/payment summary
+- attendee details
+- check-in logs
+- ExperienceCheckin record if present
+- resend confirmation action
+- manual check-in action
+- blocked reason if refunded, cancelled, invalid, or already checked in
+
+4. Manual issue / comp ticket
+Authorized Superadmin/Admin can issue a comp ticket:
+- session
+- ticket type
+- guest name
+- guest email
+- reason
+- optional note
+- no payment created
+- audit log required
+- ticket is marked admin-issued/comp if schema supports it; otherwise use order channel/type or metadata pattern.
+
+5. Export
+- CSV export for session ticket/attendee list.
+
+VISUAL / CSS REQUIREMENTS
+
+For /staff/check-in:
+- Create dedicated mobile-first component styles.
+- Avoid standard admin table/card layout.
+- Use a scanner-first layout.
+- At 390px width, no horizontal scrolling.
+- Scan result panel should be immediately visible without scrolling.
+- Use OKÜ brand red only for primary action/error accents.
+- Success green and warning amber should be restrained but obvious.
+- Keep background dark or high-contrast if scanner area benefits from it.
+- Do not add marketing copy.
+- Do not add decorative gradients/orbs.
+
+For /admin/tickets:
+- Use existing admin shell styling.
+- Premium, calm, table + drawer pattern.
+- Search and filters at top.
+- Clear empty states.
+
+SECURITY
+
+- SUPERADMIN and authorized ADMIN can access /admin/tickets.
+- RESTAURANT_HOST and authorized staff can access /staff/check-in.
+- Staff cannot access broader payment details.
+- Staff scanner must not expose payment credentials or refund controls.
+- Manual issue and export require admin:tickets:write.
+- Every manual issue, resend, export, and manual check-in writes AuditLog.
+- Check-in attempts write CheckInLog.
+
+ACCEPTANCE
+
+Mobile check-in:
+- /staff/check-in works well on phone viewport.
+- QR ticket scan works for a paid website ticket.
+- First scan succeeds.
+- Second scan returns already checked in.
+- Refunded/cancelled ticket is blocked.
+- Invalid QR is blocked.
+- Recent scans update.
+- Manual fallback works.
+- Restaurant host can access scanner.
+- Unauthorized user cannot access scanner.
+
+Back office:
+- /admin/tickets gives Superadmin/Admin one place to find ticket state.
+- Manual comp ticket can be issued and scanned.
+- Ticket detail drawer shows QR/check-in/order state clearly.
+- CSV export works.
+- Staff scanner remains intact.
+
+Verification:
+- Test mobile viewport manually.
+- Test desktop admin tickets.
+- Dev compile passes.
+- npm run build externally if possible.
+The most important product correction is this:
+
+/admin/tickets = control room
+/staff/check-in = door experience
+The door experience must be designed like an actual live event tool, not an admin page.

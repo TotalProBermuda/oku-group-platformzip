@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+.ticket-shell {
+  min-height: 100vh;
+  background: #f0ece6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 32px 16px 48px;
+  font-family: 'Inter', sans-serif;
+}
+
+.ticket-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-bottom: 20px;
+}
+
+.ticket-phone {
+  width: 100%;
+  max-width: 360px;
+  background: #f9f7f5;
+  border-radius: 40px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 10px #1a1614,
+    0 40px 80px rgba(0,0,0,0.35);
+}
+
+.status-bar {
+  background: #1a1614;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px 10px;
+}
+
+.phone-header {
+  background: white;
+  border-bottom: 1px solid #e5e0d8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.back-arrow {
+  font-size: 18px;
+  color: #c41e3a;
+  cursor: pointer;
+}
+
+.phone-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: #1a1614;
+  letter-spacing: 0.02em;
+}
+
+.phone-scroll {
+  padding: 20px 16px 32px;
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #9ca3af;
+  margin-bottom: 12px;
+}
+
+.ticket-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(26,22,20,0.10);
+  margin-bottom: 16px;
+}
+
+.ticket-top {
+  background: #1a1614;
+  padding: 16px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.past-top {
+  background: #6b7280;
+}
+
+.ticket-top-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.venue-tier {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 4px;
+}
+
+.event-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: white;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.badge-confirmed {
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.badge-attended {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.7);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.ticket-body {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 18px;
+}
+
+.qr-wrapper {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  background: white;
+  border-radius: 8px;
+  padding: 6px;
+  border: 1px solid #e5e0d8;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.ticket-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-type-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1614;
+  margin-bottom: 6px;
+}
+
+.ticket-meta {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 3px;
+}
+
+.ticket-code {
+  margin-top: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #9ca3af;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.tear-line {
+  margin: 0 16px;
+  border-top: 2px dashed #e5e0d8;
+}
+
+.ticket-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 18px;
+}
+
+.for-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.view-link {
+  font-size: 11px;
+  font-weight: 600;
+  color: #c41e3a;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.past-card {
+  opacity: 0.75;
+}

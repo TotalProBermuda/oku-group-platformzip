@@ -1,0 +1,66 @@
+Review #162 latest: much closer, but still not merge-ready.
+
+Resolved:
+- Direct role mapping now includes TAXI_DRIVER, HOTEL_CONCIERGE, CONCIERGE, TOUR_GUIDE, PROMOTER, PRIVATE_NETWORK, INFLUENCER_SUB_REFERRER.
+- Referrer-capable role gate was expanded.
+- Actor stealing remains blocked.
+- Legacy-linked actor ownership mismatch returns merge_required / actor_unlinked correctly.
+- The parent “Referrer Profile” heading is now inside the card, so not_applicable can hide cleanly.
+
+Remaining findings:
+
+P1 — Legacy-only dashboard can still crash in commission fallback.
+In `/api/v1/referrer/dashboard`, the new earnerWhere logic appears to do:
+
+if (legacyReferrer) {
+  const earnerScope = await resolveEarnerScopeForReferrer(legacyReferrer.id);
+  earnerWhere = earnerScope
+    ? commissionWhereForEarner(earnerScope)
+    : commissionWhereForActorOnly(actor!.id);
+}
+
+For a true legacy-only referrer, `actor` is null. If `resolveEarnerScopeForReferrer()` returns null, `actor!.id` crashes.
+
+Fix:
+For legacy-only fallback with no actor and no earnerScope, query by the legacy referrer id or return an empty safe commission where. Do not use `actor!.id` unless actor exists.
+
+Acceptance:
+Legacy-only Referrer with no ReferralActor still loads `/referrer/dashboard`.
+
+P1 — Referrer-facing “No Active Referral Code” copy is hardcoded English.
+The no-code state on `/referrer/dashboard` adds user-facing English strings:
+- “No Active Referral Code”
+- “Your referrer profile is set up…”
+- “Contact your OKÜ account manager…”
+
+Because this is referrer-facing, it should use EN/ES/PT i18n keys, unlike the admin-only diagnostic card.
+
+Fix:
+Add translations in the relevant namespace and run `npm run i18n:check`.
+
+P1 — Candidate actors with inactive links may get a new code instead of reusing/reactivating the existing code.
+In create mode, candidateActor includes only active links:
+`links: { where: { isActive: true } }`
+
+If a matching actor has an inactive ReferralLink/code, the resolver will create a new random code instead of reactivating/reusing the existing link. The plan said “existing ReferralLink/code tied to any candidate actor” should be considered.
+
+Fix:
+When reusing a candidate actor, load active and inactive links. If no active link exists but an inactive link exists, reactivate the most recent or safest existing link and mark `referralLinkReused: true`.
+
+P2 — `not_applicable` reason text is stale.
+It still says referrer-capable roles are only REFERRER, INFLUENCER, PARTNER, STREETSIDE_HOST, RESTAURANT_HOST, even though the code now includes TAXI_DRIVER, HOTEL_CONCIERGE, CONCIERGE, TOUR_GUIDE, PROMOTER, etc.
+
+P2 — Remove unrelated generated mockup artifact.
+`artifacts/mockup-sandbox/src/.generated/mockup-components.ts` still appears in the diff. Remove unless intentionally part of this task.
+
+Must verify:
+The pasted review still shows interleaved old/new code in `/api/v1/referrer/dashboard` and `/referrer/dashboard/page.tsx`. Please confirm the real files compile cleanly with a scoped typecheck on all changed #162 files.
+
+Required QA before merge:
+1. Taxi user with no actor returns unresolved and creates TAXI_DRIVER actor.
+2. Concierge user with no actor returns unresolved and creates concierge actor type.
+3. Legacy-only Referrer with no actor loads dashboard without crash.
+4. Actor linked but no active link shows localized “No active referral code.”
+5. Candidate actor with inactive link reuses/reactivates it instead of creating duplicate code.
+6. Non-referrer user gets no create action.
+7. Actor linked to another user returns merge_required / blocked.

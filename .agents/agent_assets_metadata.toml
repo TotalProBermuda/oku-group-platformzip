@@ -1,0 +1,73 @@
+uploads = []
+
+[[generated]]
+id = "f8ae_yWafhHSJWVZ0UVgN"
+uri = "file://public/images/oku-logo-generated.png"
+type = "image"
+title = "OKU Hospitality Group wordmark logo"
+
+[[generated]]
+id = "VLf0MiRrTh08TQA0EZ8WI"
+uri = "file://public/images/oku-logo-new.png"
+type = "image"
+title = "oku hospitality group logo"
+
+[[generated]]
+id = "8MlQFEU7haAdYGxCx-uow"
+uri = "file://public/images/oku-logo-final.png"
+type = "image"
+title = "oku hospitality wordmark logo"
+
+[[generated]]
+id = "p0bdG7DpstHdwt33bznIN"
+uri = "file://public/images/oku-logo-wordmark.png"
+type = "image"
+title = "OKU wordmark luxury logo"
+
+[[generated]]
+id = "GOBG7aIKuzwWeGGGyX9PA"
+uri = "file://public/images/oku-logo-primary.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "W5kjdz3w8o7v2S2nN0fSI"
+uri = "file://public/images/oku-logo-primary-light.png"
+type = "image"
+title = "generated_image"
+
+[[outputs]]
+id = "Y73xwEUeeBPksZWzlGus7"
+uri = "file://deliverables/foodie-bm-referrer-build-prompt.md"
+type = "text"
+title = "Foodie.bm — Referrer / Host / POS Build Prompt"
+
+[[outputs]]
+id = "SbO06ZKF_TR4Yf4AElWBn"
+uri = "file://docs/invu-attribution-loop.md"
+type = "text"
+title = "INVU ↔ OKÜ Attribution Loop — Technical Spec (v2.1, with Production Truth + naming hazard)"
+
+[[outputs]]
+id = "oXAQtwmBoHgUQ8EnmdRKz"
+uri = "file://docs/invu-vendor-questions.md"
+type = "text"
+title = "Memo to INVU — Nine integration clarifications required for OKÜ cutover"
+
+[[outputs]]
+id = "oyi1ULmz60dcjn4165k_F"
+uri = "file://docs/invu-execution-roadmap.md"
+type = "text"
+title = "INVU Attribution — Execution Roadmap (do now / blocked / do next / rename for safety)"
+
+[[outputs]]
+id = "hQOZWT6Y4byTarwKq13ux"
+uri = "file://docs/ux-persona-audit-2026-05-11.md"
+type = "text"
+title = "OKÜ Persona-Based UX/UI/Visual QA Audit"
+
+[[outputs]]
+id = "UU-ARL6JaU1WA2ENQoajc"
+uri = "file://catch-panama-starter-kit.zip"
+type = "unspecified"
+title = "CATCH Starter Kit — final (links verified + master prompt)"

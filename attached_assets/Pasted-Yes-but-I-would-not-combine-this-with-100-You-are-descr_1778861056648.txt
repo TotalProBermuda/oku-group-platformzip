@@ -1,0 +1,178 @@
+Yes, but I would not combine this with #100.
+
+You are describing a Referrer Offer/Assignment UX problem, not a retention-worker problem.
+
+#100 is about deleting/anonymising old data. It should stay narrow and privacy-focused. The event/referrer QR logic should be its own task because it touches core ReferrerOS product architecture.
+
+The Logic Challenge
+A referrer should not be tied to only one QR code forever.
+
+They should have:
+
+A master referrer identity
+Example: Taxi Juan, Panama City Tours, Concierge Maria.
+
+Multiple referral assignments
+Example:
+
+OKÜ dinner reservations
+CATCH weekend brunch
+Sushi masterclass event
+Partner wine dinner
+Past event attribution history
+Multiple QR/link contexts
+One referrer can share different QR codes depending on the situation.
+
+So the primitive should not be:
+
+Referrer → QR Code
+
+It should be:
+
+Referrer → Offer Assignment → QR / Link
+
+Where an offer can be:
+
+restaurant reservation
+event
+series
+membership
+private dining
+partner package
+future tourism/tour/charter product
+What happens with multiple partners?
+If two unrelated partners both create or invite the same referrer, the system should avoid duplicate identities.
+
+Correct model:
+
+ReferrerActor
+- real-world person/entity
+- phone/email/name
+- canonical identity
+
+ReferralAssignment
+- referrerActorId
+- offerType: RESTAURANT | EVENT | SERIES | MEMBERSHIP | PACKAGE
+- offerId
+- createdByPartnerId optional
+- createdByAdminId optional
+- commissionPlanId
+- status
+- referralCode
+- qrPayload
+So the same taxi driver can have:
+
+QR for OKÜ reservations
+QR for Friday event
+QR for a partner series
+QR for CATCH brunch
+No duplicate “Taxi Juan” records needed.
+
+Past Events
+Past events should absolutely remain visible, but not as the primary share surface.
+
+Use:
+
+Active / Recommended
+Today
+This week
+Upcoming
+Past
+Past events matter for:
+
+attribution history
+payout proof
+disputes
+partner reporting
+commission audit
+But they should not clutter the taxi driver’s immediate sharing screen.
+
+Best UX
+For a taxi driver or streetside host, the UI should start with intent:
+
+What do you want to share?
+
+[Restaurant reservation]
+[Something happening today]
+[Upcoming events]
+[My assigned offers]
+Then show simple share cards:
+
+OKÜ Dinner Reservation
+Best for: tonight / anytime
+[Show QR] [WhatsApp] [Copy Link]
+
+CATCH Brunch
+Best for: weekend
+[Show QR] [WhatsApp] [Copy Link]
+
+Sushi Masterclass
+Today 7:00 PM
+[Show QR] [WhatsApp] [Copy Link]
+For partners, yes, it can feel closer to the series UI: choose a series/session/event, then invite/share. But for taxi drivers and street referrers, it needs to be faster and more situational.
+
+Separate Task Prompt
+Use this as a new task, not #100:
+
+Implement Referrer Offer Assignment UX P1 — multi-offer QR wallet for referrers, partners, and streetside hosts.
+
+Goal:
+Referrers should be able to share the correct QR/link for the right context: restaurant reservations, events, series, memberships, or assigned partner offers.
+
+Do not assume one referrer equals one QR code.
+
+Core model:
+- ReferrerActor is the canonical identity.
+- ReferralAssignment links a referrer to an offer/context.
+- Each assignment can have its own referral code, QR payload, commission plan, status, and creator.
+
+Offer types:
+- RESTAURANT
+- EVENT
+- SERIES
+- MEMBERSHIP
+- PRIVATE_DINING
+- PACKAGE
+
+UX:
+For referrer/street/taxi users, build a mobile-first “Share” surface:
+- Today
+- This week
+- Restaurants
+- Events
+- My assigned offers
+- Past activity
+
+Each active offer card shows:
+- offer name
+- venue
+- date/time if event
+- best-use hint
+- commission plan summary if allowed
+- Show QR
+- WhatsApp
+- Copy link
+
+Past offers:
+- visible under Past / History
+- not shown as primary share options
+- used for attribution, payout proof, and disputes
+
+Partner UX:
+Partners can assign/referral-share specific events or sessions they are associated with.
+Partner-created referrers should attach to the canonical ReferrerActor if the phone/email already exists.
+
+Rules:
+- Same real-world referrer can have multiple assignments.
+- Multiple partners may assign the same referrer to different offers.
+- Do not duplicate referrer identity when email/phone matches.
+- Attribution must preserve which assignment/offer created the conversion.
+- Past events remain auditable but not actively promoted.
+
+Acceptance:
+- Taxi/street referrer can quickly choose whether to share restaurant reservation or event QR.
+- Referrer can access all assigned active offers.
+- Past event attribution remains visible.
+- Partner can assign/share event-specific referral QR.
+- Duplicate referrers are prevented or merged by canonical identity.
+- Existing commission logic is not broken.

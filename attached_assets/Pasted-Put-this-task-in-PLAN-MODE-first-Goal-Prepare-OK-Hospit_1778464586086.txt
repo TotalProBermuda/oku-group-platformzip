@@ -1,0 +1,217 @@
+Put this task in PLAN MODE first.
+
+Goal:
+Prepare OKÜ Hospitality Group for Panama launch with CYBERSOURCE as the only live checkout gateway, while keeping AUTHORIZE_NET as a reusable inactive provider for future ReferrerOS / other-market deployments.
+
+Do not remove Authorize.net.
+Do not treat Authorize.net as a Panama launch blocker if it is inactive.
+Do not wire any new POS/INVU/referrer payout functionality in this task.
+Focus only on payment gateway selection/readiness/runtime clarity.
+
+Context:
+- OKÜ Panama live checkout will use Cybersource.
+- Authorize.net should remain in the codebase and admin UI as a supported provider, but inactive for this tenant.
+- ReferrerOS later may use Authorize.net for other merchants/markets.
+- Refunds/voids must always use the provider stored on the original Payment record, not whichever provider is currently active.
+
+Implement Payments P4/P5A — Active Checkout Gateway Selection + Panama Cybersource Readiness.
+
+Required behavior:
+
+1. Active checkout gateway source of truth
+Add or use an existing non-secret setting for:
+
+activeCheckoutGateway:
+- CYBERSOURCE
+- AUTHORIZE_NET
+
+Preferred location:
+- CommerceSettings if already suitable
+- otherwise create a small singleton payment runtime settings model
+
+Default for OKÜ Panama:
+- CYBERSOURCE
+
+This is non-secret configuration. Do not store credentials here.
+
+2. Superadmin UI
+In /admin/payments:
+- Add a clear “Active checkout gateway” control in Overview or Payment Providers.
+- Options:
+  - Cybersource
+  - Authorize.net
+- Show current active gateway as a prominent badge near the Payments title.
+- If active gateway is Cybersource:
+  - Cybersource readiness determines payment blockers.
+  - Authorize.net missing credentials should NOT appear as blockers.
+- If active gateway is Authorize.net:
+  - Authorize.net readiness determines payment blockers.
+
+The inactive provider should show:
+- “Inactive provider”
+- “Not configured” or “Configured” as appropriate
+- “Not blocking current checkout”
+
+3. Guard changing active gateway
+SUPERADMIN only.
+
+Do not allow selecting a gateway as active unless:
+- provider is enabled
+- required credentials are saved or available through env fallback
+- most recent test connection passed, OR the UI shows a strong confirmation flow requiring explicit override
+
+Recommended:
+- No override for production launch path unless there is an existing admin override pattern.
+- Safer default: block activation until test connection has passed.
+
+For Cybersource specifically:
+Required credentials:
+- Merchant ID
+- Key ID
+- Shared Secret / Secret Key
+Environment:
+- test
+- production
+
+If environment is production, require an explicit confirmation checkbox/text before saving active provider:
+“I understand this will route live checkout payments through Cybersource production.”
+
+4. Launch readiness API
+Update /api/v1/admin/launch-readiness and /api/v1/admin/payments readiness logic.
+
+Current issue:
+Readiness is still reporting Authorize.net blockers even when Panama launch will use Cybersource.
+
+Fix:
+- Payment blockers must be calculated from activeCheckoutGateway.
+- If activeCheckoutGateway = CYBERSOURCE:
+  - block only on missing/invalid Cybersource requirements
+  - do not block on missing Authorize.net credentials
+- If activeCheckoutGateway = AUTHORIZE_NET:
+  - block only on missing/invalid Authorize.net requirements
+
+System Checks tab should show both providers, but only the active provider should create launch blockers.
+
+5. Payment Providers tab
+Show both providers clearly:
+
+Cybersource
+- status: Active / Inactive
+- configured/misconfigured
+- environment
+- last test result
+- “Used for OKÜ Panama checkout” if active
+
+Authorize.net
+- status: Active / Inactive
+- configured/misconfigured
+- environment
+- last test result
+- “Available for future ReferrerOS markets” if inactive
+
+6. Checkout runtime
+Audit current checkout route.
+
+If checkout currently hardcodes Authorize.net or DEMO:
+- introduce active gateway resolution.
+- For this task, Cybersource must be the active live checkout path for OKÜ Panama if selected.
+- If full Cybersource charge/refund/void implementation already exists, use it.
+- If Cybersource settings UI exists but charge/refund/void is NOT implemented, DO NOT pretend it is live.
+- In that case, create a hard blocker in readiness:
+  “Cybersource selected but charge adapter not implemented.”
+
+Important:
+Do not create a fake successful Cybersource charge.
+Do not leave checkout silently using Authorize.net when active gateway is Cybersource.
+Do not leave checkout silently using DEMO in production.
+
+7. Provider adapter interface
+If not already present, add a minimal shared interface:
+
+PaymentProviderAdapter:
+- provider
+- getStatus()
+- testConnection()
+- charge()
+- refund()
+- void()
+
+For this task:
+- Authorize.net should continue using existing charge/refund/void logic.
+- Cybersource must accurately report whether charge/refund/void is implemented.
+- If Cybersource charge/refund/void is not implemented, block production checkout activation until implemented.
+
+8. Refunds and voids
+Do not route refunds by activeCheckoutGateway.
+
+Refund/void behavior must be:
+
+- Read Payment.provider from the original payment row.
+- If provider = AUTHORIZE_NET, use Authorize.net refund/void.
+- If provider = CYBERSOURCE, use Cybersource refund/void if implemented.
+- If provider = DEMO, show demo-only blocked state.
+- If provider implementation is missing, show blocked state and do not mutate order/payment.
+
+This is critical for future multi-provider ReferrerOS.
+
+9. Demo mode safety
+In production readiness:
+- DEMO_MODE_ENABLED must be false.
+- Demo checkout must not be used when activeCheckoutGateway is Cybersource.
+- Demo orders can remain visible in admin, but clearly labeled “DEMO — no gateway transaction.”
+
+10. AuditLog
+Write AuditLog entries for:
+- active checkout gateway changed
+- failed activation attempt
+- successful activation
+- production confirmation if used
+
+Audit metadata must include:
+- before provider
+- after provider
+- actorId
+- environment
+- no raw secrets
+
+11. Copy / UX requirements
+Use clear language:
+
+Payments title badge examples:
+- “Active checkout: Cybersource · test”
+- “Active checkout: Cybersource · production”
+- “Active checkout: Authorize.net · inactive for Panama”
+
+Blocker examples:
+- “Cybersource selected but Merchant ID is missing.”
+- “Cybersource selected but test connection has not passed.”
+- “Cybersource selected but charge adapter is not implemented.”
+- “Authorize.net is not configured, but it is inactive and not blocking Panama checkout.”
+
+Do not show:
+- “Authorize.net missing” as a top-level blocker when Cybersource is active.
+
+12. Acceptance criteria
+- /admin/payments shows active checkout gateway clearly.
+- Cybersource can be selected as the active provider for OKÜ Panama only when ready.
+- Authorize.net remains visible but inactive and non-blocking.
+- Launch readiness blockers are based on the active provider.
+- Checkout does not silently use the wrong provider.
+- Refund/void routes use original Payment.provider, not active provider.
+- Demo payments are clearly blocked from refund/void.
+- AuditLog records gateway activation changes.
+- No raw secrets returned to browser.
+- Dev compile passes.
+- npm run build if the Replit environment allows it; if not, run targeted route compilation and report honestly.
+
+Plan execution order:
+1. Inspect current payment provider models, CommerceSettings, payments page, launch-readiness API, checkout confirm route, refund route, cancel/void route.
+2. Report whether Cybersource charge/refund/void is already implemented or only settings/test connection exists.
+3. Implement activeCheckoutGateway setting and UI.
+4. Update readiness blockers.
+5. Update checkout runtime guard.
+6. Update refund/void routing guard if needed.
+7. Add audit logging.
+8. Verify with route compilation.
+9. Run architect review.
+10. Summarize exactly what is live and what remains blocked.

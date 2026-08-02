@@ -1,0 +1,68 @@
+Good analysis. Proceed, but keep the scope controlled.
+
+Decisions:
+
+1. Yes — in this context, “Entity/Profile” means **Entity only**. Do not touch InfluencerProfile, BrandProfile, or user Profile concepts for this task.
+
+2. Approved — use a separate **EntitySuggestion** table. Do **not** add draft status to Entity. Canonical Entity records should remain clean and only represent approved usable records.
+
+3. Approved — add `organizationKind` as a lightweight classification field. Prefer adding it to both `EntitySuggestion` and Entity if low-risk; if that creates unnecessary blast radius, add it to EntitySuggestion first and only map it into Entity on promotion.
+
+4. Approved — use `pg_trgm` with:
+
+* `>= 0.95` = auto-link only if unambiguous
+* `0.75–0.94` = review suggestion
+* `< 0.75` = no match; create suggestion only
+
+Also apply safer normalization:
+
+* lowercase
+* trim/collapse whitespace
+* remove accents
+* remove punctuation
+* strip only legal suffixes like S.A., LLC, Inc., S.R.L., Ltd, Ltda., & Co.
+* do not strip business nouns like Hotel, Cabs, Tours, Group, Hospitality
+
+5. Execute **Phase A first**, but design it so Phase B can be added cleanly. Do not attempt the full future-persona creation flow in this pass.
+
+6. For the 8 demo orgs, run them through the review workflow. Do not seed them as fully approved Entities automatically. Treat them as if they are unknowns so we validate the live-safe workflow.
+
+Phase A scope:
+
+* Improve normalization.
+* Add sole-proprietor detection where `organizationName === displayName`.
+* Mark those actors with `metadataJson._isSoleProprietor = true`.
+* Do not create suggestions for sole proprietors.
+* Build the admin unresolved organizations review page using the existing endpoint.
+* Add three actions:
+
+  1. Link to existing Entity
+  2. Create new approved Entity from the unresolved org
+  3. Mark as sole proprietor
+* All actions must write AuditLog entries.
+* Use permissions:
+
+  * read queue: existing `admin:audit:read`
+  * link/create/resolve: require `admin:entities:write`
+  * if that permission key does not exist, use the closest existing entity-write/admin permission and document it.
+
+Additional requirements:
+
+* Do not break existing Entity consumers.
+* Do not expose suggestions in host pickers, sponsor lists, or series/event host UIs.
+* Keep legacy `organizationName` for audit/history.
+* Preserve idempotency of the migration.
+* Make sure resolved actors no longer appear in unresolved queue.
+* Show sole proprietors in a separate “Self-managed” filter/status so admin can review them later if needed.
+
+Done looks like:
+
+* The 8 unmatched demo organizations appear in the review queue, not as live Entities.
+* Sole proprietor cases are flagged and excluded from entity suggestion pollution.
+* Admin can link an org to an existing Entity, create a new approved Entity, or mark as sole proprietor.
+* Each resolution updates the actor metadata/breadcrumb appropriately.
+* Every resolution action creates an audit log.
+* The Personas tab no longer risks broken pathways for live referral actors.
+* No existing host/sponsor/series entity pickers are polluted by unreviewed organization records.
+
+Proceed with Phase A only.

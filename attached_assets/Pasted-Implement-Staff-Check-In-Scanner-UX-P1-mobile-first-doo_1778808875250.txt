@@ -1,0 +1,71 @@
+Implement Staff Check-In Scanner UX P1 — mobile-first door workflow.
+
+Current issue:
+The /staff/check-in scanner is too generic and difficult to use on mobile. It exposes too many camera options, includes an upload option that does not make sense for live door operations, and selecting a camera can close/glitch the scanner screen.
+
+Goal:
+Make /staff/check-in a clean mobile-first scanner for restaurant hosts and staff checking in guests at the door.
+
+Core UX:
+- Default to the back/environment camera automatically.
+- Do not show a long camera picker on first load.
+- Do not show file upload / upload image option.
+- Primary mode: “Scan QR Code”.
+- Secondary fallback: “Enter ticket or reservation code manually”.
+- Keep the scanner screen stable at all times; selecting/changing camera must not collapse or close the UI.
+- If camera permission is denied/unavailable, show a calm inline error and keep manual entry visible.
+
+Required behavior:
+1. On page load:
+   - Request camera access.
+   - Prefer rear camera using facingMode: "environment".
+   - Start scanning automatically if permission is granted.
+   - Show a clear camera viewport with “Point camera at ticket QR code”.
+
+2. Camera controls:
+   - Hide advanced camera selection behind a small “Change camera” button.
+   - Only show camera picker after user taps “Change camera”.
+   - Do not expose upload-from-file.
+   - Do not show confusing device labels unless needed.
+
+3. Manual fallback:
+   - Always show “Enter ticket or reservation code manually”.
+   - Staff can type/paste ticket code, QR payload, or reservation confirmation code.
+   - Manual check-in uses the same validation endpoint and safety rules as QR scanning.
+
+4. Safety rules must remain unchanged:
+   - First valid scan succeeds.
+   - Second scan returns already checked in.
+   - Refunded/cancelled ticket cannot check in.
+   - Invalid code returns invalid.
+   - Every attempt writes CheckInLog.
+
+5. Mobile polish:
+   - Large scan area.
+   - Large result state: Success / Already checked in / Invalid / Cancelled.
+   - Clear color states.
+   - No layout jumping.
+   - No modal-like camera selector that blocks the workflow.
+   - Works cleanly on iPhone Safari and Chrome mobile.
+
+6. Remove or disable:
+   - QR upload image option.
+   - Generic html5-qrcode file-scan UI.
+   - Any default UI from the library that exposes non-operational controls.
+
+Implementation notes:
+- If using html5-qrcode, configure it so file upload is disabled.
+- Prefer direct camera config with facingMode: "environment".
+- Keep the scanner component client-only.
+- Do not change payment, ticket issuance, or commission logic.
+- Do not affect /admin/tickets.
+- Staff scanner remains at /staff/check-in.
+
+Acceptance:
+- On phone, scanner opens directly into back-camera scanning.
+- No upload option appears.
+- Staff can still manually enter a ticket/reservation code.
+- Selecting/changing camera does not close or glitch the screen.
+- Scanner result states are clear and readable.
+- Existing service-level check-in tests still pass.
+- Dev compile passes.

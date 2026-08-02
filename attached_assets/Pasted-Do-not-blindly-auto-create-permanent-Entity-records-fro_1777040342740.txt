@@ -1,0 +1,78 @@
+Do not blindly auto-create permanent Entity records from free-text organizationName values.
+
+Implement a Referral Organization Resolver with a review-safe workflow.
+
+OBJECTIVE
+Ensure all new and future referral personas have a clean structure:
+- ReferralActor = the person/desk/source doing the referring
+- Entity/Profile = the organization they belong to or represent
+- free-text organizationName is legacy/import-only and should be resolved into a proper Entity/Profile where appropriate
+
+LOGIC
+
+1. Exact Match
+If organizationName exactly matches an existing Entity/Profile name, auto-link the ReferralActor to that Entity/Profile.
+
+2. Normalized Match
+Normalize organizationName and Entity/Profile names by:
+- lowercase
+- trim whitespace
+- remove punctuation
+- normalize accents
+- ignore common suffixes where appropriate
+
+If normalized match is exact, auto-link.
+
+3. Probable Match
+If match confidence is high but not exact, do not auto-link.
+Send to review queue with suggested matches.
+
+4. No Match
+Create a draft suggested Entity/Profile record only if safe, with:
+- status = draft
+- source = migration_suggestion
+- needs_review = true
+- entity_type inferred from actor type where possible
+
+5. Sole Proprietor Rule
+If organizationName equals actor displayName, do not auto-create a separate organization.
+Mark as possible self-managed / sole proprietor and send to review if needed.
+
+6. Admin Review Actions
+Admin must be able to:
+- approve draft entity
+- link actor to existing entity
+- create new entity
+- mark as sole proprietor
+- ignore as demo/import artifact
+
+7. Future Persona Creation
+When creating a fresh ReferralActor:
+- organization should be selected from existing Entity/Profile records where possible
+- if typed manually, create it as a pending organization suggestion
+- do not leave organizationName as the primary long-term relationship
+
+8. Data Safety
+Keep legacy organizationName for audit/history.
+Do not delete legacy fields.
+Do not let unreviewed draft entities affect payouts, partner permissions, or official reporting.
+
+9. Current Demo Data
+For these unmatched organizations:
+- American Trade Hotel
+- Boquete Adventures
+- Casco Antiguo Hotel
+- City Cabs
+- Hotel Palacio de las Flores
+- Las Clementinas
+- Metro Taxis
+- Panama City VIP Tours
+
+Create draft suggested organization entities only, not fully active production entities, unless the admin approves them.
+
+DONE LOOKS LIKE
+- All migrated ReferralActors are on modern rails.
+- No actor relies only on free-text organizationName if a reviewed Entity/Profile exists.
+- Unmatched organizations appear in a review-safe resolver queue.
+- Future new personas use proper Entity/Profile selection or pending suggestions.
+- Migration remains idempotent.

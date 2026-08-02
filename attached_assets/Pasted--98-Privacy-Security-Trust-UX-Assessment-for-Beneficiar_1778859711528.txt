@@ -1,0 +1,702 @@
+#98 — Privacy, Security & Trust UX Assessment for Beneficiary/Payout Platform
+
+What & Why
+#97 maps Panama Law 81, data classification, lawful basis, cross-border processors, and the privacy roadmap. The next step is to assess what privacy/security/trust functionality already exists in the OKÜ platform and design the actual user experience for the implementation phases.
+
+This task should not build the full privacy system yet. It should assess existing code, identify reusable pieces, and produce a modern, mobile-first UX plan for the beneficiary verification, payout-readiness, privacy controls, and trust surfaces.
+
+The goal is to avoid bolting privacy onto the platform as legal text. Privacy should become a product experience: clear, secure, confidence-building, and easy for referrers, partners, beneficiaries, finance admins, and Superadmins to use.
+
+Context
+OKÜ is now collecting or preparing to collect:
+- beneficiary bank information
+- payout verification details
+- ID / tax / RUC status
+- proof-of-address status
+- source-of-funds status
+- payout rules
+- payout eligibility states
+- finance/admin review notes
+
+This is restricted compliance data. It must be protected and also explained clearly to users.
+
+Privacy Program Layers
+Assess and design around four layers:
+
+Layer 1 — Audit / Documentation
+Already covered by #97:
+- Law 81 audit
+- data classification
+- lawful basis matrix
+- cross-border processor map
+- compliance roadmap
+
+Layer 2 — Security Controls
+Assess what exists and what is missing:
+- encryption helpers
+- masking helpers
+- role-based access control
+- field-level access control
+- sensitive access logging
+- AuditLog hygiene
+- error/log scrubbing
+- rate limiting
+- session timeout
+- API response redaction
+- CSV/export redaction
+- AI data-handling guardrails
+
+Layer 3 — Product Functionality
+Assess what exists and what is missing:
+- beneficiary verification workflow
+- payout readiness status
+- bank profile review
+- payout policy assignment
+- compliance holds
+- data-subject request register
+- vendor/processor register
+- retention policy admin screen
+- incident response register
+- privacy request workflow
+
+Layer 4 — Trust UX
+Design the mobile-first user experience:
+- visible privacy notices
+- safety cards
+- payout verification cards
+- masked bank-detail views
+- admin restricted-data warnings
+- clear payout blocker reasons
+- confidence-building microcopy
+- “why we need this” explanations
+- simple step-by-step verification flow
+
+Scope
+Discovery and UX planning only.
+
+Do:
+- inspect the repository
+- identify existing primitives, routes, APIs, services, permissions, encryption helpers, UI components, and admin shells
+- identify gaps
+- create UX architecture
+- create mobile-first screen flows
+- create implementation task plan
+- define modern minimalist UI specifications for the later implementation tasks
+
+Do not:
+- change schema
+- add routes
+- write UI code
+- modify security logic
+- implement encryption changes
+- implement uploads
+- implement privacy request register
+- implement vendor register
+- implement beneficiary verification
+- alter payment gateway logic
+- alter Banesco export logic
+
+Core Questions To Answer
+
+1. What already exists?
+Audit the repo for:
+- encryption helpers
+- masking helpers
+- beneficiary/payout models
+- payout batch services
+- AuditLog patterns
+- role/permission model
+- admin shell/UI primitives
+- dashboard UI primitives
+- existing privacy/consent copy
+- existing file upload/storage
+- existing rate limit helpers
+- existing error capture
+- existing CSV/export logic
+- existing user profile/account settings
+
+2. What is missing?
+Identify missing functionality across:
+- security controls
+- beneficiary verification workflow
+- payout eligibility UI
+- privacy notices
+- admin review
+- vendor/processor register
+- data-subject requests
+- incident response
+- retention policy
+- mobile-first UX
+
+3. What should be reused?
+Avoid inventing new patterns where the repo already has:
+- AdminPageShell
+- drawers
+- tabs
+- status pills
+- KPI cards
+- audit log components
+- form rows
+- payout panels
+- existing encryption helpers
+- existing RBAC helpers
+- existing API validation patterns
+
+4. What needs new design?
+Design any missing primitives:
+- TrustCard
+- VerificationStepper
+- PrivacyNoticePanel
+- MaskedSensitiveField
+- RestrictedDataBanner
+- PayoutEligibilityStatus
+- BeneficiaryStatusPill
+- ComplianceHoldBanner
+- FinanceReviewDrawer
+- MobileVerificationWizard
+
+5. What should the mobile-first UX look like?
+Produce detailed UX flows for:
+
+A. Referrer / Influencer / Partner
+Mobile-first beneficiary verification journey:
+- Dashboard card: “Complete payout verification”
+- Explanation: “You can keep earning, but OKÜ only pays verified bank accounts”
+- Step 1: Profile type
+- Step 2: Legal identity
+- Step 3: Bank details
+- Step 4: Document status / finance notes
+- Step 5: Review & submit
+- Submitted state
+- Changes requested state
+- Verified state
+- On hold state
+
+B. Admin Finance / Superadmin
+Mobile-friendly but desktop-optimized review flow:
+- Beneficiaries queue
+- Needs review / Changes requested / Verified / On hold tabs
+- Beneficiary drawer
+- Masked sensitive fields
+- Verification checklist
+- Payout policy
+- Eligibility blockers
+- Audit trail
+- Approve / reject / request changes / hold
+
+C. Payout Batch Flow
+- Eligible earners only
+- Blocked earners list
+- Bank-ready status
+- Export format status
+- Banesco pending-spec warning
+- Generic finance CSV ready
+- Maker/checker approval states
+
+D. Privacy / Compliance Admin
+- Privacy requests register
+- Vendor/processor register
+- Retention policy register
+- Incident response register
+
+6. How do we make users feel safe?
+Draft microcopy for:
+- beneficiary collection privacy notice
+- payout verification card
+- bank detail masking
+- admin restricted data banner
+- data-subject rights entry point
+- Banesco pending-spec explanation
+- “bank payouts only” explanation
+- “access is logged” explanation
+- “why we ask for this” explanations
+
+7. What should be built first?
+Create an implementation roadmap that breaks the work into small mergeable tasks:
+- task name
+- purpose
+- dependencies
+- files likely touched
+- acceptance criteria
+- risk level
+- whether it affects launch
+
+Required Deliverables
+Create:
+
+1. docs/privacy/privacy-functionality-gap-assessment.md
+Must include:
+- existing functionality
+- missing functionality
+- reusable repo primitives
+- risky areas
+- recommended priority
+
+2. docs/privacy/mobile-trust-ux-plan.md
+Must include:
+- mobile-first beneficiary verification flow
+- admin review flow
+- payout batch trust flow
+- trust microcopy
+- screen-by-screen UX descriptions
+- accessibility considerations
+- empty/loading/error states
+- modern minimalist UI specification
+- component-level UX requirements
+- mobile layout rules
+- admin layout rules
+
+3. docs/privacy/privacy-implementation-task-plan.md
+Must include:
+- ordered tasks after #97
+- dependencies
+- acceptance criteria
+- suggested task numbers
+- P0/P1/P2 priority
+- out-of-scope boundaries
+
+UX Standards
+The UI plan must be:
+- mobile-first for referrers/influencers/partners
+- simple enough for non-technical users
+- finance-grade for admins
+- clear about what is verified and what is pending
+- clear that OKÜ performs beneficiary verification, while Banesco performs formal bank/KYC/AML
+- beautiful, modern, calm, and trust-building
+- not a wall of legal text
+- not generic compliance software
+- consistent with OKÜ’s premium hospitality brand
+- minimalist but not empty
+- operationally useful, not decorative
+- designed for speed, reassurance, and clarity
+
+Modern Minimalist Functional UI Specification
+The UX plan must define a visual and interaction system for future implementation.
+
+Design Principles:
+1. Calm confidence
+   The UI should reduce anxiety around money, bank details, and identity verification.
+   Avoid alarming language unless action is truly blocked.
+
+2. One decision per screen
+   Especially on mobile, each step should ask for one logical group of information only.
+
+3. Visible protection
+   Users should always know why information is requested, how it is protected, and what happens next.
+
+4. Status before detail
+   Every screen should first answer:
+   - Am I verified?
+   - Can I be paid?
+   - What is blocking me?
+   - What action do I need to take?
+
+5. Progressive disclosure
+   Do not show dense compliance detail unless the user asks or the admin needs it.
+
+6. No false certainty
+   Distinguish:
+   - OKÜ verified
+   - bank-ready
+   - Banesco formal KYC/AML
+   - payout eligible
+   - payout paid
+
+7. No raw sensitive data
+   After save, sensitive fields appear masked only.
+
+Visual Style:
+- Premium, quiet, hospitality-grade.
+- White or warm off-white backgrounds for finance/admin surfaces.
+- Deep charcoal or OKÜ dark surfaces only where already established for earner dashboards.
+- Restrained OKÜ red for primary actions.
+- Green only for verified/paid/success.
+- Amber for pending/review/needs attention.
+- Red only for rejected/blocked/security risk.
+- Avoid loud gradients, decorative blobs, or busy illustrations.
+- Use cards only for distinct repeated items, review blocks, or mobile step panels.
+- Do not nest cards inside cards.
+- Keep radius subtle: 6–8px max unless existing system says otherwise.
+- Dense admin tables are acceptable on desktop; avoid dense tables on mobile.
+
+Typography:
+- Clear hierarchy:
+  - Page title
+  - Status summary
+  - Action instruction
+  - Supporting explanation
+- Avoid long legal paragraphs in primary flow.
+- Use plain language:
+  “Complete payout verification”
+  not
+  “Submit compliance documentation.”
+- Button labels should be action-specific:
+  “Submit for review”
+  “Request changes”
+  “Approve beneficiary”
+  “Place payout hold”
+  “Add bank details”
+- Do not use tiny compliance disclaimers as the only privacy notice.
+
+Mobile Layout Rules:
+- Design first for 375px width.
+- Single-column flow.
+- Sticky bottom action bar for long forms.
+- Large touch targets, minimum 44px height.
+- Progress indicator always visible during verification.
+- Manual save reassurance:
+  “Saved securely”
+  “Masked after saving”
+- Show only one primary CTA per screen.
+- Secondary actions should be text buttons.
+- Avoid horizontal scrolling.
+- Avoid tables; use stacked rows/cards.
+- Error messages appear inline directly under the affected field.
+- Blocking status appears at top as a clear summary.
+- Manual support path always visible.
+
+Admin Layout Rules:
+- Desktop-first, but responsive.
+- Queue view with filters, tabs, and search.
+- Drawer detail for review.
+- Masked sensitive fields by default.
+- “Restricted compliance data — access is logged” banner at top of drawer.
+- Review checklist in right rail or top summary.
+- Eligibility blockers clearly grouped:
+  - Identity
+  - Bank readiness
+  - Compliance hold
+  - Threshold
+  - Reconciliation
+  - Payout cadence
+- Audit trail visible but not visually dominant.
+- Approval/rejection actions require confirmation.
+- Reject/request-changes requires a reason.
+- Hold requires a reason.
+- Approve action disabled until required checks pass.
+
+Suggested Components To Specify:
+1. TrustCard
+Purpose:
+Show safety assurance in user-facing flows.
+
+Content:
+- icon
+- title
+- one-sentence reassurance
+- optional checklist
+
+Example:
+“Your payout information is protected”
+“Sensitive details are encrypted and shown only in masked form after saving.”
+
+2. VerificationStepper
+Purpose:
+Mobile-first guided flow.
+
+Steps:
+- Profile type
+- Legal identity
+- Bank details
+- Document status
+- Review
+
+States:
+- incomplete
+- current
+- complete
+- blocked
+- changes requested
+
+3. MaskedSensitiveField
+Purpose:
+Show sensitive values safely.
+
+Examples:
+- Account ending 4821
+- ID ending 9184
+- RUC verified
+- Stored securely
+
+Rules:
+- Never show raw value after save.
+- Provide “Replace value” not “Edit visible value.”
+
+4. PayoutEligibilityStatus
+Purpose:
+Explain payout state in one glance.
+
+States:
+- Verification required
+- Under review
+- Bank ready
+- Below minimum
+- Held for reconciliation
+- Scheduled
+- Payable
+- Paid
+
+5. RestrictedDataBanner
+Purpose:
+Admin compliance warning.
+
+Copy:
+“Restricted compliance data. Access to this record is logged. Do not copy beneficiary data outside OKÜ systems unless required for bank processing.”
+
+6. FinanceReviewDrawer
+Purpose:
+Admin beneficiary review.
+
+Sections:
+- Status summary
+- Commercial profile
+- Legal identity
+- Bank profile
+- Document status
+- Payout policy
+- Eligibility blockers
+- Notes
+- Audit trail
+- Actions
+
+7. ComplianceHoldBanner
+Purpose:
+Explain blocked payout state.
+
+Copy examples:
+“Payouts are on hold while finance reviews this beneficiary.”
+“Bank details changed and must be re-reviewed before payout.”
+
+8. SafetyChecklist
+Items:
+- Bank payouts only
+- Encrypted sensitive fields
+- Masked after save
+- Finance review required
+- Access is audit-logged
+
+Mobile Beneficiary Verification Screen Specs
+Screen 1 — Payout Verification Intro:
+- status pill
+- short explanation
+- safety checklist
+- primary CTA: Start verification
+- secondary: Contact support
+
+Screen 2 — Profile Type:
+- two large options: Individual / Company
+- short explanation of why this matters
+
+Screen 3 — Legal Identity:
+- grouped fields
+- “Why we ask” expandable explanation
+- inline save state
+- no dense legal text
+
+Screen 4 — Bank Details:
+- bank payouts only notice
+- bank country
+- bank name dropdown
+- account holder name
+- account type
+- account number
+- currency
+- masking explanation before submit
+
+Screen 5 — Document Status:
+- for P1, status flags + finance notes only
+- copy:
+  “Document uploads are not enabled yet. Finance may record document status after manual review.”
+
+Screen 6 — Review & Submit:
+- summary of masked details
+- privacy notice
+- confirmation checkbox
+- primary CTA: Submit for review
+
+Post-submit:
+- large status panel:
+  “Submitted · under review”
+- what happens next
+- expected review wording without promising a date
+- support CTA
+
+Changes Requested:
+- requested changes at top
+- reopen only affected sections
+- CTA: Resubmit
+
+Verified:
+- green status
+- payout policy summary
+- next payout eligibility state
+
+On Hold:
+- amber/red status depending severity
+- reason
+- contact support CTA
+
+Admin Beneficiary Review Screen Specs
+Queue:
+- top KPI/status strip:
+  Needs review
+  Changes requested
+  Verified
+  On hold
+- filters by role, status, bank readiness
+- search by name/email/referral code
+- table on desktop
+- stacked cards on mobile
+
+Drawer:
+- fixed header with name, role, status
+- restricted-data banner
+- masked sensitive fields
+- checklist:
+  Identity complete
+  Bank profile complete
+  Document statuses reviewed
+  No compliance hold
+  Payout policy assigned
+- blocker panel
+- audit trail
+- sticky action footer:
+  Approve
+  Request changes
+  Reject
+  Hold
+
+Confirmation Modals:
+Approve:
+- summary of what approval enables
+- confirm button
+
+Reject:
+- required reason
+
+Request changes:
+- required message to beneficiary
+
+Hold:
+- required hold reason
+- choose hold type if useful:
+  compliance
+  bank mismatch
+  manual finance review
+  other
+
+Payout Batch Trust UX Specs
+Batch preview must show:
+- payable total
+- number of eligible earners
+- number blocked
+- why blocked
+- bank export format status
+- Banesco pending-spec warning
+- generic CSV availability
+
+Blocked earner card:
+- name
+- role
+- amount
+- blocker reason
+- action:
+  View beneficiary
+  Request changes
+  Leave out of batch
+
+Banesco Copy:
+“Banesco bulk-payment format is pending bank confirmation. You may continue internal review and approval, but bank-native export will be enabled only after Banesco provides the official format.”
+
+Privacy / Compliance Admin UX Specs
+Privacy Requests:
+- list of requests
+- type
+- requester
+- status
+- due/received date
+- owner
+- action
+
+Vendor Register:
+- vendor
+- data category
+- country
+- contract/DPA status
+- risk level
+- notes
+
+Retention Policy:
+- data category
+- retention basis
+- current implementation
+- target policy
+- owner
+
+Incident Register:
+- incident date
+- affected category
+- containment
+- notification needed
+- legal/ANTAI review needed
+- resolution
+
+Accessibility Requirements:
+- WCAG AA contrast for text and status pills.
+- Status must not rely on color only.
+- Every status pill has text.
+- Form fields have labels.
+- Error messages are announced near fields.
+- Buttons have clear accessible names.
+- Touch targets minimum 44px on mobile.
+- No text overlap at 320px width.
+- No tiny disclosure-only privacy notices.
+- Keyboard navigation for admin drawers/modals.
+
+Empty / Loading / Error States:
+Beneficiary not started:
+“Complete payout verification to receive payouts.”
+
+No payouts yet:
+“You can complete verification now so payouts are ready when earnings are approved.”
+
+Under review:
+“Finance is reviewing your payout profile.”
+
+Missing encryption key:
+“Sensitive fields cannot be saved until platform encryption is configured.”
+
+Bank format pending:
+“Banesco export format is pending bank confirmation.”
+
+Error:
+Use specific recovery copy:
+“We could not save your bank profile. Your previous saved information is unchanged.”
+
+Security/Privacy Requirements To Consider
+The plan must account for:
+- Panama Law 81 principles
+- role-based access
+- field-level access
+- encryption
+- masking
+- audit logging
+- no raw sensitive fields in logs
+- no raw sensitive fields in AI prompts
+- cross-border processor awareness
+- data-subject rights
+- incident response
+- retention policy
+
+Acceptance
+- No code changes made.
+- Three documents created under docs/privacy/.
+- The assessment clearly states what exists vs what is missing.
+- UX plan gives enough detail for Replit to implement without guessing.
+- Implementation plan breaks the privacy program into small tasks.
+- Mobile-first beneficiary verification journey is clearly designed.
+- Admin finance review journey is clearly designed.
+- Modern minimalist UI specs are included.
+- Component-level UX requirements are included.
+- Banesco pending-spec and Cybersource separation are clearly preserved.
+- The plan does not conflate bank KYC with OKÜ beneficiary verification.

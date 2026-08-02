@@ -1,0 +1,256 @@
+Refactor the OKÜ ↔ INVU integration so that **match confidence is deterministic, not heuristic**.
+
+CORE OBJECTIVE
+Redesign the matching architecture so that OKÜ can link an INVU table/order to the correct reservation, referrer, host, partner, and table session with effectively **100% match confidence**, except where a human explicitly overrides or data was never captured.
+
+DEFINITION OF MATCH CONFIDENCE
+Match confidence = did OKÜ correctly link that INVU table/order to the right reservation/referrer/session?
+
+TARGET OUTCOME
+Eliminate fuzzy matching based primarily on:
+- time window
+- customer name similarity
+- approximate party size
+- weak table-label guesses
+
+Replace it with a deterministic trust chain using shared IDs, explicit check-in/seating workflows, and immutable session binding.
+
+GOVERNING RULE
+Commissions are calculated at the reservation-linked table-session level. Split checks or multiple payment events do not create separate commission objects. All financial activity associated with the attributed table session must be aggregated into one final closed table value, which determines commission eligibility and payout.
+
+REQUIRED ARCHITECTURAL SHIFT
+Move from:
+- heuristic reservation/order matching after the fact
+
+To:
+- explicit reservation → check-in → table-session binding before or at table open
+- shared identifiers passed into the INVU workflow
+- deterministic revenue reconciliation after close
+
+BUILD A 100% MATCH CONFIDENCE MODEL
+
+1. INTRODUCE A HARD IDENTITY CHAIN
+Create and enforce these IDs:
+- reservation_id
+- attribution_session_id
+- table_session_id
+- venue_id
+- invu_order_id
+- invu_public_order_number
+- optional booking_code / short human-readable code
+
+The most important record is:
+- `table_session_id`
+
+This must become the canonical bridge between:
+- reservation
+- check-in
+- host/referrer attribution
+- INVU order
+- final commission object
+
+2. ADD EXPLICIT CHECK-IN / SEATING WORKFLOW
+Before revenue can be commission-eligible, the guest must be checked in or seated through OKÜ.
+
+Create a workflow:
+- reservation exists in OKÜ
+- host/front desk selects arriving reservation
+- host clicks “Check In” or “Seat Guest”
+- system creates immutable `table_session_id`
+- system binds host/referrer attribution to that table session
+- system records table label / area / venue
+- system records timestamp and actor
+
+No commission-grade matching should rely on passive inference if this workflow was available but skipped.
+
+3. WRITE A SHARED REFERENCE INTO THE INVU FLOW
+At table open, send one or more deterministic OKÜ references into INVU.
+
+Preferred fields if INVU supports them:
+- external_ref
+- booking_code
+- notes/comment field
+- customer reference field
+- custom metadata field
+- order reference / public note field
+
+Write at minimum:
+- `table_session_id`
+- optionally `reservation_id`
+- optionally `booking_code`
+
+If INVU does not expose a clean metadata field, implement the best available fallback using the most stable reference-bearing field available.
+
+4. REQUIRE HOST CONFIRMATION AT TABLE OPEN
+Add an OKÜ operational requirement:
+- when opening or confirming a table session, the host must confirm the reservation/session
+- if there is no reservation, the host must create an attributed walk-in session in OKÜ first
+- no “orphan” commissionable table should exist without an OKÜ table session record
+
+5. ADD WALK-IN ATTRIBUTION LOGIC
+For non-reservation traffic:
+- host/referrer must create a walk-in attribution record first
+- system generates `table_session_id`
+- that ID becomes the same deterministic anchor used for INVU linkage
+
+6. CHANGE MATCH ENGINE PRIORITY
+Replace the old scoring hierarchy with this:
+
+Tier 1 — Deterministic Match (auto-approved)
+- exact `table_session_id` found
+- exact booking_code found
+- exact external reference found
+- exact manually bound session reference found at check-in/open
+
+Tier 2 — Operationally Bound Match (high trust)
+- host explicitly bound reservation to live table session in OKÜ before close
+- INVU order linked through table/open workflow
+
+Tier 3 — Manual Review Only
+- no deterministic ID
+- only time-window/table/name heuristics available
+
+Heuristic-only matches must never be treated as true 100% matches.
+
+7. SEPARATE MATCH STATUS FROM SYNC STATUS
+Implement separate statuses:
+
+A. Sync Status
+- not_synced
+- synced
+- partial_sync
+- sync_failed
+
+B. Match Status
+- deterministic_match
+- operational_match
+- manual_match
+- heuristic_candidate
+- unmatched
+
+C. Commission Eligibility
+- eligible_auto
+- eligible_review
+- ineligible
+
+Do not confuse successful sync with successful attribution matching.
+
+8. INTRODUCE A MATCH PROOF OBJECT
+Every commissionable session must store a `match_proof` JSON snapshot containing:
+- match_type
+- source_reference_used
+- who created the binding
+- when binding occurred
+- whether linkage was deterministic, operational, or manual
+- supporting fields used
+- audit timestamps
+
+9. REDEFINE “100% MATCH CONFIDENCE”
+The system may only assign 100% match confidence when one of the following is true:
+- exact `table_session_id` present in INVU-linked record
+- exact `booking_code` present and unique
+- explicit OKÜ seating/check-in binding created before or at table open
+- manual admin confirmation locked the final mapping
+
+Everything else must be below 100%.
+
+10. CHANGE THE UI LANGUAGE
+Do not show vague percentages alone.
+Show:
+- Match Type
+- Confidence
+- Proof Source
+- Bound By
+- Bound At
+
+Example:
+- Deterministic Match — 100%
+- Proof Source: table_session_id
+- Bound By: Host Console
+- Bound At: 2026-04-21 19:04
+
+Or:
+- Heuristic Candidate — 15%
+- Proof Source: venue + time window only
+- Review Required
+
+11. ADD REQUIRED UX FLOWS
+Build or refactor these flows:
+
+A. Reservation Check-In
+- search reservation
+- confirm guest arrived
+- assign/confirm table
+- create `table_session_id`
+
+B. Walk-In Attribution
+- create walk-in
+- assign source/referrer/host
+- create `table_session_id`
+
+C. Table Open Binding
+- bind live table to existing `table_session_id`
+- write reference downstream into INVU-compatible field
+
+D. Review Queue Upgrade
+- reviewers can promote a session to a locked manual match
+- once approved, save immutable proof snapshot
+
+12. ADD DB FIELDS / TABLES
+Add or extend:
+- reservations
+- attribution_sessions
+- table_sessions
+- invu_orders_raw
+- invu_orders_normalized
+- match_proofs
+- manual_match_overrides
+- operational_bindings
+- review_queue
+
+Required fields on `table_sessions`:
+- id
+- reservation_id
+- attribution_session_id
+- venue_id
+- table_label
+- host_user_id
+- referrer_id
+- check_in_at
+- seated_at
+- opened_invu_order_id nullable
+- invu_reference_written nullable
+- match_status
+- match_confidence
+- match_proof_id nullable
+
+13. HARD BUSINESS RULES
+- No commission auto-approval from heuristic matching alone
+- No “100%” confidence unless deterministic or explicitly locked by manual review
+- Split checks do not reduce confidence if they roll up to the same bound table session
+- Sync polling improves freshness, not certainty
+- Certainty comes from explicit identity binding
+
+14. OUTPUT REQUIRED
+Return:
+1. updated architecture summary
+2. deterministic matching strategy
+3. revised DB schema
+4. revised backend services
+5. revised host/seating UX flow
+6. INVU reference-writing strategy
+7. review queue rules
+8. match status model
+9. acceptance criteria for true 100% confidence
+10. migration plan from heuristic matching to deterministic matching
+
+15. ACCEPTANCE CRITERIA
+The redesign is complete only if:
+- a reservation can create a unique table_session_id before revenue closes
+- a walk-in can create a unique attributed table_session_id
+- the system can bind that session to the INVU order flow
+- deterministic matches are distinguishable from heuristic matches
+- only deterministic or manually locked matches can hit 100%
+- commission auto-approval depends on deterministic or locked matches
+- split checks still roll up into one commissionable table-session object
+- audit proof exists for every 100% match

@@ -1,0 +1,71 @@
+Stop expanding the Revenue Trust Dashboard scope.
+
+Complete only a P0 correctness stabilization pass for Task #39.
+
+Do not add new large UI features in this pass.
+Do not redesign the event attribution page.
+Do not add complex new filters yet.
+Do not expand the session ledger beyond compile-safe existing fields.
+
+Fix only these issues:
+
+1. Fix Mark Paid
+- Add a dedicated endpoint:
+  POST /api/v1/admin/revenue/allocations/[id]/mark-paid
+- It must transition APPROVED → PAID only.
+- It must reject PENDING, DISPUTED, REVERSED, or already PAID allocations with a clear error.
+- It must write an AuditLog entry with actor, allocationId, tableSessionId, before status, after status, and timestamp.
+- Update /admin/revenue/obligations so the Mark Paid button calls mark-paid, not approve.
+
+2. Fix Reverse to preserve audit trail
+- Do not silently mutate financial history.
+- If the data model supports creating a new CommissionAllocation row, create a new REVERSED allocation row with a negative amountCents referencing the original allocation in metadata.
+- If there is no schema field for parent allocation, store originalAllocationId in audit metadata and create the negative reversal row against the same tableSession/earner.
+- The original allocation should remain historically readable.
+- Write AuditLog with before/after and reversalAllocationId.
+- If schema does not allow safe reversal-row creation, stop and report the blocker instead of mutating the original row.
+
+3. Add missing empty-state CTAs
+For these pages:
+- /admin/revenue
+- /admin/revenue/sessions
+- /admin/revenue/obligations
+- /admin/revenue/review
+- /admin/revenue/events
+
+When there is no synced data, show:
+“No table sessions have been synced yet.”
+“Go to INVU Integration to trigger your first sync.”
+Button/link: /admin/integrations/invu
+
+4. Fix compile/type issues introduced by this task
+Specifically check:
+- src/components/AdminNav.tsx for duplicated labels/keys or broken object syntax.
+- src/lib/permissions.ts for duplicate ADMIN_COMMERCIAL entries and missing commas.
+- src/types/roles.ts for malformed union syntax.
+- All new API routes under src/app/api/v1/admin/revenue/** must use the project’s Next 15 route param pattern if required:
+  { params }: { params: Promise<{ id: string }> }
+  const { id } = await params;
+
+5. Run verification
+- npm run build
+- If available, run npx tsc --noEmit or report why it is not available.
+- Manually confirm these routes render:
+  /admin/revenue
+  /admin/revenue/sessions
+  /admin/revenue/obligations
+  /admin/revenue/review
+  /admin/revenue/events
+
+Do not work on these in this pass:
+- Event cards grouped by date/event
+- Venue dropdown/custom date range
+- Expanded ledger columns
+- Advanced drill-down fields
+- New visual redesign
+
+After finishing, report:
+- changed files
+- whether Mark Paid now calls a dedicated endpoint
+- whether Reverse creates an immutable reversal row or if blocked by schema
+- build result

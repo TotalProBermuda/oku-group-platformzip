@@ -1,0 +1,78 @@
+{
+  "backToGroup": "OKÜ Hospitality Group",
+  "ourRestaurants": "Nuestros Restaurantes",
+  "restaurantsSubtitle": "Tres experiencias gastronómicas únicas bajo un mismo techo — cada una con su propia identidad, cocina y ambiente.",
+  "reserveArrow": "Reservar una Mesa →",
+  "viewProfile": "Ver Perfil",
+  "cuisine": "Cocina",
+  "covers": "Capacidad",
+  "setting": "Ambiente",
+  "hours": "Horario",
+  "dress": "Vestimenta",
+  "about": "Sobre nosotros",
+  "theMenu": "El Menú",
+  "drinkMenu": "Menú de Bebidas",
+  "scroll": "Desplazar",
+  "photography": "Fotografía © OKÜ Hospitality Group",
+  "theKitchen": "La Cocina",
+  "atTheBar": "En el Bar",
+  "theSpace": "El Espacio",
+  "seats": "asientos",
+  "oku": {
+    "headline": "Alta Cocina Íntima",
+    "tagline": "Mantel blanco. Luz de velas. Servicio estructurado para 27.",
+    "tag": "Alta Cocina",
+    "description": "OKÜ es nuestro comedor principal — una experiencia íntima dirigida por el chef, arraigada en la cocina mediterránea moderna. El salón tiene capacidad para 27 y cada mesa se siente como un asunto privado.",
+    "heroLine1": "Íntimo.",
+    "heroLine2": "Deliberado.",
+    "heroLine3": "27 cubiertos.",
+    "cuisine": "Mediterránea Moderna",
+    "setting": "Interior · Climatizado",
+    "dresscode": "Smart casual a formal",
+    "about": [
+      "Nombrado en honor al grupo que ancla, OKÜ es un estudio en contención. Mantel blanco impecable, cristalería soplada a mano y una cocina que cree que la simplicidad es la forma más elevada de sofisticación.",
+      "El menú cambia con las estaciones — abastecido por productores de todo el Mediterráneo. Embutidos ibéricos, cítricos sicilianos, aceites de oliva del Egeo — compuestos en menús de degustación que se sienten inevitables.",
+      "El comedor tiene 27 asientos. La iluminación es siempre exactamente la correcta."
+    ],
+    "sushiBarHeading": "La Barra de Sushi",
+    "sushiBarBody": "En el corazón de OKÜ se encuentra una íntima barra de sushi. Cada día los chefs preparan cortes frescos de pescado entero seleccionado por nuestros proveedores — atún, salmón, pulpo — expuestos en la vitrina iluminada para que los comensales los vean antes de ordenar.",
+    "cocktailHeading": "Elaborados\ncon intención.",
+    "cocktailBody": "Cada cóctel de la carta de OKÜ es una pequeña tesis — construido alrededor de una sola idea. Un elemento umami japonés expresado a través del sésamo y el yuzu. Un estudio botánico en espuma y flores comestibles. Un trago espirituoso que se revela lentamente sobre hielo.",
+    "spaceHeading": "Tres paredes.\nUna historia.",
+    "spaceBody": "La pared de escamas de pez. El panel koi. La barra de sushi. Estas no son elecciones decorativas — son la identidad del salón. Cada elemento fue seleccionado, diseñado o construido específicamente para este espacio."
+  },
+  "catch": {
+    "headline": "Vida Nocturna Caribeña Boho",
+    "tagline": "Platos para compartir, DJs en vivo y energía caribeña.",
+    "tag": "Restaurante Nocturno",
+    "description": "CATCH es donde la cena se convierte en noche. Platos para compartir de inspiración caribeña, un programa de cócteles curado y una cabina de DJ rotatoria hacen de cada velada un evento en sí mismo.",
+    "heroLine1": "La noche",
+    "heroLine2": "comienza aquí.",
+    "heroLine3": "",
+    "cuisine": "Platos caribeños para compartir",
+    "setting": "Híbrido interior/exterior",
+    "dresscode": "Smart casual",
+    "about": [
+      "CATCH fue creado para las horas después de las 9. Para mesas que se demoran, para rondas que se convierten en tres, para el momento en que una cena se convierte en una noche.",
+      "El menú está diseñado para compartir — platos de inspiración caribeña que llegan en oleadas, cada uno una excusa para quedarse un poco más. La cabina de DJ rota cada jueves a sábado con talento local e internacional.",
+      "Accesorios de ratán, concreto expuesto, iluminación cálida. Un espacio simultáneamente relajado y magnético."
+    ]
+  },
+  "terrace": {
+    "headline": "Restaurante en Azotea al Aire Libre",
+    "tagline": "Azulejo pintado. Brisa nocturna. La ciudad abajo.",
+    "tag": "Azotea",
+    "description": "La Terraza es la corona al aire libre de Gold House — 42 cubiertos bajo el cielo de Panamá, rodeados de azulejos pintados a mano y luz de faroles. Platos panamericanos para compartir, cócteles artesanales y vistas de atardecer.",
+    "heroLine1": "La ciudad",
+    "heroLine2": "a tus pies.",
+    "heroLine3": "",
+    "cuisine": "Platos panamericanos para compartir",
+    "setting": "Azotea al aire libre",
+    "dresscode": "Casual a smart casual",
+    "about": [
+      "La Terraza se encuentra en la azotea de Gold House y abre cada noche al cielo de Panamá. Azulejo marroquí pintado a mano cubre el suelo. Faroles de hierro forjado bordean el perímetro. Buganvilla trepa por la pared sur.",
+      "La cocina sirve platos panamericanos para compartir — ceviches, anticuchos, panes planos al horno de leña — diseñados para comerse lentamente, en conversación, mientras la ciudad transita del día a la noche.",
+      "Con 42 cubiertos, es nuestro espacio más grande y también el más querido."
+    ]
+  }
+}

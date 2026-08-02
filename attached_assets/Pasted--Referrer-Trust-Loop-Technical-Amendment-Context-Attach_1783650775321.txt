@@ -1,0 +1,100 @@
+# Referrer Trust Loop Technical Amendment
+
+## Context
+
+Attachment `#140 - Referrer Trust Loop` describes a broken trust loop in the
+current OKU/Foodie application:
+
+- Streetside referrers can create reservations through QR/link flows.
+- The referrer-facing active feed can still show `No active bookings`.
+- The feed appears to use a fixed short look-back window and narrow gating.
+- Future-dated referrals can be hidden even when the reservation was created
+  successfully.
+- The backend trust chain can capture check close, commission, ledger, and
+  payout state, but the referrer does not see that chain.
+
+The referenced implementation files are not present in this local workspace, so
+this amendment is written as a patch-ready technical spec for the app codebase.
+
+## Red-Team Findings
+
+### 1. The 8-hour look-back creates false negatives
+
+A referrer feed must not be based on reservation creation time or a short
+look-back window. Referral usefulness is based on service time and referral
+ownership, not recent creation.
+
+Risk:
+
+- A future reservation created today for tomorrow disappears immediately.
+- Referrers lose trust because successful QR reservations look missing.
+- Rollup totals undercount active contribution.
+
+Amendment:
+
+- Active referrals must be selected by reservation service window and referrer
+  ownership.
+- History referrals must be selected by terminal status or expired service
+  window.
+
+### 2. Referrer surfaces can drift
+
+Separate streetside, referrer, influencer, and partner dashboards invite
+different query rules.
+
+Risk:
+
+- Streetside sees nothing while influencer sees data.
+- Financial fields appear in one place and not another.
+- Fixes are applied to the broken tab only, leaving the platform inconsistent.
+
+Amendment:
+
+- Build one shared server data source for `myReferrals`.
+- Consume that source from every referrer-facing surface.
+- Keep SSR and polling/API refresh on the same include/projection.
+
+### 3. Referral ownership must be immutable enough to trust
+
+If reservations are not anchored to a referrer actor at creation, downstream
+commission logic becomes guesswork.
+
+Risk:
+
+- Admin cannot prove which referrer drove the booking.
+- Manual binds can rewrite ownership without audit history.
+- Commission disputes become operationally expensive.
+
+Amendment:
+
+- Reservation creation from QR/link must persist the referrer actor, referral
+  link, attribution session, and campaign/offer context immediately.
+- Manual/no-code binds must write an audited correction event, not silently edit
+  history.
+
+### 4. INVU close and commission state must be read through the trust chain
+
+The financial loop should not be recomputed in the dashboard.
+
+Risk:
+
+- UI calculates a different commission than the ledger.
+- Payout state drifts from maker/checker payout batches.
+- Refund or void handling becomes inconsistent.
+
+Amendment:
+
+- Referrer views must read from existing trust-chain records:
+  `AttributionSession -> TableSession -> CommissionAllocation -> LedgerEntry -> PayoutBatch`.
+- UI may display contribution, commission, and paid status, but must not decide
+  payout eligibility.
+
+### 5. Status expiry must be deterministic
+
+The active/history split cannot depend on manual cleanup.
+
+Risk:
+
+- Completed/no-show/cancelled reservations linger in active views.
+- Future reservations are hidden before service.
+- Timezone mismatches break Panama service windows.

@@ -1,0 +1,9 @@
+{
+  "required": "This field is required",
+  "invalidEmail": "Please enter a valid email address",
+  "invalidPhone": "Please enter a valid phone number",
+  "minLength": "Must be at least {n} characters",
+  "maxLength": "Must be no more than {n} characters",
+  "submitError": "Something went wrong. Please try again.",
+  "success": "Submitted successfully"
+}
