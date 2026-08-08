@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 48" fill="none" role="img" aria-label="OKÜ Hospitality Group">
+  <!-- OKÜ wordmark -->
+  <text x="0" y="38"
+    font-family="Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif"
+    font-size="42" font-weight="400" letter-spacing="-1.5" fill="#c41e3a">OKÜ</text>
+  <!-- Divider -->
+  <line x1="108" y1="9" x2="108" y2="42" stroke="#1a1614" stroke-width="0.75" opacity="0.18"/>
+  <!-- Tagline group -->
+  <text x="118" y="24"
+    font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="7" font-weight="400" letter-spacing="4.2" fill="#1a1614" opacity="0.42">HOSPITALITY</text>
+  <text x="121.5" y="38"
+    font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="7" font-weight="400" letter-spacing="6.8" fill="#1a1614" opacity="0.42">GROUP</text>
+</svg>

@@ -1,0 +1,91 @@
+Red-team review of #166–#170:
+
+Direction is correct. We need one canonical ReferralActor dedupe service first, then wire every provisioning surface into it, then build admin merge-required handling.
+
+Required amendments before build:
+
+GLOBAL
+1. Standardize audit actions.
+Use explicit actions:
+- referral.actor.dedupe_found
+- referral.actor.dedupe_linked
+- referral.actor.dedupe_reactivated
+- referral.actor.dedupe_created
+- referral.actor.merge_required
+- referral.actor.merge_resolved
+
+#170 currently expects `referral.actor.merge_required`, but #166 only says “writes AuditLog.” Make the action names consistent now.
+
+2. Do not treat AuditLog as mutable unless it already supports that.
+#170 says “marks the conflict as resolved.” Audit logs should normally be immutable. If AuditLog has no resolvedAt/resolvedBy fields, do not mutate it. Instead:
+- write a new `referral.actor.merge_resolved` AuditLog entry referencing the original conflict audit id
+- derive unresolved conflicts as merge_required entries without a later merge_resolved reference
+If this is too awkward, create a dedicated merge-conflict table as a separate schema task.
+
+3. Concurrency warning.
+Without DB-level normalized email/phone unique constraints or an advisory lock, “same email can never create duplicate actors” is not guaranteed under concurrent requests. The shared service should use a transaction and a final re-check immediately before create, but call this best-effort unless a unique key / lock exists.
+
+#166 amendments
+4. Phone normalization:
+Do not blindly add E.164. Use normalized digits; only create E.164 when country/market context is known.
+
+5. ReferralLink.code check:
+Only run the code match if input.referralCode / linkCode exists. Do not loosely scan links.
+
+6. Audit volume:
+“found” audit logs are okay because this is a provisioning attempt, but include `provisioningPath` and `mutated: false` so audits distinguish read-only dedupe from actual link/create.
+
+7. Result shape:
+Use a discriminated union with at least:
+- found_existing_linked
+- found_existing_unlinked
+- linked
+- reactivated_link
+- created
+- merge_required
+
+Include:
+- actorId
+- referralLinkId?
+- candidateActorId?
+- matchField
+- provisioningPath
+- mutated
+- reason
+
+#167 amendments
+8. Be consistent on merge_required HTTP behavior.
+Operator create should return 409. Admin resolve can return 409 or 200 with resolved:false, but choose one convention and document it. Do not make callers guess.
+
+9. “Same response shape” plus “include status” conflicts slightly.
+Adding `status` is fine if additive, but confirm existing UI does not depend on exact response keys.
+
+#168 amendments
+10. Event/ticket dedupe must not merge identities based only on event participation.
+EventReferrerAssignment bridge should count as match evidence only when it directly links to the same actor/person/code/email/phone. Avoid merging unrelated ticket and walk-in identities just because they share event context.
+
+11. Partner concurrent invite test is important, but again only truly safe with transaction/lock/unique constraint. State this clearly.
+
+#169 amendments
+12. Seed/migration scripts should never auto-link an actor already owned by another user.
+They should log merge_required and continue, not fail the whole seed unless running in strict mode.
+
+13. The duplicate check `GROUP BY userId` must ignore null userId, otherwise orphan actors may look like duplicates. Also add checks by normalized email/phone if available.
+
+#170 amendments
+14. “Create separate” should not simply allow future duplicate creation silently.
+It should write an explicit override audit with reason, then call the dedupe service with an override token/context so the separate actor creation is still audited and traceable.
+
+15. “Link to existing” must not change commission eligibility.
+It should only connect identity/proof chain. No compensation plan, commission rule, payout state, or entity resolution changes.
+
+Recommended dependency:
+#170 should depend on #166 plus at least one producer of merge_required logs (#167). It does not need to wait for every path (#168/#169) if the API is generic, but it should be aware new provisioningPath values will arrive later.
+
+Final acceptance across the epic:
+- Same userId never creates a second actor.
+- Same email/phone returns existing/link/reactivate/merge_required.
+- Inactive links are reused before new codes are created.
+- Actor owned by another user always returns merge_required.
+- Audit log explains exactly why each decision happened.
+- No commission eligibility, entity resolution, attribution, payout, or ledger behavior changes.

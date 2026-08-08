@@ -1,0 +1,255 @@
+TASK: REFACTOR THE SUPERADMIN INFORMATION ARCHITECTURE AND PROGRAMMING LOGIC WITHOUT INCORRECTLY MAKING “EXPERIENCES” THE ROOT OF THE PLATFORM
+
+PRIMARY CORRECTION
+Do NOT refactor the whole website or the whole Superadmin dashboard around Experiences and Events.
+
+Experiences is only ONE module inside a broader programmable hospitality operating model.
+
+The Superadmin dashboard is broader than Experiences.
+The architecture must remain domain-based, not experience-centric.
+
+CORE PRODUCT PRINCIPLE
+The platform is a programmable hospitality operating system with multiple major domains.
+Experiences belongs inside that operating model as one module, alongside orders, memberships, profiles, compensation, sponsorship, hiring, IR, integrations, review, and venue operations.
+
+DO NOT COLLAPSE THE PLATFORM INTO:
+- Experiences
+- Series
+- Events
+
+Instead, preserve the broader operating model.
+
+TARGET SUPERADMIN ARCHITECTURE
+
+The Superadmin dashboard should be modeled around domains such as:
+
+1. Identity / Registry
+- Profiles
+- platform access / linked accounts where relevant
+
+2. Programming
+- Experiences
+- Series
+- sessions / occurrences
+- hosts
+- sponsors
+- influencers
+- attendees
+- reservation blocks
+- access rules
+
+3. Commerce
+- Orders
+- memberships
+- ticketing
+- add-ons
+- channels
+- attribution
+
+4. Incentives / Distribution
+- Compensation
+- partners
+- referrers
+- conversion-linked payouts
+
+5. Intelligence / Oversight
+- Analytics
+- conversion
+- review queue
+- table sessions
+- integrations
+
+6. Governance / Admin
+- IR documents
+- hiring
+- sponsorship policy
+- streetside permissions
+- system tools
+
+IMPORTANT
+The goal is NOT to remove Experiences or Series.
+The goal is to correctly place them inside the broader domain architecture and clean up how they relate to one another.
+
+PART A — INFORMATION ARCHITECTURE RULES
+
+1. KEEP DOMAIN-BASED TOP NAVIGATION
+Do not redesign the entire Superadmin around Experiences.
+Keep the dashboard as a multi-domain admin system.
+
+2. EXPERIENCES IS A MODULE, NOT THE ROOT
+Treat Experiences as one programming module inside the larger platform.
+
+3. SERIES IS NOT A COMPETING PLATFORM ROOT
+Series should not feel like a separate top-level worldview.
+It should either:
+- be a filtered operational view inside Programming
+or
+- remain as a dedicated module view that still uses the same underlying programming model and canonical editor
+
+4. PRESERVE OTHER CRITICAL DOMAINS
+Do not break or subordinate:
+- Orders
+- Memberships
+- Profiles
+- Compensation
+- Partners
+- Conversion
+- Table Sessions
+- Review Queue
+- Integrations
+- Hiring
+- IR Documents
+
+PART B — PROGRAMMING MODULE LOGIC
+
+Within the Programming domain, fix the relationship between:
+- Experiences
+- Series
+- Sessions / event occurrences
+- Participants
+- Sponsorship
+- Access rules
+- Ticketing
+
+RULES
+
+1. “Experience” is one programmable object inside Programming.
+2. An Experience may be:
+- a standalone one-off programmed offer
+- a recurring / multi-date programmed offer
+- linked to one or many sessions
+3. “Series” should not behave like a completely separate creation universe.
+4. If both tabs remain:
+- Experiences = broad management view
+- Series = filtered management/operations view for recurring or grouped programming objects
+- both must open the SAME canonical editor
+
+PART C — DO NOT BREAK WHAT ALREADY WORKS
+
+Preserve the broader dashboard structure that already supports:
+- profiles
+- sponsorship
+- orders
+- memberships
+- IR
+- hiring
+- compensation
+- partners
+- conversion
+- streetside
+- integrations
+- table sessions
+- review queue
+
+Refactor only where relationships and logic are currently rigid or duplicated.
+
+PART D — EXPERIENCE / SERIES CREATION LOGIC
+
+The problem is not that Experiences exists.
+The problem is that the current programming flow is too rigid.
+
+Fix the creation model as follows:
+
+1. Primary creation CTA in Programming should allow the admin to choose what they are creating:
+- Standalone Experience
+- Experience with multiple sessions
+- Series / recurring program structure
+
+2. During creation, ask:
+- Is this part of a series? YES / NO
+- If yes, allow flexible multi-session generation
+- If no, allow a clean single programmed experience
+
+3. Allow:
+- default properties applied across all sessions/events
+- optional overrides for selected sessions/events
+- bulk edit tools for large series
+- per-session sponsor/host/co-host overrides
+- per-session media overrides
+- per-session ticketing/capacity overrides
+
+PART E — CANONICAL PROGRAMMING EDITOR
+
+Regardless of whether the admin enters from:
+- Experiences
+- Series
+
+they must land in one canonical editor.
+
+That editor must support:
+
+1. Front-facing content editing
+- title
+- subtitle
+- description
+- hero image
+- gallery
+- SEO
+- visibility
+
+2. Programming structure
+- standalone or series-based structure
+- session/event builder
+- dates/times
+- venue defaults and overrides
+- participant defaults and overrides
+
+3. Participant assignment
+- hosts
+- co-hosts
+- MCs
+- sponsors
+- partners
+- influencers
+- per-all vs per-selected-session logic
+
+4. Commerce
+- tickets
+- add-ons
+- waitlist
+- access rules
+- reservation blocks
+
+5. Performance
+- attendees
+- orders
+- analytics
+- payout implications
+
+PART F — SERIES / EXPERIENCES UX CLEANUP
+
+If keeping both tabs:
+- Experiences should be the broader programming list
+- Series should be the narrower operational list for grouped/repeating programs
+
+Examples:
+- Experiences list can show all programmed offers
+- Series list can show only recurring/grouped offers with session counts and inheritance logic
+
+But:
+- no duplicated edit systems
+- no contradictory create flows
+- no separate schemas in the UI mental model
+
+PART G — REQUIRED OUTPUT
+
+Return:
+1. Revised Superadmin domain architecture
+2. Which modules belong to which domain
+3. Revised Programming-domain structure
+4. Revised Experiences vs Series relationship
+5. Canonical editor logic
+6. Creation-flow logic for standalone vs series-based programming
+7. Which current tabs remain unchanged
+8. Which current tabs need relationship cleanup only
+9. Navigation recommendations that preserve the broader hospitality operating model
+10. Implementation sequence that avoids breaking the rest of the platform
+
+SUCCESS CRITERIA
+The redesign is successful when:
+- the Superadmin dashboard still feels like a broad hospitality operating system
+- Experiences is correctly treated as one module within that system
+- Series no longer feels like a competing root concept
+- the broader programmable hospitality model remains intact
+- no unrelated modules are distorted or subordinated just to accommodate experience editing
+- the system becomes more flexible without collapsing the platform into one content model

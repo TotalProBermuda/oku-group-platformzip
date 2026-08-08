@@ -1,0 +1,61 @@
+{
+  "invitationSubject": "Estás invitado a {eventTitle}",
+  "invitationHeadline": "Has sido invitado",
+  "invitationCta": "Aceptar invitación",
+  "invitationDecline": "Rechazar",
+  "ticketConfirmationSubject": "Tu entrada para {eventTitle}",
+  "ticketConfirmationHeadline": "Reserva confirmada",
+  "membershipWelcomeSubject": "Bienvenido a la membresía OKÜ",
+  "membershipWelcomeHeadline": "Bienvenido, miembro",
+  "membershipApprovedSubject": "Tu membresía OKÜ está activa",
+  "membershipPendingSubject": "Hemos recibido tu solicitud de membresía",
+  "membershipPendingBody": "Gracias por tu interés. Nuestro equipo se pondrá en contacto contigo en 48 horas para completar tu inscripción.",
+  "passwordResetSubject": "Restablece tu contraseña de OKÜ",
+  "reminderSubject": "Recordatorio: {eventTitle} es mañana",
+  "reminderHeadline": "Nos vemos mañana",
+  "followUpSubject": "Gracias por asistir a {eventTitle}",
+  "footer": "OKÜ Hospitality Group · Casco Viejo, Ciudad de Panamá",
+  "unsubscribe": "Cancelar suscripción",
+  "viewOnline": "Ver en línea",
+  "copyright": "© {year} OKÜ Hospitality Group. Todos los derechos reservados.",
+  "beneficiary": {
+    "greeting": "Hola {name},",
+    "greetingFallback": "Hola,",
+    "reasonLabel": "Motivo",
+    "cta": "Ver tu perfil de beneficiario",
+    "orOpen": "O abre:",
+    "footerNote": "Estás recibiendo este correo porque tienes un perfil de beneficiario en la plataforma de pagos de OKÜ.",
+    "buckets": {
+      "OKU_APPROVAL": "Aprobación OKÜ",
+      "BANK_READINESS": "Validación bancaria",
+      "HOLD_OR_REJECT": "Acción requerida"
+    },
+    "status": {
+      "READY_FOR_REVIEW": {
+        "subject": "Aprobación OKÜ — tu perfil de beneficiario está en revisión",
+        "headline": "Tu perfil está en revisión",
+        "body": "Gracias — por ahora tenemos todo lo que necesitamos. Nuestro equipo de finanzas revisará tu perfil de beneficiario y te avisará cuando se complete la aprobación de OKÜ."
+      },
+      "OKU_APPROVED": {
+        "subject": "Aprobación OKÜ — tu perfil de beneficiario ha sido aprobado",
+        "headline": "OKÜ ha aprobado tu perfil",
+        "body": "Buenas noticias — Finanzas OKÜ ha aprobado tu perfil de beneficiario. El siguiente paso es la validación bancaria: Banesco revisará tu expediente como parte de su propio proceso de incorporación antes de emitir cualquier pago."
+      },
+      "BANK_READY": {
+        "subject": "Validación bancaria — Banesco ha confirmado tu cuenta",
+        "headline": "Tu cuenta está lista para recibir pagos",
+        "body": "Banesco ha confirmado tu expediente de beneficiario. Ya puedes recibir pagos en el próximo lote de pagos que te incluya."
+      },
+      "ON_HOLD": {
+        "subject": "Acción requerida — tu perfil de beneficiario está en espera",
+        "headline": "Tu perfil está en espera",
+        "body": "Hemos colocado una retención temporal de cumplimiento sobre tu perfil de beneficiario. Los pagos se reanudarán una vez que se levante la retención. Revisa el motivo a continuación y escríbenos si tienes preguntas."
+      },
+      "REJECTED": {
+        "subject": "Acción requerida — tu perfil de beneficiario fue rechazado",
+        "headline": "Tu perfil fue rechazado",
+        "body": "No pudimos aceptar tu perfil de beneficiario tal como fue enviado. Revisa el motivo a continuación; puedes actualizar tus datos y volver a enviarlo en cualquier momento."
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+Review #162: close, but please fix before merge.
+
+Findings:
+
+P1 — Referrer resolution card appears to be rendered for every admin user, not only referrer-capable users.
+The spec says this diagnostic applies to users with referrer-capable roles. If PersonaProfilePanel renders this for every user, admins may see “Unresolved — no actor found” and a “Create Referrer Profile” action for normal customers/admins/staff. Gate the card/actions by referrer-capable role, or return a “not_applicable” state with no create action.
+
+P1 — Legacy Referrer with referralActor but actor.userId not linked can produce an action mismatch.
+In resolveReferrerResolution(), legacy.referralActor can return actor_no_link/resolved_v2 even if ReferralActor.userId is not actually target user.id. But create_link later looks up ReferralActor by userId and will fail. Please ensure:
+- actor_no_link only means ReferralActor.userId === user.id and no active link
+- if a legacy-linked actor exists but actor.userId is null, return actor_unlinked and use the link action first
+- if actor.userId belongs to another user, return merge-required / blocked, not resolved
+
+P1 — Creating from legacy should preserve the existing legacy referral code when safe.
+If a legacy Referrer has referralCode and create mode creates a new ReferralActor + ReferralLink with a random code, old printed/shared codes may break or drift. When creating an actor from legacy Referrer, reuse legacy.referralCode as the active ReferralLink code if it is unique/available, or explicitly document/handle a collision.
+
+P1 — New actors default to actorType "OTHER".
+For Taxi, concierge, hotel concierge, tour guide, promoter, etc., create mode should derive actorType/actorTypeCode from the user role, operator/referrer persona, or legacy referrerType when available. Otherwise the dashboard may resolve but show generic OTHER/generic theme instead of TAXI_DRIVER/HOTEL_CONCIERGE/etc.
+
+P2 — Remove unrelated generated mockup artifact change.
+The diff includes `artifacts/mockup-sandbox/src/.generated/mockup-components.ts`. This appears unrelated to #162 and should not be part of the merge unless there is a clear reason.
+
+P2 — No-code dashboard state is good, but should retain normal account shell if possible.
+“No Active Referral Code” is correct, but ideally it should still render inside the normal referrer portal shell/layout so the user does not feel dropped into a separate dead-end page.
+
+Please re-run:
+- npm run i18n:check
+- typecheck scoped to changed #162 files
+- manual QA:
+  1. Taxi user with actor.userId + active link opens /referrer/dashboard
+  2. Concierge user with actor.userId + active link opens /referrer/dashboard
+  3. Actor linked but no active link shows “No active referral code,” not “No Referrer Profile”
+  4. Legacy-only Referrer still works
+  5. Non-referrer user does not get a create-referrer-profile action
+  6. Existing actor linked to another user cannot be stolen

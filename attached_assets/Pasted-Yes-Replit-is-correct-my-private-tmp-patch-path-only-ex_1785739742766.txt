@@ -1,0 +1,314 @@
+Yes, Replit is correct: my /private/tmp/... patch path only exists in this Codex environment, not inside Replit.
+Send Replit this exact file content and instruction:
+Create this file exactly:
+
+tests/browser/referrer-console-standardization.spec.ts
+/**
+ * Regression coverage for #190 — all referrer-capable dashboards must render
+ * the same QR-first PureReferrerConsole pattern.
+ *
+ * These tests intentionally mock dashboard payloads while still visiting the
+ * real authenticated routes. That keeps the assertions focused on the UI shell:
+ * LocaleProvider wrapping, QR-first ordering, instruction card visibility,
+ * WhatsApp CTA translation, partner dashboard non-empty state, and no stray
+ * tooltip/label regressions.
+ */
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { clearAuth, loginAs } from "./helpers/auth";
+
+const EMPTY_REFERRALS = {
+  rows: [],
+  rollups: {
+    activeCount: 0,
+    historyCount: 0,
+    commissionPendingCents: 0,
+    paidLedgerAvailable: false,
+  },
+};
+
+const COPY = {
+  en: {
+    consoleTitle: "Referral Console",
+    qrTab: "Share QR",
+    instruction: "Show this to your guest",
+    whatsapp: "Share on WhatsApp",
+  },
+  es: {
+    consoleTitle: "Consola de Referidos",
+    qrTab: "Compartir QR",
+    instruction: "Muéstrale esto a tu invitado",
+    whatsapp: "Compartir por WhatsApp",
+  },
+  pt: {
+    consoleTitle: "Console de Indicações",
+    qrTab: "Compartilhar QR",
+    instruction: "Mostre isso ao seu hóspede",
+    whatsapp: "Partilhar no WhatsApp",
+  },
+} as const;
+
+type Locale = keyof typeof COPY;
+
+const PROFILES = [
+  {
+    name: "Taxi profile",
+    route: "/referrer/dashboard",
+    email: "taxi@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/referrer/dashboard", async (route) => {
+        await route.fulfill({
+          json: {
+            referrer: {
+              fullName: "Taxi Juan",
+              referrerType: "TAXI_DRIVER",
+              actorTypeCode: "TAXI_DRIVER",
+              referralCode: "TAXI01",
+              organizationName: "City Cabs",
+              isActive: true,
+              profileSource: "legacy",
+            },
+          },
+        });
+      });
+    },
+  },
+  {
+    name: "Panama/referrer profile",
+    route: "/referrer/dashboard",
+    email: "panama@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/referrer/dashboard", async (route) => {
+        await route.fulfill({
+          json: {
+            referrer: {
+              fullName: "Panama City Tours",
+              referrerType: "TOUR_GUIDE",
+              actorTypeCode: "TOUR_GUIDE",
+              referralCode: "TOUR01",
+              organizationName: "Panama City Tours",
+              isActive: true,
+              profileSource: "legacy",
+            },
+          },
+        });
+      });
+    },
+  },
+  {
+    name: "Generic referrer profile",
+    route: "/referrer/dashboard",
+    email: "carlos@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/referrer/dashboard", async (route) => {
+        await route.fulfill({
+          json: {
+            referrer: {
+              fullName: "Carlos Mendez",
+              referrerType: "OTHER",
+              actorTypeCode: "OTHER",
+              referralCode: "CARLOS01",
+              organizationName: "OKÜ Local Network",
+              isActive: true,
+              profileSource: "legacy",
+            },
+          },
+        });
+      });
+    },
+  },
+  {
+    name: "Sophia influencer",
+    route: "/influencer/dashboard",
+    email: "influencer@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/influencer/dashboard", async (route) => {
+        await route.fulfill({
+          json: {
+            profile: {
+              handle: "sophia_laurent",
+              refCode: "INF-SOPHIA",
+              commissionRateBps: 1200,
+            },
+            stats: {
+              clicks: 5,
+              signups: 1,
+              purchases: 2,
+              revenueCents: 100000,
+              commissionEarnedCents: 13000,
+              commissionPaidCents: 0,
+            },
+            referrals: EMPTY_REFERRALS,
+          },
+        });
+      });
+    },
+  },
+  {
+    name: "Marco partner",
+    route: "/partner/dashboard",
+    email: "partner@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/partner/dashboard", async (route) => {
+        await route.fulfill({
+          json: {
+            profile: { name: "Marco Rossi" },
+            stats: {
+              totalSeries: 0,
+              totalSessions: 0,
+              totalTicketsSold: 0,
+              totalRevenueCents: 0,
+            },
+            series: [],
+            referrals: EMPTY_REFERRALS,
+            referral: {
+              referralCode: "PARTNER-MARCO",
+              actorTypeCode: "PARTNER",
+            },
+          },
+        });
+      });
+      await page.route("**/api/v1/partner/share-surface", async (route) => {
+        await route.fulfill({ json: { offers: [] } });
+      });
+    },
+  },
+] as const;
+
+async function setLocale(context: BrowserContext, locale: Locale) {
+  // Protected dashboard routes are not locale-prefixed route trees in this app.
+  // src/middleware.ts strips locale prefixes for auth checks but does not
+  // rewrite /es/referrer/dashboard to /referrer/dashboard. The layouts read
+  // oku_locale, so the regression matrix pins locale through the cookie.
+  await context.addCookies([
+    {
+      name: "oku_locale",
+      value: locale,
+      domain: "localhost",
+      path: "/",
+      httpOnly: false,
+      secure: false,
+      sameSite: "Lax",
+    },
+  ]);
+}
+
+async function stubSharedConsoleNetwork(page: Page) {
+  await page.route("**/api/v1/me/referrals", async (route) => {
+    await route.fulfill({ json: EMPTY_REFERRALS });
+  });
+  await page.route("**/api/v1/me/beneficiary", async (route) => {
+    await route.fulfill({ json: null });
+  });
+}
+
+async function expectNoRawKeysOrStrayLabels(page: Page) {
+  const visibleText = await page.locator("body").innerText();
+  expect(
+    visibleText,
+    "visible dashboard text must not contain raw i18n keys",
+  ).not.toMatch(/console\.title|console\.tab\.|streetForm\.guestQR\./);
+
+  const html = await page.content();
+  expect(html, "old stray QR tooltip/title must stay removed").not.toContain("Booking QR Code");
+}
+
+async function expectInfluencerConsoleBeforePerformance(page: Page, consoleTitle: string) {
+  const order = await page.evaluate((title) => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    let consoleIndex = -1;
+    let performanceIndex = -1;
+    let i = 0;
+
+    while (walker.nextNode()) {
+      const el = walker.currentNode as HTMLElement;
+      const text = (el.textContent || "").trim();
+      if (consoleIndex === -1 && text === title) consoleIndex = i;
+      if (performanceIndex === -1 && text === "Performance") performanceIndex = i;
+      if (consoleIndex !== -1 && performanceIndex !== -1) break;
+      i += 1;
+    }
+
+    return { consoleIndex, performanceIndex };
+  }, consoleTitle);
+
+  expect(order.consoleIndex, "influencer console heading should render").toBeGreaterThanOrEqual(0);
+  expect(order.performanceIndex, "influencer Performance section should render").toBeGreaterThanOrEqual(0);
+  expect(order.consoleIndex, "QR console must appear before Performance in DOM order").toBeLessThan(
+    order.performanceIndex,
+  );
+}
+
+test.beforeEach(async ({ context }) => {
+  await clearAuth(context);
+});
+
+for (const locale of ["en", "es", "pt"] as const) {
+  test.describe(`#190 shared referrer console — ${locale.toUpperCase()} @dashboard`, () => {
+    for (const profile of PROFILES) {
+      test(`${profile.name} is QR-first and translated`, async ({ context, page }, testInfo) => {
+        await setLocale(context, locale);
+        await loginAs(context, profile.email);
+        await stubSharedConsoleNetwork(page);
+        await profile.setup(page);
+
+        await page.goto(profile.route, { waitUntil: "domcontentloaded" });
+
+        const copy = COPY[locale];
+        await expect(page.getByRole("heading", { name: copy.consoleTitle }).first()).toBeVisible();
+        await expect(page.getByText(copy.qrTab).first()).toBeVisible();
+        await expect(page.getByText(copy.instruction).first()).toBeVisible();
+        await expect(page.getByText(copy.whatsapp).first()).toBeVisible();
+
+        const qrCode = page.locator('svg[width="248"][height="248"]').first();
+        await expect(qrCode).toBeVisible();
+        await expectNoRawKeysOrStrayLabels(page);
+
+        const noResults = page.getByText(/No results found/i);
+        await expect(noResults, "whole-dashboard empty state must not replace QR console").toHaveCount(0);
+
+        const stats = page.getByText(/Performance/i).first();
+        if (await stats.isVisible().catch(() => false)) {
+          await expectInfluencerConsoleBeforePerformance(page, copy.consoleTitle);
+          const [qrBox, statsBox] = await Promise.all([
+            qrCode.boundingBox(),
+            stats.boundingBox(),
+          ]);
+          expect(qrBox, "QR code should have layout").not.toBeNull();
+          expect(statsBox, "Performance stats should have layout").not.toBeNull();
+          expect(
+            statsBox!.y,
+            `${profile.name} must not show private stats above the QR on ${testInfo.project.name}`,
+          ).toBeGreaterThan(qrBox!.y);
+        }
+      });
+    }
+  });
+}
+Then tell Replit to run:
+npm run i18n:check
+npx playwright test tests/browser/referrer-console-standardization.spec.ts --project=desktop
+npx playwright test tests/browser/referrer-console-standardization.spec.ts --project=mobile
+And one important reminder for Replit:
+Do not use /en/referrer/dashboard, /es/referrer/dashboard, or /pt/referrer/dashboard unless middleware proves those protected routes are valid. In this app, the safer route is setting oku_locale and visiting /referrer/dashboard, /influencer/dashboard, and /partner/dashboard.
+
+
+1:46
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Ask for approval

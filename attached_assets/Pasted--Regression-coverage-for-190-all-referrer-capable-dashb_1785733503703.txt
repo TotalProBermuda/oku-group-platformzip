@@ -1,0 +1,96 @@
+/**
+ * Regression coverage for #190 — all referrer-capable dashboards must render
+ * the same QR-first PureReferrerConsole pattern.
+ *
+ * These tests intentionally mock dashboard payloads while still visiting the
+ * real authenticated routes. That keeps the assertions focused on the UI shell:
+ * LocaleProvider wrapping, QR-first ordering, instruction card visibility,
+ * WhatsApp CTA translation, partner dashboard non-empty state, and no stray
+ * tooltip/label regressions.
+ */
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { clearAuth, loginAs } from "./helpers/auth";
+
+const EMPTY_REFERRALS = {
+  rows: [],
+  rollups: {
+    activeCount: 0,
+    historyCount: 0,
+    commissionPendingCents: 0,
+    paidLedgerAvailable: false,
+  },
+};
+
+const COPY = {
+  en: {
+    qrTab: "Share QR",
+    instruction: "Show this to your guest",
+    whatsapp: "Share on WhatsApp",
+  },
+  es: {
+    qrTab: "Compartir QR",
+    instruction: "Muéstrale esto a tu invitado",
+    whatsapp: "Compartir por WhatsApp",
+  },
+  pt: {
+    qrTab: "Compartilhar QR",
+    instruction: "Mostre isso ao seu hóspede",
+    whatsapp: "Partilhar no WhatsApp",
+  },
+} as const;
+
+type Locale = keyof typeof COPY;
+
+const PROFILES = [
+  {
+    name: "Taxi profile",
+    route: "/referrer/dashboard",
+    email: "taxi@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/referrer/dashboard", async (route) => {
+        await route.fulfill({
+          json: {
+            referrer: {
+              fullName: "Taxi Juan",
+              referrerType: "TAXI_DRIVER",
+              actorTypeCode: "TAXI_DRIVER",
+              referralCode: "TAXI01",
+              organizationName: "City Cabs",
+              isActive: true,
+              profileSource: "legacy",
+            },
+          },
+        });
+      });
+    },
+  },
+  {
+    name: "Panama/referrer profile",
+    route: "/referrer/dashboard",
+    email: "panama@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/referrer/dashboard", async (route) => {
+        await route.fulfill({
+          json: {
+            referrer: {
+              fullName: "Panama City Tours",
+              referrerType: "TOUR_GUIDE",
+              actorTypeCode: "TOUR_GUIDE",
+              referralCode: "TOUR01",
+              organizationName: "Panama City Tours",
+              isActive: true,
+              profileSource: "legacy",
+            },
+          },
+        });
+      });
+    },
+  },
+  {
+    name: "Generic referrer profile",
+    route: "/referrer/dashboard",
+    email: "carlos@oku.local",
+    setup: async (page: Page) => {
+      await page.route("**/api/v1/referrer/dashboard", async (route) => {
+        await route.fulfill({
+          json: {

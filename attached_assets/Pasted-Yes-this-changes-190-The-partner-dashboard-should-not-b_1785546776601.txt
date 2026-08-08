@@ -1,0 +1,68 @@
+Yes, this changes #190. The partner dashboard should not be treated as a working surface that only needs QA. It is currently a missing/empty implementation.
+I’d update #190 from “consistency fix” to “unified referrer console rollout across all profiles.”
+Add To #190
+Problem 4 — Partner dashboard is empty
+/partner/dashboard renders a shell titled Partner Dashboard but shows No results found. It does not render the shared QR-first referrer console, referral QR, WhatsApp CTA, instruction card, activity, or earnings. For a partner account, that is effectively no dashboard.
+Root Cause Hypothesis
+Partner route is likely still using an old partner list/data page, or it expects partner records/results instead of rendering PureReferrerConsole with a partner role config.
+Required Fix
+/partner/dashboard must render the same shared PureReferrerConsole / ReferralConsoleShell.
+Partner role config should inherit the default QR-first behavior.
+Partner dashboard must show:title/label: Partner Console or Referral Console
+QR card
+“Show this to your guest” instruction card
+WhatsApp share CTA
+Offers tab
+Activity tab
+Earnings tab
+Profile/account tab
+
+Do not show No results found unless a specific tab has no data, and even then the QR tab must never be empty.
+Partner should be included in the same EN/ES/PT i18n coverage.
+Partner should be included in the 390px mobile audit.
+Acceptance Gate Additions
+Test these four routes with real seeded users:
+/referrer/dashboard
+/influencer/dashboard
+/partner/dashboard
+/host/streetside
+All must render the shared QR-first console and no raw keys.
+The product principle is even sharper now:
+Taxi, Influencer, and Partner are not separate dashboards. They are role configurations of the same referrer console.
+
+
+19:55
+
+
+
+
+
+
+#190 - Align all referrer dashboards to the streetside UI pattern What & Why Th…
+
+
+
+
+Worked for 8s
+
+
+
+This #190 plan is good, but it is missing the strongest partner-dashboard requirement.
+Right now it says “Smoke-check partner dashboard.” That is too soft. Your screenshot shows /partner/dashboard is not merely drifting; it is functionally empty.
+Required Change
+Replace step 5 with:
+Implement partner dashboard on the shared console — /partner/dashboard currently renders a shell with No results found. Replace that empty partner-results surface with PureReferrerConsole or the shared referrer shell using a partner role config. The partner dashboard must show the QR tab, instruction card, QR code, WhatsApp share CTA, Offers, Activity, Earnings, and Profile. No results found may only appear inside a specific empty tab/state, never as the whole dashboard.
+Also add this to Done Looks Like:
+/partner/dashboard is not empty. It renders the same QR-first shared referrer console as /referrer/dashboard and /influencer/dashboard.
+And this:
+“No results found” is not allowed as the default dashboard state for any active referrer, influencer, or partner profile.
+One More Tightening
+Line 13 says the three dashboards should render through the shared shell. Good. But because streetside is the canonical reference, I’d include /host/streetside in the visual QA matrix even though it is out of scope for code changes.
+Acceptance test matrix:
+/host/streetside — reference only
+/referrer/dashboard
+/influencer/dashboard
+/partner/dashboard
+Desktop, 390px mobile, EN/ES/PT.
+Verdict
+Send after that partner-dashboard wording is strengthened. The current plan could let Replit pass with a “smoke check” even though the partner dashboard is still empty.

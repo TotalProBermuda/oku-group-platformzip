@@ -1,0 +1,91 @@
+This is urgent and should be treated as a P0 regression in #200.
+The guest can fill the form but cannot complete the booking. That means the QR trust loop is broken at the most important moment.
+Send this to Replit now:
+P0 regression: guest cannot submit reservation from QR landing page.
+
+Context:
+User tested the mobile QR booking flow and reached the bottom of the form. The “Submit Reservation” button is visible, but tapping it does not successfully confirm/send the booking request.
+
+Relevant flow:
+QR link /r/[referralCode] → GuestBookingForm → POST /api/reservations
+
+Hard boundary:
+Do not widen scope. Do not touch referrer dashboards, host dashboard, table/floor work, INVU, service blocks, or unrelated UI.
+
+Debug and fix only the QR reservation submit path.
+
+Required investigation:
+
+1. Reproduce on mobile viewport
+- Open /r/INF-SOPHIA or the same QR referral URL.
+- Fill all required fields.
+- Select party size, date, time, and space/no preference.
+- Tap “Submit Reservation”.
+- Capture browser console errors, network request, response status, and response body.
+
+2. Check frontend validation
+In src/components/booking/GuestBookingForm.tsx:
+- Confirm submit handler fires on mobile tap.
+- Confirm required fields are actually present in payload:
+  - guestName
+  - guestEmail
+  - partySize
+  - reservationDate
+  - reservationTime
+  - conceptRequested
+  - requestedSpaceId or ""
+- If validation fails, show a visible error above the submit button.
+- Do not silently fail.
+
+3. Check parent handler
+In src/app/r/[referralCode]/page.tsx:
+- Confirm handleBookingSubmit receives payload.
+- Confirm it sends POST /api/reservations.
+- Confirm response body is read once only.
+- Confirm errors from SPACE_INVALID / SPACE_FULL / missing fields are shown visibly in the form.
+
+4. Check API route
+In src/app/api/reservations/route.ts:
+- Confirm the API accepts the exact payload sent by GuestBookingForm.
+- Confirm source QR_SCAN maps correctly to ReservationSource enum.
+- Confirm conceptKey maps to a real zone.
+- Confirm requestedSpaceId validation does not reject “no preference”.
+- Confirm capacity validation does not crash when requestedSpaceId is empty.
+- Confirm date parsing works from reservationDate ISO.
+- Confirm no transaction/outbox/capacity hold error is causing 500.
+
+5. Most likely failure points to check
+- page.tsx reads res.json() twice or uses stale body variable.
+- requestedSpaceId empty string being treated as invalid.
+- source enum mismatch QR_SCAN / QR_CODE.
+- conceptRequested blank after hiding duplicate Experience card.
+- party size 6+ custom value not converted before availability/submit.
+- capacity hold/outbox logic throwing inside reservation transaction.
+- validation error not displayed on mobile because error block is above the fold.
+
+Required fix behavior:
+- If submit succeeds:
+  - show normal success screen or pending approval screen.
+- If submit fails:
+  - show visible error near the submit button.
+  - do not leave the user thinking the button is broken.
+- Submit button should show loading state while request is in progress.
+- Button should not become permanently disabled after an error.
+
+QA required:
+- Mobile 390px: successful booking with no preference.
+- Mobile 390px: successful booking with available requestedSpaceId.
+- Mobile 390px: pending approval booking.
+- Invalid/full space error appears visibly near submit button.
+- Network response status/body captured for failed case before fix.
+- Confirm reservation row created after successful submit.
+- Confirm referral attribution still survives.
+
+Report:
+- root cause
+- files changed
+- exact error observed
+- tests/QA run
+- screenshot or screen recording of successful mobile submit
+My suspicion from the diff: conceptRequested may be blank when the duplicate Experience card is suppressed or no space is selected, or the API is rejecting a validation field while the UI doesn’t show the error near the button. Another likely issue is res.json() / response-body handling got messy in page.tsx, because the review diff showed duplicate old/new lines around reading the body.
+The fix should be surgical: reproduce, inspect payload/response, fix the one broken path, and make errors visible near the submit button.

@@ -1,0 +1,121 @@
+Yes, those two suggested tasks are both real, but I would not start both immediately.
+Start this one first:
+Catch QR booking flow regressions before they ship
+That is the higher-leverage task because #200 just proved the danger: API curl tests passed, but the actual mobile guest tap path was still broken. This task should add automated or scripted coverage for the real QR flow:
+Guest opens /r/[referralCode]
+fills form
+selects party size/date/time/space/no-preference
+taps Submit Reservation
+sees success or pending approval screen
+reservation row exists
+attribution survives
+This protects every future change.
+Defer this one until after:
+Tell guests when their pending space request has been approved or rejected
+That is important product polish, but it depends on the base pending-approval flow being reliable first. It also touches messaging/notifications, host approval events, possibly email/WhatsApp, and guest status copy. Worth doing, just not before regression protection.
+So the order I’d use:
+Catch QR booking flow regressions before they ship
+Tell guests when pending space request has been approved or rejected
+Also: I’d still push Replit to prove the submit button works on live mobile before calling #200 done. The regression task should prevent this exact thing from burning credits again.
+
+
+22:47
+
+
+
+
+
+
+Red Team and this please and provide the code against the actual repo. 
+
+
+
+
+
+
+22:50
+
+
+
+
+
+
+Working for 3m 57s
+
+
+
+
+I’ll work against the repo we have locally and first verify what code is actually present. If the current workspace is still only a snapshot or missing the Replit branch, I’ll say that plainly and produce a patchable implementation plan against the real file paths instead of pretending.
+
+
+
+
+Read files, ran commandsRan pwd
+
+
+
+
+Listed files
+
+
+
+Ran git status --short
+
+
+
+
+
+
+
+
+
+The top-level workspace is not the OKÜ app repo. I see an oku-referrer-platform folder, so I’m going to inspect that next for the live app paths before editing anything.
+
+
+
+
+Read files, ran commands
+
+
+oku-referrer-platform is not a usable checkout: Git has no commits there, and the app paths aren’t present. I’ll verify whether the pushed GitHub snapshot can be fetched into a clean local folder, since that’s the safest way to produce real code.
+
+
+
+
+Read files
+
+
+To code against the actual repo, I need to pull the GitHub snapshot branch into a local working copy. I’m going to try the connected GitHub route first; if that’s not available, I’ll ask for network approval for a git clone.
+
+
+
+
+The GitHub tools can read individual files, but for a real implementation I need a working tree. I’ll download the pushed branch snapshot into /private/tmp, then patch/test there without touching your unrelated local files.
+
+
+
+
+Ran a command, searched the webRan mkdir -p /private/tmp/oku-repo-work
+
+
+
+
+Running command for 2m 31s
+
+
+
+
+
+
+
+
+
+The snapshot is large but downloading cleanly. Once it finishes, I’ll inspect the QR form and add a regression harness against the actual code rather than inventing a parallel module.
+
+
+
+
+
+
+
+Still moving. I’m keeping it scoped: the target is not table/floor work or notifications, just the regression catcher for “QR submit button must actually produce a booking.”

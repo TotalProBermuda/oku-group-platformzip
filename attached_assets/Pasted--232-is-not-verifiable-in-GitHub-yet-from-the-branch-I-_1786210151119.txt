@@ -1,0 +1,41 @@
+#232 is not verifiable in GitHub yet from the branch I can read.
+I checked TotalProBermuda/oku-group-platformzip on replit-live-69973b7e-snapshot, and that snapshot is still pre-#232:
+prisma/schema.prisma does not include FB_DIRECTOR or RESTAURANT_SUPERVISOR.
+src/lib/permissions.ts still gives ADMIN_COMMERCIAL broad finance/governance powers.
+src/middleware.ts still allows ADMIN_COMMERCIAL into /admin/payouts, /admin/users, /admin/analytics, etc.
+src/lib/routePolicy.ts does not exist in GitHub.
+So: the Replit task log says #232 was completed, but the GitHub source I can access does not contain it yet. That means I would not call it merged-safe until Replit applies it to main and/or pushes the updated branch.
+Red-Team Verdict
+Conditionally good design, but not green until evidence is shown from the actual code.
+The Replit log shows the right reviewer catches happened:
+Supervisor missing host guards was caught.
+/host/me, /host/operations, table bind, bookings, analytics, reservation blocks, and gift-bag object-level authorization were reviewed.
+admin:audit:read was removed from F&B Director and replaced with scoped admin:orders:read.
+Supervisor-without-profile fallback was rejected correctly and replaced with 403.
+Migration file was added after reviewer rejected db push only.
+That is the right direction.
+Next Message To Replit
+Send this exactly:
+Before I green-light #232, produce a final evidence dump from the actual main version after applying changes.
+
+Show code snippets and test output proving:
+
+1. prisma/schema.prisma RoleKey includes FB_DIRECTOR and RESTAURANT_SUPERVISOR.
+2. There is a committed migration adding those enum values.
+3. ADMIN_COMMERCIAL no longer carries payout, payment, commission, compensation, beneficiary, user-edit, audit, refund, or revenue-write permissions.
+4. FB_DIRECTOR only has restaurant-operations permissions: menus, experiences, spaces/capacity, operational analytics, ticket/order read where needed.
+5. RESTAURANT_SUPERVISOR has no /admin access and only host/live-service capabilities.
+6. Middleware route policy and AdminNav are driven from the same role policy source, not duplicated tables.
+7. /api/v1/admin/** denies RESTAURANT_SUPERVISOR.
+8. Payments, Payouts, Commission Rules, Compensation, Beneficiaries, Security, Audit Trail, and user permission management are SUPERADMIN-only.
+9. Host bookings, host analytics, table-open-bind, reservation-block, reservation-block QR, reservation-block arrive, gift-bag, scan-config, and promoter routes all enforce venue-scoped RestaurantHostProfile checks for RESTAURANT_SUPERVISOR.
+10. RESTAURANT_SUPERVISOR without RestaurantHostProfile returns 403, not fallback findFirst().
+11. Seed creates/upserts RestaurantHostProfile for Rafael / host1 idempotently.
+12. Login persona labels changed:
+    - Admin Commercial → F&B Director
+    - Rafael Núñez → Restaurant Supervisor
+13. Tests passing, including RBAC route tests and object-level venue scoping tests.
+
+Also confirm whether these changes have been applied to the main version and pushed to GitHub. The current GitHub snapshot I can access is still pre-#232.
+My recommendation
+Do not start a new RBAC-related task until this evidence dump is clean. This is a governance boundary, and it touches money, staff churn, ProofPay visibility, and live restaurant operations. Worth being boringly strict here.

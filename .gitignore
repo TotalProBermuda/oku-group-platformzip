@@ -1,0 +1,23 @@
+# Next.js build output
+.next/
+out/
+
+# Node
+node_modules/
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+tsconfig.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# Export/archive artifacts
+*.zip

@@ -1,0 +1,157 @@
+Implement Sprint A: QR reservation hardening.
+
+This task must fix the current QR booking/reservation flow without creating duplicate modules.
+
+Source files to use:
+- src/app/r/[referralCode]/page.tsx
+- src/components/booking/GuestBookingForm.tsx
+- src/app/api/reservations/route.ts
+- src/app/api/v1/spaces/available/route.ts
+- src/server/spaces/capacityService.ts
+- prisma/schema.prisma
+
+Hard boundary:
+Do NOT create a second booking form, second reservation API, second availability endpoint, second host dashboard, or second capacity service. Reuse and harden the existing files.
+
+Required fixes:
+
+1. Preserve pending approval state on the QR success screen
+Current issue:
+The reservation API returns pendingApproval, but src/app/r/[referralCode]/page.tsx immediately sets bookedOk=true and renders the generic success screen. This swallows the pending-approval message.
+
+Fix:
+- Add parent state in page.tsx, e.g. bookingPendingApproval.
+- Parse the API response body before setting bookedOk.
+- If body.pendingApproval === true, render pending approval success copy.
+- If false, render normal success copy.
+
+Expected UX:
+- Confirmed booking: “You’re on the list. We’ll reach out to confirm your reservation.”
+- Pending approval booking: “Request received. This space requires host approval. We’ll confirm shortly.”
+
+2. Validate requestedSpaceId server-side
+Current issue:
+src/app/api/reservations/route.ts accepts requestedSpaceId and only reads requiresApproval. It does not prove the space belongs to the venue, is active, is reservable, or has enough capacity.
+
+Fix:
+- In /api/reservations POST, if requestedSpaceId is present, query RestaurantSpace with:
+  - id: requestedSpaceId
+  - venueId: venue.id
+  - isActive: true
+  - reservable: true
+- If no valid space is found, return 400 with a clear error.
+- Use capacityService.getAvailableCovers(requestedSpaceId, startAt, endAt) before accepting the booking.
+- Client-side availability is advisory only. The reservation API must be authoritative.
+
+Expected behavior:
+- Valid active/reservable space: accepted if capacity rules pass.
+- Forged/out-of-venue/inactive/non-reservable space: 400.
+- Full space that does not require approval: 409 with availability details.
+- Full space that requires approval: either PENDING_APPROVAL if host-review is intended, or 409 if the product rule is strict. Pick one and document it in code comments.
+
+3. Preserve QR source
+Current issue:
+The QR landing page sends source: "QR_SCAN", but /api/reservations hardcodes reservation.source = "UMBRELLA_SITE".
+
+Fix:
+- Destructure source from request body.
+- Whitelist accepted public sources:
+  - QR_SCAN
+  - REFERRER_LINK
+  - UMBRELLA_SITE
+- Persist the whitelisted source.
+- Default to UMBRELLA_SITE only if source is missing or invalid.
+
+Expected behavior:
+- Reservations submitted from /r/[referralCode] persist source = QR_SCAN.
+
+4. Fix ledger event correctness
+Current issue:
+The route supports PENDING_APPROVAL, but still emits RESERVATION_CONFIRMED unconditionally.
+
+Fix:
+- Always emit RESERVATION_REQUESTED.
+- Emit RESERVATION_CONFIRMED only when reservation.status === "CONFIRMED".
+- Do not emit RESERVATION_CONFIRMED for PENDING_APPROVAL.
+- Do not invent a new LedgerEventType unless the Prisma enum/migration is included. If RESERVATION_PENDING_APPROVAL is not available yet, skip that event for now and leave a short TODO.
+
+Expected behavior:
+- Pending approval booking has no false confirmed ledger event.
+
+5. Move party size before availability in QR mode
+Current issue:
+GuestBookingForm fetches availability using partySize, but party size appears below date/time/space. On mobile, the guest can select a space based on partySize=2, then change party size to 6+ afterward.
+
+Fix:
+- In GuestBookingForm, when showDateTimePicker=true, render party size before the date/time/space picker.
+- Changing party size must clear requestedSpaceId.
+- Availability should refetch with the current party size.
+
+Expected behavior:
+- The guest selects party size first, then date, time, and space.
+- Availability always reflects the visible party size.
+
+6. Avoid duplicate experience controls in QR mode
+Current issue:
+The QR page has concept/experience selection, the space picker also implies concept, and GuestBookingForm has another Experience section.
+
+Fix:
+- When showDateTimePicker=true and the space picker is active, do not render the lower Experience section as a second concept selector.
+- Space selection should set conceptRequested as it does now.
+- Keep conceptRequested fallback for cases where no space is selected.
+
+Expected behavior:
+- Guest sees one clear reservation flow:
+  Party size → Date → Time → Space/Experience → Guest info → Notes → Submit
+
+7. i18n
+Add/update EN, ES, and PT copy for:
+- pending approval success title/body
+- invalid requested space error
+- full capacity error
+- date/time/party/space labels if affected by reordering
+
+8. Tests / QA
+Run or add targeted tests for:
+
+A. QR happy path
+- Open /r/INF-SOPHIA.
+- Select party size, date, time, and available space.
+- Submit.
+- Reservation is created with requestedSpaceId and source QR_SCAN.
+- Referral attribution still exists.
+
+B. Pending approval
+- Select a requiresApproval space.
+- Submit.
+- API returns pendingApproval=true.
+- Guest sees pending approval success copy.
+- Reservation status is PENDING_APPROVAL.
+- No RESERVATION_CONFIRMED ledger event is emitted.
+
+C. Invalid requestedSpaceId
+- POST /api/reservations with a forged/out-of-venue/inactive requestedSpaceId.
+- API returns 400.
+- No reservation is created.
+
+D. Full capacity
+- Submit for a full non-approval space.
+- API returns 409 or documented host-review behavior.
+- No silent confirmed reservation is created.
+
+E. Party size refetch
+- Select date/time/space with party size 2.
+- Change party size to 6+.
+- requestedSpaceId clears.
+- Availability refetches.
+
+F. Regression
+- Existing attribution behavior must not change.
+- No fallback to DIRECT when referral context is known.
+- Existing host board should still show requestedSpace badge.
+
+Stop after Sprint A. Report:
+- files changed
+- tests run
+- screenshots or QA evidence
+- any follow-up tasks for table/chair capacity, INVU binding, service blocks, and notifications

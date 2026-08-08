@@ -1,0 +1,72 @@
+I did a code-level security pass against the extracted OKÜ repo I can access locally. One caveat: this extracted copy may lag the latest Replit auto-merged branch, so treat these as vulnerabilities to verify immediately in Replit, not a final pentest report.
+
+Critical
+
+Passwordless CredentialsProvider appears always enabled
+
+In src/lib/auth.ts (line 20), CredentialsProvider accepts only an email and logs in any existing user. It is not gated by DEMO_MODE_ENABLED.
+
+If still present in current Replit, this is the biggest issue. Anyone who knows a Superadmin email could attempt credentials sign-in.
+
+Fix: remove CredentialsProvider in production, or gate it behind isDemoModeEnabled() and restrict to @oku.local.
+
+NEXTAUTH_SECRET fallback
+
+src/lib/auth.ts (line 10) falls back to "replace-me". Launch-readiness checks the env var, but the code should fail closed in production.
+
+Fix: throw during startup if NODE_ENV=production and NEXTAUTH_SECRET is missing.
+
+High
+
+3. Stale JWT roles may survive role removal
+
+src/server/auth/session.ts (line 21) trusts roles stored in the JWT. If someone’s role is removed, their old token may still carry the old role until expiry.
+
+Fix: add token version / session invalidation, or refresh roles from DB for admin-sensitive routes.
+
+Public media proxy can sign arbitrary object paths
+
+src/app/api/v1/media/[...path]/route.ts (line 8) accepts any path and returns a signed read URL. If object paths are guessable or leaked, access is not re-authorized.
+
+Fix: restrict to allowed prefixes, validate DB ownership/public visibility, and separate private beneficiary documents from public uploads.
+
+Authenticated upload endpoint allows SVG
+
+src/app/api/v1/uploads/route.ts (line 5) allows image/svg+xml. If SVGs are served inline by storage, this can create XSS risk.
+
+Fix: block SVG uploads unless sanitized, or serve all uploads with safe Content-Disposition and strict content security.
+
+Medium
+
+6. Client error capture logs user-controlled stack/message
+
+src/app/api/v1/error-capture/route.ts (line 44) sends client-provided message/stack into logging. If the latest scrubber work is not wired here, PII can leak into logs.
+
+Fix: run the privacy scrubber on message, stack, URL, digest, extras before logging.
+
+Cookies use SameSite=None broadly
+
+src/lib/auth.ts (line 69) sets session cookies SameSite=None. That may be needed for Replit preview, but for production custom domain it increases CSRF exposure.
+
+Fix: use SameSite=Lax for production custom-domain deployments unless a specific cross-site auth need exists.
+
+My Recommended Next Replit Task
+
+Run a focused security hardening task:
+
+text
+
+
+
+Audit and fix auth/session/media vulnerabilities:
+1. Gate or remove passwordless CredentialsProvider outside demo mode.
+2. Fail closed if NEXTAUTH_SECRET is missing in production.
+3. Ensure admin-sensitive routes refresh roles from DB or enforce tokenVersion/session invalidation.
+4. Restrict /api/v1/media signed URLs to authorized/public DB-backed objects.
+5. Block or sanitize SVG uploads.
+6. Ensure error-capture uses privacy scrubber before logging.
+7. Review SameSite=None cookies for production custom-domain deployment.
+
+
+
+The one I would not wait on is passwordless CredentialsProvider. Verify that first.

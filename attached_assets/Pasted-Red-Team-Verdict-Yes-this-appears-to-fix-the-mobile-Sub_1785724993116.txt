@@ -1,0 +1,41 @@
+Red-Team Verdict
+Yes, this appears to fix the mobile “Submit Reservation” failure and the major #200 capacity lifecycle defects. But I would give it a conditional green, not a blind green, because there are two items Replit must confirm from the actual final files before you apply to main.
+What Looks Fixed
+The original mobile submit issue is correctly addressed:
+GuestBookingForm.tsx now uses noValidate.
+Native required attributes were removed from date/name/email.
+Email validation is now handled in JS and surfaced visibly near the submit flow.
+This matches the bug: mobile browser validation was firing off-screen, making the button look broken.
+The reservation correctness work is also materially stronger:
+QR_SCAN now maps to QR_CODE.
+requestedSpaceId is validated against venueId, isActive, and reservable.
+partySize is validated as a finite whole number between 1 and 100.
+PENDING_APPROVAL is added to ReservationStatus.
+PENDING_APPROVAL → CONFIRMED host acceptance creates the hold and promotes requestedSpaceId → assignedSpaceId.
+Confirmed holds now use FAR_FUTURE_EXPIRY and are released by terminal transitions, not by the time sweep.
+Expired holds are ignored by capacity checks via expiresAt > now.
+Regression tests were added for pending approval acceptance, expired-hold behavior, and confirmed-hold lifecycle.
+Do Not Green-Light Until These Are Confirmed
+Durable ledger consistency
+The route creates CAPACITY_HOLD_CREATED using emitLedgerEvent(...) outside the transaction as best-effort. After #186, that should probably be enqueueLedgerEvent(tx, ...) inside the same transaction, or else the capacity hold can exist without a durable proof event.
+Send Replit this:
+Confirm whether CAPACITY_HOLD_CREATED in POST /api/reservations is intentionally best-effort emitLedgerEvent outside the transaction. Given #186 durable outbox, this should likely be enqueueLedgerEvent inside the transaction with the reservation + hold write, or explain why this event is allowed to be non-durable.
+Actual final file must not contain duplicated diff artifacts
+The pasted review shows old/new lines interleaved, including scary fragments like duplicate eventType, duplicate idempotencyKey, and a weird return res; }); throw txErr; shape. This may just be unified diff rendering, but Replit must confirm the actual file compiles cleanly.
+Send this:
+Please confirm the final actual src/app/api/reservations/route.ts has:
+- one destructuring block
+- one reservation creation transaction
+- one RESERVATION_REQUESTED enqueue
+- RESERVATION_CONFIRMED only inside if (res.status === "CONFIRMED")
+- no duplicate eventType/idempotencyKey keys
+- no unreachable return / malformed catch block
+- TypeScript clean for this file
+My Recommendation
+If Replit confirms those two points and the claimed checks are true:
+all 13 regression tests pass
+all 4 QA scenarios pass
+i18n passes
+mobile 390px submit works
+Then yes: apply #200 to main.
+But I would ask for the two confirmations above first. The code direction is right; now we are protecting against one last “diff looked fine, final file wasn’t fine” situation.

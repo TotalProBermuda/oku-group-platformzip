@@ -1,0 +1,45 @@
+Build next: Prevent actor duplication across signup/provisioning channels.
+
+Goal:
+Ensure the same real-world referrer does not get multiple ReferralActor records when they enter through different paths: operator/admin creation, referrer signup, partner/event referral, influencer sub-referrer, ticket referral, or legacy import.
+
+Core rule:
+ReferralActor is the governed referrer identity. Before creating a new actor, every provisioning path must run the same dedupe / find-or-link logic.
+
+Check order before creating actor:
+1. Existing ReferralActor.userId === user.id
+2. Existing ReferralActor by normalized email
+3. Existing ReferralActor by normalized phone
+4. Legacy Referrer.userId === user.id
+5. EventReferrerAssignment / legacy event-referrer bridge, if applicable
+6. Existing ReferralLink/code tied to any candidate actor
+7. Only then create a new ReferralActor
+
+If a match belongs to another user:
+- do not auto-merge
+- return merge_required / blocked
+- require explicit admin merge flow later
+
+If a match is unlinked:
+- link it to the user if safe
+- reuse/reactivate existing ReferralLink where possible
+- write AuditLog
+
+Affected paths to audit:
+- /api/v1/operators/create
+- /api/v1/admin/users/[id]/referrer-resolution/resolve
+- /api/v1/admin/referrals/actors/find-or-create
+- event/ticket referrer provisioning
+- influencer sub-referrer provisioning
+- partner/referrer invite flows
+- any seed/demo provisioning scripts that create ReferralActor
+
+Acceptance:
+- Same email cannot create duplicate actors through two different paths.
+- Same normalized phone cannot create duplicate actors through two different paths.
+- Existing inactive ReferralLink is reused/reactivated instead of creating a new active code.
+- Existing actor linked to another user returns merge_required, not silent reassignment.
+- AuditLog records link/reuse/create decisions.
+- Commission eligibility is not inferred or changed.
+- Organization/entity resolution is not changed.
+- Streetside provisioning continues to work.

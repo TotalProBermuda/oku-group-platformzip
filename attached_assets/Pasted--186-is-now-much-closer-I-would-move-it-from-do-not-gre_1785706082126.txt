@@ -1,0 +1,80 @@
+#186 is now much closer. I would move it from “do not green-light” to conditional green / one UI polish pass required.
+The backend P0s appear resolved from the latest report:
+POS_CHECK_CLOSED exists in LedgerEventType.
+RESERVATION_CONFIRMED is now conditional on status === "CONFIRMED".
+createStreetsideBooking is wrapped into one transaction with the outbox row.
+transitionStatus now keeps statusLog, reservation update, holds, and outbox rows in one transaction.
+idempotencyKey is now @unique.
+enqueueLedgerEvent correctly rethrows so the business action rolls back if proof intent cannot be written.
+So from a trust-ledger architecture standpoint: yes, this is now basically right.
+But I would send one final, focused UI/UX correction before accepting:
+#186 is conditionally accepted on backend durability. One final UI/UX pass is required before green-light.
+
+Backend acceptance:
+- PENDING_APPROVAL reservations enqueue RESERVATION_REQUESTED only, not RESERVATION_CONFIRMED.
+- Streetside booking writes reservation + outbox row in one transaction.
+- transitionStatus writes status log + reservation update + capacity events + outbox rows in one transaction.
+- POS_CHECK_CLOSED exists in LedgerEventType.
+- LedgerEventOutbox.idempotencyKey is unique.
+- enqueueLedgerEvent rethrows correctly.
+
+Remaining UI/UX fixes:
+
+1. Desktop/table rendering
+LedgerOutboxClient currently appears to set the desktop table wrapper to display: "none" while the card list is always visible. If there is no CSS media rule overriding this, the table never appears on desktop.
+
+Fix:
+- Desktop/table layout should render on wider screens.
+- Mobile card layout should render at 390px.
+- Do not show both layouts at the same time.
+- No horizontal overflow at 390px.
+
+2. Human-readable business object
+The outbox table still appears mostly technical: event type, source, status, attempts, UUID/idempotency detail.
+
+Fix:
+Add a "Business object" column/card section that shows human-readable context when available:
+- Reservation: confirmation code, guest name, reservation date/time
+- Capacity hold: space name + party size
+- Commission allocation: amount + earner
+- Attribution session: referrer/actor if available
+
+UUIDs can stay in expanded detail, but the main row should not be UUID-only.
+
+3. Empty states
+Use specific empty states, not generic "No {status} rows."
+
+Required:
+- FAILED_REVIEW: "Proof trail healthy — no events require manual review."
+- PENDING: "No queued proof events."
+- PROCESSING: "No events currently being drained."
+- EMITTED: "No emitted outbox events in this filter."
+
+4. Default tab behavior
+Default tab should be:
+- FAILED_REVIEW if count > 0
+- else PENDING if count > 0
+- else EMITTED
+
+Not always FAILED_REVIEW.
+
+5. Operator actions
+For FAILED_REVIEW rows, add:
+- Copy idempotency key
+- Copy payload
+- Open linked reservation/admin object when a route exists
+
+6. i18n
+All added UI copy must be in EN, ES, and PT.
+Run i18n parity check.
+
+7. Final evidence required
+Report:
+- files changed
+- prisma validate/generate
+- TypeScript result, clearly separating pre-existing mockup-sandbox errors
+- tests run
+- screenshot or QA note for /admin/operations/ledger-outbox desktop
+- screenshot or QA note for /admin/operations/ledger-outbox at 390px mobile
+- role proof: SUPERADMIN/ADMIN_FINANCE can retry; ADMIN_COMMERCIAL read-only; host/referrer/guest blocked
+My recommendation: do not spend more credits re-litigating the backend unless Replit shows new evidence. The backend is now where it needs to be. The only meaningful remaining gap is making the admin outbox UI genuinely operational instead of engineer-only.

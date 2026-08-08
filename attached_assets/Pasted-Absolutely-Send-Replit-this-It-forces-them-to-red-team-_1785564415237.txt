@@ -1,0 +1,150 @@
+Absolutely. Send Replit this. It forces them to red-team the system as a product, an operations tool, and a codebase, not just answer file-by-file.
+Before implementing #194 / floor-table workflow, red-team the current reservation ecosystem from first principles.
+
+Do not only summarize what exists. I need you to expose what is missing, brittle, disconnected, or unclear across the full guest → referrer → host → superadmin → INVU flow.
+
+Please answer with code evidence, file paths, and line references wherever possible.
+
+SYSTEM GOAL
+A guest scans any referrer QR and can make a real reservation request with date, time, party size, and requested space/experience. The restaurant host can manage that reservation through confirmation, arrival, seating, table assignment, INVU binding, closing, and commission proof. Superadmin/owner can configure the venue, spaces, tables, chair capacity, permissions, and operational rules.
+
+RED-TEAM AREAS
+
+1. Guest QR booking flow
+- What does /r/[referralCode] currently render?
+- Can the guest select date?
+- Can the guest select time?
+- Can the guest select requested space/experience?
+- Are those selections persisted to Reservation?
+- Is availability checked before submit?
+- What happens if the requested time/space is full?
+- Is the mobile flow usable at 390px width?
+- Are EN/ES/PT labels complete?
+- Does attribution survive all booking choices?
+
+2. Reservation data model
+- What fields exist today on Reservation?
+- Is reservationDate a full datetime or date-only?
+- Is requestedSpaceId populated anywhere?
+- Is assignedSpaceId populated anywhere?
+- Is there a table assignment model?
+- Is there an INVU table/check binding model?
+- What is missing from the schema to support real restaurant operations?
+
+3. Capacity logic
+- Does capacity work by exact time match or overlapping time windows?
+- Does it work by space only or by table/chair capacity?
+- Can two concurrent requests overbook the same space?
+- Can one reservation receive multiple active holds?
+- Are holds created on guest booking, host confirmation, or table assignment?
+- Are holds released on cancellation, no-show, completion, and expiry?
+- Are capacity warnings and host overrides durably logged?
+
+4. Host dashboard workflow
+- Where do new QR reservations appear?
+- Can the host see requested date, time, party size, referrer, and requested space in one card?
+- Can the host confirm, reject, modify, or propose another time/space?
+- Can the host assign a table?
+- Can the host seat the party?
+- Is there a persistent warning when a seated reservation is not bound to INVU?
+- Can the host close an unbound reservation?
+- What is the fastest path for a busy host to move a guest from incoming → seated → bound → closed?
+
+5. Floor/table control UI
+- Can owner/admin create sections/spaces?
+- Can owner/admin create tables inside each section?
+- Can each table have chair capacity?
+- Can tables be combined for larger parties?
+- Can tables be marked unavailable?
+- Can tables be bound to INVU table IDs?
+- Does the host UI show floor state clearly enough during service?
+- Is there forward/back navigation or a guided action flow?
+- What is missing to make this usable under restaurant pressure?
+
+6. Superadmin / permissions
+- Who can create/edit venues, spaces, tables, and INVU mappings?
+- Who can confirm reservations?
+- Who can override capacity?
+- Who can cancel/no-show/complete reservations?
+- Who can bind INVU tables/checks?
+- Who can close a reservation into commission proof?
+- Are permissions enforced server-side, not only hidden in UI?
+- Are restaurant hosts scoped to their venue only?
+
+7. INVU binding and proof
+- What INVU data is available today?
+- Is there a model for INVU table ID?
+- Is there a model for INVU check/order ID?
+- Where is binding performed?
+- What happens if a guest is seated but never bound?
+- What prevents commission proof from being created on an unbound table/check?
+- What is the recovery path if the host binds the wrong INVU table?
+
+8. Referrer trust loop
+- Does referrer attribution persist through host reassignment?
+- Does changing space/table ever rewrite attribution?
+- Does referrer feed show the correct reservation status?
+- Does referrer feed show requested/assigned space?
+- What happens if attribution fails?
+- What event evidence exists for disputes?
+
+9. Event ledger / audit
+- Which actions emit LedgerEvent today?
+- Which critical actions do not?
+- Are event writes durable or best-effort?
+- Are idempotency keys deterministic?
+- Are duplicate events handled correctly?
+- Can an admin reconstruct the full story of a reservation from QR scan to close?
+
+10. Launch-readiness matrix
+Provide a pass/fail table for:
+- /r/INF-SOPHIA
+- taxi referrer QR
+- partner referrer QR
+- generic referrer QR
+- EN / ES / PT
+- desktop
+- 390px mobile
+- available capacity
+- full capacity
+- requiresApproval space
+- attribution preserved
+- host confirmation
+- table assignment
+- INVU binding
+- close blocked if unbound
+
+OUTPUT FORMAT
+
+Please return:
+
+1. Current architecture map
+Guest QR → reservation API → capacity service → host dashboard → table assignment → INVU binding → close/commission proof
+
+2. Findings ranked P0/P1/P2
+Include file path and line evidence.
+
+3. Missing schema
+List exact models/fields needed.
+
+4. Missing APIs
+List exact routes needed.
+
+5. Missing UI
+List exact screens/components needed.
+
+6. Recommended implementation order
+Separate:
+- #194 guest QR reservation flow
+- #195 floor/table control
+- #196 INVU binding and close gate
+- #197 superadmin cleanup and permissions
+
+7. Test plan
+Include unit, integration, and Playwright/e2e tests.
+
+8. Launch gate
+State clearly whether the system is launch-ready. If not, state the minimum build required before launch.
+The important thing is this line:
+Do not tell me what is planned. Tell me what is proven in code, what is missing, and what would break during live restaurant service.
+That should get us the kind of answer we need: concrete enough to build, sharp enough to test, and honest enough to protect the launch.

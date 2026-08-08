@@ -1,0 +1,47 @@
+Yes. This is the right sprint cluster, but I would reorder and tighten it before sending to Replit.
+The main issue: #182 canonical event model is too big to sit in the same sprint as two urgent product trust fixes unless it is cut down to a thin foundation. #180 and #181 are directly tied to live trust failures. #182 is important infrastructure, but it can sprawl.
+Recommended Sprint Order
+#180 PENDING_ATTRIBUTION
+#181 Space-aware capacity
+#182 Canonical events, foundation only
+Red-Team Corrections
+#180 should ship first.
+This is the cleanest trust fix: if a referrer context exists, the system must never fall back to DIRECT. But be careful with one detail: PENDING_ATTRIBUTION should probably be a status or anchorStatus, not necessarily a source. Source answers “where did this come from?” Status answers “is this fully anchored?” Better model:
+source: "QR" | "LINK" | "WHATSAPP" | "HOST_ENTRY" | "DIRECT"
+anchorStatus: "ANCHORED" | "PENDING_ATTRIBUTION" | "FAILED_REVIEW"
+That avoids semantic confusion later.
+#181 should not wait for #182.
+Capacity is a restaurant operations risk, not just a ledger risk. Add the space/hold model now. I agree with “warn, don’t hard-block” in v1, because host judgment matters. But the warning must be auditable:
+capacity_warning_shown
+capacity_overridden_by_host
+capacity_hold_created
+capacity_hold_released
+Also add requestedSpaceId and assignedSpaceId. Referrer/customer can request Terrace; host assigns OKÜ/VIP/Catch based on reality.
+#182 should be narrowed.
+Do not ask Replit to fully backfill payout eligibility, admin UI, duplicate event audit, INVU minting, manual review, and payout gates all in one pass. That is how you get half-wired infrastructure. For this sprint, make #182 foundational:
+Add LedgerEvent schema
+Add enums
+Add event writer service
+Emit events from reservation/referral/capacity flows
+Do not rewrite payout eligibility yet
+Then a later sprint wires payout gating.
+The Missing Link Across All Three
+Add a shared event vocabulary for booking/referrer operations now:
+referral_scanned
+reservation_requested
+reservation_confirmed
+reservation_modified
+reservation_cancelled
+reservation_no_show
+guest_arrived
+guest_seated
+capacity_hold_created
+capacity_hold_released
+attribution_anchor_pending
+attribution_anchor_resolved
+attribution_anchor_failed
+That gives investors, admins, restaurants, and referrers the same proof trail.
+Final Instruction To Replit
+I would tell Replit:
+“Implement #180 and #181 as the sprint-critical fixes. Implement only the foundational subset of #182 needed to emit canonical events from attribution and capacity workflows. Do not attempt full payout eligibility refactor in this sprint.”
+Clean version: protect the referrer first, protect the restaurant capacity second, create the event trail underneath both.

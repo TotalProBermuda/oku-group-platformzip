@@ -1,0 +1,106 @@
+modules = ["nodejs-20", "python-3.11", "postgresql-16"]
+[nix]
+channel = "stable-25_05"
+packages = ["unzip"]
+
+[agent]
+expertMode = true
+integrations = ["resend:1.0.0", "javascript_object_storage:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+AUTH_SECRET = "super-secret-auth-key-1234567890-abcdefghij-klmnopqrstuvwxyz"
+NEXT_PUBLIC_BASE_URL = "https://e77c13d6-de58-4f9f-bc37-5f66ab1e4947-00-suiyfe0i5lz3.picard.replit.dev"
+APP_BASE_URL = "https://e77c13d6-de58-4f9f-bc37-5f66ab1e4947-00-suiyfe0i5lz3.picard.replit.dev"
+INVU_ENCRYPTION_KEY = "4ecae0c4b07b718dd6658e2ef193db9c49c4ac65ff2e35d4a552adda5e741cbc"
+RESEND_FROM_EMAIL = "reservations@okuhospitalitygroup.com"
+
+[userenv.development]
+NEXTAUTH_URL = "https://e77c13d6-de58-4f9f-bc37-5f66ab1e4947-00-suiyfe0i5lz3.picard.replit.dev"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Next.js Dev Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "BullMQ Worker"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "i18n"
+
+[[workflows.workflow]]
+name = "Next.js Dev Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev -- -p 5000"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "BullMQ Worker"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run worker"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "i18n"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run i18n:check"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[ports]]
+localPort = 3010
+externalPort = 3003
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5555
+externalPort = 3001
+
+[[ports]]
+localPort = 23636
+externalPort = 3000
+
+[[ports]]
+localPort = 23637
+externalPort = 3002
+
+[[ports]]
+localPort = 23638
+externalPort = 4200
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "npx prisma migrate deploy && npm run start -- -p 5000"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000

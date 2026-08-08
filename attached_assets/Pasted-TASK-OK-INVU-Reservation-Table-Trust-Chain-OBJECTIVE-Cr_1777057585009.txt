@@ -1,0 +1,91 @@
+TASK: OKÜ → INVU Reservation/Table Trust Chain
+
+OBJECTIVE
+Create a low-friction, API-supported trust chain from QR/referrer reservation to INVU table/check revenue, so referrer commissions only release when POS revenue is confirmed.
+
+CORE RULE
+Do not rely on table/time/amount as the primary match.
+Primary trust key:
+OKÜ reservationCode === INVU num_cita
+
+OPERATIONAL PRINCIPLE
+- Host owns reservation recognition and seating.
+- Server owns INVU table/check service.
+- INVU remains source of truth for sale/payment.
+- OKÜ owns referral attribution and reconciliation.
+
+FLOW
+
+1. QR Reservation
+When a customer books through a QR/referrer link:
+- generate unique reservationCode
+- store referralActorId
+- store reservationId
+- venueId
+- partySize
+- booking time
+- status = RESERVED
+- posSyncStatus = NOT_SENT
+
+2. Host Seating
+When guest arrives:
+- host opens OKÜ reservation
+- confirms guest arrived
+- confirms actual party size
+- assigns table
+- records/selections server if available
+- status = SEATED
+
+3. INVU Bridge
+On seating, integrate with INVU using the least-friction supported option.
+
+Preferred if INVU supports attach/update:
+- fetch active/open INVU checks/tables
+- host selects the correct table/check
+- attach reservationCode to INVU order/check as num_cita or supported reference field
+
+Fallback if attach/update is not available:
+- call INVU Create New Order
+- send:
+  - num_cita = reservationCode
+  - cerrar_orden = false
+  - invitados = actual party size
+  - descripcion/comentario = OKÜ reservation reference
+- store returned INVU order id/code
+
+4. INVU Sync
+Use:
+- Search Invoice / Bill by num_cita for exact lookup
+- Search Invoice / Bill by id if INVU id is stored
+- List All Sales for date-range ingestion of closed orders
+
+Match priority:
+1. exact INVU num_cita === OKÜ reservationCode
+2. exact INVU id
+3. table + server + seated time review candidate
+4. manual review
+
+5. Commission Eligibility
+Do not release referrer commission on reservation alone.
+Commission becomes eligible only when:
+- INVU sale is closed/paid
+- sale matches reservation by exact num_cita or exact INVU id
+- sale is not deleted/voided/credited/refunded
+- payout verification approves the line
+
+6. Review Queue
+Flag:
+- seated reservation with no INVU order
+- INVU order missing reservationCode/num_cita
+- multiple INVU orders with same reservationCode
+- table mismatch
+- party-size mismatch
+- order still open after service window
+- voided/deleted/credited sale
+
+DONE LOOKS LIKE
+- QR booking creates reservationCode and referral attribution
+- host seating creates the bridge to INVU
+- server still operates normally in INVU
+- INVU closed sale syncs back with reservationCode or INVU id
+- referrer revenue is verified by POS sale, not by reservation alone

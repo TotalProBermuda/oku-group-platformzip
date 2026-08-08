@@ -1,0 +1,85 @@
+Good. That is the bridge we needed.
+
+Now /admin/payments is no longer just observability. It has real Superadmin control:
+
+encrypted Authorize.net credentials
+masked saved placeholders
+DB-first runtime config
+env fallback
+test connection
+clear credentials
+non-secret audit trail
+APP_ENCRYPTION_KEY safety gate
+That is a major launch dependency handled.
+
+Do this immediately before anything else:
+
+Add APP_ENCRYPTION_KEY to Replit Secrets.
+
+Generate it locally or in Replit shell:
+
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+Then add that output as:
+
+APP_ENCRYPTION_KEY=...
+After setting it, restart workflows and test:
+
+Go to /admin/payments.
+Open Authorize.net.
+Enter sandbox API Login ID and Transaction Key.
+Save.
+Confirm fields show Saved ••••1234.
+Click Test connection.
+Confirm audit log shows success/failure without secrets.
+Next, I would not jump away yet. Finish the Payments UX with:
+
+Payments P2 — Refunds & Order Controls
+
+Because once credentials work, the next operational need is: “Can I find a website order, inspect payment state, refund/void it, and see what happened?”
+
+Do this next:
+
+Implement Payments P2 — Refunds & Website Order Controls.
+
+Scope:
+Only website purchases: tickets, series/events, memberships, and future online products.
+Do not include POS/INVU table payments in this refund workflow.
+
+1. /admin/payments → Refunds & Voids tab
+- Add order search by order number, guest name, email, transaction ID, ticket code.
+- Show recent refundable website orders.
+- Columns:
+  - order number
+  - guest
+  - type
+  - status
+  - provider
+  - amount
+  - paid date
+  - refund/void eligibility
+  - action: Open order
+- Add clear copy:
+  “Refunds and voids here apply only to website checkout orders. POS/table payments are reconciled through INVU.”
+
+2. Refund/void eligibility
+- Paid Authorize.net order with authNetTransId: refund eligible.
+- Paid order before settlement if void supported: void eligible.
+- DEMO provider: mark as demo only, no gateway action.
+- Missing authNetTransId: show blocked reason.
+
+3. Recent audit
+- Show last 10 refund/void events.
+- Include status, amount, order, actor, timestamp.
+- Never show secrets.
+
+4. OrderDrawer Payment tab polish
+- If provider is DEMO, show “Demo payment — no gateway transaction.”
+- If provider is AUTHORIZE_NET, show gateway transaction ID/ref ID.
+- Add “Open payment controls” link to /admin/payments?tab=refunds.
+- Surface Refund action clearly for eligible paid website orders.
+- Make failed refund state visible.
+
+5. Build
+- npm run build
+- Architect review
+After Payments P2, then move to /admin/commerce/settings. The money path is now close enough that it deserves one more pass before you leave it.

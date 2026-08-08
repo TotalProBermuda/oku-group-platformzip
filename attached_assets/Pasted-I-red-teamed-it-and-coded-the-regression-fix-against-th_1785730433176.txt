@@ -1,0 +1,47 @@
+I red-teamed it and coded the regression fix against the actual GitHub snapshot branch we pulled locally.
+Key finding: the live-looking repo still had browser-native form validation in [GuestBookingForm.tsx (line 218)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/components/booking/GuestBookingForm.tsx:218). On mobile Safari/Chrome, that can block submission invisibly when an off-screen required field fails validation. That matches your screenshot: the button looks tappable, but nothing happens.
+What I changed:
+Disabled native browser validation with noValidate on the QR booking form.
+Removed native required attributes from guest/date inputs.
+Added explicit JS validation for:guest name
+email required
+email format
+date/time required
+
+Added EN/ES/PT copy for invalid email.
+Added a Playwright mobile regression test proving:a mobile guest can tap Submit Reservation and a POST is sent
+missing date/time shows visible app-level error and does not call the API
+
+Patch file is here:
+/private/tmp/oku-repo-work/qr-regression-relative.patch
+Core files changed:
+[GuestBookingForm.tsx (line 218)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/components/booking/GuestBookingForm.tsx:218)
+[qr-reservation-flow.spec.ts (line 1)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/tests/browser/qr-reservation-flow.spec.ts:1)
+[en/host.json (line 48)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/i18n/translations/en/host.json:48)
+[es/host.json (line 48)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/i18n/translations/es/host.json:48)
+[pt/host.json (line 48)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/i18n/translations/pt/host.json:48)
+Send Replit this exact instruction next:
+Apply the QR reservation submit regression fix only.
+
+Hard boundary: do not create a second booking form, reservation API, availability endpoint, host dashboard, or capacity service.
+
+Patch the existing GuestBookingForm so mobile browsers cannot swallow Submit Reservation via native required/email validation. Use noValidate on the form, remove native required attrs, and keep all validation in handleSubmit with visible translated errors.
+
+Add a mobile Playwright regression test at tests/browser/qr-reservation-flow.spec.ts:
+1. Mobile guest fills date, time, name, email and taps Submit Reservation.
+2. Test must assert POST /api/reservations fires with referralCode INF-SOPHIA, source QR_SCAN, partySize, requestedSpaceId, and reservationDate.
+3. Test must assert success screen appears.
+4. Missing date/time must show visible “Please select a date and time” app error and must not call POST.
+
+Run:
+npm run i18n:check
+npx playwright test tests/browser/qr-reservation-flow.spec.ts --project=mobile
+I could not run the Playwright/i18n commands locally because the GitHub archive does not include node_modules, and dependency install is blocked from this sandbox. The code-level patch is ready; Replit should run the actual verification where the app dependencies already exist.
+
+Edited 5 files+134-4Review changesUndoReview
+
+src/components/booking/GuestBookingForm.tsxsrc/components/booking/GuestBookingForm.tsx+9-4
+src/i18n/translations/en/host.jsonsrc/i18n/translations/en/host.json+1-0
+src/i18n/translations/es/host.jsonsrc/i18n/translations/es/host.json+1-0
+src/i18n/translations/pt/host.jsonsrc/i18n/translations/pt/host.json+1-0
+tests/browser/qr-reservation-flow.spec.tstests/browser/qr-reservation-flow.spec.ts+122-0

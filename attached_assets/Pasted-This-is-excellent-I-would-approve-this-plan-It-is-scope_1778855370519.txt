@@ -1,0 +1,57 @@
+This is excellent. I would approve this plan. It is scoped correctly, it does not let Replit drift into implementation, and it forces the privacy work to become an operating map instead of scattered fixes.
+
+A few final refinements I’d add before you hit build:
+
+1. Add “source confidence” requirement
+For every legal claim, require a source confidence marker:
+
+Source confidence:
+- Official: ANTAI / Panama government / law text
+- Secondary: law firm summary
+- Internal inference: engineering interpretation
+This prevents the document from over-stating legal certainty.
+
+2. Add “not legal advice” header
+Every doc should include:
+
+This is an engineering privacy audit, not legal advice. Final interpretation, retention periods, consent wording, and cross-border transfer language must be reviewed by Panama counsel.
+3. Add “existing implementation vs proposed implementation” distinction
+Especially in data-classification.md, make sure Replit separates:
+
+current state
+target state
+follow-up task
+Otherwise the docs might read as if protections already exist when they are only planned.
+
+4. Add “AI tools” to data-classification too
+Not only roadmap. In data-classification.md, include a column:
+
+AI exposure allowed: NEVER / SUMMARY_ONLY / ALLOWED_WITH_REDACTION
+For bank, ID, tax, RUC, source-of-funds, compliance notes: NEVER.
+
+5. Add “Banesco pending-spec” privacy caveat
+Because final bank export format is still unknown, add:
+
+Banesco bulk-payment export may introduce additional required fields. Any new field required by Banesco must be classified before implementation and must not be added directly to exports without privacy review.
+6. Add “screens/user personas” to roadmap copy
+The trust UI should mention where the copy lands:
+
+referrer dashboard
+influencer dashboard
+partner dashboard
+beneficiary form
+admin beneficiary drawer
+payout batch export modal
+That will make the later UI task cleaner.
+
+I’d add this compact amendment:
+
+Additional requirements:
+- Add a “not legal advice” disclaimer to each document.
+- Mark each legal assertion with source confidence: Official / Secondary / Internal inference.
+- Clearly distinguish current implementation from target implementation.
+- In data-classification.md, add “AI exposure allowed” with values NEVER / SUMMARY_ONLY / ALLOWED_WITH_REDACTION.
+- Restricted compliance fields must be AI exposure: NEVER.
+- Add Banesco pending-spec privacy caveat: any future bank-required export field must be classified before implementation.
+- Roadmap UI copy must identify exact target surfaces: referrer, influencer, partner, beneficiary form, admin beneficiary drawer, and payout export modal.
+With that amendment, I’d greenlight #97. This is the right sequencing: audit map first, hardening tasks second.

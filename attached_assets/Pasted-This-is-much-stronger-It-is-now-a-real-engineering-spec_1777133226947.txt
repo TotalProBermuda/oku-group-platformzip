@@ -1,0 +1,219 @@
+This is much stronger. It is now a real engineering spec, not a concept note.
+
+What this doc gets right
+
+It now clearly separates:
+
+what is live
+what is stubbed
+what is not implemented
+
+That is the biggest improvement.
+
+It also correctly locks down:
+
+the trust loop
+the earner model
+the universal earner key
+the AttributionSession lifecycle
+the commission mint gate
+the difference between:
+OKÜ attribution logic
+INVU revenue truth
+human-host operational binding
+true deterministic POS binding
+
+That is the right architecture.
+
+The most important practical takeaway
+
+Your system is now explicitly saying:
+
+Tier 2 works today
+Tier 1 is the real target
+the remaining biggest gap is still:
+writing the reservation identity into INVU itself
+
+That is exactly the truth.
+
+What I would call out as the 5 most important must-fix items
+1. BOUND_TO_POS is currently too optimistic
+
+Right now, your own doc says:
+
+BOUND_TO_POS can mean a local-only bind
+but not a confirmed INVU write
+
+That is dangerous language for operators and finance.
+
+Recommendation
+
+Split this into two states:
+
+POS_BIND_INTENT_RECORDED
+POS_REFERENCE_WRITTEN
+
+Or similar.
+
+Because today, “BOUND_TO_POS” sounds like INVU definitely has the reference, and your own doc says that is not always true.
+
+That is the single most important naming correction in this spec.
+
+2. citas/add is the real critical cutover
+
+This remains the core blocker.
+
+Until citas/add is truly wired with:
+
+num_cita = booking_code
+comentario = trust string
+descripcion = human summary
+
+you are still relying on:
+
+local OperationalBinding
+host correctness
+Tier 2 recovery
+
+So the real implementation priority remains:
+
+wire citas/add properly and make the matcher read those exact fields back
+
+3. Matcher must keep legacy fields during migration
+
+Your own spec says it, and it is correct:
+
+Do not remove:
+
+observations
+customer_note
+other legacy reference-bearing fields
+
+until a clean reporting window proves they are no longer used.
+
+That migration discipline is essential.
+
+4. Token rotation is now officially a known operational risk
+
+This doc correctly identifies:
+
+no scheduled 15-day token rotation
+manual re-save only
+
+That is not just a convenience issue. It is a trust-loop reliability issue.
+
+Recommendation
+
+Promote token rotation from “TODO” to a scheduled deliverable.
+It should not remain a passive risk.
+
+5. Streetside host surfaces are still incomplete
+
+This is important because it affects the commercial workflow directly.
+
+You have fixed the Operations Board, but not yet:
+
+/host/streetside
+/api/v1/host/bookings
+
+That means part of the earner-facing or host-facing system is still blind to attribution context.
+
+That needs to be treated as a real product gap, not a cosmetic one.
+
+One subtle but important contradiction to resolve
+
+Your spec says:
+
+the trust loop closes deterministically today at Tier 2
+but it also says the biggest remaining risk is human dependence at table open
+
+Both are true, but the wording should be tightened.
+
+Better framing
+
+Today, the loop closes operationally deterministically, but not yet POS-native deterministically.
+
+That distinction matters.
+
+Because Tier 2 is deterministic inside OKÜ, but not yet fully embedded into INVU’s own record.
+
+That is the exact reason Tier 1 still matters.
+
+What I would add to this spec immediately
+Add one explicit section:
+“Current Production Truth”
+
+Something like:
+
+In the current build, commissions can be trusted when:
+
+the booking has a valid AttributionSession
+the restaurant host correctly seats and binds the table
+OperationalBinding exists
+the INVU close arrives and matches at Tier 1 or Tier 2
+
+In the current build, commissions are not yet fully POS-native because the reservation reference is not yet confirmed written into INVU through citas/add.
+
+That would prevent future confusion.
+
+What I would prioritize next, in order
+Priority 1
+
+Wire citas/add with:
+
+num_cita
+comentario
+descripcion
+Priority 2
+
+Update matcher to read:
+
+num_cita
+comentario
+descripcion
+legacy fields
+Priority 3
+
+Rename BOUND_TO_POS to distinguish:
+
+local bind intent
+confirmed INVU write
+Priority 4
+
+Implement token rotation job
+
+Priority 5
+
+Extend attribution visibility to:
+
+/host/streetside
+/api/v1/host/bookings
+Priority 6
+
+Backfill historical reservations into AttributionSession where feasible
+
+Final judgment
+
+This is now a serious and usable technical spec.
+
+It does not yet mean the loop is fully solved, but it finally makes clear:
+
+what works
+what does not
+what is compensating for what
+where the trust risk still sits
+
+That is exactly what was missing before.
+
+Short verdict
+
+Strong spec.
+Main remaining blocker: real citas/add write-through into INVU.
+Main naming fix needed: BOUND_TO_POS is too strong for current reality.
+
+If you want, I’ll turn this into a single execution roadmap with:
+
+“do now”
+“do next”
+“blocked on INVU”
+“rename for safety”

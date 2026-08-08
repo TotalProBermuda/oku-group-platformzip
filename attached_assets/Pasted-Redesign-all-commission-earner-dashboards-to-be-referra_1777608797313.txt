@@ -1,0 +1,79 @@
+Redesign all commission-earner dashboards to be referral-first.
+
+Context:
+The current /referrer/dashboard has the strongest UX because it leads with a QR/link and WhatsApp share flow. That model should become the pattern for all commission-earning personas.
+
+Personas/routes to review:
+- /referrer/dashboard
+- /influencer/dashboard
+- /partner/dashboard
+- /host/streetside if relevant
+- any event-referrer or seller dashboard surfaces
+
+Core UX principle:
+Every commission earner dashboard should lead with the action that earns commission:
+1. QR code
+2. Shareable link
+3. WhatsApp message/share
+4. Manual guest/referral form
+5. Ticket/event purchasing link when assigned to an event
+6. Earnings/performance second, not first
+
+Do not remove payout dashboards, ledger, analytics, or profile completion. Reorder and redesign so referral/invite action is the first primary surface.
+
+Specific requirements:
+1. Build a reusable ReferralActionPanel component, based on the existing /referrer/dashboard QR + WhatsApp flow.
+2. Use it across influencer, partner, referrer, and assigned seller/referrer interfaces.
+3. The panel should support:
+   - referralCode
+   - destinationPath
+   - WhatsApp share message
+   - copy link
+   - QR code
+   - optional manual form CTA
+   - optional event/ticket CTA
+   - optional menu/restaurant CTA
+4. For restaurant/dining referrers:
+   - Primary CTA should send guests to restaurant/menu/reservation flow.
+   - WhatsApp message should persist the link outside the browser.
+5. For event/ticket referrers:
+   - Primary CTA should send guests to the assigned event or series ticket purchase flow.
+   - Only show ticket-selling tools if the assignment allows ticket sales/commission.
+6. For influencers:
+   - Dashboard should start with "Invite guests" / "Sell tickets" action area.
+   - Payout dashboard should move below the referral action area.
+7. For partners:
+   - Dashboard should start with team/seat referral actions if partner sellers exist.
+   - Show seller-specific QR/link if the logged-in partner seat has sales permissions.
+8. For streetside hosts:
+   - Keep QR/reservation-first.
+   - Make restaurant/menu/reservation action obvious.
+   - If assigned to an event and allowed to sell tickets, show an event ticket QR/action too.
+9. Preserve existing API contracts where possible.
+10. Do not introduce demo-only behavior into production paths.
+
+Design guidance:
+- Mobile-first.
+- The first viewport should answer: "How do I invite/refer someone right now?"
+- Use compact tabs or segmented controls:
+  - Share
+  - Bookings / Activity
+  - Earnings
+  - Profile
+- Earnings cards are secondary.
+- Avoid large payout hero blocks above QR/share actions.
+
+Implementation plan:
+1. Audit current components used by /referrer/dashboard, especially GuestQRPanel.
+2. Extract or extend reusable referral/share components instead of duplicating code.
+3. Update /influencer/dashboard first to prove the pattern.
+4. Update /partner/dashboard second.
+5. Leave /referrer/dashboard mostly intact unless needed for shared component extraction.
+6. Run npm run build.
+7. Report exact files changed, screenshots/description of new layout, and any build warnings.
+
+Before implementing, briefly summarize:
+- Current issue per dashboard
+- Proposed first-viewport layout per dashboard
+- Which data fields/API endpoints are needed
+Then proceed with the implementation.

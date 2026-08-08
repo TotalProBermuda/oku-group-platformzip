@@ -1,0 +1,68 @@
+Approved to build #216 with the following hard acceptance gates.
+
+One correction:
+In “Implementation scope confirmed,” do not mix route and UI responsibilities. 
+- test/route.ts owns upsert + persistence failure behavior.
+- CybersourceGatewayForm.tsx owns onChanged?.() after successful test so the page refreshes readiness.
+Do not put UI callback logic in the route.
+
+Build requirements:
+
+1. test/route.ts
+Replace prisma.cybersourceGatewayCredential.update(...).catch { // ignore } with a real persistence path.
+Use upsert if the row may not exist.
+A successful API response may only be returned after lastTestStatus, lastTestedAt, and lastTestMessage have been persisted.
+If Cybersource live probe succeeds but DB persistence fails, return a clear 500/persistence_failed response. Do not return gatewayOk=true.
+
+2. Response consistency
+After persistence, return a fresh safe gateway view whose gateway.lastTest.status matches the persisted DB state.
+Do not allow a response shape like:
+gatewayOk=true
+gateway.lastTest=null
+
+3. Form behavior
+CybersourceGatewayForm.runTest() must call onChanged?.() after the test completes successfully so the global readiness banner refreshes immediately.
+If persistence_failed is returned, show:
+“Connection succeeded but the test result could not be saved. Please retry or contact admin.”
+Do not show “Last test passed.”
+
+4. Save behavior
+If merchantId, keyId, or sharedSecret changes, reset:
+lastTestStatus=null
+lastTestedAt=null
+lastTestMessage=null
+
+If only non-secret config changes, do not reset test state.
+
+5. Source of truth
+After the test settles, card badge, inline Test Result, and global readiness banner must all reflect DB-backed fields:
+lastTestStatus
+lastTestedAt
+lastTestMessage
+
+Transient result.ok can only be used during the immediate request lifecycle, never as the settled readiness truth.
+
+6. Regression tests
+Add vitest coverage for:
+- lastTestStatus="passed", recent lastTestedAt => no blocker
+- null status/date => “test connection has not passed”
+- failed status => “test connection has not passed”
+- passed but stale => recency blocker
+- credential field changed => last test fields reset
+- live probe success + persistence failure => API returns failure, not gatewayOk=true
+
+7. Manual QA
+After build:
+- run test connection
+- confirm card badge says Last test passed
+- confirm inline Test Result says Passed
+- confirm top banner changes to Cybersource · test · ready
+- confirm the blocker disappears without manual page refresh
+- change only checkout copy/debug settings and confirm test remains passed
+- change Key ID/Shared Secret and confirm test status resets
+
+Do not create:
+- second readiness service
+- second payments page
+- second Cybersource config model
+- duplicate test state

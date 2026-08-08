@@ -1,0 +1,55 @@
+In progress (1)
+
+#39 — Commission allocation lifecycle + trust KPIs (depends on INVU foundation)
+Pending / ready to start (10)
+
+#43 Connect real INVU data endpoints once API URLs are confirmed
+#44 Per-venue INVU sync schedules
+#51 Partner self-service portal
+#53 QR hero on partner dashboard
+#55 Deterministic INVU trust chain & table-session aggregation
+#56 Review queue investigation workspace
+#58 Compensation plan inline assignment
+#59 Superadmin commercial persona surface
+#60 / #61 Make admin metric tooltips testable + roll the new tooltip pattern across all admin dashboards
+#67 / #68 Edit/disable custom operator types + show operator type label in compensation reports
+#69 Event-specific menus
+#71 / #72 / #73 Partner seller dashboard + seat audit + edit commission (these three are actually already merged — just stale state in the queue from the recent batch)
+Proposed — small streetside / event polish (10)
+
+#11 flexible per-event guest entitlements (welcome gifts, kits, books)
+#12 fix refresh-time flicker on Streetside Team/Attendance
+#13 live reservation block arrival progress on Active tab
+#14 gift bag distribution report per session
+#28 control which hosts can scan reservation block QRs
+#29 gift bag prompt when QR scanned for already-arrived group
+#20 show all upcoming sessions on calendar (not just first 3)
+#21 Add-to-Calendar in purchase confirmation emails
+#22 social share + meta-tag audit on event pages
+#65 per-event operator roster on session detail
+Proposed — invitations / influencer (5)
+
+#23 send real invitation emails through admin composer
+#24 clear error when invite preview fails
+#25 send invitation email when a new influencer is invited
+#26 i18n strings for new influencer/promoter UI
+#27 influencer perf stats (clicks, bookings) in portal
+Proposed — i18n / referrer portal polish (5)
+
+#32 fix Streetside language switcher + missing PT
+#33 referrer dashboard: share sheet + earnings trend chart
+#34 show "Referrer" role in admin user list
+#35 translate remaining host portal pages (QR scanner, reservations)
+#36 persist host language preference
+Proposed — branding / logos (2)
+
+#41 dark-bg OKU logo for admin/host pages
+#42 update email templates to new logo
+Proposed — INVU follow-ups (2)
+
+#45 venue filter dropdown on revenue dashboard
+#46 manually link table session to reservation from review queue
+Proposed — referrer/operator migration (3)
+
+#64 one-click "Migrate referrers" button in Compensation admin
+#66 prevent stat double-counting once commissions are written natively to ReferralActor

@@ -1,0 +1,11 @@
+- [Streetside host referral identity](streetside-referral-identity.md) — streetside hosts have no RestaurantHostProfile; without a standalone ReferralActor+ReferralLink their QR attributes nothing.
+- [Seed reseed FK gotcha](seed-reseed-fk.md) — `npm run seed` clean-slate crashes on non-fresh DBs (InvuIntegrationCredential→Venue FK); prefer non-destructive scripts.
+- [Host reservation visibility split](host-reservation-visibility.md) — /api/v1/host/me returns two role-gated, non-overlapping lists; a surface reading only one shows empty for the other.
+- [Shared my-referrals source](my-referrals-source.md) — getMyReferrals(userId) is the ONE canonical earner referral feed across all referrer surfaces; don't fork it per role.
+- [Restaurant standalone sites](restaurant-standalone-sites.md) — each OKÜ restaurant gets its own independent website on top of the shared commercial engine.
+- [Grep mangles role/perm strings](agent-tooling-grep-corruption.md) — bash rg/grep can render STREETSIDE_HOST as ln, host:reservations:checkin as n; verify these literals with the read tool.
+- [Two i18n translation hooks](oku-i18n-translation-hooks.md) — `@/components/i18n/LocaleProvider` vs `@/i18n/useTranslation` have different return shapes; picking the wrong one breaks silently.
+- [Batched ≠ paid — ISCL payout lifecycle](iscl-payout-lifecycle.md) — InfluencerSubCommissionLedger payoutStatus must NOT flip to PAID until the bank adapter includes those rows in the payable file; payoutBatchId alone means "batched/export-pending."
+- [AuditLog actorId required](auditlog-actorid.md) — AuditLog.actorId is a non-nullable String; system-generated events use a sentinel like "system:ticket-attribution" (pattern from retentionWorker.ts).
+- [Pushing large Replit repo to GitHub](replit-github-push-large-repo.md) — 5+ GiB history blocks HTTPS push; fix via shallow clone + git fast-import orphan root commit, then push ~650 MB pack.
+- [RBAC role split — FB_DIRECTOR / RESTAURANT_SUPERVISOR](rbac-role-split.md) — ADMIN_COMMERCIAL retired to zero-permission legacy; new roles govern access boundaries across middleware, API routes, and UI.

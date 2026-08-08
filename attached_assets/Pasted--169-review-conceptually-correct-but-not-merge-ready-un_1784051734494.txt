@@ -1,0 +1,56 @@
+#169 review: conceptually correct, but not merge-ready until real-file cleanup is confirmed.
+
+The intended architecture is right:
+- streetside identity now runs through findOrLinkReferralActor
+- merge_required returns a typed no-QR result
+- seed logs/skips conflicts and stays non-destructive
+- migration paths log/skip by default and support --strict
+- smoke scripts normalize email/phone and exclude null userId duplicates
+
+However, the pasted diff shows multiple interleaved old/new code fragments that would be hard blockers if they exist in the real files.
+
+P0: Confirm and remove stale duplicate code before merge.
+
+Examples visible in the pasted package:
+
+1. prisma/seed.ts shows both:
+   await ensureStreetsideReferralIdentity(
+   const result = await ensureStreetsideReferralIdentity(
+
+2. src/app/api/v1/host/me/route.ts shows both:
+   const identity = await ensureStreetsideReferralIdentity(
+   const result = await ensureStreetsideReferralIdentity(
+   streetsideReferralCode = identity.code;
+
+3. scripts/run-referral-migration.ts shows duplicated migration calls:
+   const r = await migrateReferrersToActors();
+   const r = await migrateReferrersToActors({ strict });
+   const e = await migrateEventReferrersToActors();
+   const e = await migrateEventReferrersToActors({ strict });
+
+4. src/server/referrals/referralMigrationService.ts shows old bare create blocks interleaved with dedupeResult logic, including references to both actor.id and dedupeResult.actorId.
+
+5. src/server/referrals/streetsideReferralService.ts shows old userId-only actor lookup/create logic interleaved with the new dedupeResult logic.
+
+If those are only review/diff rendering artifacts, please confirm by showing:
+- the final real contents of the affected functions, or
+- npm/typecheck/test output proving these exact files compile.
+
+Required validation before merge:
+- npx tsc --noEmit has zero errors in:
+  - prisma/seed.ts
+  - src/app/api/v1/host/me/route.ts
+  - scripts/run-referral-migration.ts
+  - src/server/referrals/referralMigrationService.ts
+  - src/server/referrals/streetsideReferralService.ts
+  - scripts/commission-dedup-smoke.ts
+  - scripts/verify-all-persona-commissions.ts
+- targeted tests for streetside merge_required and migration merge_required pass
+- seed dry run or seed test confirms merge_required logs/skips and does not issue QR/link to the wrong user
+- migration default mode logs/skips conflicts
+- migration --strict exits non-zero after reporting conflicts
+- smoke scripts fail with structured duplicate actor output using normalized email/phone
+
+Verdict:
+Architecture: green.
+Merge readiness: blocked until Replit confirms the real files do not contain the interleaved stale code shown in the pasted diff.

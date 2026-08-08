@@ -1,0 +1,39 @@
+#170 follow-up review: substantive blockers appear addressed, but merge still needs real-file validation.
+
+The three product/architecture issues from the prior review look fixed:
+
+1. admin_identity_link now powers actual ownership reads
+- resolveOwnedEarnerIdentities now reads referral.actor.admin_identity_link where metadata.linkedUserId = userId and adds those actorIds to the owned set.
+- findOrLinkReferralActor also recognizes the same admin_identity_link and avoids re-raising merge_required for the same actor/user pair.
+This satisfies the identity-only link path without touching commission/payout/attribution state.
+
+2. Candidate owner lookup is fixed
+- GET /merge-conflicts now fetches candidate actors first, then includes live actor.userId in allUserIds before loading users.
+- This fixes the missing-owner issue when metadata.candidateActorUserId is absent.
+
+3. Create separate no longer blindly uses the candidate display name
+- It now uses the incoming user’s own name where available.
+- It still copies email/phone/whatsapp from the candidate actor as the shared evidence that triggered the conflict. That is acceptable only because the override path is explicit, admin-approved, and audited.
+
+Remaining blocker is mechanical validation, because the pasted diff still shows rendering artifacts that would be hard compile/JSON failures if present in real files:
+
+- admin/layout.tsx still visually shows duplicate launchReadiness lines.
+- AdminNav.tsx still visually shows duplicate launchReadiness lines.
+- EN/ES/PT referrals.json still visually show duplicate noActiveCode_contact lines, including the old no-comma line.
+
+If those are only diff artifacts, please confirm by showing the real-file checks:
+
+Required before merge:
+- npm run i18n:check passes.
+- npx tsc --noEmit has zero errors in all #170 files.
+- Real EN/ES/PT referrals.json files parse as valid JSON.
+- Real admin/layout.tsx and AdminNav.tsx contain only one launchReadiness key each.
+- Targeted test/manual proof:
+  1. Resolve “link” for an already-owned actor.
+  2. Incoming user can access /referrer/dashboard and /api/v1/me/referrals through the admin_identity_link alias.
+  3. Same pair does not re-trigger merge_required.
+  4. Resolve “separate” creates an override actor and writes merge_resolved without mutating commission, payout, attribution, or entity state.
+
+Verdict:
+Architecture: green after the fixes.
+Merge readiness: conditional on clean real-file validation above.

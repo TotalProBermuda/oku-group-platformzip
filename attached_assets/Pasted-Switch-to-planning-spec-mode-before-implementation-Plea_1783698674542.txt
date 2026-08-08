@@ -1,0 +1,78 @@
+Switch to planning/spec mode before implementation.
+
+Please produce a full technical spec for standardizing the referrer surfaces before writing code.
+
+Goal:
+Create a reusable Pure Referrer Console pattern for:
+- streetside host
+- concierge
+- taxi driver
+- tour guide
+- promoter
+- creator/referrer
+- legacy referrer
+
+These should share the same UI shell and governed data source.
+
+Partner Portal is the exception:
+It may extend the shared referrer core with partner/business tools like events, guest lists, co-hosts, campaign reporting, and multiple referral assignments.
+
+Spec should cover:
+
+1. Current state audit
+- Which routes/pages currently exist for streetside, referrer, influencer, partner, and any legacy referrer screens?
+- Which components are duplicated?
+- Which APIs/data sources each surface uses?
+- Which surfaces already use getMyReferrals?
+- Which surfaces still read legacy/referrer-specific data?
+
+2. Proposed architecture
+- Shared Pure Referrer Console component/module
+- Shared tabs and layout
+- Shared QR/referral link module
+- Shared Active/History module
+- Shared spend/commission state module
+- Shared menu/profile module
+- Shared i18n keys
+- Shared source: ReferralActor / ReferralLink / AttributionSession / getMyReferrals
+
+3. Role mapping
+- STREETSIDE_HOST → Pure Referrer Console
+- concierge/taxi/tour-guide/promoter → Pure Referrer Console
+- legacy referrer → Pure Referrer Console
+- influencer/creator → Pure Referrer Console unless extra campaign tools are required
+- Partner → Partner Portal with embedded shared referrer core + partner-specific modules
+
+4. Permission model
+- Pure referrers are read-only observers.
+- No INVU bind.
+- No open table.
+- No operational reservation status mutation.
+- No venue-wide visibility.
+- They only see reservations attributed to their own QR/referral actor.
+- Spend/commission is read-only and comes from the governed shared referral source.
+- Paid/unpaid remains Phase 2 payout-ledger bridge.
+
+5. UX rules
+- QR tab must be clean and guest-facing.
+- No stats above QR.
+- Stats appear inside Active/History area only.
+- Active list shows current referral reservations only.
+- History shows terminal/expired referrals.
+- Partner portal can add richer business modules but must not fork referral truth.
+
+6. Migration plan
+- What can be refactored now safely?
+- What should remain role-specific temporarily?
+- What should be deferred?
+- How to avoid breaking OKÜ launch?
+
+7. Acceptance criteria
+- Same referral source across pure referrer roles.
+- Same active/history behavior.
+- Same read-only money state.
+- No operational controls for pure referrers.
+- Partner portal keeps its business capabilities while using the shared referral core.
+- No changes to Phase 2 payout-ledger scope.
+
+Do not implement yet. Return the plan/spec and list any schema/API questions before coding.

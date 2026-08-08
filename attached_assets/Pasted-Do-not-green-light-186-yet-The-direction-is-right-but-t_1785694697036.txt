@@ -1,0 +1,264 @@
+Do not green-light #186 yet. The direction is right, but the review bundle exposes a few real issues that should be fixed before #200 builds on it.
+P0 Findings
+Reservation creation still enqueues RESERVATION_CONFIRMED unconditionally.
+In src/app/api/reservations/route.ts, the new transaction writes both:RESERVATION_REQUESTED
+RESERVATION_CONFIRMED
+
+That directly conflicts with #200. If status is PENDING_APPROVAL, it must not enqueue confirmed proof.
+Streetside booking still violates the outbox principle.
+createStreetsideBooking appears to create the reservation first, then calls enqueueLedgerEvent(prisma, ...) outside the reservation transaction. If that enqueue fails, the business action commits without proof intent. The whole point of #186 is: business action + proof intent commit together.
+
+Possible invalid event type: POS_CHECK_CLOSED.
+The #182 event vocabulary you pasted does not include POS_CHECK_CLOSED, but commissionMintingService.ts enqueues it. Replit must verify LedgerEventType actually contains POS_CHECK_CLOSED in prisma/schema.prisma. If not, this will fail or drift from #182.
+
+P1 Findings
+4. Outbox idempotency is not enforced at the outbox level.
+The migration adds an index on idempotencyKey, but not a unique constraint. Final LedgerEvent dedupe may protect the emitted event, but repeated business retries can create duplicate outbox rows. Better: enforce unique idempotency for outbox rows, or explicitly document why duplicates are acceptable.
+enqueueLedgerEvent comments contradict behavior.
+The doc says “Never throws,” but the function rethrows to roll back the transaction. The code behavior is correct; the comment must be corrected.
+Send Replit this:
+#186 review: do not green-light yet. Please fix these issues before #200 builds on the durable outbox.
+
+P0 fixes required:
+
+1. Reservation creation must not enqueue RESERVATION_CONFIRMED unconditionally.
+In src/app/api/reservations/route.ts:
+- Always enqueue RESERVATION_REQUESTED inside the reservation transaction.
+- Enqueue RESERVATION_CONFIRMED only if res.status === "CONFIRMED".
+- If res.status === "PENDING_APPROVAL", do not enqueue RESERVATION_CONFIRMED.
+- Do not add RESERVATION_PENDING_APPROVAL in this task unless the Prisma enum/migration already exists.
+
+2. createStreetsideBooking must commit business action + outbox intent atomically.
+Currently it appears to create the reservation, then enqueueLedgerEvent(prisma, ...) outside the transaction.
+Fix:
+- Wrap the streetside reservation creation and RESERVATION_REQUESTED outbox row in the same prisma.$transaction.
+- Do not leave this as a best-effort post-create enqueue.
+
+3. Verify POS_CHECK_CLOSED exists in LedgerEventType.
+#182’s documented event vocabulary does not list POS_CHECK_CLOSED.
+If POS_CHECK_CLOSED is not in prisma/schema.prisma:
+- Do not enqueue it.
+- Either use the existing valid event vocabulary or create a separate migration/task to add POS_CHECK_CLOSED.
+- Do not silently cast an invalid string to LedgerEventType.
+
+P1 fixes required:
+
+4. Outbox idempotency.
+The migration currently indexes idempotencyKey but does not enforce uniqueness.
+Either:
+- add a unique constraint for idempotencyKey if keys are globally deterministic, or
+- document why duplicate outbox rows are allowed and prove emitLedgerEvent dedupe makes this safe.
+Preferred: unique deterministic idempotencyKey at the outbox layer.
+
+5. Fix misleading comments in ledgerOutboxService.
+The function rethrows on enqueue failure, which is correct because the business transaction must roll back.
+Update comments that say “Never throws” / “swallows errors.”
+
+After fixes, report:
+- changed files
+- prisma validate/generate result
+- TypeScript result
+- proof that PENDING_APPROVAL reservations enqueue REQUESTED only, not CONFIRMED
+- proof that streetside booking enqueues outbox inside the same transaction
+- confirmation whether POS_CHECK_CLOSED exists in LedgerEventType
+Bottom line: #186 is the right architecture, but it needs this pass before #200 depends on it.
+
+
+13:03
+
+
+
+
+
+
+i shared the UI/UX screenshot of the dashboards for this as well... you need to also create the UI/UX instructions
+
+
+
+
+
+
+13:13
+
+
+
+
+
+
+Yes. You’re right. #186 is not only backend reliability. It also needs a clear operations UI because this is how an admin proves the trust loop is healthy.
+Send Replit this add-on for #186:
+#186 UI/UX Addendum — Durable Ledger Event Outbox Admin Experience
+
+The durable ledger outbox is not just a backend worker. It needs an operations-grade admin UI so Superadmin / Finance / Ops can see whether the ProofPay proof trail is healthy.
+
+Relevant UI:
+- /admin/operations/ledger-outbox
+- Admin navigation
+- Any existing Superadmin operations dashboard
+
+Hard boundary:
+Do not create a separate admin app. Add this into the existing Superadmin/Admin operations UI.
+
+User roles:
+- SUPERADMIN: full view + retry controls
+- ADMIN_FINANCE: view + retry controls
+- ADMIN_COMMERCIAL: view only unless existing permissions allow operational retry
+- Restaurant host / referrer / guest: no access
+
+UI goals:
+The page should answer four questions in under 5 seconds:
+
+1. Is the proof trail healthy?
+2. Are events stuck?
+3. Which business object is affected?
+4. What can I safely do next?
+
+Required screen structure:
+
+1. Health header
+At top of page show:
+- Total pending
+- Processing
+- Failed review
+- Emitted in last 24h
+- Oldest pending age
+- Last drain worker run time if available
+
+Use clear status colors:
+- Green: healthy / emitted
+- Amber: pending / retrying
+- Blue: processing
+- Red: failed review
+
+2. Status tabs
+Tabs:
+- Failed Review
+- Pending
+- Processing
+- Emitted
+
+Default tab:
+- Failed Review if count > 0
+- otherwise Pending
+- otherwise Emitted
+
+Each tab should show count badges.
+
+3. Event table
+Columns:
+- Event type
+- Business object
+- Source
+- Status
+- Attempts
+- Last error
+- Created
+- Last attempt
+- Action
+
+Business object should be human-readable:
+- Reservation: confirmation code / guest name if available
+- Attribution Session: actor/referrer if available
+- Capacity Hold: space + party size if available
+- Commission Allocation: amount + earner if available
+
+Do not only show raw UUIDs in the main row. UUIDs can appear in expanded detail.
+
+4. Row expansion
+Clicking a row expands:
+- Outbox ID
+- Idempotency key
+- Ledger event ID if emitted
+- Reservation ID
+- Attribution session ID
+- Capacity hold ID
+- Commission allocation ID
+- Payload JSON
+- Last error full text
+- Attempt history if available
+
+5. Actions
+For FAILED_REVIEW:
+- Retry row
+- Retry all failed
+- Copy idempotency key
+- Copy payload
+- Open related reservation/admin object if route exists
+
+For PROCESSING older than stale threshold:
+- Show warning: “Processing stale — worker will recover automatically”
+- Optional admin reset only for SUPERADMIN
+
+For EMITTED:
+- View linked LedgerEvent
+- Copy ledger event ID
+
+6. Empty states
+Empty states must be operationally useful:
+
+Failed Review empty:
+“Proof trail healthy — no events require manual review.”
+
+Pending empty:
+“No queued proof events.”
+
+Processing empty:
+“No events currently being drained.”
+
+Emitted empty:
+“No emitted outbox events in this filter.”
+
+Do not show generic “No results found.”
+
+7. Mobile/responsive behavior
+At 390px mobile:
+- Health cards stack 2 per row or 1 per row
+- Table becomes card list
+- Primary action stays visible
+- Payload JSON is collapsed by default
+- No horizontal overflow
+
+8. Copy tone
+Use operational language, not developer-only language.
+
+Good:
+- “Retry proof event”
+- “Needs review”
+- “Proof trail healthy”
+- “Linked reservation”
+- “Last worker attempt”
+
+Avoid:
+- “Job failed lol”
+- “Unhandled error”
+- raw-only status pages
+
+9. i18n
+All UI copy must ship in EN, ES, and PT.
+
+10. Navigation
+Add /admin/operations/ledger-outbox to the existing admin/superadmin navigation under:
+Operations → Ledger Outbox
+or
+Trust Operations → Ledger Outbox
+
+Do not hide it as an unlinked route.
+
+11. QA
+Test:
+- SUPERADMIN can access page
+- allowed admin roles can access per permission rule
+- host/referrer/guest cannot access
+- Failed Review rows show retry controls
+- Pending/Processing/Emitted rows render correctly
+- Retry one resets status=PENDING and attemptCount=0
+- Retry all resets all FAILED_REVIEW rows
+- Mobile 390px layout has no horizontal overflow
+- Empty states are specific, not generic
+- EN/ES/PT render real strings, no raw keys
+Also add this to the #186 backend review response:
+In addition to the backend fixes, please apply the #186 UI/UX addendum. The durable outbox must be visible and actionable inside the Superadmin/Admin operations dashboard. This is part of investor-grade trust infrastructure, not an optional developer page.
+My strong view: #186 should not be marked complete unless the admin UI is understandable to a non-engineer operator. Otherwise it’s technically durable but operationally invisible.
+
+
+13:13

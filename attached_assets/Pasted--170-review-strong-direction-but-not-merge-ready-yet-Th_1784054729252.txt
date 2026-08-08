@@ -1,0 +1,55 @@
+#170 review: strong direction, but not merge-ready yet.
+
+The append-only AuditLog model is correct:
+- merge_required entries are not mutated.
+- merge_resolved entries reference originalConflictAuditId.
+- unresolved conflicts are derived by subtracting resolved audit ids.
+- APIs are SUPERADMIN-gated.
+- reason is required.
+- no commission/payout/attribution mutation is visible in the resolve route.
+
+However, I see three issues to resolve or explicitly prove before merge.
+
+P1: "Link to existing" may be audit-only unless all referrer ownership reads honor admin_identity_link.
+
+The link branch handles an already-owned actor by writing:
+referral.actor.admin_identity_link
+
+The dedupe service checks that audit entry before re-raising merge_required, which is good.
+
+But this is not enough by itself. If /referrer/dashboard, /api/v1/me/referrals, resolveOwnedEarnerIdentities, or other user→actor ownership queries still only check ReferralActor.userId, the incoming user will still not actually see the referrer profile/feed after the admin clicks "Link to existing."
+
+Please verify and, if needed, update all referrer identity/ownership read paths so admin_identity_link is treated as an approved user→actor identity alias.
+
+Acceptance:
+- After resolving a conflict with "Link to existing" where the candidate actor is already owned by another user, the incoming user can access the correct referrer dashboard/profile/feed.
+- The system does not re-raise merge_required for the same pair.
+- Attribution/commission/payout state is not changed.
+
+P1: merge-conflicts read API may fail to show the existing actor owner.
+
+GET /merge-conflicts builds allUserIds from metadata.incomingUserId and metadata.candidateActorUserId before fetching actors. But if candidateActorUserId is absent in metadata, it later falls back to candidateActor.userId after the user query has already run. That owner user may not be in userMap, so candidateUser can render null even when the actor has an owner.
+
+Fix by either:
+- fetching actors first, then adding actor.userId to the user id set, or
+- requiring/writing candidateActorUserId in every merge_required audit entry and backfilling/falling back safely.
+
+P1/P2: "Create separate" uses candidate actor identity fields for the override actor.
+
+The separate branch passes candidateActor.displayName/email/phone/whatsapp into findOrLinkReferralActor for the incoming user. That may be correct when the conflict was truly same email/phone, but it also risks creating a second actor with copied identity evidence from the existing actor rather than evidence from the incoming user/conflict.
+
+Please confirm this is intentional. Ideally, "separate" should build the new actor from the incoming user/conflict evidence, not blindly copy the candidate actor fields, unless the conflict metadata explicitly records those fields as the incoming identity evidence.
+
+P0 verification required because the pasted diff shows possible rendering artifacts:
+- admin/layout.tsx shows duplicate launchReadiness lines.
+- AdminNav.tsx shows duplicate launchReadiness lines.
+- referrals.json shows the old noActiveCode_contact line without a comma plus the new comma version.
+
+If those are diff artifacts, fine. Please confirm:
+- npm run i18n:check passes.
+- npx tsc --noEmit has zero errors in all #170 files.
+- The real JSON files are valid.
+
+Verdict:
+Architecture: mostly green.
+Merge readiness: blocked until admin_identity_link is proven to power actual dashboard/feed ownership, candidate owner lookup is fixed/confirmed, and i18n/typecheck validation is clean.

@@ -1,0 +1,62 @@
+:root {
+  --font-body: var(--font-inter), "Segoe UI", system-ui, sans-serif;
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-cormorant), Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  color: #1f1a17;
+  background: #faf8f6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Stack the two-column sections on small screens. */
+@media (max-width: 760px) {
+  .catch-about-grid {
+    grid-template-columns: 1fr !important;
+    gap: 40px 0 !important;
+  }
+  .catch-gallery-grid {
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-rows: 200px 200px 200px !important;
+  }
+  .catch-gallery-grid > * {
+    grid-row: auto !important;
+    grid-column: auto !important;
+  }
+  .catch-events-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .catch-nav-links {
+    display: none !important;
+  }
+  .catch-section {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+}

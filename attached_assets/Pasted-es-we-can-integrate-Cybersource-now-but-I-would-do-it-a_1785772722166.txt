@@ -1,0 +1,110 @@
+es, we can integrate Cybersource now, but I would do it as a payments foundation sprint, not a “turn payments on everywhere” sprint.
+Key red-team point: do not let the OKÜ app touch raw card data. Use Cybersource-hosted/client tokenization such as Unified Checkout/Flex-style token flow, then your server only receives a transient token/payment token and creates the payment server-side. Cybersource’s docs also now recommend JWT messaging for new REST integrations, with HTTP Signature migration requirements coming by September 2026, so don’t build a fresh integration around old auth unless Cybersource/your bank specifically requires it. Sources: Cybersource REST getting started, Authentication, API reference.
+Paste this to Replit:
+Create a new task: #214 — Cybersource Payment Foundation for OKÜ Reservations
+
+Goal:
+Add the minimum safe Cybersource payment foundation for reservation deposits, event/ticket checkout, and future membership/private dining payments without increasing PCI scope or disrupting the current QR reservation flow.
+
+Hard boundaries:
+- Do not collect or store raw card numbers, CVV, or PAN in our app database.
+- Do not build a custom card form that posts card data to our server.
+- Do not replace the existing reservation flow.
+- Do not change payout/commission logic in this task.
+- Do not turn on production payments until sandbox auth, tokenization, webhooks, and reconciliation pass.
+
+Use Cybersource official REST APIs and tokenized payment flow:
+- Prefer JWT/MLE-ready REST setup for new integration unless our Cybersource account/bank requires another method.
+- Keep sandbox and production credentials separate.
+- Store credentials only in environment secrets.
+
+Required environment variables:
+CYBERSOURCE_ENV=sandbox|production
+CYBERSOURCE_MERCHANT_ID
+CYBERSOURCE_KEY_ID
+CYBERSOURCE_SHARED_SECRET or CYBERSOURCE_P12_CERT_SECRET depending on chosen auth
+CYBERSOURCE_API_HOST
+CYBERSOURCE_WEBHOOK_SECRET or verification key, if applicable
+
+Build in phases.
+
+Phase 1 — Payment schema + service layer only
+Add models/tables as needed:
+- PaymentIntent / PaymentAttempt or equivalent
+- reservationId nullable
+- orderType enum: RESERVATION_DEPOSIT, EVENT_TICKET, MEMBERSHIP, PRIVATE_DINING
+- amountCents
+- currency
+- status: CREATED, AUTHORIZED, CAPTURED, FAILED, CANCELLED, REFUNDED
+- cybersourceTransactionId
+- cybersourceRequestId
+- idempotencyKey
+- raw response reference / sanitized payload
+- createdAt / updatedAt
+
+Create a server-only Cybersource client/service:
+- createPaymentIntent()
+- authorizePayment()
+- capturePayment()
+- voidPayment()
+- refundPayment()
+- getPaymentStatus()
+- normalizeCybersourceError()
+
+No UI yet unless needed for a sandbox smoke test.
+
+Phase 2 — Reservation deposit flow
+Add optional deposit/payment step to the existing QR reservation flow:
+- Do not block normal no-deposit reservations unless venue rules require deposit.
+- If selected space / date / private event rule requires deposit, create PaymentIntent.
+- Guest pays through tokenized Cybersource UI/token flow.
+- On payment authorization success, reservation can proceed to CONFIRMED or PENDING_APPROVAL depending on space rules.
+- On payment failure, reservation must not be silently confirmed.
+
+Important:
+Attribution must survive payment failure, retry, authorization, capture, refund, and reservation status changes.
+
+Phase 3 — Webhooks + ledger events
+Add Cybersource webhook endpoint:
+- Verify webhook authenticity.
+- Deduplicate by Cybersource event ID / transaction ID / idempotency key.
+- Update PaymentAttempt/PaymentIntent status.
+- Emit LedgerEvent for:
+  PAYMENT_AUTHORIZED
+  PAYMENT_CAPTURED
+  PAYMENT_FAILED
+  PAYMENT_VOIDED
+  PAYMENT_REFUNDED
+
+If LedgerEventType does not yet include these, add them in a migration.
+
+Phase 4 — Admin/host visibility
+Minimal UI:
+- Reservation detail shows payment status.
+- Host dashboard card shows deposit paid / unpaid / failed.
+- Superadmin payment ledger lists attempts, status, transaction ID, reservation, amount, and last error.
+- No raw card data anywhere.
+
+Phase 5 — Tests
+Add tests for:
+- sandbox auth configuration missing → safe failure
+- create payment intent idempotency
+- failed payment does not confirm reservation
+- successful authorization updates payment status
+- webhook duplicate does not double-update
+- refund/void does not affect attribution anchor
+- QR reservation flow still works without payment when deposit not required
+
+Before coding:
+Inspect existing files for payment/order/ticket/membership models and reuse them where appropriate. Do not create duplicate checkout systems.
+
+Likely relevant files:
+prisma/schema.prisma
+src/app/api/reservations/route.ts
+src/components/booking/GuestBookingForm.tsx
+src/server/services/ledger/ledgerEventService.ts
+src/app/api/v1/*
+src/server/*
+src/app/admin
+src/components/host/HostOperationsBoard.tsx
+My recommendation: do #211 and #209 first if they are not merged, then start Cybersource. Payments will amplify any reservation-state bugs, so the booking flow needs to be stable before money enters the loop.

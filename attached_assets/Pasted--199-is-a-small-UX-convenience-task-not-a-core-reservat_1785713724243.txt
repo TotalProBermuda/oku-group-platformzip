@@ -1,0 +1,75 @@
+#199 is a small UX convenience task, not a core reservation-hardening task. Keep it narrow.
+My assessment: conditional accept, with a few corrections.
+What #199 Does
+It pre-fills the reservation date when a QR is generated from /host/streetside, by passing:
+?date=YYYY-MM-DD
+through:
+GuestQRPanel → QRModule → ReservationWizard
+That is useful for streetside/host-driven same-day reservation flow.
+What It Should Not Become
+Do not let #199 expand into:
+new booking flow
+new reservation API
+new availability logic
+new capacity rules
+changes to /r/[referralCode]
+table/floor/INVU work
+That belongs to #200 and later tasks.
+Issues To Fix Before Green-Light
+Send this to Replit:
+#199 review — keep this as a minimal UX convenience task.
+
+Conditional accept, but fix these before final approval:
+
+1. Remove unrelated mockup-sandbox artifact changes
+The diff includes:
+- artifacts/mockup-sandbox/src/.generated/mockup-components.ts
+
+This is unrelated to pre-filling reservation date and appears to be generated/mockup noise. Revert it unless there is a direct reason it is required for #199.
+
+2. Scope clarification
+#199 only pre-fills date for the ReservationWizard path reached from the streetside host QR panel.
+
+Do not expand #199 into /r/[referralCode] or GuestBookingForm unless explicitly required. /r/[referralCode] hardening belongs to #200.
+
+3. Date validation should be strict
+In ReservationWizard, do not rely only on new Date(dateParam), because invalid dates can normalize.
+
+Use strict YYYY-MM-DD validation:
+- regex: /^\d{4}-\d{2}-\d{2}$/
+- parse year/month/day
+- confirm parsed date returns the same year/month/day
+- reject malformed dates silently
+
+4. Past-date handling
+If the date param is before today, do not prefill it.
+This prevents stale QR links from opening a past reservation date.
+
+5. Availability/state interaction
+If prefilled date affects availability, ensure the existing time/space availability flow refreshes normally after setDate(dateParam).
+
+Do not add a new availability endpoint.
+
+6. i18n
+No new visible copy appears necessary. If any validation/error copy is added, ship EN/ES/PT.
+
+7. QA
+Run:
+- /host/streetside QR generates URL with date=today
+- URL query uses correct separators whether ref is present or not
+- ReservationWizard opens with date prefilled
+- Guest can still change the date
+- malformed date is ignored
+- past date is ignored
+- referral code/ref param still persists
+- no changes to /r/[referralCode] behavior
+My Verdict
+Do not spend many credits on #199. It is a lightweight helper. The only must-fix is the unrelated mockup-sandbox file and stricter date validation.
+The priority stack remains:
+#186 durable outbox final UI polish
+#190 referrer dashboard standardization
+#200 QR reservation hardening
+#199 can merge if kept tiny and clean
+
+
+18:34

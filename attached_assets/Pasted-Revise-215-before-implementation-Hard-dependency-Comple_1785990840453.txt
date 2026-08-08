@@ -1,0 +1,146 @@
+Revise #215 before implementation.
+
+Hard dependency:
+Complete #216 first. Do not start payment flow work until /admin/payments has one reliable DB-backed readiness truth:
+enabled=true + saved credentials + recent passed test => Cybersource · test · ready.
+
+#215A - Cybersource payment acceptance foundation for OKÜ reservations and checkout
+
+What & Why
+OKÜ now has working Cybersource test credentials via REST - Shared Secret / HTTP Signature, stored encrypted in the database through /admin/payments using APP_ENCRYPTION_KEY. The goal is to safely add Cybersource-backed payment acceptance for reservation deposits and checkout without raw card handling, without duplicate payment models, and without breaking QR reservations.
+
+Hard boundaries
+- Do not store or post raw PAN/CVV/card data to OKÜ servers.
+- Use Cybersource Unified Checkout / Flex transient token flow.
+- Use existing DB-stored Cybersource credentials from /admin/payments.
+- Do not add env-var credential fallback for merchant ID/key/secret.
+- Do not duplicate checkout routes, payment settings page, Cybersource adapter, or active gateway logic.
+- Do not implement payouts in this task.
+- Do not enable production payments.
+- Do not require deposits by default for all QR reservations.
+
+Known current setup
+- Environment: test
+- Merchant / Transacting ID: bc_5808160532
+- Account ID: banesco_acct
+- Credential source: CybersourceGatewayCredential DB row
+- Auth method: REST Shared Secret / HTTP Signature
+- Encryption secret: APP_ENCRYPTION_KEY
+- Current credential status must be read via activeGateway / Cybersource readiness, not env vars.
+
+Phase 0 - Audit before schema
+Before creating new tables, inspect:
+- Order model
+- Payment model
+- existing checkout intent/quote/confirm routes
+- cybersourceAdapter
+- activeGateway
+- CybersourceGatewayCredential
+- LedgerEvent
+
+Answer with code evidence:
+1. Can existing Order + Payment represent reservation deposits?
+2. Is a new PaymentAttempt table actually needed, or can Payment hold attempt-level data?
+3. Where is idempotency currently enforced?
+4. Does current Cybersource adapter perform auth+capture immediately?
+5. What is the smallest extension that avoids duplicate payment architecture?
+
+Phase 1 - Minimal schema/service foundation
+Prefer extending existing Order/Payment unless code evidence proves this is unsafe.
+
+Add only what is needed for:
+- orderType or equivalent: RESERVATION_DEPOSIT
+- payment statuses: CREATED / AUTHORIZED / CAPTURED / FAILED / VOIDED / REFUNDED if missing
+- Cybersource auth transaction ID
+- Cybersource capture transaction ID if separate
+- request ID
+- reconciliation ID if available
+- idempotency key
+- linked reservationId where appropriate
+
+Add LedgerEventType values:
+- PAYMENT_AUTHORIZED
+- PAYMENT_CAPTURED
+- PAYMENT_FAILED
+- PAYMENT_VOIDED
+- PAYMENT_REFUNDED
+
+Phase 2 - Tokenized payment service
+Create/extend server-only payment service using existing Cybersource adapter and DB credentials.
+
+Required methods:
+- createReservationDepositIntent
+- authorizeWithTransientToken
+- captureAuthorization
+- voidAuthorization
+- refundPayment
+- normalizeCybersourceError
+- getPaymentStatus
+
+Required behavior:
+- server accepts only Cybersource transient token JWT, never raw card data
+- transient token is passed to Cybersource as tokenInformation.transientTokenJwt
+- auth and capture must be separate
+- idempotency required for retries
+- failed payment cannot confirm a required-deposit reservation
+
+Phase 3 - QR reservation deposit hook
+Default QR reservation flow remains no-payment.
+
+Only when venue/space/private-event rule requires deposit:
+- create reservation/request in non-confirmed payment-pending state
+- create deposit intent
+- return payment step data to client
+- guest completes Unified Checkout/Flex tokenized payment
+- server authorizes payment
+- only then allow confirmation/pending approval according to reservation rules
+
+Attribution must survive:
+- payment failure
+- retry
+- authorization
+- capture
+- void/refund
+- reservation status changes
+
+Phase 4 - Admin + host visibility
+Show deposit state without clutter:
+- host booking card: deposit badge only when deposit is required
+- reservation detail: authorized/captured/failed/refunded
+- superadmin payments ledger: payment, reservation, amount, status, Cybersource IDs, last error
+- no raw card data
+
+Phase 5 - Event notifications / webhooks
+Do not assume webhooks are enabled.
+
+First verify:
+- which Cybersource notification product/account feature is enabled
+- signature/JWT verification requirements
+- transaction IDs available for dedupe
+
+If enabled, add /api/v1/hooks/cybersource:
+- verify signature/JWT
+- dedupe events
+- update payment status idempotently
+- emit LedgerEvent payment events
+
+If not enabled, leave a documented reconciliation follow-on and do not fake webhook support.
+
+Tests
+Required:
+- missing/disabled Cybersource readiness => safe failure, no crash
+- no-deposit QR reservation still works end-to-end
+- required deposit cannot confirm reservation without successful authorization
+- create deposit intent is idempotent
+- authorize success updates payment status
+- failed authorization leaves reservation unconfirmed
+- duplicate payment/webhook/retry does not double-update
+- void/refund does not touch attribution anchor
+- no raw card fields are accepted by API validation
+
+Out of scope
+- Production credential activation
+- Payouts/Visa Direct/OCT/NACHA
+- JWT/MLE migration
+- Membership recurring billing
+- Replacing active checkout gateway logic

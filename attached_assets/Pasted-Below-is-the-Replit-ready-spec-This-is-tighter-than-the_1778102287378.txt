@@ -1,0 +1,528 @@
+Below is the Replit-ready spec. This is tighter than the earlier version and includes the exact Cybersource credential requirements, provider model, UI behavior, server signing requirements, and acceptance rules.
+
+Payments P3 — Cybersource Provider Settings
+Build Cybersource Provider Settings inside the existing /admin/payments Superadmin dashboard.
+
+This must sit beside Authorize.net in the same Payments area. It is not a replacement for Authorize.net.
+
+Official Cybersource REST credentials are different from Authorize.net:
+
+Merchant ID
+API Key ID
+Shared Secret / Secret Key
+optional Organization ID or Portfolio ID for meta-key / portfolio setups
+Environment: test or production
+Cybersource REST hosts:
+
+test: apitest.cybersource.com
+production: api.cybersource.com
+Cybersource REST HTTP Signature requests require:
+
+v-c-merchant-id
+host
+date
+(request-target)
+digest for POST/PUT requests
+Signature header using keyid, algorithm="HmacSHA256", signed with the Shared Secret
+Sources:
+
+Cybersource API keys
+Cybersource HTTP Signature auth
+Cybersource meta keys
+Goal
+Superadmin can configure, test, clear, and audit Cybersource credentials directly from the OKÜ admin website, using the same encrypted credential pattern already created for Authorize.net.
+
+The user experience should feel like:
+
+Admin Console → Payments → Cybersource
+
+Not a developer diagnostics page.
+
+Scope
+Implement:
+
+Cybersource provider panel inside /admin/payments
+encrypted credential save/edit/clear flow
+test connection button
+status badges in Overview / Payment Providers / System Checks
+audit trail entries
+server-side config resolver
+server-side HTTP Signature helper
+Do not implement yet:
+
+Cybersource checkout capture
+Cybersource refunds
+Cybersource voids
+customer saved cards
+webhook reconciliation
+switching live checkout from Authorize.net to Cybersource
+Unless the repo already has a clean provider-selection abstraction, this task is settings + readiness only.
+
+Admin UI
+Route
+Use existing:
+
+/admin/payments
+Add a Cybersource tab/panel.
+
+Suggested tab order:
+
+Overview
+Payment Providers
+Authorize.net
+Cybersource
+Refunds & Voids
+Receipts & Email
+Tickets & QR
+System Checks
+Audit Trail
+If the Payments page already uses panels instead of actual tabs, follow the existing pattern.
+
+Payment Providers Panel
+Show both providers:
+
+Authorize.net
+Existing provider card remains unchanged.
+
+Cybersource
+Provider card should show:
+
+Provider name: Cybersource
+Status badge:
+Not configured
+Configured
+Enabled
+Test mode
+Production mode
+Last test failed
+Environment badge: test / production
+CTA:
+Configure
+Manage
+Test connection
+Provider description:
+
+Accept card payments through Cybersource using REST API credentials. Credentials are encrypted and never displayed after saving.
+Cybersource Panel Fields
+Provider Status
+enabled: boolean toggle
+environment: select
+test
+production
+API Credentials
+merchantId
+keyId
+sharedSecret
+organizationId optional
+portfolioId optional
+Field behavior:
+
+merchantId may display normally after save.
+keyId may display normally or masked depending on the existing Authorize.net pattern.
+sharedSecret must never return raw after save.
+If saved, show:
+Saved ••••1234
+or Saved
+If missing, show:
+Missing
+Checkout Display Settings
+These are non-secret settings:
+
+checkoutTitle
+default: Credit Card
+checkoutDescription
+default: Pay securely using your credit card.
+acceptedCardLogos
+Visa
+Mastercard
+American Express
+Discover
+Diners
+JCB
+cardSecurityCodeEnabled: boolean
+detailedDeclineMessagesEnabled: boolean
+debugMode
+OFF
+ERRORS_ONLY
+VERBOSE
+Actions
+Buttons:
+
+Save Cybersource Settings
+Test Connection
+Clear Saved Credentials
+Clear credentials must require confirmation.
+
+UX Requirements
+This should feel premium and operational, not raw.
+
+Use the same visual language as the current Payments page:
+
+clean section cards
+clear status badges
+grouped fields
+inline validation
+sticky save bar if the existing page uses one
+no raw env-var list as the primary interface
+no giant developer warning unless something is actually blocking
+Recommended sections inside the Cybersource panel:
+
+Cybersource Status
+Connection Credentials
+Checkout Display
+Risk & Debugging
+Test Result
+Status examples:
+
+Configured from encrypted database credentials
+Using environment fallback
+Credential editing unavailable: APP_ENCRYPTION_KEY is missing
+Last test passed May 6, 2026, 2:14 PM
+Last test failed: invalid merchant id / key id / shared secret
+Schema
+First inspect what Authorize.net P1 created.
+
+If there is already a generic encrypted gateway settings model, reuse it.
+
+If there is an Authorize.net-specific model, migrate toward a generic provider model instead of adding another one-off Cybersource model.
+
+Recommended Prisma shape:
+
+enum PaymentGatewayProvider {
+  AUTHORIZE_NET
+  CYBERSOURCE
+}
+
+enum PaymentGatewayEnvironment {
+  SANDBOX
+  TEST
+  PRODUCTION
+}
+
+model PaymentGatewaySettings {
+  id                       String                 @id @default(cuid())
+  provider                 PaymentGatewayProvider @unique
+  enabled                  Boolean                @default(false)
+  environment              String                 @default("test")
+
+  encryptedCredentialsJson Json?
+  publicSettingsJson       Json?
+
+  lastTestStatus           String?
+  lastTestMessage          String?
+  lastTestedAt             DateTime?
+
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+}
+If the existing model has different names, adapt to it. The important rule is:
+
+secrets go in encrypted credential storage
+non-secrets go in public/settings JSON
+never store secrets in CommerceSettings
+Credential Shape
+Encrypted credential JSON should contain:
+
+type CybersourceEncryptedCredentials = {
+  merchantId?: string;
+  keyId?: string;
+  sharedSecret?: string;
+  organizationId?: string;
+  portfolioId?: string;
+};
+Public settings JSON should contain:
+
+type CybersourcePublicSettings = {
+  enabled: boolean;
+  environment: "test" | "production";
+  checkoutTitle: string;
+  checkoutDescription: string;
+  acceptedCardLogos: string[];
+  cardSecurityCodeEnabled: boolean;
+  detailedDeclineMessagesEnabled: boolean;
+  debugMode: "OFF" | "ERRORS_ONLY" | "VERBOSE";
+};
+Encryption
+Reuse the existing Authorize.net encryption helper.
+
+Requirements:
+
+encryption key comes from APP_ENCRYPTION_KEY
+use AES-256-GCM, same pattern as Authorize.net
+if APP_ENCRYPTION_KEY is missing:
+GET still works
+status says credential editing unavailable
+PATCH attempting to save secrets returns 400
+if decryption fails:
+mark DB credentials unusable
+do not crash the Payments page
+surface warning:
+Saved Cybersource credentials cannot be decrypted. Check APP_ENCRYPTION_KEY.
+Server Files
+Create or adapt:
+
+src/server/payments/providers/cybersource.ts
+src/server/payments/cybersourceConfig.ts
+src/server/payments/cybersourceSignature.ts
+If the repo already has provider folders from Authorize.net, match that structure.
+
+Implement:
+
+getCybersourceConfig()
+getCybersourceCredentialStatus()
+testCybersourceConnection()
+clearCybersourceCredentials()
+buildCybersourceHttpSignatureHeaders()
+HTTP Signature Helper
+Implement server-side signing only.
+
+Function shape:
+
+type CybersourceSignatureInput = {
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  path: string;
+  body?: string;
+  merchantId: string;
+  keyId: string;
+  sharedSecret: string;
+  host: string;
+};
+
+function buildCybersourceHttpSignatureHeaders(input: CybersourceSignatureInput): Record<string, string>
+For POST/PUT:
+
+include Digest
+include headers list:
+host date (request-target) digest v-c-merchant-id
+For GET/DELETE:
+
+no digest unless Cybersource endpoint requires it
+include headers list:
+host date (request-target) v-c-merchant-id
+Signature algorithm:
+
+HMAC-SHA256
+decode Cybersource shared secret from base64 if Cybersource key is base64 encoded
+output base64 signature
+Header example:
+
+v-c-merchant-id: {merchantId}
+host: apitest.cybersource.com
+date: Wed, 06 May 2026 15:00:00 GMT
+digest: SHA-256={base64Digest}
+signature: keyid="{keyId}", algorithm="HmacSHA256", headers="host date (request-target) digest v-c-merchant-id", signature="{signature}"
+Test Connection
+Implement:
+
+POST /api/v1/admin/payments/cybersource/test
+Rules:
+
+must not charge a card
+must not authorize a payment
+must use selected environment host
+must use saved encrypted DB credentials first
+may fall back to env only if that is already the Authorize.net pattern
+Preferred approach:
+
+Use a safe Cybersource endpoint that validates authentication without creating money movement.
+
+If a true no-op auth endpoint is unavailable in the repo/timebox, implement a signed GET request to a harmless endpoint that Cybersource will authenticate before returning either a valid response or a non-auth business response. Treat:
+
+2xx as pass
+401 / 403 as credential failure
+network/DNS as connection failure
+other signed response as “credentials accepted but endpoint returned X” only if clearly authenticated
+Do not use /pts/v2/payments with a real auth/capture in the test button.
+
+API Routes
+Create:
+
+GET    /api/v1/admin/payments/cybersource
+PATCH  /api/v1/admin/payments/cybersource
+POST   /api/v1/admin/payments/cybersource/test
+POST   /api/v1/admin/payments/cybersource/clear
+GET Response
+Must return no raw shared secret.
+
+Example:
+
+{
+  "ok": true,
+  "data": {
+    "provider": "CYBERSOURCE",
+    "enabled": false,
+    "environment": "test",
+    "configured": false,
+    "credentialSource": "none",
+    "credentialStatus": {
+      "merchantId": "missing",
+      "keyId": "missing",
+      "sharedSecret": "missing",
+      "organizationId": "optional",
+      "portfolioId": "optional"
+    },
+    "masked": {
+      "merchantId": null,
+      "keyId": null,
+      "sharedSecret": null
+    },
+    "publicSettings": {
+      "checkoutTitle": "Credit Card",
+      "checkoutDescription": "Pay securely using your credit card.",
+      "debugMode": "OFF"
+    },
+    "lastTest": null,
+    "canEditCredentials": true
+  }
+}
+PATCH Body
+{
+  "enabled": true,
+  "environment": "test",
+  "merchantId": "merchant_id_here",
+  "keyId": "key_id_here",
+  "sharedSecret": "secret_here",
+  "organizationId": "",
+  "portfolioId": "",
+  "checkoutTitle": "Credit Card",
+  "checkoutDescription": "Pay securely using your credit card.",
+  "acceptedCardLogos": ["visa", "mastercard", "amex"],
+  "cardSecurityCodeEnabled": true,
+  "detailedDeclineMessagesEnabled": true,
+  "debugMode": "ERRORS_ONLY"
+}
+PATCH Validation
+Use Zod.
+
+Rules:
+
+enabled: boolean
+environment: enum test | production
+merchantId: optional string, trim
+keyId: optional string, trim
+sharedSecret: optional string
+organizationId: optional string
+portfolioId: optional string
+checkoutTitle: max length 80
+checkoutDescription: max length 240
+debugMode: enum
+if enabled === true, require:
+merchantId
+keyId
+sharedSecret already saved or provided
+Audit Logs
+Every action writes AuditLog.
+
+Actions:
+
+payment.gateway.cybersource.update
+payment.gateway.cybersource.clear
+payment.gateway.cybersource.test.succeeded
+payment.gateway.cybersource.test.failed
+Audit metadata must never include raw credentials.
+
+Allowed metadata:
+
+{
+  "provider": "CYBERSOURCE",
+  "environmentBefore": "test",
+  "environmentAfter": "production",
+  "enabledBefore": false,
+  "enabledAfter": true,
+  "merchantIdChanged": true,
+  "keyIdChanged": true,
+  "sharedSecretChanged": true,
+  "organizationIdChanged": false,
+  "portfolioIdChanged": false,
+  "publicSettingsChanged": true
+}
+Payments Page Integration
+Overview
+Add Cybersource to “Status at a glance”:
+
+Cybersource provider     Not configured / Configured / Enabled
+Cybersource mode         test / production
+Cybersource last test    Passed / Failed / Never tested
+Payment Providers
+Show both provider cards:
+
+Authorize.net
+Cybersource
+Do not make it look like Cybersource replaced Authorize.net.
+
+System Checks
+Add warnings:
+
+Cybersource is enabled but Merchant ID is missing
+Cybersource is enabled but Key ID is missing
+Cybersource is enabled but Shared Secret is missing
+Cybersource credentials cannot be decrypted
+APP_ENCRYPTION_KEY missing: credential editing unavailable
+Audit Trail
+Include Cybersource events in the Payments audit feed.
+
+Provider Architecture
+If no shared adapter exists, add a small interface now but only implement what is needed.
+
+export type PaymentProviderId = "AUTHORIZE_NET" | "CYBERSOURCE";
+
+export type PaymentProviderStatus = {
+  provider: PaymentProviderId;
+  enabled: boolean;
+  configured: boolean;
+  environment: string;
+  credentialSource: "database" | "environment" | "none";
+  lastTestStatus?: "passed" | "failed";
+  lastTestedAt?: string;
+};
+
+export interface PaymentProviderAdapter {
+  provider: PaymentProviderId;
+  getStatus(): Promise<PaymentProviderStatus>;
+  testConnection(): Promise<{ ok: boolean; message: string; rawCode?: string }>;
+
+  // Future only. Do not wire Cybersource checkout in this task.
+  charge?: unknown;
+  refund?: unknown;
+  void?: unknown;
+}
+Security Requirements
+SUPERADMIN only.
+No raw shared secret in:
+GET response
+React props
+logs
+AuditLog
+browser local storage
+query strings
+No client-side signing.
+No payment transaction in the test button.
+Use server-side encrypted DB credentials.
+Do not store Cybersource secrets in CommerceSettings.
+Acceptance Criteria
+/admin/payments has a visible Cybersource provider area.
+Superadmin can enter:
+Merchant ID
+Key ID
+Shared Secret
+optional Organization ID
+optional Portfolio ID
+environment
+Shared Secret is encrypted with APP_ENCRYPTION_KEY.
+Saved Shared Secret is never returned raw.
+Superadmin can clear saved Cybersource credentials.
+Superadmin can test Cybersource connection.
+Overview and System Checks reflect Cybersource status.
+Payment Providers clearly show Authorize.net and Cybersource separately.
+Authorize.net continues working unchanged.
+No checkout capture uses Cybersource yet unless a safe provider abstraction already exists.
+Dev compile passes.
+Run npm run build externally if the Replit agent shell cannot keep the build alive.
+One Implementation Note
+Because some Cybersource account setups use meta keys at the portfolio or organization level, keep organizationId and portfolioId optional now. The critical runtime credential set is still:
+
+merchantId
+keyId
+sharedSecret
+environment
+That gives OKÜ the right Superadmin control now without overbuilding the full Cybersource payment engine before launch.

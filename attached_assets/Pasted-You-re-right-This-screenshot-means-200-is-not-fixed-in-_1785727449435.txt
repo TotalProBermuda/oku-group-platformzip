@@ -1,0 +1,38 @@
+You’re right. This screenshot means #200 is not fixed in live UX yet.
+The button visually renders, but the guest still cannot complete the reservation. So the correct status is:
+Do not apply / do not green-light #200 until Replit proves the mobile tap path works on the live preview.
+Send Replit this exact message:
+P0 still reproduces on live mobile QR flow.
+
+The “Submit Reservation” button is visible at the bottom of the QR reservation form, but tapping it still does not submit/confirm the booking.
+
+Do not mark #200 complete based on API curl tests alone. The failure is in the real mobile browser interaction path.
+
+Required next debug:
+1. Open the live preview on mobile viewport or actual mobile Safari/Chrome.
+2. Navigate to the same QR reservation flow.
+3. Fill every visible required field.
+4. Tap “Submit Reservation”.
+5. Confirm whether GuestBookingForm.handleSubmit fires.
+6. Confirm whether onSubmit in /r/[referralCode]/page.tsx fires.
+7. Confirm whether POST /api/reservations appears in Network.
+8. If no POST appears, inspect:
+   - button type
+   - form onSubmit binding
+   - any overlay intercepting the tap
+   - disabled/isSubmitting state
+   - native validation still firing
+   - pointer-events / z-index / fixed browser bottom bar overlap
+9. If POST appears, capture response status/body and render the error visibly directly above the Submit button.
+
+Acceptance proof required:
+- Screen recording or screenshot sequence showing mobile tap → loading state → success/pending approval screen.
+- Network log showing POST /api/reservations from the mobile submit.
+- Reservation row created.
+- Referrer attribution preserved.
+
+Do not widen scope. Fix only the QR submit path.
+My read: if noValidate was added and the button still does nothing, the next most likely issue is either the tap is not triggering the form submit, or the validation error is still rendered somewhere not visible. Curl/API passing is not enough here. The real test is: mobile tap creates a POST and reaches success/error state visibly.
+
+
+22:19

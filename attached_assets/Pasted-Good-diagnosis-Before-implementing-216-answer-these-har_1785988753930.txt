@@ -1,0 +1,81 @@
+Good diagnosis. Before implementing #216, answer these hard questions with file/line evidence so we do not patch only the symptom.
+
+1. Why did the DB write fail?
+The silent catch explains why the UI lied, but not why prisma.cybersourceGatewayCredential.update(...) failed.
+Was it:
+- missing row?
+- wrong where clause?
+- stale credential id?
+- auth/session venue/account mismatch?
+- schema field mismatch?
+- encryption/view serialization issue?
+- DB transaction issue?
+
+Show the exact update call, its where clause, and the credential row lookup used before the test.
+
+2. Should this be update or upsert?
+If the test route is testing credentials that already exist in DB, update should be enough.
+If the UI can test credentials before the row exists, then upsert is correct.
+Which lifecycle is actually intended?
+
+3. What is the canonical source of truth?
+Confirm the exact fields that should drive all three UI states:
+- Cybersource card badge
+- Inline Test Result
+- Top readiness banner / blockers
+
+Expected canonical DB fields:
+lastTestStatus
+lastTestedAt
+lastTestMessage / lastTestError if present
+
+No component should infer “Last test passed” only from a transient API response after reload.
+
+4. Does Test Connection test saved credentials or unsaved form credentials?
+The UI currently says “Save Merchant ID, Key ID, and Shared Secret before testing.”
+Confirm the test route only tests DB-saved encrypted credentials.
+If it tests unsaved payload credentials, the readiness banner must still require saving before ready.
+
+5. What happens if Cybersource accepts credentials but persistence fails?
+Required behavior:
+- Return 500 or explicit persistence_failed.
+- UI must say “Connection succeeded but result could not be saved.”
+- Do not show “Last test passed.”
+- Do not clear blockers.
+
+6. Does Save Cybersource Settings overwrite lastTestStatus?
+If the user saves settings after a successful test, does save reset lastTestStatus to null?
+If credentials change, it SHOULD reset lastTestStatus.
+If only non-secret display/config fields change, it SHOULD NOT necessarily reset.
+Confirm behavior.
+
+7. Does enabling/disabling gateway affect readiness correctly?
+Expected:
+- enabled=false: not active, no checkout-ready status.
+- enabled=true + saved credentials + recent passed test: ready.
+- enabled=true + missing credentials: blocker.
+- enabled=true + failed/null/stale test: blocker.
+
+8. What is the test recency rule?
+Confirm current expected:
+- test env: 7 days?
+- production env: 24 hours?
+Do not change unless already specified.
+
+9. Is the launch-readiness API cached?
+If /admin/payments calls readiness from src/app/api/v1/admin/launch-readiness/route.ts, confirm whether it is cached, memoized, or stale after test.
+After a passed test, the page should refresh/revalidate readiness immediately.
+
+10. Does the response include the updated safe gateway view?
+After write succeeds, return a fresh DB read or the updated Prisma row passed through toSafeCybersourceView.
+Do not return stale pre-update credential view plus gatewayOk=true.
+
+Implementation gate:
+Do not create a second readiness service, second payment settings page, second Cybersource config model, or duplicate test state. Fix the existing route and normalize all UI from the same DB-backed readiness state.
+
+Regression tests required:
+- lastTestStatus="passed", recent lastTestedAt => no blocker.
+- lastTestStatus=null, lastTestedAt=null => has-not-passed blocker.
+- lastTestStatus="failed" => has-not-passed blocker.
+- lastTestStatus="passed" but stale => recency blocker.
+- persistence failure after live test success => API does not return success and UI does not show Last test passed.

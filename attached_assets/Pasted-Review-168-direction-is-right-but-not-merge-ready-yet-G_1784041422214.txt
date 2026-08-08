@@ -1,0 +1,55 @@
+Review #168: direction is right, but not merge-ready yet.
+
+Good:
+- Event bridge exactness is tested: `eventId` alone is not enough, direct identity evidence is required.
+- Partner path inherits the shared dedupe chain through `findOrCreateReferralActor`.
+- `createEventReferrer` now surfaces `merge_required` instead of silently creating duplicate sub-referrer actors.
+- Host personal referrer provisioning no longer hard-fails `/host/me` when an identity conflict exists.
+- No commission, payout, or attribution-money logic appears to be changed.
+
+Blockers / fixes:
+
+P0 — Confirm pasted diff artifacts are not in the real `eventReferrerService.ts`.
+The pasted diff shows old and new code interleaved inside `ensureHostReferralActor`, including stale `actorByUser` create/update code mixed with the new dedupe result flow. If that is real, it will not compile and may still create actors directly. If it is just diff noise, confirm with typecheck.
+
+P1 — `createEventReferrer` provisions an actor but does not appear to bridge it to the new assignment.
+The function calls `findOrLinkReferralActor` before creating `EventReferrerAssignment`, then creates the assignment, but I do not see a follow-up update setting `ReferralActor.legacyEventReferrerAssignmentId = assignment.id` when safe.
+
+That means the actor exists, but the event-referrer assignment may not be connected to the shared actor bridge, weakening the convergence path.
+
+Fix:
+- preflight dedupe first to catch `merge_required`
+- create the assignment
+- if dedupe returned an actor and `legacyEventReferrerAssignmentId` is empty, update it to the assignment id
+- if already bridged elsewhere, do not overwrite; log/leave as-is
+
+P1 — Avoid duplicate `referral.actor.merge_required` audit rows.
+`findOrLinkReferralActor` already writes `referral.actor.merge_required`. `ensureHostReferralActor` and `createEventReferrer` appear to write a second `referral.actor.merge_required` for the same conflict.
+
+That will make #170 harder because unresolved conflicts are derived from AuditLog. Prefer one canonical conflict row per conflict. Either:
+- rely on the dedupe service audit and include `provisioningPath` / surface metadata in the service input, or
+- write a different supplemental action name, not another merge_required.
+
+P1 — Preserve canonical 409 conflict shape.
+`/api/v1/event-referrers` returns `mergeRequired` and `candidateActorId`, but drops `candidateActorUserId` and `matchField`. The #167 convention was `{ code: "merge_required", candidateActorId, candidateActorUserId, matchField }`.
+
+Use the same shape here so admin merge UI and clients do not need route-specific parsing.
+
+P1 — Handle `blocked` as a controlled 409, not a thrown 500.
+`createEventReferrer` throws on `dedupeResult.status === "blocked"`. The route only handles `{ ok:false }` merge results, so blocked may bubble as a 500.
+
+Fix route/service mapping:
+- `blocked` → HTTP 409 with `{ code: "blocked", reason }`
+- no actor creation
+- no assignment creation
+
+P2 — Partner “concurrent invite” test is acceptable as inheritance coverage, but it is not a true route/integration test.
+The test demonstrates the wrapper delegates to the dedupe service and documents the DB-constraint gap, which is fine. Just don’t overstate it as true concurrency protection.
+
+Verdict:
+Architecture is right, but hold merge until:
+1. real files are compile-clean,
+2. event assignments are bridged to actors after create,
+3. duplicate merge_required audit rows are avoided,
+4. event-referrer route uses the canonical 409 shape,
+5. blocked maps to controlled 409.

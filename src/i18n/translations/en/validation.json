@@ -1,0 +1,11 @@
+{
+  "required": "This field is required.",
+  "invalidEmail": "Please enter a valid email address.",
+  "invalidPhone": "Please enter a valid phone number.",
+  "minLength": "This field must be at least {min} characters.",
+  "maxLength": "This field must be no more than {max} characters.",
+  "noAvailability": "No availability for the selected date. Please choose another.",
+  "success": "Your reservation has been confirmed.",
+  "error": "Something went wrong. Please try again.",
+  "networkError": "Network error. Please check your connection and try again."
+}

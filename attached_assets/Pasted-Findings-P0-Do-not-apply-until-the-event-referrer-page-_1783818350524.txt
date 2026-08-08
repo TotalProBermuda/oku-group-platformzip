@@ -1,0 +1,26 @@
+Findings
+P0: Do not apply until the event-referrer page is proven clean.
+The pasted diff for src/app/influencer/referrer-dashboard/page.tsx shows duplicate/conflicting declarations: fmt, copyLink, assignments, totalTickets, and old/new JSX blocks interleaved. This may be diff noise, but if real, it will not compile. Replit must confirm the final file has no duplicate identifiers and no old /api/v1/event-referrers/my-assignments fetch.
+
+P1: Ticket attribution failures are swallowed silently.
+checkout/confirm does:
+await writeTicketAttributionSession(order.id).catch(() => {});
+Non-blocking checkout is right, but silent failure is not ProofPay-safe. Failed ticket attribution should write a log/audit/retry queue item so revenue proof is not lost invisibly.
+
+P1: Venue fallback can create false proof.
+writeTicketAttributionSession() falls back to the first venue if series venue lookup fails. That can attach a ticket attribution session to the wrong venue. Better: fail into review/retry or use an explicit platform/event venue mapping, not arbitrary first venue.
+
+P1: “Batched” is not the same as paid.
+Ticket rows set commissionPendingCents only for payoutStatus=PENDING && !payoutBatchId. Once attached to a draft batch, pending drops even though the referrer has not necessarily been paid. That can understate unpaid earnings. The UI/data model should distinguish accrued, batched, approved/exported, and paid, or keep all non-paid amounts visible as not-yet-paid.
+
+P1: Payout batch totals may not include sub-commissions.
+The service comments say sub-commission rows do not affect batch.totalCents or batch.lineCount, but “bank export includes them.” That creates reconciliation risk: batch totals shown to admins may not match export totals. Either update totals to include sub-commission lines or expose separate subCommissionTotalCents/subCommissionLineCount clearly.
+
+P2: Ticket count may overcount non-ticket line items.
+ticketCount = order.lineItems.reduce((s, li) => s + li.qty, 0) ignores itemType. If orders include fees, add-ons, tables, or merch, ticket counts inflate. Filter to ticket item types.
+
+P2: Schema diff shows possible duplicate entries.
+PayoutBatch shows both entries LedgerEntry[] and entries        LedgerEntry[]. Likely diff artifact, but confirm final Prisma schema has only one field.
+
+Verdict
+Do not apply #151 yet. The concept is right, but this is money/ledger infrastructure. It needs final confirmation on compile cleanliness, failure logging/retry, venue attribution safety, and payout total semantics before merge.

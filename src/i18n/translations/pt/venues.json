@@ -1,0 +1,78 @@
+{
+  "backToGroup": "OKÜ Hospitality Group",
+  "ourRestaurants": "Nossos Restaurantes",
+  "restaurantsSubtitle": "Três experiências gastronômicas únicas sob o mesmo teto — cada uma com sua própria identidade, culinária e atmosfera.",
+  "reserveArrow": "Reservar uma Mesa →",
+  "viewProfile": "Ver Perfil",
+  "cuisine": "Culinária",
+  "covers": "Capacidade",
+  "setting": "Ambiente",
+  "hours": "Horário",
+  "dress": "Vestuário",
+  "about": "Sobre nós",
+  "theMenu": "O Menu",
+  "drinkMenu": "Menu de Bebidas",
+  "scroll": "Rolar",
+  "photography": "Fotografia © OKÜ Hospitality Group",
+  "theKitchen": "A Cozinha",
+  "atTheBar": "No Bar",
+  "theSpace": "O Espaço",
+  "seats": "assentos",
+  "oku": {
+    "headline": "Alta Gastronomia Íntima",
+    "tagline": "Toalha branca. Luz de velas. Serviço estruturado para 27.",
+    "tag": "Alta Gastronomia",
+    "description": "OKÜ é o nosso restaurante principal — uma experiência íntima guiada pelo chef, enraizada na cozinha mediterrânea moderna. O salão acomoda 27 e cada mesa parece um caso privado.",
+    "heroLine1": "Íntimo.",
+    "heroLine2": "Deliberado.",
+    "heroLine3": "27 lugares.",
+    "cuisine": "Mediterrânea Moderna",
+    "setting": "Interior · Climatizado",
+    "dresscode": "Smart casual a formal",
+    "about": [
+      "Batizado em homenagem ao grupo que ancora, OKÜ é um estudo em contenção. Toalha branca impecável, cristaleria soprada à mão e uma cozinha que acredita que a simplicidade é a forma mais elevada de sofisticação.",
+      "O menu muda com as estações — abastecido por produtores de todo o Mediterrâneo. Embutidos ibéricos, cítricos sicilianos, azeites do Egeu — compostos em menus de degustação que parecem inevitáveis.",
+      "O salão tem 27 lugares. A iluminação é sempre exatamente certa."
+    ],
+    "sushiBarHeading": "O Balcão de Sushi",
+    "sushiBarBody": "No coração do OKÜ encontra-se um íntimo balcão de sushi. Cada dia os chefs preparam cortes frescos de peixes inteiros selecionados pelos nossos fornecedores — atum, salmão, polvo — expostos na vitrine iluminada para os clientes verem antes de pedir.",
+    "cocktailHeading": "Elaborados\ncom intenção.",
+    "cocktailBody": "Cada coquetel da carta do OKÜ é uma pequena tese — construído em torno de uma única ideia. Um elemento umami japonês expresso através do gergelim e do yuzu. Um estudo botânico em espuma e flores comestíveis. Uma bebida espirituosa que se revela lentamente sobre gelo.",
+    "spaceHeading": "Três paredes.\nUma história.",
+    "spaceBody": "A parede de escamas de peixe. O painel koi. O balcão de sushi. Estas não são escolhas decorativas — são a identidade do salão. Cada elemento foi selecionado, projetado ou construído especificamente para este espaço."
+  },
+  "catch": {
+    "headline": "Vida Noturna Caribenha Boho",
+    "tagline": "Pratos para compartilhar, DJs ao vivo e energia caribenha.",
+    "tag": "Restaurante Noturno",
+    "description": "CATCH é onde o jantar se transforma em noite. Pratos caribenhos para compartilhar, um programa de coquetéis curado e uma cabine de DJ rotatória fazem de cada noite um evento em si mesmo.",
+    "heroLine1": "A noite",
+    "heroLine2": "começa aqui.",
+    "heroLine3": "",
+    "cuisine": "Pratos caribenhos para compartilhar",
+    "setting": "Híbrido interior/exterior",
+    "dresscode": "Smart casual",
+    "about": [
+      "CATCH foi criado para as horas depois das 9. Para mesas que se demoram, para rodadas que viram três, para o momento em que um jantar se transforma em uma noite.",
+      "O menu foi criado para compartilhar — pratos de inspiração caribenha que chegam em ondas, cada um uma desculpa para ficar um pouco mais. A cabine de DJ roda toda quinta a sábado com talentos locais e internacionais.",
+      "Acessórios de rattan, concreto exposto, iluminação quente. Um espaço ao mesmo tempo casual e magnético."
+    ]
+  },
+  "terrace": {
+    "headline": "Restaurante em Terraço ao Ar Livre",
+    "tagline": "Azulejo pintado. Brisa noturna. A cidade lá embaixo.",
+    "tag": "Terraço",
+    "description": "O Terraço é a coroa ao ar livre do Gold House — 42 lugares sob o céu do Panamá, rodeados de azulejos pintados à mão e luz de lanternas. Pratos pan-americanos para compartilhar, coquetéis artesanais e vistas imperdíveis do pôr do sol.",
+    "heroLine1": "A cidade",
+    "heroLine2": "aos seus pés.",
+    "heroLine3": "",
+    "cuisine": "Pratos pan-americanos para compartilhar",
+    "setting": "Terraço ao ar livre",
+    "dresscode": "Casual a smart casual",
+    "about": [
+      "O Terraço fica no telhado do Gold House e abre todas as noites para o céu do Panamá. Azulejo marroquino pintado à mão cobre o chão. Lanternas de ferro forjado contornam o perímetro. Buganvílias sobem pela parede sul.",
+      "A cozinha serve pratos pan-americanos para compartilhar — ceviches, anticuchos, pães planos no forno de lenha — criados para serem comidos devagar, em conversa, enquanto a cidade transita do dia para a noite.",
+      "Com 42 lugares, é o nosso maior espaço e também o mais querido."
+    ]
+  }
+}

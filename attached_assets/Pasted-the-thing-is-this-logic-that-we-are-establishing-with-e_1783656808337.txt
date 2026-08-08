@@ -1,0 +1,35 @@
+the thing is, this logic that we are establishing with existing referrers needs to be a fixed and governed format moving forward for future USERS that also have referrer capabilities. 
+
+
+
+
+23:12
+
+
+
+
+
+
+Yes. That’s the right instinct. This should not be treated as a one-off “street host fix.” It needs to become the governed referrer identity and payout model for every future user type with referrer capability.
+I would codify it like this:
+Governed Referrer Capability Principle
+
+Any user, actor, partner, employee, creator, concierge, host, venue, platform, or future account type that can drive referrals must resolve into the same canonical referrer model.
+
+The system must not create separate referral logic per role. A future user with referrer capability should receive:
+- a ReferralActor identity
+- one or more ReferralLinks / QR assignments
+- AttributionSessions created from their links
+- shared active/history referral feed behavior
+- shared commission eligibility logic
+- shared payout-ledger paid status
+- shared audit/dispute history
+
+Role-specific dashboards may differ in UI, permissions, and labels, but they must read from the same governed source of truth.
+For Replit, I’d add this amendment:
+Please treat referrer capability as a governed cross-role capability, not a streetside-specific feature. Streetside host, influencer, partner, taxi/concierge/tour-guide/promoter, legacy referrer, and any future user type with referral permissions must all map to the same canonical ReferralActor + ReferralLink + AttributionSession model.
+
+Do not add role-specific referral feed logic. New referrer-capable roles should be onboarded by assigning/refining ReferralActor ownership and permissions, then automatically receive the shared my-referrals feed, active/history logic, commission eligibility path, payout-ledger paid status, and audit/dispute trail.
+
+UI can vary by role, but referral identity, attribution, commission, payout status, and proof history must remain governed and shared.
+This matters because ProofPay’s long-term value is not “we fixed OKÜ streetside.” It is: any referrer-capable participant can be added without inventing a new trust loop.

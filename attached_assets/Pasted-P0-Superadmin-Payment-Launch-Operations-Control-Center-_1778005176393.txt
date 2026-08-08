@@ -1,0 +1,74 @@
+P0 — Superadmin Payment & Launch Operations Control Center
+
+Goal:
+Before launch, create a Superadmin-only operational readiness interface for payments, email, ticketing, and launch-critical integrations. Do not expose raw secret values in the UI. Secrets must remain in environment variables / Replit Secrets.
+
+Primary route:
+Add either:
+- /admin/launch-readiness
+or
+- /admin/settings/launch-readiness
+
+Also add an AdminNav/Admin home entry visible only to SUPERADMIN.
+
+Required panels:
+
+1. Payments / Authorize.net
+- Show configured / missing status for:
+  AUTHORIZE_NET_API_LOGIN_ID
+  AUTHORIZE_NET_TRANSACTION_KEY
+  AUTHORIZE_NET_ENV
+- Show mode: sandbox or production.
+- Do not display secret values.
+- Add a “Test Authorize.net Config” action that safely validates the gateway configuration without charging a real customer.
+- If a sandbox payment test already exists, expose a clearly labelled sandbox-only test.
+- Show last test result, timestamp, and error message if failed.
+
+2. Payment runtime correctness
+- Audit the current payment cancel route.
+- If any code writes Payment.status = "VOIDED", make sure Prisma PaymentStatus supports VOIDED and migrate cleanly, OR change the cancel flow to use an existing valid status with a correct OrderEvent/AuditLog.
+- Add or stub a safe gateway void path:
+  - If transaction can be voided, call Authorize.net voidTransaction.
+  - If not possible, show a clear admin message and do not pretend money was voided.
+- Verify refund route calls Authorize.net refundTransaction before mutating DB.
+- Failed refund must NOT mark order/payment as refunded.
+- Add audit logs for success and failure.
+
+3. Email
+- Show configured / missing status for:
+  RESEND_API_KEY
+  RESEND_FROM_EMAIL
+- Do not display secret values.
+- Add a safe “Send Test Email” Superadmin action to the current admin email or a typed test recipient.
+- Show last result and error details.
+
+4. Ticketing / QR / Check-in
+- Show readiness status for:
+  ticket creation on paid order
+  QR/check-in validate route
+  attendee scanner page
+  resend confirmation route
+- If RFID is not implemented, show “RFID not configured / not implemented” as an explicit warning, not a failure.
+- Do not build RFID in this task.
+
+5. Launch flags
+- Show DEMO_MODE_ENABLED status.
+- Warn if demo mode is true.
+- Show NEXTAUTH_SECRET, NEXTAUTH_URL, NEXT_PUBLIC_APP_URL presence only.
+- Show REDIS_URL status as warning only, not a blocker, because current launch uses inline fallback.
+
+Acceptance criteria:
+- Superadmin can open the readiness center and see Payments, Email, Ticketing, Auth, Redis, Demo Mode statuses.
+- No secret values are rendered in the browser.
+- Missing required secrets show as launch blockers.
+- Authorize.net sandbox config can be tested safely.
+- Payment cancel/refund status mismatch is fixed or explicitly proven not present.
+- npm run build passes.
+- Provide a short sandbox test checklist for:
+  checkout success
+  checkout decline
+  refund success
+  failed refund
+  confirmation email
+  ticket QR scan
+  resend confirmation

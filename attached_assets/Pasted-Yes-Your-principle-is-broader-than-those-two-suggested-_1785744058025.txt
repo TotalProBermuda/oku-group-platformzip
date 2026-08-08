@@ -1,0 +1,43 @@
+Yes. Your principle is broader than those two suggested tasks:
+Every referrer-capable console must be QR-first, forever.
+That includes taxi drivers, concierges, influencers, partners, partner-created referrers, streetside hosts, and any future delegated/referrer profile.
+So I would merge the intent like this:
+Start with partner crash hardening, but expand the regression boundary:
+
+All referrer-capable dashboards must preserve the QR-first console pattern:
+- /referrer/dashboard
+- /influencer/dashboard
+- /partner/dashboard
+- /host/streetside
+- any partner-created / delegated referrer profile
+- any future route that renders PureReferrerConsole or exposes a referral QR
+
+Definition of QR-first:
+- The QR tab / QR module is the default visible state.
+- Instruction copy appears above or immediately beside the QR.
+- The QR code is visible before private performance metrics, offer wallets, earnings, activity, or admin tooling.
+- WhatsApp/share CTA is visible near the QR.
+- No raw i18n keys.
+- No empty shell such as “No results found” where a QR console should be.
+- No browser tooltip/stray label like “Booking QR Code”.
+- Partner-created referrers inherit the same console shell and only vary by role config/copy/data, not by separate dashboard UI.
+
+Code rule:
+Do not create separate dashboards for taxi/influencer/partner/delegated referrers. Use the shared PureReferrerConsole / roleConfig pattern. If a route must add extra widgets, those widgets render below the QR-first console by default.
+
+Test rule:
+Extend #210 or add a companion suite so QR-first coverage includes:
+1. Taxi
+2. Concierge / generic referrer
+3. Influencer
+4. Partner
+5. Partner-created delegated referrer
+6. Streetside host
+
+Run across:
+- EN / ES / PT
+- desktop and mobile
+
+Also implement #211:
+ShareSurfacePanel must tolerate malformed /api/v1/partner/share-surface responses and render a safe empty state instead of crashing.
+So yes: do #211, but don’t treat it as only a partner crash task. Treat it as a hardening task for the entire QR-first referrer architecture.

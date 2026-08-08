@@ -1,0 +1,64 @@
+JUst to be clear, the resturant staff are the ones doing the scanning of the tickets. 
+17:26
+
+
+Yes, understood clearly: restaurant staff are the ticket scanners.
+
+So the permission and UX model should be:
+
+Restaurant staff / restaurant hosts:
+- Use /staff/check-in
+- Scan guest ticket QR codes at the door
+- Manually search/check in if QR scan fails
+- See only the ticket/session/check-in information needed for entry
+
+Admins / Superadmins:
+- Use /admin/tickets
+- Search all tickets
+- Issue comp/manual tickets
+- Export attendee lists
+- Resend confirmations
+- View audit/check-in logs
+So the task should say this explicitly:
+
+Restaurant staff are the primary users of the QR scanning interface.
+
+The /staff/check-in route must be built for restaurant staff using mobile phones at the venue entrance. It should not feel like an admin dashboard.
+
+Restaurant staff can:
+- select today’s assigned event/session
+- scan ticket QR codes
+- see success / already checked-in / invalid / refunded / cancelled states
+- manually search by guest name, email, or ticket code
+- manually check in a valid guest if permitted
+- see recent scan attempts
+
+Restaurant staff cannot:
+- refund orders
+- see payment credentials
+- edit ticket types
+- issue comp tickets unless they also have admin permission
+- access /admin/tickets unless assigned admin role
+
+Superadmin/Admin can:
+- manage tickets from /admin/tickets
+- issue comp tickets
+- export lists
+- audit check-in activity
+- assign who has scanning permission
+For permissions, I’d phrase it like this:
+
+Add/confirm permission:
+- tickets:checkin
+
+Grant tickets:checkin to:
+- RESTAURANT_HOST
+- STAFF_OKU, if this is the correct restaurant staff role in the repo
+- SUPERADMIN
+- ADMIN_COMMERCIAL or ADMIN role if present
+
+Do not grant ticket scanning to ordinary guests, referrers, influencers, or partners by default.
+And the key acceptance criterion:
+
+A restaurant staff account can log in on a phone, open /staff/check-in, select the assigned session, scan a guest QR code, and check the guest in without needing Superadmin access.
+That is the correct operating model.

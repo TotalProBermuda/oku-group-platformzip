@@ -1,0 +1,89 @@
+Build the OKÜ Hospitality Group trust environment for INVU integration with this core rule:
+
+Commissions are calculated at the reservation-linked table-session level. Split checks or multiple payment events do not create separate commission objects. All financial activity associated with the attributed table session must be aggregated into one final closed table value, which determines commission eligibility and payout.
+
+The platform must treat INVU as the financial close truth source, while OKÜ remains the source of attribution, commission logic, review, approval, and payout governance.
+
+The system must support:
+- secure INVU integration setup through Superadmin
+- venue-to-branch mapping
+- sync diagnostics and API health monitoring
+- raw INVU payload storage
+- normalized revenue records
+- reservation and table-session matching
+- table-session aggregation
+- commission-ready trust records
+- review queue and guided issue resolution
+- multilingual UI in English, Spanish, and Portuguese
+
+Risk Reduction Rule
+
+In planning and development, the platform must reduce ambiguity before it reaches the review queue.
+
+Do not rely on post-facto fixes as the primary strategy.
+
+Implement these safeguards now:
+
+1. Use deterministic identifiers wherever possible:
+- reservation_id
+- attribution_session_id
+- table_session_id
+- booking_code
+
+2. Require explicit operational checkpoints:
+- check-in
+- seating/table assignment
+- host/referrer binding
+- table_session creation before commission eligibility
+
+3. Separate issue types into:
+- auto-safe remediation
+- guided human review
+- manual/superadmin-only resolution
+
+4. Store immutable evidence for every trust-impacting record:
+- raw payload
+- normalized payload
+- match proof
+- aggregation snapshot
+- commission rule snapshot
+- actor and timestamp
+
+5. For all human-judgment issues, build guided resolution workflows instead of one-click fixes.
+
+Human-judgment issues include:
+- multiple possible reservation matches
+- credit-note ambiguity
+- suspicious duplicate revenue
+- payout-impacting mismatches
+- disputes involving referrer/host ownership
+
+Each of these must have:
+- a defined issue type
+- recommended action
+- structured review UI
+- payout blocking behavior
+- superadmin escalation path if needed
+
+The goal in development is not to automate every problem.
+The goal is to make risky states rare, explicit, auditable, and safely resolvable.
+
+Build the system so that:
+- sync reliability can approach 100%
+- true 100% match confidence only happens through deterministic identifiers or locked manual review
+- Superadmin owns all API health, mismatches, unresolved anomalies, and payout-blocking trust issues
+- operational users may work issues, but Superadmin remains the final accountable role
+- every issue shown in the UI includes status, likely cause, recommendation, and fix or guided review action
+- every fix action writes to the audit trail
+- no commission auto-approval happens from weak heuristic matching alone
+
+Return:
+- architecture summary
+- schema changes
+- API routes
+- service architecture
+- admin UX pages
+- review queue logic
+- trust score model
+- issue resolution framework
+- acceptance criteria

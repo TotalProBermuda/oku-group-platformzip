@@ -1,0 +1,167 @@
+Now - big question. If I activer cybersource, will it now work with the rest of the SHOP functionality i.e. refunds, inventory receipts etc
+18:34
+
+Short answer: no, not yet. Activating Cybersource now only makes it configured and testable in the Superadmin Payments area. It does not automatically make checkout, refunds, voids, receipts, inventory, or tickets use Cybersource.
+
+Current state:
+
+Authorize.net is still the live payment engine for website checkout, refunds, and voids.
+Cybersource P3 is a settings/readiness integration only: credentials, encryption, status, test connection, audit.
+Inventory/ticket issuing/receipts are tied to successful website order payment, but the actual charge path has not been switched to Cybersource.
+Refunds & voids currently call Authorize.net routes/client logic, not Cybersource.
+Receipts/email/tickets will still work after a successful order, but only if the checkout payment flow creates the same Order, Payment, and Ticket records.
+So if you turn on Cybersource today, it should be treated as: “Cybersource credentials are ready,” not “Cybersource is processing orders.”
+
+The next required task is:
+
+Payments P4 — Active Gateway Runtime Selection + Cybersource Transaction Adapter
+
+It should include:
+
+A clear “Active checkout gateway” control in /admin/payments
+
+Authorize.net
+Cybersource
+Demo/offline disabled in production
+Runtime guard
+
+Checkout must use only the active gateway.
+Cannot activate Cybersource for checkout unless test connection has passed.
+Production mode requires explicit confirmation.
+Cybersource charge adapter
+
+implement card authorization/capture through Cybersource
+return a normalized payment result shaped like the current Authorize.net result
+persist Payment.provider = CYBERSOURCE
+persist Cybersource transaction/reference IDs
+Cybersource refund adapter
+
+refund website orders paid through Cybersource
+Authorize.net refunds only for Authorize.net orders
+no cross-provider refund attempts
+Cybersource void adapter
+
+void unsettled Cybersource payments where supported
+same gateway-first failure rules as Authorize.net
+Keep downstream commerce unchanged
+
+successful payment still creates Order/Tickets
+capacity release/hold logic still works
+receipts still send
+QR tickets still scan
+audit logs still write
+That is the proper bridge from configured provider to working shop payment engine.
+
+
+
+
+
+18:34
+User attachment
+Is it fully configured. I see only notification of Authorised.net payment blockers:
+
+"Payment blockers (2):
+AUTHORIZE_NET_API_LOGIN_ID missing
+AUTHORIZE_NET_TRANSACTION_KEY missing"
+18:35
+
+No. From that screenshot, payments are not fully configured for live website checkout.
+
+What you’re seeing is correct for the current architecture:
+
+The payment blockers are only looking at the current live checkout gateway, which is still Authorize.net.
+Authorize.net is missing:
+AUTHORIZE_NET_API_LOGIN_ID
+AUTHORIZE_NET_TRANSACTION_KEY
+Therefore website checkout is still blocked, even if Cybersource settings exist.
+Cybersource may now be configured as a provider, but it is not yet the active checkout processor. So the system is basically saying:
+
+“The gateway I currently use for checkout is Authorize.net, and Authorize.net is missing required credentials.”
+
+That means Cybersource P3 is not enough by itself. You need one more layer:
+
+Payments P4 — Active Payment Gateway Selection
+
+This should add a clear control in /admin/payments, probably in Overview or Payment Providers:
+
+Active checkout gateway:
+[ Authorize.net ] [ Cybersource ]
+
+Current active gateway: Authorize.net
+Checkout status: Blocked because Authorize.net credentials are missing
+Then rules:
+
+If active gateway = AUTHORIZE_NET, blockers check Authorize.net.
+If active gateway = CYBERSOURCE, blockers check Cybersource.
+Cybersource cannot be selected as active unless:
+credentials are saved
+test connection has passed
+environment is explicitly confirmed
+Checkout, refunds, voids must route based on Payment.provider.
+So right now: Cybersource is a configured/readiness provider, not the live payment engine. The UI should make that much clearer.
+
+
+
+
+
+18:36
+User attachment
+(No content)
+No, it is not fully configured.
+
+From that screenshot, you have three separate issues:
+
+Authorize.net is still the active/live checkout blocker
+
+The global blocker banner is only complaining about Authorize.net:
+AUTHORIZE_NET_API_LOGIN_ID missing
+AUTHORIZE_NET_TRANSACTION_KEY missing
+That strongly suggests the app still considers Authorize.net the current checkout gateway.
+Cybersource is also not configured
+
+In System Checks, Cybersource shows:
+APP_ENCRYPTION_KEY missing
+Merchant ID missing
+Key ID missing
+Shared Secret missing
+Because APP_ENCRYPTION_KEY is missing, you cannot save Cybersource credentials from the dashboard yet.
+NEXT_PUBLIC_APP_URL is missing
+
+That affects absolute public links in emails, QR/ticket links, redirects, and share URLs.
+This should be set before launch.
+So the real status is:
+
+Authorize.net: not configured
+Cybersource: not configured
+Active checkout gateway: still effectively Authorize.net
+Credential editing: blocked because APP_ENCRYPTION_KEY is missing
+App URL: incomplete because NEXT_PUBLIC_APP_URL is missing
+Immediate next steps:
+
+Add APP_ENCRYPTION_KEY to Replit Secrets.
+Generate it with:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+Add NEXT_PUBLIC_APP_URL.
+Use your production public URL, for example:
+https://app.okugroup.com
+Restart the app/workflows so secrets load.
+
+Go back to /admin/payments?tab=cybersource.
+
+Enter:
+
+Merchant ID
+Key ID
+Shared Secret
+environment: test
+Save.
+
+Run Test Connection.
+
+Even after that, Cybersource will be configured, but not automatically the live checkout engine until you implement the active gateway selection/runtime adapter layer.
+
+
+
+
+
+18:39

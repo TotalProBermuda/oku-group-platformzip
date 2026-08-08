@@ -1,0 +1,44 @@
+Review #168: improved, but I’d hold for one more hardening pass.
+
+The prior blockers are mostly addressed:
+
+- Event-referrer route now returns canonical 409 shape for `merge_required`.
+- `blocked` now maps to controlled 409 in `/api/v1/event-referrers`.
+- `createEventReferrer` now bridges `ReferralActor.legacyEventReferrerAssignmentId` to the new assignment when safe.
+- Duplicate `referral.actor.merge_required` audit writes were removed from `ensureHostReferralActor` / `createEventReferrer`; relying on the dedupe service is cleaner for #170.
+- Event bridge exactness tests are still good.
+
+Remaining issues:
+
+P0 — Confirm real `eventReferrerService.ts` is compile-clean.
+The pasted diff still shows interleaved old/new code inside `ensureHostReferralActor` and `provisionHostPersonalReferrer`. If real, it is not mergeable. If diff noise, confirm with scoped typecheck.
+
+P1 — Wrap `createEventReferrer` actor provisioning + assignment creation + bridge update in one transaction.
+Right now `findOrLinkReferralActor` can mutate/create/link/reactivate an actor before `eventReferrerAssignment.create()` succeeds. If assignment creation fails after that, you can leave behind an actor/link mutation without the event assignment anchor.
+
+`findOrLinkReferralActor` accepts a transaction client, so use it:
+- transaction starts
+- dedupe preflight/mutation runs inside tx
+- assignment is created inside tx
+- `legacyEventReferrerAssignmentId` bridge update runs inside tx
+- commit only if all succeed
+
+P1 — Host personal referrer can leave an active assignment when actor provisioning returns merge_required.
+In `provisionHostPersonalReferrer`, the new/reactivated assignment is created/promoted before `ensureHostReferralActor` returns. If `ensureHostReferralActor` returns `mergeRequired`, the function returns `{ ok:false }` but the assignment may remain active without an actor bridge.
+
+That can produce a “QR assignment exists but identity is unresolved” state.
+
+Fix options:
+- run assignment creation/reactivation + actor bridge inside a transaction and roll back on merge_required, or
+- mark the assignment blocked/invited/inactive on merge_required so it cannot be treated as a valid active personal referrer assignment.
+
+P1 — Host `/me` conflict response is too quiet for admin resolution.
+`/api/v1/host/me` only logs `candidateActorId` to console. If no user-facing behavior should change, okay, but at minimum make sure the conflict is visible in AuditLog from the dedupe service with enough metadata to resolve later. Do not rely on console logs for operational resolution.
+
+P2 — Add transaction/failure tests.
+Add tests for:
+- `createEventReferrer`: if assignment create fails, actor bridge/create/link changes do not persist.
+- `provisionHostPersonalReferrer`: merge_required does not leave an active unbridged assignment.
+
+Verdict:
+The design is right, but not quite merge-ready until event assignment provisioning and host personal assignment provisioning are atomic or explicitly blocked on merge conflicts.

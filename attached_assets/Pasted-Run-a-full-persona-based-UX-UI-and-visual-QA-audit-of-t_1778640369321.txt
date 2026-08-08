@@ -1,0 +1,161 @@
+Run a full persona-based UX/UI and visual QA audit of the OKÜ webapp.
+
+Goal:
+Produce a robust report that Codex can later assess for launch readiness, visual polish, UX gaps, broken flows, and persona-specific friction.
+
+Do not make code changes in this task unless a page cannot load due to a trivial compile/runtime issue. This task is discovery/reporting only.
+
+Personas to test:
+1. Public guest / unauthenticated visitor
+2. Logged-in customer / attendee
+3. Referrer
+4. Influencer
+5. Partner
+6. Restaurant host / staff scanner
+7. Admin Commercial
+8. Superadmin
+9. Finance / payout operator if role exists
+10. Support/admin operator if support tools exist
+
+For each persona, audit:
+
+A. Navigation and first impression
+- What page do they land on?
+- Is the primary action obvious?
+- Is the page visually premium and consistent with OKÜ?
+- Are labels understandable to a non-technical user?
+- Are there confusing or missing menu items?
+
+B. Core workflow
+Test the main job-to-be-done for that persona.
+
+Examples:
+- Guest: browse event → view details → checkout path
+- Customer: view tickets/orders
+- Referrer: access QR → share link → view bookings → view earnings/payout status
+- Influencer: invite/share → see attribution/performance
+- Partner: view sessions/attendees/sales
+- Host/staff: scan ticket/QR → handle valid/already-used/invalid result
+- Superadmin: payments, commerce settings, users, orders, tickets, support, payouts
+- Admin Commercial: create/manage operational items without Superadmin-only access
+
+C. Visual QA
+Check:
+- spacing
+- alignment
+- typography hierarchy
+- button consistency
+- card density
+- color contrast
+- mobile responsiveness
+- empty states
+- loading states
+- error states
+- dark-mode/light-mode consistency
+- dropdown/modal/drawer behavior
+- text overflow
+- sticky headers/footers
+- tables on mobile
+- screenshots where issues appear
+
+D. Trust and operations clarity
+Specifically assess whether users can understand:
+- what happened
+- what they need to do next
+- whether money/tickets/referrals/payouts are pending, approved, blocked, paid, cancelled, refunded, or disputed
+- who to contact for help
+- whether support/ticketing exists
+- whether payout timing and minimum payout rules are clear
+
+E. Launch readiness gaps
+Classify every issue as:
+- P0 launch blocker
+- P1 should fix before public launch
+- P2 post-launch improvement
+- P3 future product enhancement
+
+F. Screenshot evidence
+For every meaningful issue, include:
+- route URL
+- persona
+- viewport size tested
+- screenshot path or description
+- expected behavior
+- actual behavior
+- severity
+- recommended fix
+
+Required routes to inspect at minimum:
+Public:
+- /
+- /en
+- /restaurants
+- /experiences
+- /membership
+- /careers
+- event/experience detail route if available
+- checkout flow if available
+
+Account/customer:
+- /account or /me if available
+- /tickets
+- /orders
+
+Referrer/influencer/partner:
+- /referrer/dashboard
+- /influencer/dashboard
+- /influencer/referrer-dashboard
+- /partner/dashboard
+- /partner/series/[id] if seeded data allows
+
+Staff:
+- /staff/check-in
+
+Admin/Superadmin:
+- /admin
+- /admin/payments
+- /admin/commerce/settings
+- /admin/orders
+- /admin/tickets
+- /admin/revenue
+- /admin/revenue/sessions
+- /admin/revenue/obligations
+- /admin/revenue/review
+- /admin/revenue/events
+- /admin/users
+- /admin/experiences
+- /admin/menus
+- /admin/payouts if available
+- /admin/support if available
+
+Testing requirements:
+- Desktop viewport: 1440px wide
+- Mobile viewport: iPhone-sized
+- Test both light/dark mode if available
+- Test unauthenticated redirects
+- Test role-based access boundaries
+- Record browser console errors
+- Record network/API errors
+- Note any pages that 404, 500, redirect incorrectly, or render blank
+
+Output format:
+Create a Markdown report at:
+
+docs/ux-persona-audit-[date].md
+
+Report structure:
+1. Executive Summary
+2. Persona-by-Persona Findings
+3. P0 Launch Blockers
+4. P1 Pre-Launch Fixes
+5. P2 Post-Launch Improvements
+6. Visual Design System Issues
+7. Mobile UX Issues
+8. Trust / Payments / Payout Clarity Issues
+9. Support / Communication Gaps
+10. Screenshots Index
+11. Recommended Fix Order
+
+Important:
+Do not over-focus on code architecture. This is a product, UX, visual, trust, and launch-readiness audit.
+Be blunt. If something looks cheap, confusing, incomplete, inconsistent, or operationally risky, say so.

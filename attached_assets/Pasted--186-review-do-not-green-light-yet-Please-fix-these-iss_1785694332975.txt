@@ -1,0 +1,44 @@
+#186 review: do not green-light yet. Please fix these issues before #200 builds on the durable outbox.
+
+P0 fixes required:
+
+1. Reservation creation must not enqueue RESERVATION_CONFIRMED unconditionally.
+In src/app/api/reservations/route.ts:
+- Always enqueue RESERVATION_REQUESTED inside the reservation transaction.
+- Enqueue RESERVATION_CONFIRMED only if res.status === "CONFIRMED".
+- If res.status === "PENDING_APPROVAL", do not enqueue RESERVATION_CONFIRMED.
+- Do not add RESERVATION_PENDING_APPROVAL in this task unless the Prisma enum/migration already exists.
+
+2. createStreetsideBooking must commit business action + outbox intent atomically.
+Currently it appears to create the reservation, then enqueueLedgerEvent(prisma, ...) outside the transaction.
+Fix:
+- Wrap the streetside reservation creation and RESERVATION_REQUESTED outbox row in the same prisma.$transaction.
+- Do not leave this as a best-effort post-create enqueue.
+
+3. Verify POS_CHECK_CLOSED exists in LedgerEventType.
+#182’s documented event vocabulary does not list POS_CHECK_CLOSED.
+If POS_CHECK_CLOSED is not in prisma/schema.prisma:
+- Do not enqueue it.
+- Either use the existing valid event vocabulary or create a separate migration/task to add POS_CHECK_CLOSED.
+- Do not silently cast an invalid string to LedgerEventType.
+
+P1 fixes required:
+
+4. Outbox idempotency.
+The migration currently indexes idempotencyKey but does not enforce uniqueness.
+Either:
+- add a unique constraint for idempotencyKey if keys are globally deterministic, or
+- document why duplicate outbox rows are allowed and prove emitLedgerEvent dedupe makes this safe.
+Preferred: unique deterministic idempotencyKey at the outbox layer.
+
+5. Fix misleading comments in ledgerOutboxService.
+The function rethrows on enqueue failure, which is correct because the business transaction must roll back.
+Update comments that say “Never throws” / “swallows errors.”
+
+After fixes, report:
+- changed files
+- prisma validate/generate result
+- TypeScript result
+- proof that PENDING_APPROVAL reservations enqueue REQUESTED only, not CONFIRMED
+- proof that streetside booking enqueues outbox inside the same transaction
+- confirmation whether POS_CHECK_CLOSED exists in LedgerEventType

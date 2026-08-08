@@ -1,0 +1,128 @@
+I would not green-light #222 exactly as written yet. It is close, but there are a few places where it could build the right-looking rule engine on top of wrong payout math.
+Main Red-Team Findings
+P0 — “Do not re-audit INVU fields” is too dangerous.
+For financial payout logic, Replit should not skip verification. Even if fields were “pre-confirmed,” the task must still verify with code evidence that the minting service is using the correct fields. The difference between gross - tax and true eligible net is material.
+Bad assumption:
+TableSession.commissionableCents = gross - tax → eligibleNetRevenueCents
+This may still include tips, gratuity, service charges, discounts, refunds, or voids depending on how INVU normalizes gross.
+Correct requirement:
+eligibleNetRevenueCents =
+netRevenueCents
+- refundCents
+- voidCents
+- excludedItemsCents
+Only use commissionableCents if code proves it already excludes tax, tips, gratuity, service charges, discounts, refunds, and voids.
+P0 — Service charges cannot simply be ignored.
+The task says service charges are absent, so exclude from formula. That is not enough. If service charges are absent as a separate field but included in gross/net, commissions may be inflated.
+Replit must confirm one of:
+service charges are not present in INVU totals
+or
+service charges are included but can be excluded
+or
+service charges are unknown, so allocations require manual review
+P0 — LedgerEntry bridge may not be compatible with payout batches.
+The task says “do not change payoutBatchService,” which is fine only if LedgerEntry already supports:
+sourceType = COMMISSION_ALLOCATION
+sourceId = allocationId
+amountCents
+currency
+beneficiary / referrer identity
+status
+idempotency key
+If not, the bridge will create records that payout batches cannot safely aggregate or dedupe.
+P1 — Rule resolution is underspecified for private events.
+The schema has:
+scopeType: GLOBAL / VENUE / REFERRER_ACTOR / CAMPAIGN_OFFER
+tier: PRIVATE_EVENT
+But the resolver says private-event assignment is level 1. There is no explicit PRIVATE_EVENT or ASSIGNMENT scope type. That can become muddy.
+Better:
+scopeType:
+GLOBAL
+VENUE
+REFERRER_ACTOR
+CAMPAIGN_OFFER
+PRIVATE_EVENT
+Then private event rules are unambiguous.
+P1 — “version auto-increment per scope” is risky in Prisma.
+Auto-increment per scope is not native. If two admins create rules at the same time, version collisions can happen unless handled transactionally.
+Require:
+@@unique([scopeType, scopeId, tier, version])
+and assign version inside a transaction.
+P1 — Referrer tier must be explicit.
+Do not infer tier from role alone. A taxi can become trusted. A concierge can be standard. A partner-created referrer may inherit partner terms.
+Need a real source of truth:
+ReferralActor.commissionTier
+or equivalent.
+Corrected Replit Instruction
+Revise #222 before implementation.
+
+This is a financial calculation task. Do not skip the INVU audit. Before writing commission-rule code, verify with file paths and line references exactly how TableSession.commissionableCents, netRevenueCents, discountCents, taxCents, tipCents, refundCents, and guestCount are populated and used.
+
+Hard correction:
+Do not assume commissionableCents = eligibleNetRevenueCents unless code proves it excludes tax, tips, gratuity, service charges, discounts, refunds, voids, and excluded items.
+
+If service charges are not separately captured, determine whether they are:
+1. absent from INVU totals,
+2. included but removable,
+3. included and not removable.
+
+If #3, mark those allocations HELD_FOR_REVIEW rather than auto-approved.
+
+Dynamic rule formula remains:
+
+percentageComponent =
+min(eligibleNetRevenueCents * percentageBps / 10000, percentageCapCents ?? infinity)
+
+perPersonComponent =
+verifiedGuestCount * perPersonCents
+
+grossCommission =
+max(percentageComponent, perPersonComponent)
+
+maxTakeRateCap =
+eligibleNetRevenueCents * maxTakeRateBps / 10000
+
+finalCommission =
+min(grossCommission, maxTakeRateCap)
+
+But eligibleNetRevenueCents must be derived from verified POS/INVU close data, not gross total.
+
+Schema corrections:
+- Add CommissionRule scopeType PRIVATE_EVENT.
+- Add explicit ruleVersionId on CommissionAllocation.
+- Add full calculation trace fields.
+- Confirm ReferralActor has an explicit commissionTier; if not, add one or document existing equivalent.
+- Ensure LedgerEntry can reference CommissionAllocation idempotently. If not, add sourceType/sourceId or equivalent before bridging.
+
+Resolution order:
+1. PRIVATE_EVENT scoped rule
+2. CAMPAIGN_OFFER scoped rule
+3. REFERRER_ACTOR scoped rule
+4. referrer commissionTier default
+5. VENUE default
+6. GLOBAL STANDARD default
+7. hardcoded fallback only as emergency, logged as configuration warning
+
+Batch payout requirement:
+CommissionAllocation determines what is owed.
+LedgerEntry makes it payable.
+PayoutBatch executes payment.
+Do not let Cybersource, ACH, or any payment rail determine the commission amount.
+
+Tests must include:
+- $2,000 eligible net, 7 guests, STANDARD → $35
+- $2,000 eligible net, 7 guests, TRUSTED → $50
+- $2,000 eligible net, 7 guests, PREMIUM → $100
+- low-spend large party capped by maxTakeRateBps
+- refunds reduce or block payout
+- tips/tax excluded
+- missing guest count falls back safely
+- service charge unknown → HELD_FOR_REVIEW
+- duplicate bridge does not create duplicate LedgerEntry
+Verdict
+#222 is the right task, but it needs one correction in posture:
+It should not say:
+INVU data audit result pre-confirmed, do not re-audit.
+It should say:
+INVU data appears available, but must be verified in code before commission automation.
+That is the difference between a clean payout engine and a future dispute engine.

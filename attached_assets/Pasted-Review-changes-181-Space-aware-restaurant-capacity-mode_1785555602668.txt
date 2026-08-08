@@ -1,0 +1,2000 @@
+Review changes
+
+#181 – Space-aware restaurant capacity model (RestaurantSpace + CapacityHold)
+prisma/migrations/20260801140000_restaurant_spaces_capacity_holds/migration.sql
+-- Migration: Task #181 — RestaurantSpace and CapacityHold
+--
+-- Adds:
+--   1. CapacityHoldStatus enum
+--   2. RestaurantSpace table (per-venue dining spaces with capacity)
+--   3. CapacityHold table (overlap-aware covers tracking)
+--   4. requestedSpaceId / assignedSpaceId FK columns on Reservation
+--   5. FK constraint + index for LedgerEvent.capacityHoldId → CapacityHold
+--      (the TEXT column itself was added in migration 20260731120000_add_ledger_event_proofpay
+--       as a placeholder; this migration promotes it to a real FK)
+--
+-- All new Reservation columns are nullable — fully default-safe for existing rows.
+-- Step 1: Create CapacityHoldStatus enum
+CREATE TYPE "CapacityHoldStatus" AS ENUM ('ACTIVE', 'RELEASED', 'EXPIRED', 'OVERRIDDEN', 'CANCELLED');
+-- Step 2: Create RestaurantSpace table
+CREATE TABLE "RestaurantSpace" (
+  "id"                TEXT         NOT NULL,
+  "venueId"           TEXT         NOT NULL,
+  "name"              TEXT         NOT NULL,
+  "capacity"          INTEGER      NOT NULL,
+  "reservable"        BOOLEAN      NOT NULL DEFAULT true,
+  "requiresApproval"  BOOLEAN      NOT NULL DEFAULT false,
+  "weatherSensitive"  BOOLEAN      NOT NULL DEFAULT false,
+  "sortOrder"         INTEGER      NOT NULL DEFAULT 0,
+  "isActive"          BOOLEAN      NOT NULL DEFAULT true,
+  "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "RestaurantSpace_pkey" PRIMARY KEY ("id")
+);
+-- Unique constraint: one space name per venue
+ALTER TABLE "RestaurantSpace"
+  ADD CONSTRAINT "RestaurantSpace_venueId_name_key" UNIQUE ("venueId", "name");
+-- FK: RestaurantSpace → Venue
+ALTER TABLE "RestaurantSpace"
+  ADD CONSTRAINT "RestaurantSpace_venueId_fkey"
+  FOREIGN KEY ("venueId") REFERENCES "Venue"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Index for venue-scoped lookups
+CREATE INDEX "RestaurantSpace_venueId_idx" ON "RestaurantSpace"("venueId");
+-- Step 3: Create CapacityHold table
+CREATE TABLE "CapacityHold" (
+  "id"            TEXT                  NOT NULL,
+  "spaceId"       TEXT                  NOT NULL,
+  "reservationId" TEXT                  NOT NULL,
+  "startAt"       TIMESTAMP(3)          NOT NULL,
+  "endAt"         TIMESTAMP(3)          NOT NULL,
+  "partySize"     INTEGER               NOT NULL,
+  "status"        "CapacityHoldStatus"  NOT NULL DEFAULT 'ACTIVE',
+  "expiresAt"     TIMESTAMP(3),
+  "createdAt"     TIMESTAMP(3)          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"     TIMESTAMP(3)          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "CapacityHold_pkey" PRIMARY KEY ("id")
+);
+-- Unique constraint: one hold per (space, reservation) pair
+ALTER TABLE "CapacityHold"
+  ADD CONSTRAINT "CapacityHold_spaceId_reservationId_key" UNIQUE ("spaceId", "reservationId");
+-- FK: CapacityHold → RestaurantSpace
+ALTER TABLE "CapacityHold"
+  ADD CONSTRAINT "CapacityHold_spaceId_fkey"
+  FOREIGN KEY ("spaceId") REFERENCES "RestaurantSpace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- FK: CapacityHold → Reservation
+ALTER TABLE "CapacityHold"
+  ADD CONSTRAINT "CapacityHold_reservationId_fkey"
+  FOREIGN KEY ("reservationId") REFERENCES "Reservation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Composite index for overlap-aware availability query (spaceId + status + window)
+CREATE INDEX "CapacityHold_spaceId_status_startAt_endAt_idx"
+  ON "CapacityHold"("spaceId", "status", "startAt", "endAt");
+-- Index for expiry sweep (status + expiresAt)
+CREATE INDEX "CapacityHold_status_expiresAt_idx"
+  ON "CapacityHold"("status", "expiresAt");
+-- Step 4: Add space FK columns to Reservation
+--   (Both nullable; no backfill required for existing rows.)
+ALTER TABLE "Reservation"
+  ADD COLUMN "requestedSpaceId" TEXT,
+  ADD COLUMN "assignedSpaceId"  TEXT;
+-- FK: Reservation.requestedSpaceId → RestaurantSpace
+ALTER TABLE "Reservation"
+  ADD CONSTRAINT "Reservation_requestedSpaceId_fkey"
+  FOREIGN KEY ("requestedSpaceId") REFERENCES "RestaurantSpace"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- FK: Reservation.assignedSpaceId → RestaurantSpace
+ALTER TABLE "Reservation"
+  ADD CONSTRAINT "Reservation_assignedSpaceId_fkey"
+  FOREIGN KEY ("assignedSpaceId") REFERENCES "RestaurantSpace"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- Indexes for space FK lookups on Reservation
+CREATE INDEX "Reservation_requestedSpaceId_idx" ON "Reservation"("requestedSpaceId");
+CREATE INDEX "Reservation_assignedSpaceId_idx"  ON "Reservation"("assignedSpaceId");
+-- Step 5: Promote LedgerEvent.capacityHoldId to a real FK.
+--   The TEXT column was added as a placeholder in migration
+--   20260731120000_add_ledger_event_proofpay. Now that CapacityHold exists,
+--   we add the FK constraint and index here.
+ALTER TABLE "LedgerEvent"
+  ADD CONSTRAINT "LedgerEvent_capacityHoldId_fkey"
+  FOREIGN KEY ("capacityHoldId") REFERENCES "CapacityHold"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX "LedgerEvent_capacityHoldId_idx" ON "LedgerEvent"("capacityHoldId");
+prisma/schema.prisma
+-0
++10
+model CustomFormWidget {
+  updatedAt DateTime @updatedAt
+}
+// ─── Restaurant Spaces & Capacity ─────────────────────────────────────────────
+enum CapacityHoldStatus {
+  ACTIVE
+  RELEASED
+  EXPIRED
+  OVERRIDDEN
+  CANCELLED
+}
+// ─── Reservation System ───────────────────────────────────────────────────────
+enum ZoneType {
+-0
++1
+model Venue {
+  commissionValidationMode CommissionValidationMode @default(ON_SEATED)
+  zones                  Zone[]
+  spaces                 RestaurantSpace[]
+  reservations           Reservation[]
+  waitlistEntries        ResWaitlistEntry[]
+  privateRequests        PrivateRequest[]
+-0
++51
+model Venue {
+  updatedAt DateTime @updatedAt
+}
+// A named physical dining space within a venue (OKÜ Dining Room, Catch Experience, Terrace, VIP).
+// Capacity is enforced using overlapping-window holds (CapacityHold) so concurrent reservations
+// that share time slots are counted correctly — not just exact-match windows.
+model RestaurantSpace {
+  id                 String   @id @default(cuid())
+  venueId            String
+  name               String
+  capacity           Int      // maximum simultaneous covers
+  reservable         Boolean  @default(true)
+  requiresApproval   Boolean  @default(false)
+  weatherSensitive   Boolean  @default(false)
+  sortOrder          Int      @default(0)
+  isActive           Boolean  @default(true)
+  venue            Venue            @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  capacityHolds    CapacityHold[]
+  requestedByReservations Reservation[] @relation("ReservationRequestedSpace")
+  assignedToReservations  Reservation[] @relation("ReservationAssignedSpace")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([venueId, name])
+  @@index([venueId])
+}
+// Tracks covers held in a RestaurantSpace for a given time window.
+// Overlap-aware: the capacity check counts all ACTIVE holds whose window
+// overlaps the new reservation's window (NOT just exact-match windows).
+model CapacityHold {
+  id            String              @id @default(cuid())
+  spaceId       String
+  reservationId String
+  startAt       DateTime
+  endAt         DateTime
+  partySize     Int
+  status        CapacityHoldStatus  @default(ACTIVE)
+  expiresAt     DateTime?           // set to endAt+buffer; EXPIRED sweep uses this
+  space       RestaurantSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  reservation Reservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ledgerEvents LedgerEvent[]  @relation("LedgerEventCapacityHold")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([spaceId, reservationId])
+  @@index([spaceId, status, startAt, endAt])
+  @@index([status, expiresAt])
+}
+model Zone {
+  id                 String   @id @default(cuid())
+  venueId            String
+-4
++12
+model Reservation {
+  arrivedHeadcount         Int?
+  seatedAt                 DateTime?
+  venue        Venue                  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  zone         Zone?                  @relation(fields: [zoneId], references: [id])
+  guestProfile ResGuestProfile?       @relation(fields: [guestProfileId], references: [id])
+  assignedHost RestaurantHostProfile? @relation(fields: [assignedRestaurantHostId], references: [id])
+  // Space-aware capacity (Task #181). The referrer/guest requests a space;
+  // the host may assign a different one. Attribution is keyed on the session,
+  // not the space — space reassignment NEVER touches referrer anchors.
+  requestedSpaceId String?
+  assignedSpaceId  String?
+  venue          Venue                  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  zone           Zone?                  @relation(fields: [zoneId], references: [id])
+  guestProfile   ResGuestProfile?       @relation(fields: [guestProfileId], references: [id])
+  assignedHost   RestaurantHostProfile? @relation(fields: [assignedRestaurantHostId], references: [id])
+  requestedSpace RestaurantSpace?       @relation("ReservationRequestedSpace", fields: [requestedSpaceId], references: [id])
+  assignedSpace  RestaurantSpace?       @relation("ReservationAssignedSpace", fields: [assignedSpaceId], references: [id])
+  addons                ReservationAddon[]
+  communications        ReservationCommunication[]
+-0
++1
+model Reservation {
+  attributionSession    AttributionSession?        @relation("ReservationAttributionSession")
+  matchProofs           MatchProof[]
+  ledgerEvents          LedgerEvent[]              @relation("LedgerEventReservation")
+  capacityHolds         CapacityHold[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+-0
++2
+model Reservation {
+  @@index([zoneId, reservationDate])
+  @@index([status])
+  @@index([contactEmail])
+  @@index([requestedSpaceId])
+  @@index([assignedSpaceId])
+}
+model ReservationAddon {
+-1
++1
+model LedgerEvent {
+  // Nullable FKs to domain entities — set whichever apply to this event
+  attributionSessionId   String?
+  reservationId          String?
+  capacityHoldId         String?          // reserved for future CapacityHold model
+  capacityHoldId         String?
+  commissionAllocationId String?
+  // Payload snapshot (JSONB) — structured fields extracted from rawPayloadRef
+-0
++1
+model LedgerEvent {
+  attributionSession   AttributionSession?   @relation("LedgerEventAttributionSession", fields: [attributionSessionId], references: [id], onDelete: SetNull)
+  reservation          Reservation?          @relation("LedgerEventReservation", fields: [reservationId], references: [id], onDelete: SetNull)
+  capacityHold         CapacityHold?         @relation("LedgerEventCapacityHold", fields: [capacityHoldId], references: [id], onDelete: SetNull)
+  commissionAllocation CommissionAllocation? @relation("LedgerEventCommissionAllocation", fields: [commissionAllocationId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+-0
++1
+model LedgerEvent {
+  @@index([idempotencyKey])
+  @@index([attributionSessionId])
+  @@index([reservationId])
+  @@index([capacityHoldId])
+  @@index([commissionAllocationId])
+  @@index([occurredAt])
+  @@index([confidenceClass])
+prisma/seed.ts
+-0
++26
+async function main() {
+    });
+  }
+  // ─── Restaurant Spaces (Task #181 — idempotent upsert) ─────────────────────
+  // Four permanent OKÜ dining spaces. Keyed by (venueId, name) so running
+  // the seed twice or on an existing DB never creates duplicate rows.
+  const spaceData = [
+    { name: "OKÜ Dining Room",   capacity: 27, sortOrder: 0, weatherSensitive: false },
+    { name: "Catch Experience",  capacity: 24, sortOrder: 1, weatherSensitive: false },
+    { name: "Terrace",           capacity: 42, sortOrder: 2, weatherSensitive: true  },
+    { name: "VIP",               capacity: 10, sortOrder: 3, weatherSensitive: false, requiresApproval: true },
+  ];
+  for (const s of spaceData) {
+    await prisma.restaurantSpace.upsert({
+      where: { venueId_name: { venueId: goldHouse.id, name: s.name } },
+      update: { capacity: s.capacity, sortOrder: s.sortOrder, weatherSensitive: s.weatherSensitive, requiresApproval: (s as any).requiresApproval ?? false },
+      create: {
+        venueId: goldHouse.id,
+        name: s.name,
+        capacity: s.capacity,
+        sortOrder: s.sortOrder,
+        weatherSensitive: s.weatherSensitive,
+        requiresApproval: (s as any).requiresApproval ?? false,
+        reservable: true,
+        isActive: true,
+      },
+    });
+  }
+  // Compensation Plans
+  const planHostStreetside = await prisma.compensationPlan.create({
+    data: { name: "Streetside Host — Flat per Cover", appliesToType: "STREETSIDE_HOST", modelType: "FLAT_PER_SEATED_COVER", flatPerCoverCents: 200, isActive: true },
+src/app/admin/spaces/page.tsx
+"use client";
+import { useState, useEffect } from "react";
+type Space = {
+  id: string;
+  venueId: string;
+  name: string;
+  capacity: number;
+  reservable: boolean;
+  requiresApproval: boolean;
+  weatherSensitive: boolean;
+  sortOrder: number;
+  isActive: boolean;
+  venue: { id: string; name: string; slug: string };
+  _count?: { capacityHolds: number };
+};
+type Venue = { id: string; name: string; slug: string };
+export default function SpacesAdminPage() {
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = { venueId: "", name: "", capacity: 0, reservable: true, requiresApproval: false, weatherSensitive: false, sortOrder: 0 };
+  const [form, setForm] = useState(emptyForm);
+  useEffect(() => {
+    fetchAll();
+  }, []);
+  async function fetchAll() {
+    setLoading(true);
+    try {
+      const [sRes, vRes] = await Promise.all([
+        fetch("/api/v1/admin/spaces"),
+        fetch("/api/v1/admin/venues"),
+      ]);
+      if (sRes.ok) {
+        const d = await sRes.json();
+        setSpaces(d.data ?? []);
+      }
+      if (vRes.ok) {
+        const d = await vRes.json();
+        // /api/v1/admin/venues returns { venues: [...] }
+        setVenues(d.venues ?? d.data ?? []);
+      }
+    } catch (e) {
+      setError("Failed to load spaces");
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function handleCreate() {
+    if (!form.venueId || !form.name || form.capacity < 1) {
+      setError("Venue, name, and a positive capacity are required");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/admin/spaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, capacity: Number(form.capacity) }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error ?? "Failed to create"); return; }
+      setSpaces(prev => [...prev, d.data]);
+      setShowCreate(false);
+      setForm(emptyForm);
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function handleUpdate(id: string, patch: Record<string, unknown>) {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/admin/spaces/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error ?? "Failed to update"); return; }
+      setSpaces(prev => prev.map(s => s.id === id ? { ...s, ...d.data } : s));
+      setEditingId(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function handleDeactivate(id: string) {
+    if (!confirm("Deactivate this space? Existing holds are preserved for history.")) return;
+    await handleUpdate(id, { isActive: false });
+  }
+  async function handleReactivate(id: string) {
+    await handleUpdate(id, { isActive: true });
+  }
+  const BADGE = (label: string, color: string) => (
+    <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", background: color, color: "#fff" }}>{label}</span>
+  );
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px", fontFamily: "var(--font-sans)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: 0 }}>Restaurant Spaces</h1>
+          <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>
+            Manage dining spaces and their capacity. Overlap-aware holds prevent overbooking.
+          </p>
+        </div>
+        <button
+          onClick={() => { setShowCreate(true); setEditingId(null); setError(null); setForm(emptyForm); }}
+          style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+        >
+          + Add Space
+        </button>
+      </div>
+      {error && (
+        <div style={{ padding: "10px 16px", borderRadius: 8, background: "#fff1f2", border: "1px solid #fda4af", color: "#be123c", fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+      {/* Create form */}
+      {showCreate && (
+        <div style={{ background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: 24, marginBottom: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "0 0 16px" }}>New Space</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Venue *</label>
+              <select value={form.venueId} onChange={e => setForm(f => ({ ...f, venueId: e.target.value }))} style={inputStyle}>
+                <option value="">Select venue…</option>
+                {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Space Name *</label>
+              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. OKÜ Dining Room" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Capacity (covers) *</label>
+              <input type="number" min={1} value={form.capacity || ""} onChange={e => setForm(f => ({ ...f, capacity: Number(e.target.value) }))} placeholder="27" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Sort Order</label>
+              <input type="number" min={0} value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))} style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 20, marginTop: 14 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", cursor: "pointer" }}>
+              <input type="checkbox" checked={form.reservable} onChange={e => setForm(f => ({ ...f, reservable: e.target.checked }))} /> Reservable
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", cursor: "pointer" }}>
+              <input type="checkbox" checked={form.requiresApproval} onChange={e => setForm(f => ({ ...f, requiresApproval: e.target.checked }))} /> Requires Approval
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", cursor: "pointer" }}>
+              <input type="checkbox" checked={form.weatherSensitive} onChange={e => setForm(f => ({ ...f, weatherSensitive: e.target.checked }))} /> Weather Sensitive
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+            <button onClick={handleCreate} disabled={saving} style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}>
+              {saving ? "Creating…" : "Create Space"}
+            </button>
+            <button onClick={() => setShowCreate(false)} style={{ padding: "9px 16px", borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>Loading spaces…</div>
+      ) : (
+        <div>
+          {spaces.length === 0 && (
+            <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No spaces configured yet. Add one above.</div>
+          )}
+          {spaces.map(space => (
+            <SpaceRow
+              key={space.id}
+              space={space}
+              editing={editingId === space.id}
+              saving={saving}
+              onEdit={() => { setEditingId(space.id); setShowCreate(false); setError(null); }}
+              onCancelEdit={() => setEditingId(null)}
+              onSave={(patch) => handleUpdate(space.id, patch)}
+              onDeactivate={() => handleDeactivate(space.id)}
+              onReactivate={() => handleReactivate(space.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+const labelStyle: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 };
+const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, color: "#0f172a", boxSizing: "border-box" };
+function SpaceRow({
+  space, editing, saving,
+  onEdit, onCancelEdit, onSave, onDeactivate, onReactivate,
+}: {
+  space: Space; editing: boolean; saving: boolean;
+  onEdit: () => void; onCancelEdit: () => void;
+  onSave: (patch: Record<string, unknown>) => void;
+  onDeactivate: () => void; onReactivate: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: space.name,
+    capacity: space.capacity,
+    reservable: space.reservable,
+    requiresApproval: space.requiresApproval,
+    weatherSensitive: space.weatherSensitive,
+    sortOrder: space.sortOrder,
+  });
+  if (editing) {
+    return (
+      <div style={{ background: "#f0f9ff", border: "1.5px solid #bae6fd", borderRadius: 12, padding: 20, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Name</label>
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Capacity</label>
+            <input type="number" min={1} value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: Number(e.target.value) }))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Sort Order</label>
+            <input type="number" min={0} value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))} style={inputStyle} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", cursor: "pointer" }}>
+            <input type="checkbox" checked={form.reservable} onChange={e => setForm(f => ({ ...f, reservable: e.target.checked }))} /> Reservable
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", cursor: "pointer" }}>
+            <input type="checkbox" checked={form.requiresApproval} onChange={e => setForm(f => ({ ...f, requiresApproval: e.target.checked }))} /> Requires Approval
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", cursor: "pointer" }}>
+            <input type="checkbox" checked={form.weatherSensitive} onChange={e => setForm(f => ({ ...f, weatherSensitive: e.target.checked }))} /> Weather Sensitive
+          </label>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => onSave(form)} disabled={saving} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button onClick={onCancelEdit} style={{ padding: "8px 14px", borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer" }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const utilPct = space._count ? Math.min(100, Math.round((space._count.capacityHolds / space.capacity) * 100)) : 0;
+  return (
+    <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "16px 20px", marginBottom: 10, opacity: space.isActive ? 1 : 0.6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{space.name}</span>
+            {!space.isActive && <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, background: "#94a3b8", color: "#fff" }}>INACTIVE</span>}
+            {space.weatherSensitive && <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, background: "#0ea5e9", color: "#fff" }}>☁ Weather</span>}
+            {space.requiresApproval && <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, background: "#7e22ce", color: "#fff" }}>✓ Approval</span>}
+            {!space.reservable && <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, background: "#64748b", color: "#fff" }}>Not Reservable</span>}
+          </div>
+          <div style={{ display: "flex", gap: 20, marginTop: 6 }}>
+            <span style={{ fontSize: 13, color: "#475569" }}>
+              <strong style={{ color: "#0f172a" }}>{space.capacity}</strong> covers
+            </span>
+            <span style={{ fontSize: 12, color: "#64748b" }}>{space.venue.name}</span>
+            <span style={{ fontSize: 12, color: "#64748b" }}>Sort: {space.sortOrder}</span>
+            {space._count !== undefined && (
+              <span style={{ fontSize: 12, color: space._count.capacityHolds > 0 ? "#059669" : "#94a3b8" }}>
+                {space._count.capacityHolds} active hold{space._count.capacityHolds !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          {/* Utilisation bar */}
+          <div style={{ marginTop: 8, maxWidth: 240 }}>
+            <div style={{ height: 5, borderRadius: 99, background: "#f1f5f9", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${utilPct}%`, borderRadius: 99, background: utilPct > 80 ? "#ef4444" : utilPct > 50 ? "#f59e0b" : "#10b981", transition: "width 0.3s" }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onEdit} style={{ padding: "6px 14px", borderRadius: 7, border: "1.5px solid #e2e8f0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            Edit
+          </button>
+          {space.isActive ? (
+            <button onClick={onDeactivate} style={{ padding: "6px 14px", borderRadius: 7, border: "1.5px solid #fda4af", background: "#fff", color: "#be123c", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Deactivate
+            </button>
+          ) : (
+            <button onClick={onReactivate} style={{ padding: "6px 14px", borderRadius: 7, border: "1.5px solid #86efac", background: "#fff", color: "#15803d", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Reactivate
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+src/app/api/v1/admin/spaces/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { requireSession } from "@/server/auth/session";
+import { prisma } from "@/lib/prisma";
+const ADMIN_ROLES = ["SUPERADMIN", "ADMIN_COMMERCIAL"];
+function isSpacesAdmin(roles: string[]) {
+  return roles.some((r) => ADMIN_ROLES.includes(r));
+}
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const s = await requireSession();
+    if (!isSpacesAdmin(s.roles)) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  } catch (e) {
+    const err = e as { message?: string; status?: number };
+    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+  }
+  const { id } = await params;
+  const space = await prisma.restaurantSpace.findUnique({
+    where: { id },
+    include: {
+      venue: { select: { id: true, name: true, slug: true } },
+      capacityHolds: {
+        where: { status: "ACTIVE" },
+        select: { id: true, partySize: true, startAt: true, endAt: true, reservationId: true },
+        orderBy: { startAt: "asc" },
+        take: 20,
+      },
+    },
+  });
+  if (!space) return NextResponse.json({ ok: false, error: "Space not found" }, { status: 404 });
+  return NextResponse.json({ ok: true, data: space });
+}
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const s = await requireSession();
+    if (!isSpacesAdmin(s.roles)) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  } catch (e) {
+    const err = e as { message?: string; status?: number };
+    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+  }
+  const { id } = await params;
+  const body = await req.json();
+  const { name, capacity, reservable, requiresApproval, weatherSensitive, sortOrder, isActive } = body;
+  const existing = await prisma.restaurantSpace.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) return NextResponse.json({ ok: false, error: "Space not found" }, { status: 404 });
+  const update: Record<string, unknown> = {};
+  if (name !== undefined) update.name = name;
+  if (capacity !== undefined) {
+    if (typeof capacity !== "number" || capacity < 1)
+      return NextResponse.json({ ok: false, error: "capacity must be a positive number" }, { status: 400 });
+    update.capacity = capacity;
+  }
+  if (reservable !== undefined) update.reservable = reservable;
+  if (requiresApproval !== undefined) update.requiresApproval = requiresApproval;
+  if (weatherSensitive !== undefined) update.weatherSensitive = weatherSensitive;
+  if (sortOrder !== undefined) update.sortOrder = sortOrder;
+  if (isActive !== undefined) update.isActive = isActive;
+  try {
+    const space = await prisma.restaurantSpace.update({ where: { id }, data: update });
+    return NextResponse.json({ ok: true, data: space });
+  } catch (e: unknown) {
+    const err = e as { code?: string };
+    if (err.code === "P2002") {
+      return NextResponse.json({ ok: false, error: "A space with that name already exists in this venue" }, { status: 409 });
+    }
+    return NextResponse.json({ ok: false, error: "Failed to update space" }, { status: 500 });
+  }
+}
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const s = await requireSession();
+    if (!isSpacesAdmin(s.roles)) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  } catch (e) {
+    const err = e as { message?: string; status?: number };
+    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+  }
+  const { id } = await params;
+  const existing = await prisma.restaurantSpace.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) return NextResponse.json({ ok: false, error: "Space not found" }, { status: 404 });
+  // Soft-delete: deactivate rather than hard delete to preserve hold history
+  const space = await prisma.restaurantSpace.update({ where: { id }, data: { isActive: false } });
+  return NextResponse.json({ ok: true, data: space });
+}
+src/app/api/v1/admin/spaces/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { requireSession } from "@/server/auth/session";
+import { requirePermission } from "@/lib/rbac";
+import { prisma } from "@/lib/prisma";
+const ADMIN_ROLES = ["SUPERADMIN", "ADMIN_COMMERCIAL"];
+function isSpacesAdmin(roles: string[]) {
+  return roles.some((r) => ADMIN_ROLES.includes(r));
+}
+export async function GET() {
+  try {
+    const s = await requireSession();
+    if (!isSpacesAdmin(s.roles)) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  } catch (e) {
+    const err = e as { message?: string; status?: number };
+    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+  }
+  const spaces = await prisma.restaurantSpace.findMany({
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    include: {
+      venue: { select: { id: true, name: true, slug: true } },
+      _count: { select: { capacityHolds: { where: { status: "ACTIVE" } } } },
+    },
+  });
+  return NextResponse.json({ ok: true, data: spaces });
+}
+export async function POST(req: NextRequest) {
+  try {
+    const s = await requireSession();
+    if (!isSpacesAdmin(s.roles)) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  } catch (e) {
+    const err = e as { message?: string; status?: number };
+    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+  }
+  const body = await req.json();
+  const { venueId, name, capacity, reservable, requiresApproval, weatherSensitive, sortOrder } = body;
+  if (!venueId || !name || capacity == null) {
+    return NextResponse.json({ ok: false, error: "venueId, name, and capacity are required" }, { status: 400 });
+  }
+  if (typeof capacity !== "number" || capacity < 1) {
+    return NextResponse.json({ ok: false, error: "capacity must be a positive number" }, { status: 400 });
+  }
+  // Check venue exists
+  const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { id: true } });
+  if (!venue) return NextResponse.json({ ok: false, error: "Venue not found" }, { status: 404 });
+  try {
+    const space = await prisma.restaurantSpace.create({
+      data: {
+        venueId,
+        name,
+        capacity: Number(capacity),
+        reservable: reservable ?? true,
+        requiresApproval: requiresApproval ?? false,
+        weatherSensitive: weatherSensitive ?? false,
+        sortOrder: sortOrder ?? 0,
+        isActive: true,
+      },
+    });
+    return NextResponse.json({ ok: true, data: space }, { status: 201 });
+  } catch (e: unknown) {
+    const err = e as { code?: string; message?: string };
+    if (err.code === "P2002") {
+      return NextResponse.json({ ok: false, error: "A space with that name already exists in this venue" }, { status: 409 });
+    }
+    console.error("[POST /api/v1/admin/spaces]", e);
+    return NextResponse.json({ ok: false, error: "Failed to create space" }, { status: 500 });
+  }
+}
+src/app/api/v1/host/bookings/[id]/assign-space/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { requireSession } from "@/server/auth/session";
+import { requirePermission } from "@/lib/rbac";
+import { assignSpace, CapacityExceededError, SpaceAssignmentError, getAvailableCovers } from "@/server/spaces/capacityService";
+import { prisma } from "@/lib/prisma";
+const DEFAULT_DURATION_MINUTES = 120;
+/**
+ * PATCH /api/v1/host/bookings/[id]/assign-space
+ *
+ * Two-phase protocol for safe space assignment:
+ *
+ * Phase 1 — preflight (pure read, no writes):
+ *   Body: { spaceId }
+ *   If available covers ≥ partySize → proceeds to assignment immediately.
+ *   If insufficient → returns HTTP 409 { needsConfirmation: true, warning }.
+ *   Nothing is written. The host must explicitly confirm.
+ *
+ * Phase 2 — confirmed write:
+ *   Body: { spaceId, confirmOverride: true }
+ *   `assignSpace` runs everything in a single advisory-locked transaction:
+ *   old-hold release, capacity recheck, FK update, new hold creation.
+ *   If a concurrent assignment filled the space since the preflight, the
+ *   in-transaction recheck still catches it and throws CapacityExceededError
+ *   (→ 409) with no partial mutation.
+ *
+ * Authorization:
+ *   - Requires host:reservations:checkin.
+ *   - Non-SUPERADMIN callers MUST have a RestaurantHostProfile with venueId.
+ *   - Reservation and space MUST belong to the same venue (all callers,
+ *     including SUPERADMIN).
+ */
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let userId: string;
+  let roles: string[];
+  try {
+    const s = await requireSession();
+    userId = s.userId;
+    roles = s.roles;
+    requirePermission(roles as any, "host:reservations:checkin");
+  } catch (e) {
+    const err = e as { message?: string; status?: number };
+    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+  }
+  const { id: reservationId } = await params;
+  const body = await req.json();
+  const { spaceId, confirmOverride = false } = body as { spaceId?: string; confirmOverride?: boolean };
+  if (!spaceId) {
+    return NextResponse.json({ ok: false, error: "spaceId is required" }, { status: 400 });
+  }
+  // ── Authorization: resolve host venue ────────────────────────────────────
+  let hostVenueId: string | null = null;
+  if (roles.includes("SUPERADMIN")) {
+    // SUPERADMIN bypasses profile scoping but venue equality is still enforced below
+    hostVenueId = null;
+  } else {
+    const profile = await prisma.restaurantHostProfile.findUnique({
+      where: { userId },
+      select: { venueId: true },
+    });
+    if (!profile || !profile.venueId) {
+      return NextResponse.json(
+        { ok: false, error: "Forbidden: no host profile associated with your account" },
+        { status: 403 }
+      );
+    }
+    hostVenueId = profile.venueId;
+  }
+  // Fetch reservation and space in parallel
+  const [reservation, space] = await Promise.all([
+    prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { id: true, venueId: true, partySize: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true },
+    }),
+    prisma.restaurantSpace.findUnique({
+      where: { id: spaceId },
+      select: { id: true, name: true, capacity: true, venueId: true, isActive: true },
+    }),
+  ]);
+  if (!reservation) return NextResponse.json({ ok: false, error: "Reservation not found" }, { status: 404 });
+  if (!space)       return NextResponse.json({ ok: false, error: "Space not found" }, { status: 404 });
+  if (!space.isActive) return NextResponse.json({ ok: false, error: "Space is not active" }, { status: 400 });
+  // ── Venue equality: enforced for every caller including SUPERADMIN ────────
+  if (reservation.venueId !== space.venueId) {
+    return NextResponse.json(
+      { ok: false, error: "Forbidden: reservation and space must belong to the same venue" },
+      { status: 403 }
+    );
+  }
+  // ── Non-SUPERADMIN: reservation must also belong to the host's own venue ──
+  if (hostVenueId !== null && reservation.venueId !== hostVenueId) {
+    return NextResponse.json(
+      { ok: false, error: "Forbidden: reservation belongs to a different venue" },
+      { status: 403 }
+    );
+  }
+  // ── Phase 1: Preflight — pure read, no writes ─────────────────────────────
+  // Only run the read-check when confirmOverride is false. If the check shows
+  // insufficient capacity we return a 409 without touching the database.
+  // Note: assignSpace will re-verify atomically inside its transaction, so
+  // this preflight is purely for the UX warning loop.
+  if (!confirmOverride) {
+    const startAt = new Date(reservation.reservationDate);
+    const endAt = new Date(
+      startAt.getTime() + (reservation.durationMinutes ?? DEFAULT_DURATION_MINUTES) * 60_000
+    );
+    const { available, capacity } = await getAvailableCovers(spaceId, startAt, endAt, reservationId);
+    if (reservation.partySize > available) {
+      return NextResponse.json(
+        {
+          ok: false,
+          needsConfirmation: true,
+          warning: { overCapacity: true, available, capacity, partySize: reservation.partySize },
+        },
+        { status: 409 }
+      );
+    }
+    // Sufficient capacity in the preflight — fall through to assignment.
+    // assignSpace will re-verify atomically; if a concurrent hold was just
+    // written it will re-surface the 409 below via CapacityExceededError.
+  }
+  // ── Phase 2: Atomic assignment ────────────────────────────────────────────
+  // assignSpace wraps everything (advisory lock, hold release, capacity check,
+  // FK update, hold creation) in a single transaction. Throws
+  // CapacityExceededError if capacity is exhausted between preflight and write.
+  try {
+    const { overCapacity, available } = await assignSpace({
+      reservationId,
+      newSpaceId: spaceId,
+      actorId: userId,
+      confirmOverride,
+    });
+    const updated = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: {
+        id: true,
+        assignedSpaceId: true,
+        requestedSpaceId: true,
+        assignedSpace: { select: { id: true, name: true, capacity: true } },
+        requestedSpace: { select: { id: true, name: true, capacity: true } },
+      },
+    });
+    return NextResponse.json({
+      ok: true,
+      data: updated,
+      warning: overCapacity ? { overCapacity: true, available, capacity: space.capacity } : null,
+    });
+  } catch (e) {
+    if (e instanceof CapacityExceededError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          needsConfirmation: true,
+          warning: { overCapacity: true, available: e.available, capacity: e.capacity, partySize: e.partySize },
+        },
+        { status: 409 }
+      );
+    }
+    if (e instanceof SpaceAssignmentError) {
+      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
+    }
+    console.error("[PATCH /api/v1/host/bookings/[id]/assign-space]", e);
+    return NextResponse.json({ ok: false, error: "Failed to assign space" }, { status: 500 });
+  }
+}
+src/app/api/v1/host/spaces/utilisation/route.ts
+import { NextResponse } from "next/server";
+import { requireSession } from "@/server/auth/session";
+import { requirePermission } from "@/lib/rbac";
+import { prisma } from "@/lib/prisma";
+import { getVenueSpaceUtilisation } from "@/server/spaces/capacityService";
+/**
+ * GET /api/v1/host/spaces/utilisation
+ *
+ * Returns per-space utilisation for the current service window using the
+ * overlap-aware CapacityHold query.
+ *
+ * Authorization:
+ *   - Requires host:reservations:checkin.
+ *   - Non-SUPERADMIN callers MUST have a RestaurantHostProfile with a non-null
+ *     venueId — callers without a profile are rejected with 403. SUPERADMIN
+ *     bypasses profile-scoping and falls back to the first venue.
+ */
+export async function GET() {
+  let userId: string;
+  let roles: string[];
+  try {
+    const s = await requireSession();
+    userId = s.userId;
+    roles = s.roles;
+    requirePermission(roles as any, "host:reservations:checkin");
+  } catch (e) {
+    const err = e as { message?: string; status?: number };
+    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+  }
+  let venueId: string | null = null;
+  if (roles.includes("SUPERADMIN")) {
+    // SUPERADMIN: fall back to first venue (admin/dev usage)
+    const venue = await prisma.venue.findFirst({ select: { id: true } });
+    venueId = venue?.id ?? null;
+  } else {
+    // Non-SUPERADMIN: MUST have a RestaurantHostProfile with a venueId
+    const profile = await prisma.restaurantHostProfile.findUnique({
+      where: { userId },
+      select: { venueId: true },
+    });
+    if (!profile || !profile.venueId) {
+      return NextResponse.json(
+        { ok: false, error: "Forbidden: no host profile associated with your account" },
+        { status: 403 }
+      );
+    }
+    venueId = profile.venueId;
+  }
+  if (!venueId) return NextResponse.json({ ok: true, data: [] });
+  const utilisation = await getVenueSpaceUtilisation(venueId);
+  return NextResponse.json({ ok: true, data: utilisation });
+}
+src/components/AdminNav.tsx
+-0
++1
+export default function AdminNav({ labels = {} }: AdminNavProps) {
+    { label: "Commerce",            href: "/admin/commerce/settings",         roles: ["SUPERADMIN"] },
+    { label: "Security",            href: "/admin/security",                  roles: ["SUPERADMIN"] },
+    { label: "Attribution Review",  href: "/admin/attribution-anchor",        roles: ["SUPERADMIN", "ADMIN_COMMERCIAL"] },
+    { label: "Spaces",              href: "/admin/spaces",                    roles: ["SUPERADMIN", "ADMIN_COMMERCIAL"] },
+  ];
+  const tabs = ALL_TABS.filter((t) => t.roles.some((r) => roles.includes(r)));
+src/components/host/HostOperationsBoard.tsx
+-0
++17
+type Handoff = { handoffStatus: string };
+type Addon = { addonType: string; label: string };
+type Zone = { name: string; conceptKey: string };
+type RestaurantSpace = {
+  id: string;
+  name: string;
+  capacity: number;
+};
+type SpaceUtilisation = {
+  id: string;
+  name: string;
+  capacity: number;
+  held: number;
+  available: number;
+  utilPct: number;
+  isActive: boolean;
+  reservable: boolean;
+};
+type Reservation = {
+  id: string;
+  contactName: string;
+-0
++3
+type Reservation = {
+  addons: Addon[];
+  statusLogs: StatusLog[];
+  assignedHost?: { displayName: string } | null;
+  // Space-aware capacity (Task #181)
+  requestedSpace?: RestaurantSpace | null;
+  assignedSpace?: RestaurantSpace | null;
+};
+type WaitlistEntry = {
+-1
++44
+function JourneyTimeline({ logs }: { logs: StatusLog[] }) {
+  );
+}
+function GuestDrawer({ res, zones, onClose, onAction }: { res: Reservation; zones: VenueZone[]; onClose: () => void; onAction: (id: string, status: string, opts?: Record<string, string>) => void }) {
+function GuestDrawer({
+  res, zones, spaces, onClose, onAction,
+}: {
+  res: Reservation; zones: VenueZone[]; spaces: SpaceUtilisation[];
+  onClose: () => void; onAction: (id: string, status: string, opts?: Record<string, string>) => void;
+}) {
+  const t = useTranslation();
+  const [tab, setTab] = useState<"journey" | "actions">("actions");
+  const [tableLabel, setTableLabel] = useState(res.assignedTableLabel ?? "");
+  const [selectedSpaceId, setSelectedSpaceId] = useState(res.assignedSpace?.id ?? "");
+  const [spaceWarning, setSpaceWarning] = useState<{ overCapacity: boolean; available: number; capacity?: number; partySize?: number } | null>(null);
+  const [assigningSpace, setAssigningSpace] = useState(false);
+  const [lossReason, setLossReason] = useState("");
+  const [lossNotes, setLossNotes] = useState("");
+  const [showLossForm, setShowLossForm] = useState(false);
+  const [pendingLossStatus, setPendingLossStatus] = useState("");
+  /**
+   * Two-phase space assignment:
+   *  Phase 1: POST without confirmOverride — if 409+needsConfirmation, show warning.
+   *  Phase 2: POST with confirmOverride:true after host explicitly confirms.
+   */
+  async function handleAssignSpace(forceOverride = false) {
+    if (!selectedSpaceId) return;
+    setAssigningSpace(true);
+    setSpaceWarning(null);
+    try {
+      const body: Record<string, unknown> = { spaceId: selectedSpaceId };
+      if (forceOverride) body.confirmOverride = true;
+      const r = await fetch(`/api/v1/host/bookings/${res.id}/assign-space`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (r.status === 409 && d.needsConfirmation) {
+        // Server returned a preflight warning — show it, do NOT write yet
+        setSpaceWarning(d.warning);
+        return;
+      }
+      if (!r.ok) { alert(d.error ?? "Failed to assign space"); return; }
+      // Success (possibly with post-hoc override note)
+      if (d.warning?.overCapacity) setSpaceWarning(d.warning);
+    } catch (e) {
+      console.error("[assign-space]", e);
+    } finally {
+      setAssigningSpace(false);
+    }
+  }
+  // Three-tier fallback: prefer the new attribution chain, then the legacy
+  // ReservationAttribution row. The session-level `referralActor` covers
+  // RAFNH01-style host-link bookings where no Referrer row exists; the
+-6
++8
+function GuestDrawer({ res, zones, onClose, onAction }: { res: Reservation; zone
+      {/* Guest info */}
+      <div style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+        {[
+          { labelKey: "operations.fieldTime",       val: fmtTime(res.reservationDate) },
+          { labelKey: "operations.fieldZone",        val: res.zone?.name ?? res.conceptRequested ?? "—" },
+          { labelKey: "operations.fieldOccasion",    val: res.occasion ?? "—" },
+          { labelKey: "operations.fieldReferredBy",  val: refName ? `${refName}${refType ? ` (${REFERRER_TYPE_LABEL[refType] ?? refType})` : ""}` : "—" },
+          { labelKey: "operations.fieldTable",       val: res.assignedTableLabel ?? "—" },
+          { labelKey: "operations.fieldCommission",  val: res.commissionEligible ? `✓ ${t("host", "operations.validated")}` : t("host", "operations.pending") },
+          { labelKey: "operations.fieldTime",          val: fmtTime(res.reservationDate) },
+          { labelKey: "operations.fieldZone",           val: res.zone?.name ?? res.conceptRequested ?? "—" },
+          { labelKey: "operations.fieldOccasion",       val: res.occasion ?? "—" },
+          { labelKey: "operations.fieldReferredBy",     val: refName ? `${refName}${refType ? ` (${REFERRER_TYPE_LABEL[refType] ?? refType})` : ""}` : "—" },
+          { labelKey: "operations.fieldTable",          val: res.assignedTableLabel ?? "—" },
+          { labelKey: "operations.fieldCommission",     val: res.commissionEligible ? `✓ ${t("host", "operations.validated")}` : t("host", "operations.pending") },
+          { labelKey: "operations.fieldAssignedSpace",  val: res.assignedSpace?.name ?? "—" },
+          { labelKey: "operations.fieldRequestedSpace", val: res.requestedSpace?.name ?? "—" },
+        ].map(({ labelKey, val }) => (
+          <div key={labelKey}>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>{t("host", labelKey)}</div>
+-0
++34
+function GuestDrawer({ res, zones, onClose, onAction }: { res: Reservation; zone
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+        {tab === "actions" && !showLossForm && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Space assignment — available for all active reservations */}
+            {spaces.length > 0 && !["CANCELLED", "NO_SHOW", "COMPLETED"].includes(res.status) && (
+              <div style={{ marginBottom: 10, padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 8 }}>{t("host", "operations.spaceAssignment")}</div>
+                {spaceWarning?.overCapacity && (
+                  <div style={{ padding: "8px 10px", borderRadius: 6, background: "#fff7ed", border: "1px solid #fed7aa", color: "#c2410c", fontSize: 11, marginBottom: 8 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("host", "operations.spaceWarning")}</div>
+                    <div style={{ fontSize: 10, color: "#92400e", marginBottom: 6 }}>
+                      {spaceWarning.partySize ?? res.partySize} guests · {spaceWarning.available ?? 0} covers free of {spaceWarning.capacity ?? "?"}
+                    </div>
+                    <button onClick={() => { void handleAssignSpace(true); }} disabled={assigningSpace}
+                      style={{ padding: "5px 12px", borderRadius: 5, border: "1.5px solid #c2410c", background: "#c2410c", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      {assigningSpace ? "…" : t("host", "operations.spaceWarningOverride")}
+                    </button>
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <select value={selectedSpaceId} onChange={e => { setSelectedSpaceId(e.target.value); setSpaceWarning(null); }}
+                    style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: "1.5px solid #e2e8f0", fontSize: 12, color: "#0f172a", background: "#fff" }}>
+                    <option value="">{t("host", "operations.spacePlaceholder")}</option>
+                    {spaces.filter(s => s.isActive && s.reservable).map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.held}/{s.capacity}) {s.utilPct >= 100 ? "⚠" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <button onClick={() => { void handleAssignSpace(); }} disabled={!selectedSpaceId || assigningSpace}
+                    style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: selectedSpaceId ? "#0f172a" : "#e2e8f0", color: selectedSpaceId ? "#fff" : "#94a3b8", fontSize: 11, fontWeight: 700, cursor: selectedSpaceId ? "pointer" : "not-allowed" }}>
+                    {assigningSpace ? "…" : t("host", "operations.assignSpace")}
+                  </button>
+                </div>
+              </div>
+            )}
+            {res.status === "ARRIVED" && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", marginBottom: 6 }}>{t("host", "operations.tableAssignment")}</div>
+-0
++1
+export default function HostOperationsBoard({
+  const t = useTranslation();
+  const [reservations, setReservations] = useState(initial);
+  const [waitlist, setWaitlist] = useState(initialWl);
+  const [spaces, setSpaces] = useState<SpaceUtilisation[]>([]);
+  const [waitlistBusy, setWaitlistBusy] = useState<string | null>(null);
+  // Mark-lost / remove handler for stale waitlist entries (Apr 29 2026
+-0
++17
+export default function HostOperationsBoard({
+  const [boardView, setBoardView] = useState<"operations" | "attendance">("operations");
+  const [attendanceSessionId, setAttendanceSessionId] = useState<string>("");
+  // Fetch space utilisation on mount and periodically
+  const refreshSpaces = useCallback(async () => {
+    try {
+      const r = await fetch("/api/v1/host/spaces/utilisation");
+      if (r.ok) {
+        const d = await r.json();
+        setSpaces(d.data ?? []);
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    refreshSpaces();
+    const interval = setInterval(refreshSpaces, 30_000);
+    return () => clearInterval(interval);
+  }, [refreshSpaces]);
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch("/api/v1/host/queue");
+-1
++13
+export default function HostOperationsBoard({
+      {/* Operations View — Zone, Filters, Kanban, Waitlist */}
+      {boardView === "operations" && <><div style={{ display: "flex", gap: 8, padding: "12px 20px", borderBottom: "1px solid #e2e8f0", background: "#fff", overflowX: "auto" }}>
+        {zones.map(z => {
+        {/* Space utilisation (from CapacityHold — overlap-aware) */}
+        {spaces.length > 0 ? spaces.map(s => {
+          const bg = s.utilPct > 85 ? "#ef4444" : s.utilPct > 60 ? "#f59e0b" : "#10b981";
+          return (
+            <div key={s.id} style={{ minWidth: 130, background: "#f8fafc", border: `1px solid ${s.utilPct >= 100 ? "#fda4af" : "#e2e8f0"}`, borderRadius: 10, padding: "10px 12px", flexShrink: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", marginBottom: 5, textTransform: "uppercase" }}>{s.name}</div>
+              <div style={{ height: 5, borderRadius: 3, background: "#e2e8f0", overflow: "hidden", marginBottom: 4 }}>
+                <div style={{ height: "100%", background: bg, width: `${Math.min(s.utilPct, 100)}%`, borderRadius: 3, transition: "width 0.4s" }} />
+              </div>
+              <div style={{ fontSize: 10, color: "#94a3b8" }}>{s.held}/{s.capacity} covers {s.utilPct >= 100 ? "⚠" : ""}</div>
+            </div>
+          );
+        }) : zones.map(z => {
+          const seated = filtered.filter(r => (r.zone?.conceptKey ?? r.conceptRequested) === z.conceptKey && r.status === "SEATED").reduce((s, r) => s + r.partySize, 0);
+          const pct = Math.min(Math.round((seated / z.capacityCovers) * 100), 100);
+          const bg = CONCEPT_BG[z.conceptKey] ?? "#334155";
+-0
++1
+export default function HostOperationsBoard({
+        <GuestDrawer
+          res={activeRes}
+          zones={zones}
+          spaces={spaces}
+          onClose={() => setActiveRes(null)}
+          onAction={handleAction}
+        />
+src/i18n/translations/en/host.json
+-1
++12
+    "fieldCommission": "Commission",
+    "validated": "Validated",
+    "pending": "Pending",
+    "tableAssignment": "Table Assignment"
+    "tableAssignment": "Table Assignment",
+    "fieldAssignedSpace": "Assigned Space",
+    "fieldRequestedSpace": "Requested Space",
+    "spaceAssignment": "Space Assignment",
+    "spacePlaceholder": "Select a dining space…",
+    "assignSpace": "Assign Space",
+    "spacesTitle": "Space Utilisation",
+    "spacesCoversHeld": "{held} of {capacity} covers held",
+    "spaceAvailable": "{n} available",
+    "spaceOverCapacity": "⚠ Over capacity — host override recorded",
+    "spaceWarning": "⚠ This space is at or near capacity. Confirm to proceed.",
+    "spaceWarningOverride": "Proceed anyway"
+  },
+  "streetForm": {
+    "submitButton": "Submit Reservation →",
+src/i18n/translations/es/host.json
+-1
++12
+    "fieldCommission": "Comisión",
+    "validated": "Validado",
+    "pending": "Pendiente",
+    "tableAssignment": "Asignación de mesa"
+    "tableAssignment": "Asignación de mesa",
+    "fieldAssignedSpace": "Espacio asignado",
+    "fieldRequestedSpace": "Espacio solicitado",
+    "spaceAssignment": "Asignación de espacio",
+    "spacePlaceholder": "Seleccionar espacio de comedor…",
+    "assignSpace": "Asignar espacio",
+    "spacesTitle": "Utilización de espacios",
+    "spacesCoversHeld": "{held} de {capacity} cubiertos reservados",
+    "spaceAvailable": "{n} disponibles",
+    "spaceOverCapacity": "⚠ Capacidad excedida — anulación del anfitrión registrada",
+    "spaceWarning": "⚠ Este espacio está al límite de capacidad. Confirma para continuar.",
+    "spaceWarningOverride": "Continuar de todas formas"
+  },
+  "streetForm": {
+    "submitButton": "Enviar Reserva →",
+src/i18n/translations/pt/host.json
+-1
++12
+    "fieldCommission": "Comissão",
+    "validated": "Validado",
+    "pending": "Pendente",
+    "tableAssignment": "Atribuição de mesa"
+    "tableAssignment": "Atribuição de mesa",
+    "fieldAssignedSpace": "Espaço atribuído",
+    "fieldRequestedSpace": "Espaço solicitado",
+    "spaceAssignment": "Atribuição de espaço",
+    "spacePlaceholder": "Selecionar um espaço de refeições…",
+    "assignSpace": "Atribuir espaço",
+    "spacesTitle": "Utilização de espaços",
+    "spacesCoversHeld": "{held} de {capacity} lugares reservados",
+    "spaceAvailable": "{n} disponíveis",
+    "spaceOverCapacity": "⚠ Capacidade excedida — substituição do anfitrião registada",
+    "spaceWarning": "⚠ Este espaço está no limite da capacidade. Confirme para continuar.",
+    "spaceWarningOverride": "Continuar mesmo assim"
+  },
+  "streetForm": {
+    "submitButton": "Enviar Reserva →",
+src/server/host/hostService.ts
+-0
++3
+import { getResendClient, isResendConfigured } from "@/server/invitation/resend"
+import { createAttributionSession } from "@/server/services/invu/identityService";
+import { ensureHostAttributionForReservation } from "@/server/referrals/hostAttributionResolver";
+import { emitLedgerEvent } from "@/server/services/ledger/ledgerEventService";
+// Capacity hold lifecycle is handled inline in transitionStatus using the
+// prisma client directly so the mutations are atomic with the reservation update.
+// createCapacityHold / assignSpace are used by the dedicated assign-space route.
+export const INCLUDE_FULL = {
+  zone: true,
+-0
++3
+export const INCLUDE_FULL = {
+  addons: true,
+  statusLogs: { orderBy: { changedAt: "desc" as const }, take: 10 },
+  assignedHost: true,
+  // Space-aware capacity (Task #181)
+  requestedSpace: { select: { id: true, name: true, capacity: true } },
+  assignedSpace:  { select: { id: true, name: true, capacity: true } },
+};
+export async function getHostQueue(venueId: string) {
+-4
++138
+export async function transitionStatus(
+    });
+  }
+  const reservation = await prisma.reservation.update({
+    where: { id: reservationId },
+    data: update,
+    include: INCLUDE_FULL,
+  // ── Capacity hold lifecycle — ATOMIC with the reservation update ─────────
+  // Hold create (on CONFIRMED with an already-assigned space) and hold release
+  // (on terminal statuses) share the same transaction as the reservation row
+  // update.
+  //
+  // Both this transaction and `assignSpace` acquire advisory locks in the same
+  // deterministic order — reservation lock (category 1) first, then space lock
+  // (category 2) — so they are mutually exclusive on the same reservation,
+  // preventing the race where a terminal transition commits after a concurrent
+  // assignment creates a new ACTIVE hold.
+  //
+  // Ledger events fire after the transaction commits (best-effort).
+  let confirmedHoldId: string | null = null;
+  let confirmedSpaceId: string | null = null;
+  let confirmedOverCapacity = false;
+  let releasedHoldIds: string[] = [];
+  const holdReleaseStatus: "RELEASED" | "CANCELLED" =
+    toStatus === "CANCELLED" ? "CANCELLED" : "RELEASED";
+  const reservation = await prisma.$transaction(async (tx) => {
+    // ── Reservation advisory lock (same category/order as assignSpace) ──────
+    // Serializes this transition with any concurrent assignSpace call on the
+    // same reservation, preventing orphan active holds on terminal reservations.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(1, hashtext(${reservationId}))`;
+    // 1. Capacity hold: create on CONFIRMED (if a space was pre-assigned)
+    if (toStatus === "CONFIRMED" && !isReverse && existing.assignedSpaceId) {
+      // Also acquire the space lock (category 2) and run the overlap-aware
+      // capacity check, so confirmation-created holds obey the same overbooking
+      // guarantee as manually assigned ones.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${existing.assignedSpaceId}))`;
+      const startAt = new Date(existing.reservationDate);
+      const endAt = new Date(startAt.getTime() + (existing.durationMinutes ?? 120) * 60_000);
+      // Capacity check under space advisory lock
+      const space = await tx.restaurantSpace.findUnique({
+        where: { id: existing.assignedSpaceId },
+        select: { capacity: true },
+      });
+      const competing = await tx.capacityHold.findMany({
+        where: {
+          spaceId: existing.assignedSpaceId,
+          status: "ACTIVE",
+          startAt: { lt: endAt },
+          endAt: { gt: startAt },
+          reservationId: { not: reservationId },
+        },
+        select: { partySize: true },
+      });
+      const held = competing.reduce((s, h) => s + h.partySize, 0);
+      const available = (space?.capacity ?? 0) - held;
+      confirmedOverCapacity = existing.partySize > available;
+      // Always create the hold on confirmation (host already assigned the
+      // space; this is an auto-confirm, not a manual override). The
+      // confirmedOverCapacity flag drives post-tx warning events.
+      const hold = await tx.capacityHold.upsert({
+        where: { spaceId_reservationId: { spaceId: existing.assignedSpaceId, reservationId } },
+        create: {
+          spaceId: existing.assignedSpaceId,
+          reservationId,
+          startAt,
+          endAt,
+          partySize: existing.partySize,
+          status: "ACTIVE",
+          expiresAt: new Date(endAt.getTime() + 30 * 60_000),
+        },
+        update: {
+          startAt,
+          endAt,
+          partySize: existing.partySize,
+          status: "ACTIVE",
+          expiresAt: new Date(endAt.getTime() + 30 * 60_000),
+        },
+        select: { id: true },
+      });
+      confirmedHoldId = hold.id;
+      confirmedSpaceId = existing.assignedSpaceId;
+    }
+    // 2. Capacity hold: release on terminal statuses
+    if (["NO_SHOW", "CANCELLED", "COMPLETED"].includes(toStatus) && !isReverse) {
+      const active = await tx.capacityHold.findMany({
+        where: { reservationId, status: "ACTIVE" },
+        select: { id: true },
+      });
+      releasedHoldIds = active.map((h) => h.id);
+      if (releasedHoldIds.length > 0) {
+        await tx.capacityHold.updateMany({
+          where: { id: { in: releasedHoldIds } },
+          data: { status: holdReleaseStatus },
+        });
+      }
+    }
+    // 3. Reservation status update (same transaction)
+    return tx.reservation.update({
+      where: { id: reservationId },
+      data: update,
+      include: INCLUDE_FULL,
+    });
+  });
+  // ── Post-transaction ledger events (best-effort, non-blocking) ───────────
+  if (confirmedHoldId && confirmedSpaceId) {
+    emitLedgerEvent({
+      eventType: "CAPACITY_HOLD_CREATED",
+      source: { system: "host_status_transition" },
+      confidenceClass: "PARTNER_REPORTED_EVENT",
+      idempotencyKey: `capacity_hold:${confirmedHoldId}:created`,
+      capacityHoldId: confirmedHoldId,
+      reservationId,
+      payload: { spaceId: confirmedSpaceId, partySize: existing.partySize, overCapacity: confirmedOverCapacity },
+    }).catch((e) => console.warn("[transitionStatus] CAPACITY_HOLD_CREATED event failed", { err: e }));
+    if (confirmedOverCapacity) {
+      emitLedgerEvent({
+        eventType: "CAPACITY_WARNING_SHOWN",
+        source: { system: "host_status_transition" },
+        confidenceClass: "PARTNER_REPORTED_EVENT",
+        idempotencyKey: `capacity_hold:${confirmedHoldId}:warning`,
+        capacityHoldId: confirmedHoldId,
+        reservationId,
+        payload: { spaceId: confirmedSpaceId, partySize: existing.partySize },
+      }).catch((e) => console.warn("[transitionStatus] CAPACITY_WARNING_SHOWN event failed", { err: e }));
+    }
+  }
+  for (const holdId of releasedHoldIds) {
+    emitLedgerEvent({
+      eventType: "CAPACITY_HOLD_RELEASED",
+      source: { system: "host_status_transition" },
+      confidenceClass: "PARTNER_REPORTED_EVENT",
+      idempotencyKey: `capacity_hold:${holdId}:released`,
+      capacityHoldId: holdId,
+      reservationId,
+      payload: { toStatus: holdReleaseStatus },
+    }).catch((e) => console.warn("[transitionStatus] CAPACITY_HOLD_RELEASED event failed", { holdId, err: e }));
+  }
+  // ── Attribution session lifecycle on quick-action SEATED ─────────────
+  // The formal check-in dialog (POST /api/v1/host/checkin) handles the
+  // full mint-or-advance flow, but hosts also seat bookings via the
+src/server/queue/queue.ts
+-0
++5
+export const attributionAnchorQueue: Queue | null = hasRedis
+export const launchReadinessAlertQueue: Queue | null = hasRedis
+  ? new Queue("launch-readiness-alert", redisConnection)
+  : null;
+// Capacity hold expiry sweep — transitions ACTIVE CapacityHolds to EXPIRED
+// when the service window has passed. Runs every 30 minutes.
+export const capacityExpirySweepQueue: Queue | null = hasRedis
+  ? new Queue("capacity-expiry-sweep", redisConnection)
+  : null;
+export type CommerceJob =
+  | { name: "send_order_email"; data: { orderId: string } }
+src/server/referrals/myReferralsSource.ts
+-0
++1
+export const MY_REFERRALS_INCLUDE = {
+  reservation: {
+    include: {
+      zone: { select: { name: true, conceptKey: true } },
+      assignedSpace: { select: { id: true, name: true } },
+      guestProfile: { select: { fullName: true, email: true } },
+      handoffs: { orderBy: { createdAt: "desc" as const }, take: 1 },
+      tableSessions: {
+-0
++2
+export type ReferralRow = {
+  partySize: number;
+  conceptRequested: string | null;
+  zoneName: string | null;
+  /** Assigned dining space name (from RestaurantSpace). null for ticket sessions. */
+  assignedSpaceName: string | null;
+  /** null for TICKET_PURCHASE sessions (use ticketPurchaseDate instead). */
+  reservationDate: string | null;
+  /** null for reservation/walk-in sessions. */
+-0
++1
+export function projectReferralRow(
+      partySize: ticketCount,
+      conceptRequested: null,
+      zoneName: null,
+      assignedSpaceName: null,
+      reservationDate: null,
+      ticketPurchaseDate: (o.paidAt ?? row.openedAt).toISOString(),
+      reservationStatus: null,
+-0
++1
+export function projectReferralRow(
+    partySize: r.partySize ?? 0,
+    conceptRequested: r.conceptRequested ?? null,
+    zoneName: r.zone?.name ?? null,
+    assignedSpaceName: (r as any).assignedSpace?.name ?? null,
+    reservationDate: r.reservationDate.toISOString(),
+    ticketPurchaseDate: null,
+    reservationStatus: r.status,
+src/server/spaces/capacityService.ts
+/**
+ * Space-aware capacity service (Task #181)
+ *
+ * Capacity is computed using OVERLAPPING time windows — a 7:00–9:00 and an
+ * 8:00–10:00 reservation both hold covers during 8:00–9:00. Exact-match
+ * logic would allow overbooking.
+ *
+ * Deterministic hold idempotency key convention:
+ *   capacity_hold:{holdId}:created
+ *   capacity_hold:{holdId}:released
+ */
+import { prisma } from "@/lib/prisma";
+import type { CapacityHoldStatus } from "@prisma/client";
+import { emitLedgerEvent } from "@/server/services/ledger/ledgerEventService";
+export const DEFAULT_DURATION_MINUTES = 120;
+/** Compute covers currently held in a space for an overlapping window. */
+export async function getHeldCovers(
+  spaceId: string,
+  startAt: Date,
+  endAt: Date,
+  excludeReservationId?: string
+): Promise<number> {
+  // Two windows [A.start, A.end) and [B.start, B.end) overlap iff
+  //   A.start < B.end AND A.end > B.start
+  const holds = await prisma.capacityHold.findMany({
+    where: {
+      spaceId,
+      status: "ACTIVE",
+      startAt: { lt: endAt },
+      endAt: { gt: startAt },
+      ...(excludeReservationId ? { reservationId: { not: excludeReservationId } } : {}),
+    },
+    select: { partySize: true },
+  });
+  return holds.reduce((sum, h) => sum + h.partySize, 0);
+}
+/** Available covers in a space for the given window. */
+export async function getAvailableCovers(
+  spaceId: string,
+  startAt: Date,
+  endAt: Date,
+  excludeReservationId?: string
+): Promise<{ available: number; held: number; capacity: number }> {
+  const space = await prisma.restaurantSpace.findUnique({
+    where: { id: spaceId },
+    select: { capacity: true },
+  });
+  if (!space) throw new Error(`RestaurantSpace ${spaceId} not found`);
+  const held = await getHeldCovers(spaceId, startAt, endAt, excludeReservationId);
+  return { available: space.capacity - held, held, capacity: space.capacity };
+}
+/** Current utilisation for a space within the next DEFAULT_DURATION_MINUTES window. */
+export async function getCurrentUtilisation(spaceId: string): Promise<{
+  held: number;
+  capacity: number;
+  available: number;
+  utilPct: number;
+}> {
+  const now = new Date();
+  const windowEnd = new Date(now.getTime() + DEFAULT_DURATION_MINUTES * 60_000);
+  const { held, capacity, available } = await getAvailableCovers(spaceId, now, windowEnd);
+  return { held, capacity, available, utilPct: capacity > 0 ? Math.round((held / capacity) * 100) : 0 };
+}
+/** Fetch per-space utilisation for the host board. */
+export async function getVenueSpaceUtilisation(venueId: string): Promise<
+  Array<{
+    id: string;
+    name: string;
+    capacity: number;
+    held: number;
+    available: number;
+    utilPct: number;
+    isActive: boolean;
+    reservable: boolean;
+  }>
+> {
+  const spaces = await prisma.restaurantSpace.findMany({
+    where: { venueId, isActive: true },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, name: true, capacity: true, isActive: true, reservable: true },
+  });
+  const now = new Date();
+  const windowEnd = new Date(now.getTime() + DEFAULT_DURATION_MINUTES * 60_000);
+  return Promise.all(
+    spaces.map(async (s) => {
+      const held = await getHeldCovers(s.id, now, windowEnd);
+      const available = s.capacity - held;
+      return {
+        ...s,
+        held,
+        available,
+        utilPct: s.capacity > 0 ? Math.round((held / s.capacity) * 100) : 0,
+      };
+    })
+  );
+}
+/**
+ * Thrown when a space has insufficient capacity and the caller has not
+ * provided an explicit `confirmOverride`. Nothing is written to the database
+ * when this is thrown — the transaction rolls back completely.
+ */
+export class CapacityExceededError extends Error {
+  constructor(
+    public readonly available: number,
+    public readonly capacity: number,
+    public readonly partySize: number
+  ) {
+    super(`Capacity exceeded: ${available} available, ${partySize} requested`);
+    this.name = "CapacityExceededError";
+  }
+}
+/**
+ * Create an ACTIVE capacity hold for a reservation.
+ *
+ * Uses a PostgreSQL advisory lock (`pg_advisory_xact_lock`) on the spaceId so
+ * concurrent calls for the same space are serialized at the DB level — no two
+ * transactions can both pass the availability check and write a hold
+ * simultaneously, preventing write-skew overbooking.
+ *
+ * `confirmOverride`: when false (default) and capacity is insufficient, the
+ * function throws `CapacityExceededError` and nothing is written. Pass true
+ * only after the host has explicitly confirmed the override.
+ */
+export async function createCapacityHold(opts: {
+  reservationId: string;
+  spaceId: string;
+  startAt: Date;
+  endAt: Date;
+  partySize: number;
+  confirmOverride?: boolean;
+}): Promise<{ holdId: string; overCapacity: boolean; available: number } | null> {
+  const { reservationId, spaceId, startAt, endAt, partySize, confirmOverride = false } = opts;
+  let available = 0;
+  let capacity = 0;
+  let overCapacity = false;
+  const hold = await prisma.$transaction(async (tx) => {
+    // Advisory lock on this space — serializes concurrent capacity checks.
+    // Released automatically when the transaction commits or rolls back.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${spaceId})::bigint)`;
+    const space = await tx.restaurantSpace.findUnique({
+      where: { id: spaceId },
+      select: { capacity: true },
+    });
+    capacity = space?.capacity ?? 0;
+    const existing = await tx.capacityHold.findMany({
+      where: {
+        spaceId,
+        status: "ACTIVE",
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+        reservationId: { not: reservationId },
+      },
+      select: { partySize: true },
+    });
+    const held = existing.reduce((s, h) => s + h.partySize, 0);
+    available = capacity - held;
+    overCapacity = partySize > available;
+    if (overCapacity && !confirmOverride) {
+      throw new CapacityExceededError(available, capacity, partySize);
+    }
+    return tx.capacityHold.upsert({
+      where: { spaceId_reservationId: { spaceId, reservationId } },
+      create: {
+        spaceId,
+        reservationId,
+        startAt,
+        endAt,
+        partySize,
+        status: "ACTIVE",
+        expiresAt: new Date(endAt.getTime() + 30 * 60_000),
+      },
+      update: {
+        startAt,
+        endAt,
+        partySize,
+        status: "ACTIVE",
+        expiresAt: new Date(endAt.getTime() + 30 * 60_000),
+      },
+    });
+  });
+  // Ledger events fire outside the transaction — best-effort, non-blocking
+  emitLedgerEvent({
+    eventType: "CAPACITY_HOLD_CREATED",
+    source: { system: "capacity_service" },
+    confidenceClass: "PARTNER_REPORTED_EVENT",
+    idempotencyKey: `capacity_hold:${hold.id}:created`,
+    capacityHoldId: hold.id,
+    reservationId,
+    payload: { spaceId, partySize, startAt: startAt.toISOString(), endAt: endAt.toISOString(), capacity, overCapacity },
+  }).catch((e) => console.warn("[capacityService] CAPACITY_HOLD_CREATED event failed", { err: e }));
+  if (overCapacity) {
+    emitLedgerEvent({
+      eventType: "CAPACITY_WARNING_SHOWN",
+      source: { system: "capacity_service" },
+      confidenceClass: "PARTNER_REPORTED_EVENT",
+      idempotencyKey: `capacity_hold:${hold.id}:warning`,
+      capacityHoldId: hold.id,
+      reservationId,
+      payload: { spaceId, partySize, available, capacity },
+    }).catch((e) => console.warn("[capacityService] CAPACITY_WARNING_SHOWN event failed", { err: e }));
+  }
+  return { holdId: hold.id, overCapacity, available };
+}
+/**
+ * Emit CAPACITY_OVERRIDDEN_BY_HOST when a host proceeds despite a warning.
+ * Should be called from the host space-assignment handler when overCapacity=true.
+ */
+export async function recordCapacityOverride(holdId: string, reservationId: string, actorId: string): Promise<void> {
+  try {
+    await emitLedgerEvent({
+      eventType: "CAPACITY_OVERRIDDEN_BY_HOST",
+      source: { system: "host_ops" },
+      confidenceClass: "PARTNER_REPORTED_EVENT",
+      idempotencyKey: `capacity_hold:${holdId}:override:${actorId}`,
+      capacityHoldId: holdId,
+      reservationId,
+      payload: { actorId },
+    });
+  } catch (e) {
+    console.warn("[capacityService] CAPACITY_OVERRIDDEN_BY_HOST ledger event failed (non-blocking)", { err: e });
+  }
+}
+/**
+ * Release holds for a reservation when it is cancelled, no-showed, or completed.
+ * Emits CAPACITY_HOLD_RELEASED for each hold transitioned.
+ */
+export async function releaseCapacityHolds(
+  reservationId: string,
+  toStatus: "RELEASED" | "CANCELLED"
+): Promise<void> {
+  const holds = await prisma.capacityHold.findMany({
+    where: { reservationId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  for (const hold of holds) {
+    try {
+      await prisma.capacityHold.update({
+        where: { id: hold.id },
+        data: { status: toStatus },
+      });
+      await emitLedgerEvent({
+        eventType: "CAPACITY_HOLD_RELEASED",
+        source: { system: "capacity_service" },
+        confidenceClass: "PARTNER_REPORTED_EVENT",
+        idempotencyKey: `capacity_hold:${hold.id}:released`,
+        capacityHoldId: hold.id,
+        reservationId,
+        payload: { toStatus },
+      });
+    } catch (e) {
+      console.warn("[capacityService] releaseCapacityHolds failed for hold", { holdId: hold.id, err: e });
+    }
+  }
+}
+/**
+ * Thrown when `assignSpace` is called on a terminal or otherwise ineligible
+ * reservation, or when the target space is not reservable.
+ */
+export class SpaceAssignmentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SpaceAssignmentError";
+  }
+}
+/** Reservation statuses that permanently close a reservation. */
+const TERMINAL_STATUSES = ["NO_SHOW", "CANCELLED", "COMPLETED"] as const;
+/**
+ * Assign a space to a reservation atomically.
+ *
+ * ALL mutations — old-hold release, FK update, capacity check, new-hold
+ * creation — happen inside a single transaction protected by TWO PostgreSQL
+ * advisory locks acquired in a deterministic order:
+ *   1. Reservation lock — serializes concurrent assignments to the SAME
+ *      reservation from different spaces, preventing orphan holds.
+ *   2. Space lock     — serializes concurrent assignments to the SAME space,
+ *      preventing write-skew overbooking.
+ *
+ * Invariants enforced inside the transaction:
+ *   - Reservation must not be in a terminal status.
+ *   - Target space must have `isActive = true` and `reservable = true`.
+ *   - ALL existing active holds for the reservation are released (not just the
+ *     previously assigned one), preventing orphan holds.
+ *   - Capacity is rechecked under the advisory lock.
+ *
+ * Throws `CapacityExceededError` when over-capacity and `confirmOverride` is
+ * false (nothing written). Throws `SpaceAssignmentError` for invariant
+ * violations. Attribution is NEVER touched by space assignment.
+ */
+export async function assignSpace(opts: {
+  reservationId: string;
+  newSpaceId: string;
+  actorId: string;
+  confirmOverride?: boolean;
+}): Promise<{ overCapacity: boolean; available: number }> {
+  const { reservationId, newSpaceId, actorId, confirmOverride = false } = opts;
+  let overCapacity = false;
+  let available = 0;
+  let capacity = 0;
+  let holdId: string | null = null;
+  let releasedHoldIds: string[] = [];
+  await prisma.$transaction(async (tx) => {
+    // ── Advisory locks in deterministic order ─────────────────────────────
+    // Acquire reservation lock first (category 1), then space lock (category 2).
+    // All callers follow this order, so no deadlock is possible.
+    // pg_advisory_xact_lock(int4, int4): first arg = category, second = key.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(1, hashtext(${reservationId}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${newSpaceId}))`;
+    // ── Re-read reservation under lock ─────────────────────────────────────
+    const reservation = await tx.reservation.findUniqueOrThrow({
+      where: { id: reservationId },
+      select: { partySize: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true, status: true },
+    });
+    // Invariant: reservation must not be terminal
+    if ((TERMINAL_STATUSES as ReadonlyArray<string>).includes(reservation.status)) {
+      throw new SpaceAssignmentError(
+        `Cannot assign space to a ${reservation.status} reservation`
+      );
+    }
+    // ── Re-read space under lock ────────────────────────────────────────────
+    const space = await tx.restaurantSpace.findUnique({
+      where: { id: newSpaceId },
+      select: { capacity: true, isActive: true, reservable: true },
+    });
+    // Invariant: space must be active and reservable
+    if (!space) {
+      throw new SpaceAssignmentError("Space not found");
+    }
+    if (!space.isActive || !space.reservable) {
+      throw new SpaceAssignmentError(
+        "Space is not available for assignment (inactive or non-reservable)"
+      );
+    }
+    const startAt = new Date(reservation.reservationDate);
+    const endAt = new Date(
+      startAt.getTime() + (reservation.durationMinutes ?? DEFAULT_DURATION_MINUTES) * 60_000
+    );
+    // ── Capacity check under space advisory lock ────────────────────────────
+    capacity = space.capacity;
+    const competingHolds = await tx.capacityHold.findMany({
+      where: {
+        spaceId: newSpaceId,
+        status: "ACTIVE",
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+        reservationId: { not: reservationId },
+      },
+      select: { partySize: true },
+    });
+    const held = competingHolds.reduce((s, h) => s + h.partySize, 0);
+    available = capacity - held;
+    overCapacity = reservation.partySize > available;
+    if (overCapacity && !confirmOverride) {
+      throw new CapacityExceededError(available, capacity, reservation.partySize);
+    }
+    // ── Release ALL active holds for this reservation ─────────────────────
+    // Releasing ALL (not just the previously assigned space) prevents orphan
+    // holds that could arise from a prior interrupted assignment. Done under
+    // the reservation advisory lock, so no concurrent request can create a
+    // new hold between now and the new upsert below.
+    const toRelease = await tx.capacityHold.findMany({
+      where: { reservationId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    releasedHoldIds = toRelease.map((h) => h.id);
+    if (releasedHoldIds.length > 0) {
+      await tx.capacityHold.updateMany({
+        where: { id: { in: releasedHoldIds } },
+        data: { status: "RELEASED" },
+      });
+    }
+    // ── Update reservation space FK ────────────────────────────────────────
+    await tx.reservation.update({
+      where: { id: reservationId },
+      data: { assignedSpaceId: newSpaceId },
+    });
+    // ── Create / refresh hold for new space ───────────────────────────────
+    const hold = await tx.capacityHold.upsert({
+      where: { spaceId_reservationId: { spaceId: newSpaceId, reservationId } },
+      create: {
+        spaceId: newSpaceId,
+        reservationId,
+        startAt,
+        endAt,
+        partySize: reservation.partySize,
+        status: "ACTIVE",
+        expiresAt: new Date(endAt.getTime() + 30 * 60_000),
+      },
+      update: {
+        startAt,
+        endAt,
+        partySize: reservation.partySize,
+        status: "ACTIVE",
+        expiresAt: new Date(endAt.getTime() + 30 * 60_000),
+      },
+    });
+    holdId = hold.id;
+  }, { timeout: 10_000 });
+  // ── Ledger events — outside the transaction, best-effort ─────────────────
+  for (const oldId of releasedHoldIds) {
+    emitLedgerEvent({
+      eventType: "CAPACITY_HOLD_RELEASED",
+      source: { system: "capacity_service" },
+      confidenceClass: "PARTNER_REPORTED_EVENT",
+      idempotencyKey: `capacity_hold:${oldId}:released`,
+      capacityHoldId: oldId,
+      reservationId,
+      payload: { toStatus: "RELEASED" },
+    }).catch((e) => console.warn("[capacityService] CAPACITY_HOLD_RELEASED event failed", { holdId: oldId, err: e }));
+  }
+  if (holdId) {
+    emitLedgerEvent({
+      eventType: "CAPACITY_HOLD_CREATED",
+      source: { system: "capacity_service" },
+      confidenceClass: "PARTNER_REPORTED_EVENT",
+      idempotencyKey: `capacity_hold:${holdId}:created`,
+      capacityHoldId: holdId,
+      reservationId,
+      payload: { spaceId: newSpaceId, available, capacity, overCapacity },
+    }).catch((e) => console.warn("[capacityService] CAPACITY_HOLD_CREATED event failed", { err: e }));
+    if (overCapacity) {
+      // Override: emit CAPACITY_OVERRIDDEN_BY_HOST after tx commits
+      emitLedgerEvent({
+        eventType: "CAPACITY_OVERRIDDEN_BY_HOST",
+        source: { system: "host_ops" },
+        confidenceClass: "PARTNER_REPORTED_EVENT",
+        idempotencyKey: `capacity_hold:${holdId}:override:${actorId}`,
+        capacityHoldId: holdId,
+        reservationId,
+        payload: { actorId },
+      }).catch((e) => console.warn("[capacityService] CAPACITY_OVERRIDDEN_BY_HOST event failed", { err: e }));
+    }
+  }
+  return { overCapacity, available };
+}
+/**
+ * Expire holds whose expiresAt has passed without reaching a terminal status.
+ * Called by a scheduled job.
+ */
+export async function expireStaleHolds(): Promise<number> {
+  const now = new Date();
+  const stale = await prisma.capacityHold.findMany({
+    where: { status: "ACTIVE", expiresAt: { lt: now } },
+    select: { id: true, reservationId: true },
+  });
+  let count = 0;
+  for (const hold of stale) {
+    try {
+      await prisma.capacityHold.update({
+        where: { id: hold.id },
+        data: { status: "EXPIRED" },
+      });
+      await emitLedgerEvent({
+        eventType: "CAPACITY_HOLD_RELEASED",
+        source: { system: "capacity_expiry_job" },
+        confidenceClass: "PARTNER_REPORTED_EVENT",
+        idempotencyKey: `capacity_hold:${hold.id}:expired`,
+        capacityHoldId: hold.id,
+        reservationId: hold.reservationId,
+        payload: { toStatus: "EXPIRED" },
+      });
+      count++;
+    } catch (e) {
+      console.warn("[capacityService] expireStaleHolds failed for hold", { holdId: hold.id, err: e });
+    }
+  }
+  return count;
+}
+worker/index.ts
+-1
++2
+import { Worker } from "bullmq";
+import { prisma } from "../src/lib/prisma";
+import { redisConnection, invuSyncQueue, invuTokenRotationQueue, retentionSweepQueue, auditAnomalyScanQueue, launchReadinessAlertQueue, attributionAnchorQueue } from "../src/server/queue/queue";
+import { redisConnection, invuSyncQueue, invuTokenRotationQueue, retentionSweepQueue, auditAnomalyScanQueue, launchReadinessAlertQueue, attributionAnchorQueue, capacityExpirySweepQueue } from "../src/server/queue/queue";
+import { handleInvuSyncJob } from "./jobs/invu-sync";
+import { handleInvuTokenRotationJob } from "./jobs/invu-token-rotation";
+import { handleRetentionSweepJob } from "./jobs/retention-sweep";
+import { handleAuditAnomalyScanJob } from "./jobs/audit-anomaly-scan";
+import { handleLaunchReadinessAlertJob } from "./jobs/launch-readiness-alert";
+import { handleAttributionAnchorRetryJob } from "./jobs/attribution-anchor-retry";
+import { handleCapacityExpirySweepJob } from "./jobs/capacity-expiry-sweep";
+if (!process.env.REDIS_URL) {
+  console.warn("REDIS_URL not set. Worker is idle (jobs run inline via safeEnqueue fallback).");
+-1
++1
+function startWorkers() {
+  // Type-narrow the queue references for the rest of this function. We are
+  // already inside `if (process.env.REDIS_URL)` above, so these are non-null
+  // here, but TypeScript doesn't track env-based narrowing across imports.
+  if (!invuSyncQueue || !invuTokenRotationQueue || !retentionSweepQueue || !auditAnomalyScanQueue || !launchReadinessAlertQueue || !attributionAnchorQueue) {
+  if (!invuSyncQueue || !invuTokenRotationQueue || !retentionSweepQueue || !auditAnomalyScanQueue || !launchReadinessAlertQueue || !attributionAnchorQueue || !capacityExpirySweepQueue) {
+    throw new Error("Queue references missing despite REDIS_URL being set");
+  }
+-0
++23
+attributionAnchorQueue.add(
+  },
+).catch((err) => console.warn("[attribution-anchor] Failed to register sweep job:", err));
+// Capacity hold expiry sweep — every 30 minutes. Transitions ACTIVE holds
+// to EXPIRED when the service window has passed with no terminal status.
+const capacityExpirySweepWorker = new Worker(
+  "capacity-expiry-sweep",
+  handleCapacityExpirySweepJob,
+  redisConnection,
+);
+capacityExpirySweepWorker.on("completed", (job, result) =>
+  console.log("Capacity expiry sweep completed", job.id, job.name, result),
+);
+capacityExpirySweepWorker.on("failed", (job, err) =>
+  console.error("Capacity expiry sweep failed", job?.id, err.message),
+);
+capacityExpirySweepQueue.add(
+  "capacity-expiry-sweep-30m",
+  {},
+  {
+    repeat: { every: 30 * 60 * 1000 },
+    jobId: "capacity-expiry-sweep-30m-repeatable",
+  },
+).catch((err) => console.warn("[capacity-expiry-sweep] Failed to register repeatable job:", err));
+console.log("Worker started...");
+} // end startWorkers
+worker/jobs/capacity-expiry-sweep.ts
+import type { Job } from "bullmq";
+import { expireStaleHolds } from "../../src/server/spaces/capacityService";
+/**
+ * BullMQ handler for the periodic capacity hold expiry sweep.
+ * Transitions ACTIVE CapacityHolds to EXPIRED when their service window has
+ * passed with no terminal status. Thin wrapper — all logic lives in
+ * capacityService so it can be invoked from admin triggers or tests too.
+ */
+export async function handleCapacityExpirySweepJob(job: Job): Promise<unknown> {
+  console.log("[capacity-expiry-sweep] starting", job.id, job.name);
+  const expired = await expireStaleHolds();
+  console.log("[capacity-expiry-sweep] finished", { expired });
+  return { expired };
+}

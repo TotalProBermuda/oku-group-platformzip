@@ -1,0 +1,263 @@
+You are working on the OKÜ Hospitality Group Next.js project.
+
+Goal:
+Restructure the existing commission-earner persona dashboards so they are REFERRER-FIRST, using the functionality that already exists. Do not invent unrelated features. Do not build generic dashboard blocks. Do not add marketing copy. Do not create new landing pages.
+
+The first viewport for every commission-earning persona must answer:
+“How do I invite, refer, sell, or capture a guest right now?”
+
+Personas to update:
+1. /referrer/dashboard
+2. /influencer/dashboard
+3. /influencer/referrer-dashboard
+4. /partner/dashboard
+5. /partner/series/[id]
+6. /partner/series/[id]/sessions/[sessionId]
+7. /host/streetside
+
+Important:
+The current /referrer/dashboard is the best model. Preserve its QR-first pattern:
+- QR code first
+- WhatsApp share button
+- Copy referral link
+- Bookings/activity next
+- Earnings later
+- Profile last
+
+Do not turn the UI into a grid of KPI cards at the top.
+Do not lead with payout dashboards.
+Do not lead with performance stats.
+Do not bury referral/invite actions inside lower tabs if they are the primary reason the persona logs in.
+
+Shared UX Rules:
+1. Every commission earner dashboard must start with an action area.
+2. The action area must use available existing data and APIs.
+3. The top navigation/tabs should be simplified around action-first workflow:
+   - Share / Invite / Sell
+   - Activity
+   - Earnings
+   - Profile or Settings
+4. Earnings and payout information must move below referral/invite/sell actions.
+5. Existing invite, QR, WhatsApp, copy-link, ticket, and reservation functionality should be reused, not duplicated.
+6. Remove or demote dashboard sections that only show summary metrics above the fold.
+7. Do not remove important functionality. Reposition it.
+8. Keep mobile usability strong. The primary action must be visible quickly on mobile.
+9. Avoid generic “blocks” or decorative cards. Use purposeful panels, tabs, forms, and action rows.
+
+Implementation Instructions:
+
+A. Create or reuse a shared component for commission-earner actions
+Create a shared component if one does not already exist:
+
+src/components/referral/CommissionEarnerActionPanel.tsx
+
+It should support these optional capabilities:
+- QR code display
+- WhatsApp share
+- Copy referral link
+- Manual invite form CTA or embedded form
+- Restaurant/menu/reservation link
+- Event/series ticket purchase link
+- Partner seller/team invite link
+- Optional label showing whether commission is enabled or attribution-only
+
+Use GuestQRPanel where appropriate.
+Do not break GuestQRPanel.
+
+B. /referrer/dashboard
+This is already closest to correct.
+Keep it QR-first.
+Make only small cleanup if needed:
+- QR tab/action remains first
+- WhatsApp share remains prominent
+- Bookings/activity comes after
+- Earnings/payout dashboard stays later
+- Profile remains last
+
+Do not redesign this heavily.
+
+C. /influencer/dashboard
+Current problem:
+It starts with Performance and PayoutDashboard.
+
+Change it so the first viewport starts with influencer referral/selling actions.
+
+New order:
+1. Share / Sell action panel
+   - Show influencer referral code if available
+   - Show QR if possible
+   - Show WhatsApp share
+   - Show copy link
+   - If assigned to events/series, show ticket-selling links or a clear CTA to assigned event links
+2. Active assignments or available offers
+3. Recent attributed activity
+4. Performance stats
+5. PayoutDashboard
+
+Do not remove PayoutDashboard. Move it lower.
+
+D. /influencer/referrer-dashboard
+Current problem:
+It shows assignment stats before the referral action.
+
+Change order inside each assignment:
+1. Event/series title and status
+2. Primary referral link/action row
+3. WhatsApp share
+4. Copy link
+5. Ticket purchase CTA if referralUrl exists
+6. Stats and commission details below
+
+The page-level top summary stats should move below the active assignment referral actions.
+
+E. /partner/dashboard
+Current problem:
+It starts with KPIs and series list.
+
+Partners are nuanced. They may have layered invite modules inside events, so do not flatten everything into one QR.
+
+New order:
+1. “Active selling/invite actions” section first
+   - For each active series, show the fastest action:
+     - Open invites
+     - Share ticket/referral link if available
+     - Manage seller seats/team if available
+     - Open event/session invite tools
+2. Series list second
+3. KPIs/revenue third
+
+If no active series exists, show a practical empty state:
+“Your account manager has not assigned a live series yet.”
+Do not create fake/demo content.
+
+F. /partner/series/[id]
+Current problem:
+It leads with KPIs and read-only event details.
+
+New order:
+1. Event title/date/capacity summary
+2. Primary action tabs:
+   - Invites
+   - Seller Seats / Team
+   - Ticket Links
+   - Attendees
+   - Earnings
+   - Details
+3. The first visible tab should be Invites or Ticket Links, not Details.
+4. Move Event Details below the action tabs.
+5. Keep existing sessions list but make it action-oriented:
+   - “Open invite tools”
+   - “Manage attendees”
+   - “View earnings”
+
+Do not remove sessions functionality.
+
+G. /partner/series/[id]/sessions/[sessionId]
+Current problem:
+The invite form exists and is valuable.
+
+Keep the invite form, but make it the first useful thing on the page.
+New order:
+1. Session/event context
+2. Invite a Guest form
+3. Recent invitations
+4. Attendees
+5. Co-leads / seller seats
+6. Sales & earnings
+
+If there is a tab nav, default to Invites.
+Do not default to Details.
+
+H. /host/streetside
+Streetside hosts are reservation-capture-first.
+
+New order:
+1. QR / reservation capture panel
+   - QR code
+   - WhatsApp share if applicable
+   - Manual guest/reservation entry
+   - Restaurant/concept selector if already available
+2. Today’s bookings
+3. Handoffs/status workflow
+4. Earnings/commission context
+5. Profile/shift tools
+
+If a Streetside Host is assigned to an event/series and is allowed to sell tickets:
+- Show event ticket QR/link as a secondary action
+- Do not show ticket selling if their compensation/assignment does not permit it
+
+I. Navigation restructuring
+Simplify persona dashboards around the actual earning workflow.
+
+Use this pattern where possible:
+- Share / Invite / Sell
+- Activity
+- Earnings
+- Profile
+
+For partner event/session pages:
+- Invites
+- Team / Seller Seats
+- Attendees
+- Earnings
+- Details
+
+Remove or demote tabs/pages that lead with:
+- Generic overview
+- Dashboard stats
+- Details
+- Payout dashboard
+
+Those can remain, but not first.
+
+J. Data and API constraints
+Use existing APIs first:
+- /api/v1/referrer/dashboard
+- /api/v1/influencer/dashboard
+- /api/v1/event-referrers/my-assignments
+- /api/v1/partner/dashboard
+- /api/v1/partner/series/[id]
+- /api/v1/partner/series/[id]/sessions
+- /api/v1/partner/series/[id]/invite
+- /api/v1/partner/series/[id]/team/summary
+- host/streetside existing APIs
+
+Do not create new database tables for this task.
+Do not change commission calculation logic.
+Do not change payout logic.
+Do not change authentication logic.
+Do not add demo data.
+
+K. Visual constraints
+- Match the existing OKÜ visual style.
+- Keep the dark referrer QR aesthetic where it already exists.
+- Keep partner pages lighter if that is their current style, but make the workflow action-first.
+- Avoid oversized KPI cards at the top.
+- Avoid generic blocks/cards that do not directly help the persona refer, invite, sell, or capture.
+- Buttons should use direct action labels:
+  - Share on WhatsApp
+  - Copy Link
+  - Open Ticket Link
+  - Invite Guest
+  - Add Seller
+  - Open QR
+  - View Activity
+- Do not use vague labels like “Explore”, “Manage”, or “Overview” as primary actions.
+
+Acceptance Criteria:
+1. /referrer/dashboard still opens QR-first with WhatsApp and copy link.
+2. /influencer/dashboard no longer starts with Performance/PayoutDashboard.
+3. /influencer/dashboard first viewport includes referral/share/sell actions.
+4. /influencer/referrer-dashboard shows assignment referral links before stats.
+5. /partner/dashboard first viewport shows active invite/selling actions before KPIs.
+6. /partner/series/[id] defaults to invite/sales workflow, not details/KPIs.
+7. /partner/series/[id]/sessions/[sessionId] defaults to Invite a Guest.
+8. /host/streetside starts with QR/reservation capture.
+9. Existing invite, attendee, seller-seat, earnings, and payout functionality still exists.
+10. npm run build passes.
+
+After implementation:
+- Report changed files.
+- Explain which persona routes were changed.
+- Confirm no commission or payout calculation logic was changed.
+- Confirm build result.

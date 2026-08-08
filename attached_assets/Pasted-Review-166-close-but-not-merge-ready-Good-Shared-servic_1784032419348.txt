@@ -1,0 +1,74 @@
+Review #166: close, but not merge-ready.
+
+Good:
+- Shared service exists with the right 7-step concept.
+- No blind E.164 phone normalization.
+- ReferralLink.code only checks when explicitly supplied.
+- Event bridge requires direct evidence.
+- Audit actions are standardized.
+- merge_required includes incomingUserId / candidateActorId / candidateActorUserId.
+- overrideContext exists and is tested.
+- dedupe_found audit is suppressible.
+- Final pre-create recheck exists.
+
+Blockers:
+
+P1 — Legacy code conflict creates an actor without a referral link.
+In step 4, if a legacy Referrer has a referralCode that is already taken and `allowNewCodeOnLegacyConflict` is false, the service currently:
+1. creates a new ReferralActor,
+2. does not create a ReferralLink,
+3. returns status: "created", referralLinkId: null, reason: "legacy_code_taken".
+
+That leaves a newly created actor with no active code, even though the conflict was known before completing the branch. This is dangerous because callers may treat `created` as successful provisioning.
+
+Fix:
+If legacy referralCode is taken and allowNewCodeOnLegacyConflict is false:
+- do not create the actor, OR
+- return a distinct non-mutating status like `blocked` / `code_conflict` before create.
+
+Preferred:
+Check legacy code availability before creating the actor. If taken, return:
+{ status: "merge_required" or "blocked", reason: "legacy_code_taken", mutated:false }
+No actor should be created without a link in this branch.
+
+Acceptance:
+legacy code taken + allowNewCodeOnLegacyConflict false → no actor created, no link created, clear blocked result.
+
+P1 — Backward-compatible `findOrCreateReferralActor` hides merge_required by returning the candidate actor.
+The wrapper comment says when merge_required occurs it returns the existing candidate actor and never creates a duplicate. That prevents duplicates, but it can silently attach new partner/admin/referrer assignment work to an actor owned by another user.
+
+That violates the epic rule:
+“actor owned by another user always becomes merge_required.”
+
+Fix:
+The legacy wrapper must not silently return the candidate as a successful match when result.status === "merge_required".
+Options:
+- throw a typed MergeRequiredError, OR
+- extend the wrapper result with status/mergeRequired while preserving old keys additively, OR
+- return matched:false with error metadata that callers must handle.
+
+But do not return the candidate actor as a normal successful match.
+
+Acceptance:
+findOrCreateReferralActor called with email/phone matching actor owned by another user must expose merge_required to the caller, not look like a valid match.
+
+P1 — override_created audit should include conflict metadata.
+The override path creates a separate actor when a candidate belongs to another user, but the returned result only includes overrideContext. The audit includes candidateActorId but should also include:
+- candidateActorUserId
+- incomingUserId
+- matchField
+- authorizedBy
+- reason
+
+Acceptance:
+overrideContext + conflicting email writes audit metadata showing who/what was overridden.
+
+P2 — Full-table phone scan is correct but potentially expensive.
+Acceptable for now if data is small, but add a clear TODO for normalized phone/email indexed columns or partial unique constraints. This should become a schema follow-up.
+
+P2 — Test coverage should include the two blockers.
+Add tests:
+- legacy_code_taken does not create actor when allowNewCodeOnLegacyConflict is false
+- wrapper findOrCreateReferralActor surfaces merge_required instead of returning candidate actor as success
+
+Do not proceed to #167 until these are fixed.

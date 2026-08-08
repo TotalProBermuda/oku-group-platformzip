@@ -1,0 +1,291 @@
+Yes. You’re right again. The current /admin/payments is still mostly a status monitor, not a true payment control surface.
+
+If Superadmin cannot enter/update the Authorize.net credentials there, it is not yet the WooCommerce-level control you’re asking for.
+
+The correct next task is not Commerce Settings yet. It should be:
+
+Payments P1 — Gateway Credentials + Orders Control
+
+Important distinction: the app should not store card data. But it can safely store gateway credentials if they are encrypted server-side.
+
+Use this next:
+
+Implement Payments P1 — Superadmin-managed Authorize.net credentials and order/payment controls.
+
+Context:
+The current /admin/payments page shows AUTHORIZE_NET_API_LOGIN_ID and AUTHORIZE_NET_TRANSACTION_KEY as missing, but Superadmin cannot enter them. That is not acceptable for launch operations. Superadmin needs a WooCommerce-style payment provider management interface.
+
+Goal:
+Allow SUPERADMIN to securely enter/update Authorize.net gateway credentials inside /admin/payments, while never displaying raw secrets after save.
+
+Important:
+Do not store cardholder data.
+Do not store raw secrets in plaintext.
+Do not write secrets into AuditLog.
+Do not expose raw secrets through API responses.
+
+ENCRYPTION REQUIREMENT
+Add one required environment variable:
+- APP_ENCRYPTION_KEY
+
+This key is used only to encrypt/decrypt stored gateway credentials.
+If APP_ENCRYPTION_KEY is missing:
+- credential editing is disabled
+- page shows: “Credential editing unavailable. APP_ENCRYPTION_KEY is missing.”
+- existing env-based credentials can still be detected.
+
+Schema:
+Add model PaymentGatewayCredential:
+
+model PaymentGatewayCredential {
+  id String @id @default(cuid())
+
+  provider String @default("AUTHORIZE_NET")
+  label String @default("Authorize.net Credit Card")
+  isActive Boolean @default(true)
+
+  environment String @default("sandbox") // sandbox | production
+  connectionType String @default("gateway_only") // gateway_only | all_in_one
+
+  apiLoginIdEncrypted String?
+  transactionKeyEncrypted String?
+  signatureKeyEncrypted String?
+
+  apiLoginIdLast4 String?
+  transactionKeyLast4 String?
+  signatureKeyLast4 String?
+
+  merchantProviderName String? // e.g. Banesco, FAC, processor name
+  merchantIdLast4 String?
+  terminalIdLast4 String?
+
+  checkoutTitle String @default("Credit Card")
+  checkoutDescription String @default("Pay securely using your credit card.")
+  enableGateway Boolean @default(false)
+  displayCsc Boolean @default(true)
+  transactionType String @default("charge") // charge | authorize_only
+  detailedDeclines Boolean @default(true)
+  debugMode String @default("off") // off | errors | verbose
+  acceptedCardLogos Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedById String?
+}
+
+Encryption helper:
+Create src/server/security/encryption.ts
+
+Use Node crypto AES-256-GCM.
+APP_ENCRYPTION_KEY must be 32 bytes after decoding.
+Support base64 key.
+Export:
+- encryptSecret(value: string): string
+- decryptSecret(payload: string): string
+- maskSecret(value: string): { last4: string }
+
+API routes:
+1. GET /api/v1/admin/payments/gateways
+- SUPERADMIN only.
+- Returns provider settings and masked credential status only.
+- Never returns decrypted secrets.
+
+2. PATCH /api/v1/admin/payments/gateways/authorize-net
+- SUPERADMIN only.
+- Accepts:
+  - enableGateway
+  - environment
+  - connectionType
+  - apiLoginId
+  - transactionKey
+  - signatureKey
+  - merchantProviderName
+  - merchantId
+  - terminalId
+  - checkoutTitle
+  - checkoutDescription
+  - displayCsc
+  - transactionType
+  - detailedDeclines
+  - debugMode
+  - acceptedCardLogos
+- Encrypts credential fields before saving.
+- Stores only last4 for display.
+- If a credential field is blank, keep existing value.
+- If clearCredential=true for a field, remove it.
+- Writes AuditLog with before/after for non-secret fields only.
+- AuditLog may say “apiLoginId changed: true” but must not store values.
+
+3. POST /api/v1/admin/payments/gateways/authorize-net/test
+- SUPERADMIN only.
+- Decrypts saved credentials if present.
+- Falls back to env vars if no saved credential exists.
+- Calls Authorize.net authenticateTestRequest.
+- Writes sanitized AuditLog result.
+- Returns safe status.
+
+Update Authorize.net client:
+Refactor src/server/authorizeNet/client.ts so config resolution works like this:
+1. If active encrypted Authorize.net credential exists in DB, use it.
+2. Otherwise fallback to process.env.AUTHORIZE_NET_API_LOGIN_ID / AUTHORIZE_NET_TRANSACTION_KEY / AUTHORIZE_NET_ENV.
+3. Never log raw credential values.
+
+Function:
+- getAuthNetConfig() should become async if needed.
+- Update callers accordingly, or add getAuthNetConfigFromDbOrEnv() and keep old env config only where necessary.
+
+Payments UI:
+Update /admin/payments Authorize.net tab.
+
+The Authorize.net tab should become an editable provider settings form, like WooCommerce:
+
+Section: Gateway
+- Enable this gateway toggle
+- Status badge: Active / Disabled / Misconfigured
+- Environment segmented control: Sandbox | Production
+- Connection type: Gateway-only / All-in-one
+- Checkout title input
+- Checkout description textarea
+
+Section: Connection Settings
+- API Login ID input
+  - If existing value saved, show placeholder: “Saved ••••1234”
+  - Input is blank by default; typing replaces saved value
+- Transaction Key password input
+  - Placeholder: “Saved ••••1234”
+- Signature Key password input
+  - Placeholder: “Saved ••••1234”
+- Merchant provider name input, e.g. Banesco
+- Merchant ID input, store masked only
+- Terminal ID input, store masked only
+- Helper copy:
+  “Credentials are encrypted before storage. Raw values are never displayed after saving.”
+
+Section: Checkout Behavior
+- Display CSC toggle
+- Transaction type select:
+  - Charge immediately
+  - Authorize only
+- Accepted card logos multi-select:
+  - Visa
+  - MasterCard
+  - American Express
+  - Discover
+  - Diners
+  - JCB
+- Detailed decline messages toggle
+- Debug mode select:
+  - Off
+  - Errors only
+  - Verbose
+- If verbose selected, show warning:
+  “Verbose logs must never include card data, secrets, or full gateway payloads.”
+
+Actions:
+- Save changes
+- Test connection
+- Clear saved credentials, danger action with confirmation
+
+UX requirements:
+- This must feel like a premium settings panel, not a status table.
+- Use aligned setting rows:
+  left = label/helper
+  right = control
+- Keep controls max-width around 520px.
+- Use one main panel, not nested cards.
+- Sticky unsaved changes bar:
+  “Unsaved changes”
+  Save changes
+  Reset
+- Show success toast after save.
+- Show sanitized error banner on failure.
+- Missing credentials should appear next to the input fields, not only in a blocker banner.
+
+Payments page structure:
+Keep current tabs but improve content:
+
+Overview:
+- Payment blockers
+- Status at a glance
+- Recent payment failures
+- Recent paid orders
+
+Payment Providers:
+- Authorize.net Credit Card row
+  - Active/Misconfigured/Disabled
+  - Manage
+  - Test
+- Offline/manual payment as future disabled row
+- Product/merchandise provider placeholder only if needed later
+
+Authorize.net:
+- Editable provider settings form described above.
+
+Refunds & Voids:
+- Explain scope:
+  “Refunds and voids apply only to website orders: tickets, series/events, memberships, and future online products. POS/table payments remain under INVU reconciliation.”
+- Add order search field.
+- Show recent refundable orders.
+- Link to existing Admin Orders drawer.
+- Show gateway-first badge.
+- Show partial refund supported.
+- Show void supported.
+- Show last 10 refund/void audit entries.
+
+Receipts & Email:
+- Resend status
+- Sender email status
+- Test receipt email
+- Link to future Commerce Emails settings
+
+Tickets & QR:
+- Ticket creation status
+- QR/check-in routes:
+  - /admin/experiences/[id]/attendees
+  - /staff/check-in
+  - /api/v1/checkin/validate
+- Resend confirmation route
+- RFID: Future module / Not configured
+
+System Checks:
+- NEXTAUTH_SECRET
+- NEXTAUTH_URL
+- NEXT_PUBLIC_APP_URL
+- REDIS_URL warning
+- DEMO_MODE_ENABLED warning
+
+Audit Trail:
+- Credential changed events, with no secret values
+- Gateway test events
+- Refund/void events
+- Email test events
+
+Orders/payment detail:
+Improve the OrderDrawer Payment tab:
+- If provider is DEMO, show “Demo payment — no gateway transaction”
+- If provider is AUTHORIZE_NET, show Authorize.net transaction fields
+- Add clear link/action:
+  “Open payment controls”
+- Refund action should be easier to find for eligible paid website orders.
+- Make clear that refunds apply only to website purchases.
+
+Acceptance:
+- Superadmin can enter Authorize.net API Login ID and Transaction Key from /admin/payments.
+- Raw secrets are never returned to browser after save.
+- Saved secrets display as masked placeholders.
+- Authorize.net test uses saved encrypted credentials.
+- Checkout/refund/void uses saved encrypted credentials before falling back to env vars.
+- If APP_ENCRYPTION_KEY is missing, credential editing is disabled safely.
+- Refunds & Voids tab includes order search/recent orders/audit visibility.
+- Payment UI clearly says website purchases only, not POS/INVU payments.
+- npm run db:push --force passes.
+- npm run build passes.
+This is the missing bridge.
+
+Right now you have:
+
+Payments visibility
+What you actually need is:
+
+Payments control
+And yes, for Superadmin, entering the Authorize.net API Login ID and Transaction Key inside /admin/payments is reasonable if encrypted properly. That gives you the WooCommerce-style control you’re expecting without making the platform reckless with secrets.

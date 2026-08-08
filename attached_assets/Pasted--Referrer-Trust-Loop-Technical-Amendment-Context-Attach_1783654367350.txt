@@ -1,0 +1,100 @@
+# Referrer Trust Loop Technical Amendment
+
+## Context
+
+Attachment `#140 - Referrer Trust Loop` describes a broken trust loop in the
+current OKU/Foodie application:
+Referrers drive reservations through QR codes and links, but the current OKU
+app does not give them a reliable live view of what they referred or a
+trustworthy view of the money their referrals generated.
+
+- Streetside referrers can create reservations through QR/link flows.
+- The referrer-facing active feed can still show `No active bookings`.
+- The QR scanner may be an anonymous guest using a mobile phone; the feed owner
+  is the street host account that owns the scanned QR/link.
+- The feed appears to use a fixed short look-back window and narrow gating.
+- Future-dated referrals can be hidden even when the reservation was created
+  successfully.
+- The backend trust chain can capture check close, commission, ledger, and
+  payout state, but the referrer does not see that chain.
+The confirmed streetside bug:
+
+The referenced implementation files are not present in this local workspace, so
+this amendment is written as a patch-ready technical spec for the app codebase.
+- An anonymous guest scans a street host QR.
+- The reservation is created successfully.
+- The restaurant host dashboard sees the reservation.
+- The street host account that owns the QR still sees `No active bookings`.
+
+## Red-Team Findings
+That narrows the failure to the referrer-facing feed and/or ownership
+resolution, not reservation creation itself.
+
+### 1. The 8-hour look-back creates false negatives
+## Verified Red-Team Findings
+
+A referrer feed must not be based on reservation creation time or a short
+look-back window. Referral usefulness is based on service time and referral
+ownership, not recent creation.
+### 1. Feed Window Is The Bug
+
+Risk:
+`mySubmissions` filters by `createdAt >= now - 8h`, and this is the only feed a
+pure streetside host gets. `todayReservations` is gated to restaurant host or
+superadmin.
+
+- A future reservation created today for tomorrow disappears immediately.
+- Referrers lose trust because successful QR reservations look missing.
+- Rollup totals undercount active contribution.
+Failure mode:
+
+- A referral can show for about eight hours after creation.
+- It then disappears regardless of the actual reservation service date.
+- Future-dated referrals are especially vulnerable.
+
+Amendment:
+
+- Active referrals must be selected by reservation service window and referrer
+  ownership.
+- History referrals must be selected by terminal status or expired service
+  window.
+- The viewer does not need to be the guest/scanner. The viewer must be the
+  referrer actor that owns the QR/link used to create the reservation.
+- Select active referrals by reservation service window and referrer ownership.
+- Do not use reservation creation time as the active-feed boundary.
+- Use Panama-local service windows for launch behavior.
+
+### 2. Referrer surfaces can drift
+### 2. Referrer Surfaces Already Drift
+
+Separate streetside, referrer, influencer, and partner dashboards invite
+different query rules.
+Streetside reads `AttributionSession.referralActor`.
+
+Risk:
+The referrer dashboard reads legacy `ReservationAttribution` rows plus
+`CommissionEntry`.
+
+- Streetside sees nothing while influencer sees data.
+- Financial fields appear in one place and not another.
+- Fixes are applied to the broken tab only, leaving the platform inconsistent.
+Actor-only chains such as host links and `INFLUENCER_SUB_REFERRER` may have no
+`ReservationAttribution` row, so they are invisible on the referrer dashboard.
+
+Amendment:
+
+- Build one shared server data source for `myReferrals`.
+- Consume that source from every referrer-facing surface.
+- Keep SSR and polling/API refresh on the same include/projection.
+- Build the shared source from `AttributionSession`, because it is the superset.
+- Stop treating `ReservationAttribution` as the canonical referrer feed source.
+- Reuse one source/projection across streetside, generic referrer, influencer,
+  and partner views.
+
+### 3. Referral ownership must be immutable enough to trust
+### 3. Ownership Is Mostly Anchored, But Resolution Is Incomplete
+
+If reservations are not anchored to a referrer actor at creation, downstream
+commission logic becomes guesswork.
+The reservation route already writes `ReferralActor` and `AttributionSession`
+at booking time, with a `DIRECT` fallback.

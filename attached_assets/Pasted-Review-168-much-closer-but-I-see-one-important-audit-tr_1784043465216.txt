@@ -1,0 +1,44 @@
+Review #168: much closer, but I see one important audit/transaction issue before merge.
+
+Good:
+- `createEventReferrer` now runs dedupe + assignment create + bridge update inside one transaction.
+- Event assignment bridging is present and safe: bridge only when `legacyEventReferrerAssignmentId` is empty.
+- `/api/v1/event-referrers` now uses canonical 409 shape for `merge_required`.
+- `blocked` maps to controlled 409.
+- Duplicate manual `referral.actor.merge_required` writes were removed.
+- Host `/me` now writes a searchable supplemental audit instead of console-only.
+- Atomicity tests were added for event assignment failure and host merge_required rollback.
+
+Remaining blockers / checks:
+
+P1 — Host merge_required audit may be rolled back in the transaction path.
+For `provisionHostPersonalReferrer`, the create/reactivate paths call `ensureHostReferralActor(..., tx)`. If dedupe returns `merge_required`, the dedupe service’s canonical `referral.actor.merge_required` audit row is written inside the same transaction, then `HostMergeRequiredError` is thrown to roll back the assignment create/reactivation.
+
+That rollback likely also rolls back the canonical `referral.actor.merge_required` audit row.
+
+The follow-up `host.me.referral_actor_conflict` audit helps, but it is not the canonical action #170 will read, and it lacks the full canonical fields (`candidateActorUserId`, `matchField`, etc.).
+
+Fix:
+After catching `HostMergeRequiredError`, write a non-transactional canonical `referral.actor.merge_required` row, or change the sentinel to carry enough metadata and write both:
+- canonical `referral.actor.merge_required`
+- optional `host.me.referral_actor_conflict`
+
+Do not rely on an audit row written inside a rolled-back transaction.
+
+P1 — Existing ACTIVE assignment conflict still leaves an active unbridged assignment.
+The new transaction fix covers create/reactivate. But if `existingAny.status === ACTIVE`, the code intentionally does not transaction/rollback, and a merge conflict returns `{ ok:false }` while the active assignment remains active.
+
+If that assignment is already unbridged and conflicting, this can still produce the “active QR assignment exists but identity unresolved” state.
+
+Options:
+- on merge_required for an existing ACTIVE personal assignment, mark it non-active/blocked/invited until resolved, or
+- explicitly prove the page/API suppresses use of that assignment whenever `provisionFailed` is true.
+
+P0 — Still confirm real `eventReferrerService.ts` is compile-clean.
+The pasted diff still shows interleaved stale/new code in `ensureHostReferralActor` and `provisionHostPersonalReferrer`. If diff noise, fine. If real, not mergeable. Need scoped typecheck confirmation.
+
+P2 — Test gap:
+Add/assert that the merge_required audit survives the host transaction rollback. The current test proves assignment rollback shape, but not that the canonical conflict remains discoverable for #170.
+
+Verdict:
+Event-referrer side is now good. Hold merge until host personal referrer merge conflicts remain audit-visible after rollback and existing ACTIVE conflict behavior is made safe or explicitly suppressed.

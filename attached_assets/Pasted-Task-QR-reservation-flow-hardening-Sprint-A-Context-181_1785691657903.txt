@@ -1,0 +1,166 @@
+Task: QR reservation flow hardening — Sprint A
+
+Context:
+#181 pass 3 has been applied to main. This task is a hardening pass on the existing QR booking flow:
+
+/r/[referralCode] → GuestBookingForm → POST /api/reservations
+
+Hard boundary:
+Do NOT create a second booking form, second reservation API, second availability endpoint, second host dashboard, or second capacity service. Reuse and harden the existing files only.
+
+Relevant files:
+- src/app/r/[referralCode]/page.tsx
+- src/components/booking/GuestBookingForm.tsx
+- src/app/api/reservations/route.ts
+- src/app/api/v1/spaces/available/route.ts
+- src/server/spaces/capacityService.ts
+- prisma/schema.prisma
+- EN/ES/PT i18n files
+
+Before editing:
+Verify these #181 pass-3 changes are already present:
+- GuestBookingForm onSubmit can return pendingApproval
+- API-driven pendingApproval copy exists
+- four space badge states exist
+- PENDING_APPROVAL appears in the host queue
+- full-capacity no-preference fallback exists
+
+Do not reimplement those if already present.
+
+Fix these seven problems:
+
+1. Pending approval state is swallowed
+Current issue:
+The API returns pendingApproval, but src/app/r/[referralCode]/page.tsx immediately sets bookedOk=true and renders generic success copy regardless.
+
+Fix:
+- Add parent state for bookingPendingApproval.
+- Parse the API response body before setting bookedOk.
+- If pendingApproval=true, render pending approval success copy.
+- If pendingApproval=false, render normal success copy.
+
+Done:
+A requiresApproval space shows a pending approval success screen, not the generic confirmed screen.
+
+2. requestedSpaceId is not validated server-side
+Current issue:
+The API accepts any requestedSpaceId without checking venue ownership, isActive, reservable, or capacity. A forged ID passes silently.
+
+Fix:
+- In src/app/api/reservations/route.ts, validate requestedSpaceId against:
+  - id: requestedSpaceId
+  - venueId: venue.id
+  - isActive: true
+  - reservable: true
+- If invalid, return 400 and do not create a reservation.
+- Use capacityService.getAvailableCovers() for server-side capacity validation.
+- If the requested space is full and does not require approval, return 409.
+- If the requested space is full but requiresApproval=true, allow PENDING_APPROVAL only if this is the intended host-review rule; otherwise return 409. Document the chosen rule in a short code comment.
+
+Done:
+A forged/out-of-venue/inactive/non-reservable requestedSpaceId cannot create a reservation.
+
+3. QR source is not persisted
+Current issue:
+The QR page sends source: "QR_SCAN" but the API hardcodes source = "UMBRELLA_SITE".
+
+Fix:
+- Destructure source from request body.
+- Whitelist public reservation sources:
+  - QR_SCAN
+  - REFERRER_LINK
+  - UMBRELLA_SITE
+- Persist the whitelisted source.
+- Default to UMBRELLA_SITE only if missing/invalid.
+
+Done:
+Reservations from /r/[referralCode] persist source=QR_SCAN.
+
+4. Ledger event is wrong for pending approval
+Current issue:
+RESERVATION_CONFIRMED is emitted unconditionally, even when the booking status is PENDING_APPROVAL.
+
+Fix:
+- Always emit RESERVATION_REQUESTED.
+- Emit RESERVATION_CONFIRMED only when reservation.status === "CONFIRMED".
+- Do not invent a new LedgerEventType unless this task includes the Prisma enum/migration. If no pending-approval event type exists yet, skip it and leave a TODO.
+
+Done:
+PENDING_APPROVAL reservations do not produce false RESERVATION_CONFIRMED ledger events.
+
+5. Party size appears after space selection
+Current issue:
+Availability depends on partySize, but party size appears below date/time/space. A guest can pick a space for party size 2, then increase to 6+.
+
+Fix:
+- In GuestBookingForm, when showDateTimePicker=true, render Party Size before Date/Time/Space.
+- Changing party size must clear requestedSpaceId.
+- Availability must refetch using the visible party size.
+
+Done:
+Guest flow is:
+Party size → Date → Time → Space/Experience → Guest info → Notes → Submit.
+
+6. Duplicate experience selector in QR mode
+Current issue:
+When the space picker is active, the lower Experience section renders a second concept selector.
+
+Fix:
+- When showDateTimePicker=true and spaces are active, do not render the lower Experience card as a second concept selector.
+- Space selection should remain the primary way to set conceptRequested.
+- Keep conceptRequested fallback when no space is selected.
+
+Done:
+QR mode has one clear experience/space decision, not two competing selectors.
+
+7. Missing i18n strings
+Add/update EN, ES, and PT strings for:
+- pending approval success title/body
+- invalid requested space error
+- full capacity error
+- any changed party/date/time/space labels
+- any hidden/conditional experience copy
+
+QA required:
+A. /r/INF-SOPHIA happy path:
+- Select party size, date, time, and available space.
+- Submit.
+- Reservation is created with requestedSpaceId.
+- source=QR_SCAN.
+- referral attribution survives.
+
+B. Requires approval:
+- Select requiresApproval space.
+- Submit.
+- API returns pendingApproval=true.
+- Guest sees pending approval success screen.
+- Reservation status is PENDING_APPROVAL.
+- No RESERVATION_CONFIRMED ledger event is emitted.
+
+C. Invalid space:
+- POST forged/out-of-venue/inactive requestedSpaceId.
+- API returns 400.
+- No reservation is created.
+
+D. Full capacity:
+- Submit for full non-approval space.
+- API returns 409 or documented host-review behavior.
+- No silent confirmed booking.
+
+E. Party size:
+- Select date/time/space with party size 2.
+- Change party size to 6+.
+- requestedSpaceId clears.
+- Availability refetches.
+
+F. Regression:
+- No fallback to DIRECT when referral context is known.
+- Existing host board still shows requestedSpace badge.
+- Existing #181 pass-3 badge states still work.
+- i18n parity passes for EN/ES/PT.
+
+Stop after Sprint A and report:
+- files changed
+- tests run
+- QA evidence/screenshots
+- remaining follow-up tasks for table/chair capacity, INVU binding, service blocks, and notifications

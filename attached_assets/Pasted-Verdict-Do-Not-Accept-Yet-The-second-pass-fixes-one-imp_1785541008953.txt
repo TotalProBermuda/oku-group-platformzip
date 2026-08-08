@@ -1,0 +1,32 @@
+Verdict: Do Not Accept Yet
+The second pass fixes one important issue: POS_CHECK_CLOSED was added, so INVU minting is no longer mislabeled as ATTRIBUTION_ANCHOR_RESOLVED. Good move.
+But the pasted diff still contains compile-breaking P0s.
+Findings
+[P0] CommissionAllocation still has duplicate tableSession fields.
+The schema still shows:
+tableSession TableSession @relation(...)
+tableSession TableSession @relation(...)
+Prisma will reject this. This was flagged before and is still present around lines 176-181 of the new pasted file.
+[P0] host/checkin still returns before creating statusLog.
+The transaction still has:
+return { minted, reservationId: reservation.id, venueId: reservation.venueId };
+const statusLog = await tx.reservationStatusLog.create(...)
+Everything after that first return is unreachable, and later code still uses result.statusLogId. That means the ledger idempotency key can become reservation:{id}:status_log:undefined, or the code fails typecheck. This is still present around lines 350-381.
+[P0] transitionStatus still appears syntactically corrupted.
+The pasted diff still shows:
+await prisma.reservationStatusLog.create({
+const statusLog = await prisma.reservationStatusLog.create({
+That will not compile if reflected in the actual file. This remains around lines 457-465.
+[P1] The schema and migration are now misaligned around deduplication.
+Migration 1 creates LedgerEvent_sourceRecordId_idempotencyKey_key; migration 2 drops it and creates LedgerEvent_dedup_key. The Prisma schema uses:
+@@unique([sourceSystem, sourceRecordId, idempotencyKey], name: "LedgerEvent_dedup_key")
+That is directionally right. But because the old pasted schema section still includes earlier commentary and duplicate-looking fragments, Replit should run:
+npx prisma validate
+npx prisma generate
+npm run typecheck
+No merge without those passing.
+[P1] Event writes are still best-effort, not durable.
+This may be acceptable for #182 foundation, but it should be explicitly logged as a follow-up. If emitLedgerEvent fails after a reservation/status update commits, the proof trail silently misses the event. The real investor-grade version eventually needs transactional outbox/retry.
+What To Tell Replit
+“Do not mark #182 done until the P0 compile issues are resolved. Specifically: remove the duplicate tableSession field, move statusLog creation before the host/checkin transaction return, and replace the dangling await prisma.reservationStatusLog.create({ in transitionStatus with a single captured const statusLog = .... Then run Prisma validate/generate and typecheck.”
+The architecture is now mostly right. The implementation still looks mechanically broken.

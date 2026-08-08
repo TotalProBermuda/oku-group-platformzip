@@ -1,0 +1,98 @@
+Create a Superadmin Launch & Integrations Control Center.
+
+Route:
+ /admin/settings/launch-readiness
+or
+ /admin/integrations/readiness
+
+Goal:
+Give SUPERADMIN one place to verify critical production systems before launch.
+
+Do not store raw secrets in the database.
+Do not expose secret values in the UI.
+Only show whether each required env var is present/missing, plus safe metadata.
+
+Systems to include:
+1. Authentication
+- NEXTAUTH_SECRET present/missing
+- NEXTAUTH_URL present/missing
+- current app URL
+- warning if production URL mismatch
+
+2. Payments
+- AUTHORIZE_NET_API_LOGIN_ID present/missing
+- AUTHORIZE_NET_TRANSACTION_KEY present/missing
+- AUTHORIZE_NET_ENV shown as sandbox/production/missing
+- button: Test Authorize.net Config
+- do not charge a real card from this page
+
+3. Email
+- RESEND_API_KEY present/missing
+- RESEND_FROM_EMAIL present/missing
+- button: Send Test Email
+- show last test result
+
+4. Redis / Workers
+- REDIS_URL present/missing
+- worker mode: BullMQ active or inline fallback
+- show warning if no Redis in production
+
+5. Ticketing / RFID / QR
+- show QR scanner enabled status
+- show ticket check-in endpoint status
+- include placeholder section for RFID provider config if no RFID provider exists yet
+- label clearly: “RFID provider not configured”
+
+6. Database
+- DATABASE_URL present/missing
+- show migration status if safely available
+- do not expose database URL
+
+7. INVU
+- show whether INVU credentials exist
+- show last sync run
+- show last error if any
+- link to /admin/integrations/invu
+
+8. Demo Mode
+- DEMO_MODE_ENABLED true/false
+- if true in production, show red launch blocker
+
+UI:
+- Superadmin-only
+- Use clear status cards: PASS / WARNING / FAIL
+- Show a final Launch Readiness Summary:
+  - Ready
+  - Blocked
+  - Needs attention
+- Include direct action links:
+  - Configure Replit Secrets
+  - INVU Integration
+  - Revenue Trust
+  - Email Test
+  - Payment Test
+
+API:
+Create a server-side endpoint:
+ /api/v1/admin/launch-readiness
+
+It should return only safe booleans and statuses, never secret values.
+
+Example response:
+{
+  ok: true,
+  checks: [
+    { key: "NEXTAUTH_SECRET", label: "Auth Secret", status: "PASS" },
+    { key: "AUTHORIZE_NET_API_LOGIN_ID", label: "Authorize.net Login", status: "FAIL" }
+  ]
+}
+
+Permissions:
+Only SUPERADMIN can access this page/API.
+
+Acceptance criteria:
+- Superadmin can see missing launch-critical env vars.
+- Missing NEXTAUTH_SECRET and Authorize.net credentials show as launch blockers.
+- No secret values are exposed.
+- Email/payment/Redis/INVU status are visible.
+- npm run build passes.

@@ -1,0 +1,31 @@
+I red-teamed #190 against the actual repo snapshot and added the missing regression code.
+What I found: the app code in this branch already has most #190 fixes in place: LocaleProvider wrapping exists, influencer/partner use PureReferrerConsole, instruction card defaults are enabled, and partner is no longer just a “No results found” shell. The biggest remaining gap is prevention. Without an automated QA gate, the exact old UI failures can come back.
+I added this test file:
+[referrer-console-standardization.spec.ts (line 1)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/tests/browser/referrer-console-standardization.spec.ts:1)
+It tests:
+Taxi, Panama/referrer, generic referrer, Sophia influencer, Marco partner
+EN, ES, PT
+Desktop and mobile via existing Playwright projects
+QR tab active/visible
+Instruction card visible
+WhatsApp CTA translated
+QR code rendered
+No raw keys like console.title, console.tab.*, streetForm.guestQR.*
+No stray Booking QR Code label
+Partner dashboard is not replaced by “No results found”
+Influencer Performance stats are below the QR, not above it
+Patch file:
+/private/tmp/oku-repo-work/referrer-console-standardization.patch
+Send Replit this:
+Apply the #190 regression test patch only.
+
+Do not create a new dashboard, new console, new QR module, or new route. The existing PureReferrerConsole path is already the intended architecture.
+
+Add tests/browser/referrer-console-standardization.spec.ts and run:
+
+npm run i18n:check
+npx playwright test tests/browser/referrer-console-standardization.spec.ts --project=desktop
+npx playwright test tests/browser/referrer-console-standardization.spec.ts --project=mobile
+
+Green-light #190 only if all profiles pass in EN, ES, and PT with no raw i18n keys, no private stats above QR, no missing instruction card, no empty partner dashboard, and no stray “Booking QR Code” label.
+I could not run Playwright locally because this extracted GitHub archive has no node_modules, and this sandbox cannot install from the registry. Replit should run the test where the app dependencies already exist.

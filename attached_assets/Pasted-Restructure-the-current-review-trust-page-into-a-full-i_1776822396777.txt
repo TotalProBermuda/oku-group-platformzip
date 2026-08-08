@@ -1,0 +1,105 @@
+Restructure the current review / trust page into a full investigation and resolution workspace.
+
+Problem:
+The current page behaves like a summary queue only. Users can see issue type, confidence, and summary text, but they cannot fully inspect each line-item, source record, calculation input, or mapping decision. This makes trust-grade review and remediation incomplete.
+
+Goal:
+Turn this page into a trust investigation console where each issue can be fully analyzed from source data through resolution.
+
+Required restructuring:
+
+1. Replace summary-only issue rows with expandable issue detail views or full detail pages.
+
+2. Each issue must support these sections/tabs:
+- Overview
+- Source Evidence
+- Line Items
+- Revenue & Payments
+- Reservation Match
+- Commission Impact
+- Audit Trail
+- Resolution
+
+3. Add line-item visibility wherever applicable.
+For each relevant issue, the reviewer must be able to inspect:
+- order items
+- quantity
+- unit price
+- item subtotal
+- item discount
+- order discount allocation
+- tax
+- tip
+- payment rows
+- refund / credit note rows
+- final total
+- normalized session totals
+- commissionable base
+
+4. Add side-by-side comparison panels for:
+- raw INVU source
+- normalized OKÜ session
+- commission calculation object
+
+5. Add “why flagged” logic to every issue.
+Do not show only summary text.
+Also show:
+- likely cause
+- conflicting fields
+- records involved
+- payout impact
+- whether the issue blocks commission
+- whether Superadmin review is required
+
+6. Add actionable resolution controls.
+Each issue must show:
+- recommendation
+- fix or guided review action
+- recompute action if safe
+- relink / manual match action where appropriate
+- mark no commission
+- escalate to Superadmin
+
+7. Preserve auditability.
+Every resolution action must write:
+- actor
+- timestamp
+- before/after state
+- reason
+- evidence snapshot
+
+8. Update data mapping and backend logic so the page can actually load the required depth:
+- raw INVU record(s)
+- normalized order/session
+- related reservation and attribution records
+- related commission object
+- sync run details
+- candidate matches
+- financial line-item details
+- aggregation breakdown
+
+9. Improve the issue list table columns to include:
+- issue type
+- severity
+- status
+- confidence
+- likely cause
+- payout impact
+- assigned to
+- last checked
+- action
+
+10. Build the page as a real investigation workspace, not just a queue.
+
+Core rule:
+Reviewers and Superadmin must be able to fully inspect the underlying line-items, calculations, and mappings behind every issue before approving, fixing, rejecting, or escalating it.
+
+Deliver:
+- updated page architecture
+- updated route structure
+- backend data requirements
+- UI tab structure
+- line-item rendering logic
+- action framework
+- audit handling
+- acceptance criteria

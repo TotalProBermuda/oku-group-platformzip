@@ -1,0 +1,68 @@
+Next.js 15.5.12 (outdated)
+Webpack
+Console Error
+
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `LedgerOutboxClient`. See https://react.dev/link/warning-keys for more information.
+
+src/app/admin/operations/ledger-outbox/LedgerOutboxClient.tsx (349:19) @ eval
+
+
+  347 |               <tbody>
+  348 |                 {rows.map((row) => (
+> 349 |                   <>
+      |                   ^
+  350 |                     <tr key={row.id} style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer" }}
+  351 |                       onClick={() => setExpanded(expanded === row.id ? null : row.id)}>
+  352 |                       <td style={{ padding: "10px 14px", maxWidth: 200 }}>
+Call Stack
+23
+
+Hide 19 ignore-listed frame(s)
+createConsoleError
+node_modules/next/dist/next-devtools/shared/console-error.js (26:1)
+handleConsoleError
+node_modules/next/dist/next-devtools/userspace/app/errors/use-error-handler.js (50:1)
+console.error
+node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js (55:1)
+eval
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (23763:1)
+runWithFiberInDEV
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (871:1)
+warnForMissingKey
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (23762:1)
+warnOnInvalidKey
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (5721:1)
+reconcileChildrenArray
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (5802:1)
+reconcileChildFibersImpl
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (6123:1)
+eval
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (6228:1)
+reconcileChildren
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (8782:1)
+beginWork
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (11128:1)
+runWithFiberInDEV
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (871:1)
+performUnitOfWork
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (15726:1)
+workLoopSync
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (15546:39)
+renderRootSync
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (15526:1)
+performWorkOnRoot
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (14990:1)
+performWorkOnRootViaSchedulerTask
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (16815:1)
+MessagePort.performWorkUntilDeadline
+node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js (45:1)
+eval
+src/app/admin/operations/ledger-outbox/LedgerOutboxClient.tsx (349:19)
+Array.map
+<anonymous>
+LedgerOutboxClient
+src/app/admin/operations/ledger-outbox/LedgerOutboxClient.tsx (348:23)
+LedgerOutboxPage
+src/app/admin/operations/ledger-outbox/page.tsx (67:7)

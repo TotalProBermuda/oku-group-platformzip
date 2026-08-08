@@ -1,0 +1,95 @@
+Red-Team Verdict
+The task is directionally correct, but I would amend it before build. The repo confirms the current commission system is too simple, but the proposed financial base still has a dangerous ambiguity.
+Current minting is flat percentage:
+src/server/services/invu/commissionMintingService.ts
+amountCents = session.commissionableCents * pct
+Current payout batching only sees LedgerEntry rows:
+src/server/payouts/payoutBatchService.ts
+type in ["COMMISSION_EARNED", "COMMISSION_REVERSED"]
+So #222 must do two things cleanly:
+Calculate dynamic commission correctly.
+Bridge each approved CommissionAllocation into LedgerEntry, or payouts will never see it.
+P0 Corrections
+Do not hard-code one eligible-net formula yet.
+The INVU aggregation code says:
+commissionableCents = grossCents - taxCents
+But the comments also say INVU gross may already be discount-applied and tips may already be excluded. So this formula from the plan is risky:
+gross - tax - discount - refund - tip
+It may double-subtract discounts/tips depending on INVU payload semantics.
+Instead, add a configurable revenue basis:
+COMMISSIONABLE_CENTS
+GROSS_MINUS_TAX
+GROSS_MINUS_TAX_MINUS_TIP
+GROSS_MINUS_TAX_MINUS_DISCOUNT_REFUND_TIP
+MANUAL_REVIEW
+Then store the full trace on every allocation:
+grossCents
+taxCents
+tipCents
+discountCents
+refundCents
+eligibleRevenueBasis
+eligibleNetRevenueCents
+guestCount
+ruleId
+ruleVersion
+percentageComponentCents
+percentageCapCents
+perPersonComponentCents
+maxTakeRateCapCents
+finalCommissionCents
+Dynamic Rule Shape
+Yes, you need dynamic admin-adjustable rules. Do not make STANDARD / TRUSTED / PREMIUM hard-coded economics.
+Use seeded defaults, but let admins create versioned rules:
+Global default
+Venue default
+Referrer actor override
+Campaign / offer override
+Private event override
+Resolution order should be:
+PRIVATE_EVENT
+CAMPAIGN_OFFER
+REFERRER_ACTOR
+VENUE + tier
+VENUE default
+GLOBAL + tier
+GLOBAL default
+High-Spend Example
+For 7 guests, $2,000 eligible net:
+If rule is 10% capped at $30 OR $5/person:
+10% = $200, capped to $30
+per-person = 7 × $5 = $35
+final = $35
+That may underpay a premium referrer. So add VIP/private-event tiers, for example:
+Standard: cap-heavy, protects margin
+Trusted: higher cap
+Premium: higher per-person
+Private Event: custom rule per booking
+Copy-Ready Amendment
+Send Replit this:
+Before implementing #222, amend the task:
+
+Do not hard-code eligibleNetRevenueCents as gross - tax - discount - refund - tip until INVU raw payload fixtures prove the semantics. Current invuAggregationService comments say gross may already be discount-applied and tips may already be excluded.
+
+Add commissionRevenueBasis to CommissionRule or Venue:
+COMMISSIONABLE_CENTS
+GROSS_MINUS_TAX
+GROSS_MINUS_TAX_MINUS_TIP
+GROSS_MINUS_TAX_MINUS_DISCOUNT_REFUND_TIP
+MANUAL_REVIEW
+
+Build one shared calculation service that returns a full trace. Persist that trace on CommissionAllocation.
+
+Commission rules must be versioned and admin-adjustable. Seed STANDARD / TRUSTED / PREMIUM / PRIVATE_EVENT templates, but do not hard-code their economics.
+
+Bridge APPROVED CommissionAllocation rows into LedgerEntry with commissionAllocationId so existing PayoutBatch logic can consume them. If the earner cannot map to an InfluencerProfile / beneficiary-ready payout recipient, mark the allocation HELD_FOR_BENEFICIARY_MAPPING, not silently payable.
+
+Add tests for:
+- no double subtraction of discounts/tips
+- 7 guests / $2,000 spend
+- 20 guests / per-person dominance
+- private event override
+- unknown service charge held for review
+- duplicate bridge idempotency
+- payout batch sees bridged ledger entries
+This keeps the system flexible, auditable, and fair without creating a payout trap later.

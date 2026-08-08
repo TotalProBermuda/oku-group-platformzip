@@ -1,0 +1,126 @@
+Repair Referrer Offer Assignment P1 — Authorization, CRUD Completeness, and Share Card Content
+
+Context:
+The previous ReferrerActor / ReferralAssignment implementation was rejected. It delivered meaningful architecture, but it has a blocking partner authorization gap and incomplete task coverage.
+
+Do not add new product scope. Fix only the rejected issues.
+
+Critical Security Bug:
+src/app/api/v1/partner/referrals/assignments/route.ts allows partners to create ReferralAssignments with arbitrary scopeType/scopeId/offerId and arbitrary existing referralActorId without proving the caller owns or is associated with that offer/session/scope.
+
+This is an IDOR-style authorization bug.
+
+Goal:
+1. Enforce strict partner-side authorization before creating assignments.
+2. Complete role-scoped ReferralAssignment CRUD or clearly wire/document existing endpoints.
+3. Extend share-surface cards to include required decisioning fields: venue, best-use hint, and commission plan summary.
+
+Security Rules:
+Partner assignment creation must only be allowed when the logged-in partner is authorized for the target scope.
+
+Before creating a ReferralAssignment, verify:
+- caller is authenticated
+- caller has partner/referrer assignment permission
+- target scope exists
+- target offer/session/series belongs to or is associated with the caller’s partner profile
+- caller is partnerId on the series/event/session OR caller is an authorized CO_HOST/session host according to existing partner/session host logic
+- scopeType and scopeId match the provided offerId
+- partner cannot assign against unrelated events, unrelated series, unrelated restaurants, or arbitrary offer IDs
+- partner cannot attach arbitrary existing referralActorId unless that actor is already owned/managed by that partner OR the assignment creation flow explicitly links by verified phone/email under the canonical identity rules
+
+Remove any logic that auto-adds the caller to partnerOwnerUserIds as proof of ownership. Ownership must come from the database relationship, not from the request.
+
+Required Authorization Helper:
+Create or reuse a server helper such as:
+
+assertPartnerCanManageReferralScope({
+  userId,
+  scopeType,
+  scopeId,
+  offerId
+})
+
+It should:
+- load the caller’s partner profile / partner associations
+- load the target scope
+- verify legitimate association
+- return normalized scope/offer details if authorized
+- throw 403 if not authorized
+- throw 404 for missing scope
+- avoid leaking existence of unrelated scopes where appropriate
+
+Use this helper in every partner ReferralAssignment write route.
+
+ReferralAssignment CRUD:
+Complete or wire role-scoped CRUD endpoints.
+
+Admin:
+- GET list assignments
+- POST create assignment
+- PATCH update assignment/status
+- DELETE or archive assignment
+
+Partner:
+- GET list only assignments for scopes they are associated with
+- POST create only for authorized scopes
+- PATCH limited update/archive only for their own authorized assignments
+- No hard delete unless existing domain pattern supports it; prefer archive/status change
+
+Referrer:
+- GET own active assignments/share surface only
+- no arbitrary assignment mutation unless specifically allowed
+
+If full delete is intentionally out of scope, implement archive/deactivate and document that this satisfies delete safely.
+
+Share Surface Required Fields:
+Extend share-surface service response and UI cards to include:
+
+- venue name
+- offer/event/series title
+- date/time if event/session
+- offer type
+- best-use hint
+  Examples:
+  “Best for tonight”
+  “Best for weekend brunch”
+  “Today at 7:00 PM”
+  “Open reservation link”
+  “Good for guests asking what to do this week”
+- commission plan summary if permitted
+  Examples:
+  “Flat $5 per seated party”
+  “Earns commission after visit is validated”
+  “Partner share applies”
+  “Commission details hidden”
+- status: active/upcoming/past/paused
+- QR / WhatsApp / copy link actions
+
+Past Events:
+- Past assignments remain visible under Past / History for attribution and payout proof.
+- Past assignments should not appear as primary share cards unless explicitly filtered.
+- Do not delete past assignments or attribution history.
+
+Tests:
+Add tests for the security bug.
+
+Required test cases:
+1. Partner can create assignment for their own event/session/series.
+2. Partner cannot create assignment for unrelated event/session/series.
+3. Partner cannot spoof offerId/scopeId mismatch.
+4. Partner cannot assign arbitrary existing referralActorId they do not manage.
+5. Admin can create assignment across scopes.
+6. Referrer share surface only returns assignments visible to that referrer.
+7. Past assignments appear only in Past/History section.
+8. Share cards include venue, best-use hint, and commission plan summary.
+
+Acceptance:
+- IDOR/cross-scope assignment creation is blocked.
+- Partner assignment creation uses real DB ownership/association.
+- No request-provided ownership array is trusted.
+- Role-scoped assignment CRUD is complete or safely archived/documented.
+- Share cards contain venue, best-use hint, and commission plan summary.
+- Past events remain auditable but are not primary active share options.
+- Existing commission logic is not broken.
+- Existing checkout attribution is not broken.
+- Dev compile passes.
+- Architect review passes.

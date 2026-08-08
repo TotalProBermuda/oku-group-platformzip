@@ -1,0 +1,65 @@
+Refactor the completed Launch Readiness Center into a Superadmin Payments operations area.
+
+Do not remove the readiness checks. Re-home them under Payments.
+
+Required changes:
+
+1. Route and nav
+- Keep a redirect from /admin/settings/launch-readiness to /admin/payments for compatibility.
+- Create /admin/payments as the canonical route.
+- Rename AdminNav label from “Launch Readiness” to “Payments”.
+- Keep SUPERADMIN-only access.
+
+2. Page copy
+- H1: Payments
+- Subtitle: Gateway, refunds, receipts, tickets, and payment system checks.
+- Rename “Launch blockers” to “Payment blockers” when the blockers are payment-related.
+- Put auth/runtime/demo/Redis warnings in a lower “System Checks” section.
+
+3. Page structure
+Tabs or sections:
+- Overview
+- Payment Providers
+- Authorize.net
+- Refunds & Voids
+- Receipts & Email
+- Tickets & QR
+- System Checks
+- Audit Trail
+
+4. Authorize.net panel
+- Show provider row: Authorize.net Credit Card
+- Status: Active / Misconfigured / Disabled
+- Mode: sandbox / production
+- Credential presence only, no raw secrets
+- Button: Test Authorize.net Connection
+- Last test result
+
+5. Refunds & Voids panel
+- Show refund route status
+- Show void route status
+- Show whether partial refunds are supported
+- Show “Gateway-first enforced” if DB mutation is blocked until gateway success
+- Show last refund/void audit entries if easy to query
+
+6. Receipts & Email panel
+- Show Resend configured/missing
+- Sender email
+- Button: Send test email
+- Last test result
+
+7. Tickets & QR panel
+- Show ticket creation, QR scan, resend confirmation readiness
+- RFID should be labelled Future module / Not configured, not a launch blocker
+
+8. Verify refund route
+Open the current src/app/api/v1/admin/orders/refund/route.ts and confirm:
+- it imports refundTransaction
+- it calls Authorize.net before mutating Order or Payment
+- failed gateway refund writes audit but does not mark refunded
+- partial refund logic sets PARTIALLY_REFUNDED where appropriate
+
+If any of those are false, fix before completing.
+
+9. Build
+Run npm run build.

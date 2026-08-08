@@ -1,0 +1,96 @@
+#216 - Fix /admin/payments readiness contradiction after Cybersource test passes
+
+What & Why
+/admin/payments shows contradictory state after Cybersource Test Connection:
+- Cybersource card says Enabled / test / Last test passed
+- Inline Test Result says Passed / Credentials accepted
+- Top readiness banner says Cybersource · test · not ready
+- Blocker says “Cybersource selected but test connection has not passed.”
+
+Root cause:
+src/app/api/v1/admin/payments/cybersource/test/route.ts silently ignores failure to persist the test result:
+
+prisma.cybersourceGatewayCredential.update(...).catch { // ignore }
+
+So the live Cybersource probe succeeds, but lastTestStatus / lastTestedAt may remain null in DB. The card/inline result can show transient success, while readiness reads DB state via activeGateway.ts and still reports not ready.
+
+Hard principle:
+There must be one settled source of truth: persisted DB-backed Cybersource readiness fields.
+
+Canonical fields:
+- lastTestStatus
+- lastTestedAt
+- lastTestMessage
+
+Done looks like
+- After a passed Cybersource test, the blocker “test connection has not passed” disappears immediately.
+- The top banner shows Cybersource · test · ready, assuming no other blockers.
+- Card badge, inline Test Result, and global readiness banner all reflect the same persisted DB fields.
+- If live Cybersource test succeeds but DB persistence fails, API returns a clear failure and UI does not show “Last test passed.”
+- Changing merchantId, keyId, or sharedSecret resets prior test state.
+- Changing non-secret settings does not reset prior test state.
+- No duplicate readiness service, payment settings page, Cybersource config model, or test-state mechanism.
+
+Out of scope
+- Changing Cybersource credentials.
+- Changing connection probe logic.
+- Changing 7-day sandbox / 24-hour production recency logic.
+- Adding provider support.
+- JWT/MLE migration.
+
+Steps
+
+1. Fix persistence in test route
+In src/app/api/v1/admin/payments/cybersource/test/route.ts:
+- Remove catch { // ignore }.
+- Persist lastTestStatus, lastTestedAt, and lastTestMessage before returning success.
+- Use upsert if row may not exist.
+- If persistence fails, return 500 with code persistence_failed.
+- Never return gatewayOk=true if DB persistence failed.
+
+2. Return fresh DB-backed gateway view
+After successful persistence:
+- Re-read or use the committed row.
+- Return toSafeCybersourceView(cred).
+- Ensure gateway.lastTest.status is passed/failed and not null when gatewayOk is true/false.
+
+3. Fix form settled-state source
+In src/components/admin/payments/CybersourceGatewayForm.tsx:
+- Do not let transient gatewayOk masquerade as settled “Last test passed.”
+- After successful test and reload, display badge/result from gateway.lastTest.status.
+- On persistence_failed, show: “Connection succeeded but the test result could not be saved. Please retry or contact admin.”
+- Call onChanged?.() after test completes so launch readiness refreshes immediately.
+
+4. Reset test state when credentials change
+In the Cybersource credential update service:
+- If merchantId, keyId, or sharedSecret changes, set:
+  lastTestStatus = null
+  lastTestedAt = null
+  lastTestMessage = null
+- If only non-secret settings change, keep last test state.
+
+5. Regression tests
+Add vitest coverage for:
+- lastTestStatus="passed", recent lastTestedAt => no blocker
+- lastTestStatus=null, lastTestedAt=null => “test connection has not passed”
+- lastTestStatus="failed" => “test connection has not passed”
+- lastTestStatus="passed" but stale => recency blocker
+- credential field changed => test fields reset
+- live probe succeeds but DB persistence fails => API failure, not gatewayOk=true
+
+6. Manual QA
+- Run Test Connection.
+- Confirm inline Test Result says Passed.
+- Confirm card badge says Last test passed.
+- Confirm top banner changes to Cybersource · test · ready.
+- Confirm blocker disappears without manual refresh.
+- Change non-secret settings only and confirm test remains passed.
+- Change Key ID or Shared Secret and confirm test status resets.
+
+Relevant files
+- src/app/api/v1/admin/payments/cybersource/test/route.ts
+- src/server/payments/activeGateway.ts
+- src/components/admin/payments/CybersourceGatewayForm.tsx
+- src/app/api/v1/admin/launch-readiness/route.ts
+- src/server/payments/cybersourceCredentialService.ts
+- prisma/schema.prisma

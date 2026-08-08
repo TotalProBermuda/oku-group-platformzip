@@ -1,0 +1,61 @@
+{
+  "invitationSubject": "You're invited to {eventTitle}",
+  "invitationHeadline": "You have been invited",
+  "invitationCta": "Accept Invitation",
+  "invitationDecline": "Decline",
+  "ticketConfirmationSubject": "Your ticket for {eventTitle}",
+  "ticketConfirmationHeadline": "Booking Confirmed",
+  "membershipWelcomeSubject": "Welcome to OKÜ Membership",
+  "membershipWelcomeHeadline": "Welcome, Member",
+  "membershipApprovedSubject": "Your OKÜ Membership is Active",
+  "membershipPendingSubject": "We've received your membership application",
+  "membershipPendingBody": "Thank you for your interest. Our team will contact you within 48 hours to complete your enrolment.",
+  "passwordResetSubject": "Reset your OKÜ password",
+  "reminderSubject": "Reminder: {eventTitle} is tomorrow",
+  "reminderHeadline": "See you tomorrow",
+  "followUpSubject": "Thank you for attending {eventTitle}",
+  "footer": "OKÜ Hospitality Group · Casco Viejo, Panama City",
+  "unsubscribe": "Unsubscribe",
+  "viewOnline": "View online",
+  "copyright": "© {year} OKÜ Hospitality Group. All rights reserved.",
+  "beneficiary": {
+    "greeting": "Hi {name},",
+    "greetingFallback": "Hi there,",
+    "reasonLabel": "Reason",
+    "cta": "View your beneficiary profile",
+    "orOpen": "Or open:",
+    "footerNote": "You're receiving this because you have a beneficiary profile on the OKÜ payouts platform.",
+    "buckets": {
+      "OKU_APPROVAL": "OKÜ Approval",
+      "BANK_READINESS": "Bank Readiness",
+      "HOLD_OR_REJECT": "Action Needed"
+    },
+    "status": {
+      "READY_FOR_REVIEW": {
+        "subject": "OKÜ approval — your beneficiary profile is in review",
+        "headline": "Your profile is in review",
+        "body": "Thanks — we have everything we need for now. Our finance team will review your beneficiary profile and let you know once OKÜ approval is complete."
+      },
+      "OKU_APPROVED": {
+        "subject": "OKÜ approval — your beneficiary profile has been approved",
+        "headline": "OKÜ has approved your profile",
+        "body": "Good news — OKÜ Finance has approved your beneficiary profile. The next step is bank readiness: Banesco will review your file as part of their own onboarding before any payout is issued."
+      },
+      "BANK_READY": {
+        "subject": "Bank readiness — Banesco has confirmed your account",
+        "headline": "Your account is bank-ready",
+        "body": "Banesco has confirmed your beneficiary file. You're now eligible to receive payouts on the next payout batch that includes you."
+      },
+      "ON_HOLD": {
+        "subject": "Action needed — your beneficiary profile is on hold",
+        "headline": "Your profile is on hold",
+        "body": "We've placed a temporary compliance hold on your beneficiary profile. Payouts will resume once the hold is cleared. Please review the reason below and reach out if you have questions."
+      },
+      "REJECTED": {
+        "subject": "Action needed — your beneficiary profile was rejected",
+        "headline": "Your profile was rejected",
+        "body": "We were unable to accept your beneficiary profile as submitted. Please review the reason below; you can update your details and resubmit at any time."
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+Code red-team first: I would not green-light the extracted repo snapshot yet. Several Sprint A issues are still present in the code I can inspect locally. Replit may have newer live changes, but this snapshot still shows the risks.
+Findings
+[P0] QR pending approval is still swallowed by the parent success screen.
+[src/app/r/[referralCode\]/page.tsx (line 98)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/r/[referralCode]/page.tsx:98) sets bookedOk=true before parsing pendingApproval, and the rendered success block at [`line 227` (line 227)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/r/[referralCode]/page.tsx:227) only shows the green “You’re on the list” copy. Pending requests need their own parent state and amber copy.
+[P0] requestedSpaceId validation is still too weak.
+[src/app/api/reservations/route.ts (line 42)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/api/reservations/route.ts:42) uses findUnique({ id }) and only selects requiresApproval. It does not enforce venueId, isActive, reservable, or capacity. Then [`line 86` (line 86)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/api/reservations/route.ts:86) persists the raw ID.
+[P0] QR source is still not persisted.
+The QR page sends source: "QR_SCAN" at [src/app/r/[referralCode\]/page.tsx (line 89)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/r/[referralCode]/page.tsx:89), but the API hardcodes source: "UMBRELLA_SITE" at [src/app/api/reservations/route.ts (line 72)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/api/reservations/route.ts:72). ReservationSource.QR_CODE exists in schema, so this should map QR_SCAN -> QR_CODE.
+[P0] Pending approval still emits RESERVATION_CONFIRMED.
+[src/app/api/reservations/route.ts (line 442)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/api/reservations/route.ts:442) emits RESERVATION_CONFIRMED unconditionally. Schema also lacks RESERVATION_PENDING_APPROVAL at [prisma/schema.prisma (line 4946)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/prisma/schema.prisma:4946). That makes #204 still necessary.
+[P1] Party size still appears after availability.
+The date/time/space block starts at [GuestBookingForm.tsx (line 298)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/components/booking/GuestBookingForm.tsx:298); party size starts much later at [`line 600` (line 600)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/components/booking/GuestBookingForm.tsx:600). Since availability depends on party size, party size should move above When & Where.
+[P1] ShareSurfacePanel can still crash on malformed API shape.
+[ShareSurfacePanel.tsx (line 121)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/components/referral/ShareSurfacePanel.tsx:121) trusts the response as SurfaceData; [`line 137` (line 137)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/components/referral/ShareSurfacePanel.tsx:137) and [`line 165` (line 165)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/components/referral/ShareSurfacePanel.tsx:165) assume data.buckets exists. This is exactly the crash #210 exposed. #211 is real.
+[P1] The local #210 spec is stale.
+In this snapshot, it still uses carlos@oku.local at [tests/browser/referrer-console-standardization.spec.ts (line 95)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/tests/browser/referrer-console-standardization.spec.ts:95) and still mocks partner share-surface as { offers: [] } at [`line 166` (line 166)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/tests/browser/referrer-console-standardization.spec.ts:166). Replit reported fixing this live, so confirm those corrections are actually applied to main.
+[P2] Host form date prefill appears already done in this snapshot.
+[src/app/host/streetside/page.tsx (line 917)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/host/streetside/page.tsx:917), [`line 1037` (line 1037)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/host/streetside/page.tsx:1037), and [`line 1508` (line 1508)](/private/tmp/oku-repo-work/oku-group-platformzip-replit-live-69973b7e-snapshot/src/app/host/streetside/page.tsx:1508) show the host form date field is present, prefilled, and submitted as requestedTime. #205 may no longer be needed if this matches live.
+Recommended Order
+Do not start new feature work yet. Fix in this order:
+#200 pass/fix verification → #211 → #209 → #204 → #212
+And specifically tell Replit:
+Before starting new tasks, verify whether the live main branch still has the following defects from code evidence:
+1. QR page parent success screen swallowing pendingApproval.
+2. /api/reservations hardcoding source: UMBRELLA_SITE.
+3. /api/reservations validating requestedSpaceId only by id.
+4. /api/reservations emitting RESERVATION_CONFIRMED for PENDING_APPROVAL.
+5. GuestBookingForm rendering party size after availability.
+6. ShareSurfacePanel crashing when data.buckets is missing.
+
+If any are present, fix them in-place before marking Sprint A green. Do not create duplicate forms, routes, dashboards, or services.
+
+
+2:47

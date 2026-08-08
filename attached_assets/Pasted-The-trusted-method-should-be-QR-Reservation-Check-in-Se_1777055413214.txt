@@ -1,0 +1,134 @@
+The trusted method should be:
+
+QR → Reservation → Check-in/Seating → POS order with shared reference ID → INVU sync reconciliation
+
+Do not rely mainly on name, table, time, or amount. Those are fallback signals only.
+
+Recommended trusted chain
+1. QR scan creates a tracked reservation
+
+When a customer scans a QR code, the system should capture:
+
+qrCodeId
+referralActorId / referrer / host / partner
+campaignId if applicable
+reservationId
+reservationCode
+customer name / phone / email
+party size
+venue
+date/time
+source = QR_REFERRAL
+
+The key field is:
+
+reservationCode
+
+Example:
+
+OKU-RSV-20260424-8F3K
+2. Host checks in / seats the guest
+
+When the host seats the party, they should confirm the reservation in the platform:
+
+mark as ARRIVED
+assign table
+assign seated time
+confirm party size
+optionally assign server
+
+This creates or updates:
+
+tableSessionId
+reservationId
+reservationCode
+tableId
+seatedAt
+3. POS order must carry the same reference
+
+When the server opens the order in INVU POS, the trusted method is to place the OKÜ reservation code into an INVU-supported reference field.
+
+Ideally one of:
+
+num_cita
+invoice reference
+order note
+customer note
+external ID / metadata if available
+
+The POS order should contain:
+
+OKU-RSV-20260424-8F3K
+
+That becomes the bridge between OKÜ and INVU.
+
+4. INVU sync matches by exact reference first
+
+When INVU orders sync back, matching should happen in this order:
+
+exact reservationCode / num_cita
+exact invu_order_id
+exact invu_order_code
+table + seated time + venue
+customer phone/email
+party size
+amount as supporting evidence only
+
+The system should store:
+
+reservationId
+tableSessionId
+invuOrderId
+invuOrderCode
+matchConfidence
+matchMethod
+The core rule
+
+Every live reservation should have a unique OKÜ reservation code that travels from QR booking into the POS order.
+
+Without that, you are guessing.
+
+With that, you have a trusted chain.
+
+Minimum trusted workflow
+Customer scans QR
+→ reservation created with referralActorId + reservationCode
+→ host checks in reservation and assigns table
+→ server opens INVU order and enters reservationCode into POS reference field
+→ INVU sync imports order
+→ system matches INVU order to reservation by reservationCode
+→ order revenue attributes back to QR/referrer/partner
+What needs to be built
+In OKÜ
+generate unique reservationCode
+show it clearly on host seating screen
+require host/server handoff
+store tableSessionId
+store invuOrderId after sync
+In INVU process
+define exactly where staff enters/scans the reservation code
+ideally barcode/QR handoff to POS if possible
+otherwise manual entry into num_cita or order reference field
+In sync engine
+exact match first
+confidence score
+review queue only for unmatched/ambiguous records
+Best operating model
+
+The host screen should show:
+
+Reservation: OKU-RSV-8F3K
+Guest: Maria Lopez
+Party: 4
+Table: T-5
+Source: Taxi Juan QR
+
+Server opens POS order and enters:
+
+OKU-RSV-8F3K
+
+Then the POS sync can say:
+
+INVU order 2416 matched to reservation OKU-RSV-8F3K with 100% confidence.
+
+That is the trusted method.

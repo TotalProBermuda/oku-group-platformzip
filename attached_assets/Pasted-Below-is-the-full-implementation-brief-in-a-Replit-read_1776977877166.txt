@@ -1,0 +1,897 @@
+Below is the full implementation brief in a Replit-ready style.
+
+Task: Partner-Managed Co-Host Invite Seats
+1. Overview
+What this is
+
+Replace the current co-host creation flow, which requires an already-registered user, with an invite-based seat model that allows a partner to invite a co-host by email, assign scoped permissions to a specific event or series, and let that person create or link an account through the acceptance flow.
+
+Why this matters
+
+The existing flow creates friction and blocks partner-led collaboration. Hospitality partners need to be able to quickly invite sommeliers, guest-list managers, brand reps, temporary hosts, and other collaborators without admin intervention or a prerequisite account.
+
+This change introduces a partner-driven growth loop:
+
+Partner creates a seat
+Invite is sent by email
+Invitee accepts and completes account setup
+Access is granted only to the assigned scope
+No platform admin required for standard onboarding
+2. Problem Statement
+Current issue
+
+Today, when a partner tries to add a co-host, the system checks for an existing user account tied to that email. If none exists, the operation fails with:
+
+"No user found for that email. Ask them to create an account first, then add them as a co-host."
+
+Why this is bad
+
+This creates several problems:
+
+unnecessary bottleneck
+poor partner UX
+admin dependency
+lost invitations / delayed event setup
+weak virality and poor seat-led platform growth
+Desired behavior
+
+A partner should be able to:
+
+enter a co-host name and email
+assign a role and scope
+send an invite even if no account exists
+see the seat as pending
+resend or revoke the invite
+have the invitee create or link an account via invite acceptance
+activate access only for the intended event or series
+3. Product Goal
+
+Enable Partner-Managed Invite Seats so that:
+
+a partner can create a co-host seat by email,
+the seat can exist before a user account exists,
+the invitee can accept the invite and onboard,
+the resulting account is linked to the specific assigned event or series,
+permissions remain tightly scoped and do not grant broader admin rights.
+4. Scope
+In Scope
+invite co-host by email without pre-existing user account
+create pending seat records
+send invite email with secure token
+accept invite via sign-up or sign-in flow
+bind accepted user account to seat
+grant scoped access to event or series
+partner ability to resend or revoke pending invites
+display pending and active co-host seats in dashboard
+preset role templates for MVP
+audit trail for invite lifecycle
+token expiry handling
+email-match enforcement for acceptance
+Out of Scope for MVP
+custom permission builder UI
+bulk invite import
+invite by SMS/WhatsApp
+organization/team hierarchy beyond seat scope
+account merge flows
+accepting invite with a different email and later reconciling it
+partner-level permanent staff access across all future events
+delegated billing/payout management
+SCIM / SSO provisioning
+5. User Stories
+Primary
+
+As a partner, I want to invite a co-host by email even if they do not yet have an account, so I can set up event collaborators quickly.
+
+As an invitee, I want to accept my invite, create or sign into my account, and be taken directly to the event I was invited to support.
+
+As a product/admin team, I want all co-host access to be scoped and auditable so platform security remains intact.
+
+Secondary
+
+As a partner, I want to see which co-host invites are pending, active, expired, or revoked.
+
+As a partner, I want to resend an invite if someone missed the email.
+
+As a partner, I want to revoke an invite before it is accepted.
+
+6. Core Product Model
+
+The system must distinguish between:
+
+Seat = invitation + permission container
+User = platform account
+Access Grant = actual permission link once accepted
+Principle
+
+A seat may exist without a user.
+A user may later claim a seat.
+Permissions are activated only after claim/acceptance.
+
+7. Data Model / Schema
+7.1 partner_seats
+
+Represents the partner-created seat assignment.
+
+CREATE TABLE partner_seats (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  created_by_user_id UUID NOT NULL REFERENCES users(id),
+  event_id UUID NULL REFERENCES events(id) ON DELETE CASCADE,
+  series_id UUID NULL REFERENCES event_series(id) ON DELETE CASCADE,
+
+  invited_name VARCHAR(255) NULL,
+  invited_email CITEXT NOT NULL,
+  role_code VARCHAR(100) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'invited',
+
+  permissions_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  accepted_by_user_id UUID NULL REFERENCES users(id),
+  accepted_at TIMESTAMPTZ NULL,
+
+  revoked_at TIMESTAMPTZ NULL,
+  revoked_by_user_id UUID NULL REFERENCES users(id),
+
+  expires_at TIMESTAMPTZ NULL,
+
+  last_invited_at TIMESTAMPTZ NULL,
+  invite_count INT NOT NULL DEFAULT 1,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT chk_partner_seats_scope
+    CHECK (
+      (event_id IS NOT NULL AND series_id IS NULL)
+      OR
+      (event_id IS NULL AND series_id IS NOT NULL)
+    )
+);
+Notes
+exactly one scope must be assigned: either event_id or series_id
+status values for MVP:
+invited
+active
+expired
+revoked
+removed
+permissions_json stores resolved permissions snapshot at time of invite
+7.2 seat_invites
+
+Represents tokenized invite records. One seat may have multiple invite sends over time.
+
+CREATE TABLE seat_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  seat_id UUID NOT NULL REFERENCES partner_seats(id) ON DELETE CASCADE,
+
+  token_hash TEXT NOT NULL,
+  sent_to_email CITEXT NOT NULL,
+
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  accepted_at TIMESTAMPTZ NULL,
+  revoked_at TIMESTAMPTZ NULL,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+Notes
+store only token hash, never raw token
+raw token appears only in invite email link
+each resend should generate a new token
+previous live tokens should be invalidated when resend occurs, unless deliberately allowing multiple valid tokens; MVP should invalidate previous pending tokens
+7.3 user_event_access
+
+Represents active, accepted access rights for a user.
+
+CREATE TABLE user_event_access (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+
+  event_id UUID NULL REFERENCES events(id) ON DELETE CASCADE,
+  series_id UUID NULL REFERENCES event_series(id) ON DELETE CASCADE,
+
+  seat_id UUID NOT NULL REFERENCES partner_seats(id) ON DELETE CASCADE,
+  role_code VARCHAR(100) NOT NULL,
+  permissions_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  status VARCHAR(50) NOT NULL DEFAULT 'active',
+
+  granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  removed_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT chk_user_event_access_scope
+    CHECK (
+      (event_id IS NOT NULL AND series_id IS NULL)
+      OR
+      (event_id IS NULL AND series_id IS NOT NULL)
+    )
+);
+Notes
+one active row per user + seat
+permissions are copied here so historical seat edits do not silently rewrite prior access without an explicit update action
+7.4 audit_logs additions
+
+If an audit table already exists, extend it. Otherwise ensure equivalent logging exists.
+
+Minimum audit events:
+
+partner_seat_created
+partner_seat_invite_sent
+partner_seat_invite_resent
+partner_seat_revoked
+partner_seat_accepted
+partner_seat_access_activated
+partner_seat_removed
+partner_seat_expired
+8. Status Definitions
+Seat Status
+invited = seat exists, invite sent, awaiting acceptance
+active = accepted and access granted
+expired = invite expired before acceptance
+revoked = partner/admin revoked before acceptance
+removed = seat was previously active and later access removed
+Invite Status
+
+Derived from timestamps:
+
+pending
+accepted
+revoked
+expired
+9. Role Templates and Permission Matrix
+
+For MVP, use preset role bundles only. No custom permission editor yet.
+
+9.1 Permission Keys
+
+Suggested boolean permissions:
+
+can_view_event_summary
+can_view_attendees
+can_check_in_guests
+can_invite_guests
+can_manage_guest_notes
+can_view_ticket_sales_summary
+can_view_revenue_summary
+can_manage_subhosts
+can_export_guest_list
+can_edit_event_copy
+can_edit_event_schedule
+can_edit_ticketing
+can_edit_financial_settings
+can_view_payouts
+
+For MVP, most edit/financial permissions remain false.
+
+9.2 Role Templates
+A. Event Co-Host
+
+Use case: trusted partner-side collaborator for event operations
+
+Permissions:
+
+can_view_event_summary = true
+can_view_attendees = true
+can_check_in_guests = true
+can_invite_guests = true
+can_manage_guest_notes = true
+can_view_ticket_sales_summary = true
+can_view_revenue_summary = false
+can_manage_subhosts = false
+can_export_guest_list = true
+can_edit_event_copy = false
+can_edit_event_schedule = false
+can_edit_ticketing = false
+can_edit_financial_settings = false
+can_view_payouts = false
+B. Guest List Manager
+
+Use case: RSVP, attendee tracking, check-in
+
+Permissions:
+
+can_view_event_summary = true
+can_view_attendees = true
+can_check_in_guests = true
+can_invite_guests = true
+can_manage_guest_notes = true
+can_view_ticket_sales_summary = false
+can_view_revenue_summary = false
+can_manage_subhosts = false
+can_export_guest_list = true
+can_edit_event_copy = false
+can_edit_event_schedule = false
+can_edit_ticketing = false
+can_edit_financial_settings = false
+can_view_payouts = false
+C. Night Host
+
+Use case: day-of / night-of operational helper
+
+Permissions:
+
+can_view_event_summary = true
+can_view_attendees = true
+can_check_in_guests = true
+can_invite_guests = false
+can_manage_guest_notes = limited/true for MVP if simple text notes
+can_view_ticket_sales_summary = false
+can_view_revenue_summary = false
+can_manage_subhosts = false
+can_export_guest_list = false
+can_edit_event_copy = false
+can_edit_event_schedule = false
+can_edit_ticketing = false
+can_edit_financial_settings = false
+can_view_payouts = false
+9.3 Matrix
+Action	Partner Admin	Event Co-Host	Guest List Manager	Night Host
+View scoped event summary	Yes	Yes	Yes	Yes
+View attendee list	Yes	Yes	Yes	Yes
+Check in guests	Yes	Yes	Yes	Yes
+Invite guests / comps	Yes	Yes	Yes	No
+Add guest notes	Yes	Yes	Yes	Yes
+Export guest list	Yes	Yes	Yes	No
+View ticket sales summary	Yes	Yes	No	No
+View payout/revenue split	Yes	No	No	No
+Invite other co-hosts	Yes	No	No	No
+Edit event copy	Yes	No	No	No
+Edit date/time	Yes	No	No	No
+Edit ticket pricing/design	Yes	No	No	No
+Edit payout settings	Yes	No	No	No
+Rule
+
+A seat holder must never be able to grant permissions higher than their own.
+For MVP, only Partner Admin can create invite seats.
+
+10. Backend Endpoints
+
+All endpoints below assume authenticated partner/admin context unless otherwise stated.
+
+10.1 Create Seat Invite
+POST /api/partner-seats/invite
+
+Creates a seat and sends an invite email.
+
+Request
+{
+  "partnerId": "uuid",
+  "scopeType": "event",
+  "eventId": "uuid",
+  "seriesId": null,
+  "invitedName": "Sarah Miles",
+  "invitedEmail": "sarah@example.com",
+  "roleCode": "guest_list_manager",
+  "note": "You’ll be helping manage guest arrivals for this session."
+}
+Validation
+user must have permission to manage partner seats
+scopeType must be event or series
+exactly one of eventId or seriesId must be provided
+email must be valid
+role code must be one of allowed templates
+scope must belong to the partner
+cannot create duplicate active/pending seat for same email + same scope + same role unless explicitly allowed; MVP should block duplicates and return useful message
+Response
+{
+  "seat": {
+    "id": "uuid",
+    "status": "invited",
+    "partnerId": "uuid",
+    "eventId": "uuid",
+    "seriesId": null,
+    "invitedName": "Sarah Miles",
+    "invitedEmail": "sarah@example.com",
+    "roleCode": "guest_list_manager",
+    "permissions": {
+      "can_view_event_summary": true,
+      "can_view_attendees": true,
+      "can_check_in_guests": true,
+      "can_invite_guests": true
+    },
+    "expiresAt": "2026-05-01T23:59:59Z",
+    "createdAt": "2026-04-23T15:00:00Z"
+  }
+}
+10.2 List Seats for Scope
+GET /api/partner-seats?partnerId=...&scopeType=event&eventId=...
+
+Returns all pending/active/revoked/expired seats for that scope.
+
+Response
+{
+  "items": [
+    {
+      "id": "uuid",
+      "invitedName": "Sarah Miles",
+      "invitedEmail": "sarah@example.com",
+      "roleCode": "guest_list_manager",
+      "status": "invited",
+      "acceptedByUserId": null,
+      "expiresAt": "2026-05-01T23:59:59Z",
+      "lastInvitedAt": "2026-04-23T15:00:00Z"
+    }
+  ]
+}
+10.3 Resend Invite
+POST /api/partner-seats/:seatId/resend
+
+Generates a fresh token, invalidates previous pending tokens, sends new email.
+
+Request
+{
+  "note": "Resending this in case you missed the first email."
+}
+Validation
+seat must belong to partner
+seat status must be invited or expired
+cannot resend revoked or removed seats
+rate limit resend, e.g. once every 60 seconds
+Response
+{
+  "success": true,
+  "seatId": "uuid",
+  "status": "invited",
+  "lastInvitedAt": "2026-04-23T15:10:00Z",
+  "expiresAt": "2026-05-01T23:59:59Z"
+}
+10.4 Revoke Invite
+POST /api/partner-seats/:seatId/revoke
+
+Revokes a pending invite before it is accepted.
+
+Response
+{
+  "success": true,
+  "seatId": "uuid",
+  "status": "revoked"
+}
+10.5 Remove Active Seat
+POST /api/partner-seats/:seatId/remove
+
+Removes active access from an already accepted co-host.
+
+Behavior
+mark partner_seats.status = removed
+mark user_event_access.status = removed
+set removed_at
+revoke future access immediately
+Response
+{
+  "success": true,
+  "seatId": "uuid",
+  "status": "removed"
+}
+10.6 Get Invite Metadata (Public)
+GET /api/seat-invites/accept/:token
+
+Public endpoint used by invite landing page to validate token and show invite details.
+
+Response on valid token
+{
+  "valid": true,
+  "seat": {
+    "invitedName": "Sarah Miles",
+    "invitedEmailMasked": "s***h@example.com",
+    "roleCode": "guest_list_manager",
+    "scopeType": "event",
+    "eventTitle": "Barolo Private Dinner",
+    "seriesTitle": null,
+    "partnerName": "Rossi Hospitality Group",
+    "expiresAt": "2026-05-01T23:59:59Z"
+  }
+}
+Response on invalid token
+{
+  "valid": false,
+  "reason": "expired"
+}
+10.7 Accept Invite
+POST /api/seat-invites/accept/:token
+
+Accepts seat invite after auth.
+
+Auth behavior
+
+User must be authenticated before completing this call.
+Flow may route through:
+
+sign up
+sign in
+then return to accept call
+Validation
+token valid
+invite not expired
+invite not revoked
+seat not already active by a different user
+authenticated user's email must match invited email exactly for MVP
+Request
+{
+  "acknowledge": true
+}
+Response
+{
+  "success": true,
+  "seatId": "uuid",
+  "access": {
+    "scopeType": "event",
+    "eventId": "uuid",
+    "seriesId": null,
+    "roleCode": "guest_list_manager"
+  },
+  "redirectTo": "/partner/events/evt_123/cohost-dashboard"
+}
+11. Invite Email Requirements
+
+Subject:
+
+You’ve been invited to co-host an event on OKÜ
+
+Body should include:
+
+partner name
+event or series title
+assigned role
+concise summary of access
+expiry date
+CTA button: Accept Invitation
+Example copy
+
+Rossi Hospitality Group invited you to join Barolo Private Dinner as a Guest List Manager.
+You’ll be able to view attendees, manage guest arrivals, and support check-in for this event.
+Accept your invitation below to create or link your account.
+
+Footer:
+
+if you did not expect this invite, ignore email
+invite expires on [date]
+12. UI / Frontend Requirements
+12.1 Partner Dashboard Placement
+
+Within Partner Dashboard, inside event detail page and series detail page, add a section:
+
+Section Title
+
+Co-Hosts
+
+Sub-sections:
+
+Active Co-Hosts
+Pending Invites
+Past / Inactive
+
+Primary CTA:
+
+Invite Co-Host
+12.2 Invite Modal
+
+Fields:
+
+Full Name (optional but recommended)
+Email (required)
+Role (dropdown)
+Scope (pre-filled based on page context, not editable in event page if already in specific event)
+Optional note
+Send Invite button
+Validation messages
+invalid email
+duplicate invite for same email and scope
+unauthorized role assignment
+missing scope
+partner mismatch
+Success state
+
+Toast:
+
+Invite sent
+seat appears immediately in Pending Invites
+12.3 Pending Invite Card / Row
+
+Fields shown:
+
+Name
+Email
+Role
+Scope
+Status = Pending / Expired / Revoked
+Last sent time
+Expiry date
+
+Actions:
+
+Resend
+Revoke
+UI states
+Pending
+badge = Pending
+Resend active
+Revoke active
+Expired
+badge = Expired
+Resend active
+Revoke active
+Revoked
+badge = Revoked
+Resend disabled
+Revoke hidden/disabled
+12.4 Active Co-Host Card / Row
+
+Fields shown:
+
+Name
+Email
+Role
+Scope
+Accepted date
+Status = Active
+
+Actions:
+
+Remove Access
+View Permissions (optional drawer/popover)
+12.5 Invite Landing Page
+
+When invitee clicks email:
+
+show branded invite acceptance screen
+show partner name, event name, role, access summary
+show sign in / create account flow
+after auth, complete acceptance
+redirect to scoped dashboard
+States
+Valid token + logged out
+show invite summary
+show create account / sign in CTA
+Valid token + logged in correct email
+show Accept Invitation CTA
+Valid token + logged in wrong email
+block acceptance
+message:
+"This invite was sent to [masked email]. Please sign in with that email to accept this seat."
+Expired token
+message:
+"This invitation has expired."
+if appropriate, show:
+"Ask the sender to resend the invite."
+Revoked token
+message:
+"This invitation is no longer active."
+Already accepted
+message:
+"This invitation has already been accepted."
+button:
+Go to Dashboard
+12.6 Scoped Co-Host Dashboard Behavior
+
+After acceptance, co-host should land on a dashboard restricted to:
+
+assigned event or series only
+data filtered to their scope
+actions controlled by permissions
+
+They must not see:
+
+unrelated partners
+unrelated events
+ticketing configuration admin screens
+payout settings
+billing tools
+platform-wide settings
+13. Auth / Security Rules
+MVP Security Rules
+invite tokens must be random, long, and single-use
+store token hashes only
+acceptance requires authenticated account
+authenticated account email must match invited email exactly
+invite acceptance cannot escalate privileges beyond assigned seat
+seat access must be scope-restricted
+all changes must be audited
+partner can only manage seats for their own scope
+only authorized partner admins can create seats
+old tokens invalidated on resend
+14. Business Rules
+Only Partner Admin can create co-host seat invites in MVP
+One seat must belong to exactly one scope:
+event OR series
+A seat is not access until it is accepted
+A seat invite can exist for a non-user email
+Acceptance creates or links a user account
+Accepted account must match invited email
+Resend generates new token and updates expiry
+Revoke blocks future acceptance
+Remove Access disables active access immediately
+Co-host cannot modify event structure, pricing, or payout settings in MVP
+15. Edge Cases
+Duplicate invites
+
+If same email + same role + same scope already has a pending or active seat:
+
+block duplicate creation
+return existing seat info
+suggest resend instead
+Existing user already on platform
+
+If invited email already belongs to existing user:
+
+still send invite
+on accept, user signs in and seat activates normally
+Wrong-email login
+
+If user clicks invite but signs in with another email:
+
+do not allow acceptance
+show explanatory message
+Invite accepted after revoke
+reject with revoked status
+Invite accepted after expiry
+reject with expired status
+Partner changes mind after acceptance
+remove access endpoint used
+access disappears immediately
+Multiple pending tokens
+
+MVP should invalidate prior pending tokens when resend happens
+
+Deleted event or series
+
+If scope is deleted before acceptance:
+
+mark seat revoked or invalidated
+show unavailable message on acceptance page
+16. Suggested Frontend State Model
+type SeatStatus = 'invited' | 'active' | 'expired' | 'revoked' | 'removed';
+
+type RoleCode = 'event_co_host' | 'guest_list_manager' | 'night_host';
+
+type SeatScope =
+  | { scopeType: 'event'; eventId: string }
+  | { scopeType: 'series'; seriesId: string };
+
+type PartnerSeat = {
+  id: string;
+  partnerId: string;
+  invitedName?: string;
+  invitedEmail: string;
+  roleCode: RoleCode;
+  status: SeatStatus;
+  permissions: Record<string, boolean>;
+  scope: SeatScope;
+  acceptedByUserId?: string | null;
+  acceptedAt?: string | null;
+  expiresAt?: string | null;
+  lastInvitedAt?: string | null;
+  createdAt: string;
+};
+17. Suggested Backend Service Flow
+Create Invite Flow
+validate actor permissions
+validate scope ownership
+resolve role template -> permissions JSON
+check duplicates
+create partner_seats
+create invite token + hash
+create seat_invites
+send email
+write audit log
+return seat data
+Accept Invite Flow
+parse token
+hash token and look up live invite
+validate token state
+require auth
+compare auth email vs invited email
+ensure seat still valid and unclaimed
+create user_event_access
+mark seat active
+mark invite accepted
+write audit logs
+redirect to scoped dashboard
+18. Acceptance Criteria
+Functional
+Partner can invite a co-host by email even if no user account exists
+System creates a pending seat record immediately
+Invite email is sent with secure token
+Invite appears in Pending Invites list without page refresh if app supports live update, otherwise on reload
+Invitee can accept via sign-up flow
+Invitee can accept via sign-in flow if account already exists
+Accepted invite activates scoped access only for assigned event or series
+Partner can resend a pending or expired invite
+Resend invalidates prior token
+Partner can revoke a pending invite
+Partner can remove an active co-host
+Co-host permissions match selected role template
+Co-host cannot access unrelated partner/event data
+Co-host cannot edit event configuration, pricing, or financial settings
+All invite lifecycle actions are audit logged
+Validation / Error Handling
+Invalid email is rejected
+Duplicate seat for same email+scope+role is blocked
+Expired token cannot be accepted
+Revoked token cannot be accepted
+Wrong-email login cannot accept invite
+Unauthorized partner cannot manage another partner’s seats
+UX
+Partner sees clear statuses: Pending, Active, Expired, Revoked
+Invite acceptance page clearly shows event/partner/role context
+Wrong-email and expired-token states are human-readable and actionable
+Co-host lands in correct scoped dashboard after acceptance
+19. QA Test Cases
+Create / Invite
+invite new email to event
+invite existing user email to event
+invite to series
+attempt invalid scope
+attempt duplicate invite
+attempt invite by unauthorized actor
+Resend / Revoke
+resend valid pending invite
+resend expired invite
+revoke pending invite
+attempt resend revoked invite
+Accept
+accept as brand-new user
+accept as existing user
+accept after expiry
+accept after revoke
+accept while logged into wrong email
+accept twice
+accept after event deletion
+Access Control
+event-scoped seat sees only assigned event
+series-scoped seat sees only assigned series
+guest list manager cannot access finance
+night host cannot invite guests
+active seat removed loses access immediately
+Audit
+verify logs emitted for create/send/resend/revoke/accept/remove
+20. Done Looks Like
+
+This task is complete when:
+
+partners can invite co-hosts by email without needing a pre-existing user,
+pending invite seats are visible and manageable from the partner dashboard,
+invitees can accept via a secure tokenized flow,
+accepted users receive only the event/series access they were assigned,
+permissions are enforced by role template,
+revoked/expired/wrong-email scenarios are handled cleanly,
+seat lifecycle is fully auditable,
+no admin intervention is required for the normal invite flow.
+21. Implementation Notes for Replit Dev
+Suggested build order
+schema + migrations
+role template config
+seat creation service
+email invite generator
+invite validation endpoint
+acceptance flow + account binding
+partner dashboard seat list UI
+resend/revoke/remove actions
+scoped co-host access enforcement
+QA + polish
+Important dev constraint
+
+Do not model a co-host purely as a user relationship.
+Model it as:
+
+seat first
+user later
+access grant on acceptance
+
+That is the key architectural shift.
+
+22. Nice-to-Have After MVP
+
+Not part of this task, but logical next steps:
+
+custom permission profiles
+partner-level permanent staff seats
+bulk invite CSV
+acceptance with email change verification
+reminder automation for unaccepted invites
+sub-host invite rights for selected trusted roles
+analytics on seat adoption / invite conversion
+
+If you want, I can next turn this into a second artifact: a developer handoff spec with DB migration pseudocode, TypeScript interfaces, endpoint handler skeletons, and UI component breakdowns.

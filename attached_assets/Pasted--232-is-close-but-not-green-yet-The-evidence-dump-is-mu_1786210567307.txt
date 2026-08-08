@@ -1,0 +1,69 @@
+#232 is close, but not green yet.
+The evidence dump is much stronger than before, but I see three things to fix/verify before trusting it.
+P0 — Rotate the GitHub PAT
+Replit says the PAT was printed in terminal output. Revoke it now. Do not reuse it. Generate a new one only when ready to push again.
+P0 — GitHub is still behind
+The code is committed only in Replit workspace main at e972d16f. The GitHub mirror is not updated. Until it is pushed, I cannot verify against GitHub, and the app has a split-brain source-of-truth problem.
+P1 — Admin API guard evidence is weak
+Their statement that /api/v1/admin/** denies RESTAURANT_SUPERVISOR needs a real snippet. In the older code, admin API access used a separate ADMIN_API_ALLOWED_ROLES set, not ROLE_ROUTES. Ask Replit to show the exact current middleware block for /api/v1/admin/**.
+P1 — User/admin visibility may still be too broad
+They say /admin/users read is guarded by admin:audit:read, and ADMIN_IR, ADMIN_HR, and ADMIN_FINANCE hold that. That means IR/Finance may be able to read user/admin data. For your governance model, I’d tighten this: user management should be SUPERADMIN only, or at most SUPERADMIN + ADMIN_HR for limited staff operations. Not IR, not Finance, not F&B.
+Send Replit This
+Before final green-light on #232, address these final blockers:
+
+1. Rotate the exposed GITHUB_PAT. Do not attempt another push with the leaked token.
+
+2. Show the exact current middleware block for /api/v1/admin/**. Confirm RESTAURANT_SUPERVISOR is denied at middleware, not only by missing permissions in route handlers.
+
+3. Tighten /admin/users access. User/profile/role management should be SUPERADMIN-only unless explicitly scoped to ADMIN_HR. ADMIN_IR and ADMIN_FINANCE must not gain broad user visibility via admin:audit:read.
+
+4. Confirm finance/governance tabs are not visible to FB_DIRECTOR or RESTAURANT_SUPERVISOR:
+   - Payments
+   - Payouts
+   - Commission Rules
+   - Compensation
+   - Beneficiaries
+   - Security
+   - Audit Trail
+   - User permissions
+
+5. Push the committed Replit main branch to GitHub after rotating the token, then provide the branch/commit SHA.
+
+6. After push, rerun:
+   - prisma validate
+   - prisma generate
+   - RBAC tests
+   - middleware/route policy tests
+My read: the architecture is now right in spirit. The remaining issue is governance hygiene: make sure no “helper admin” role inherits visibility into ProofPay, payouts, users, audit, or referrer economics by accident.
+
+
+12:34
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Ask for approval
+
+
+
+
+
+
+
+5.6 TerraExtra High5.5Medium

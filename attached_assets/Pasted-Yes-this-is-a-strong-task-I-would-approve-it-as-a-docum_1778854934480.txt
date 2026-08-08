@@ -1,0 +1,59 @@
+Yes, this is a strong task. I would approve it as a documentation/audit precursor before more privacy implementation.
+
+I’d make only a few refinements before giving it to Replit:
+
+Add “consent / lawful basis matrix” explicitly
+The audit should not just say “lawful basis.” It should map each processing purpose:
+
+account creation
+ticket purchase
+referrer attribution
+commission calculation
+beneficiary verification
+bank payout
+marketing/email
+analytics/error capture
+employment/hiring
+Each should have:
+purpose → data collected → lawful basis/consent need → retention → shared with whom.
+
+Add “cross-border transfer” as its own section
+Because Replit, Resend, Cybersource, storage, monitoring, and maybe AI tooling may process data outside Panama. This needs a processor/vendor map and risk flag.
+
+Add “bank/KYC distinction” to every beneficiary section
+Make the language precise:
+
+OKÜ performs beneficiary verification and payout eligibility checks. Banesco performs formal banking/KYC/AML requirements.
+
+This avoids accidentally implying OKÜ is a regulated KYC authority.
+
+Add “data minimization challenge”
+The audit should ask: do we truly need full ID/tax/bank fields, or can some fields be status-only until Banesco confirms the exact requirement?
+
+Add “incident response” to roadmap
+Even a lightweight register:
+
+incident reported
+affected data category
+containment
+user notification needed?
+ANTAI/legal review needed?
+resolution
+Add “AI data handling”
+Since your strategic direction includes agents, the audit should explicitly say:
+
+no restricted compliance data sent to AI tools
+no bank/ID/tax fields in prompts
+AI may summarize non-sensitive payout blockers only
+any future AI use over sensitive data requires a separate approval path
+I’d add this paragraph to the task:
+
+Additional required sections:
+- Lawful basis / purpose matrix for each major processing activity.
+- Cross-border processor and vendor-transfer risk map.
+- AI data-handling rule: restricted compliance data, bank fields, tax/RUC/ID values, and source-of-funds notes must not be sent to AI tools or prompts unless a future approved privacy architecture explicitly allows it.
+- Incident-response register recommendation.
+- Data minimization review: identify fields that should remain status-only until Banesco confirms exact requirements.
+Otherwise, the task is well scoped. It is especially good that it says no implementation. Privacy needs a map before code, because otherwise Replit will scatter partial fixes across routes, schemas, and UI copy.
+
+My recommendation: run #97 before the next beneficiary/privacy implementation task. Then build the follow-ups from the roadmap.

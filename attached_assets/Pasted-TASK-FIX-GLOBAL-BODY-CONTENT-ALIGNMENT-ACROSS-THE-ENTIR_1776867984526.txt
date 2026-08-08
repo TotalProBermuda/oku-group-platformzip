@@ -1,0 +1,156 @@
+TASK: FIX GLOBAL BODY CONTENT ALIGNMENT ACROSS THE ENTIRE SUPERADMIN DASHBOARD
+
+PRIMARY OBJECTIVE
+Fix the alignment system once and for all so that ALL page body content aligns consistently with the top header/navigation structure across all Superadmin tabs and across all responsive breakpoints.
+
+CURRENT PROBLEM
+The header and top navigation appear to follow one horizontal grid, but the body content containers below are inconsistent:
+- some pages start too far left
+- some body sections are wider or narrower than others
+- some hero/title/filter/table containers do not line up with the header content width
+- some module cards, tables, and content blocks float outside the visual alignment system
+- responsive margins are inconsistent across desktop, tablet, and mobile
+- body content does not feel anchored to one shared container/grid
+
+DO NOT PATCH PAGE BY PAGE.
+Implement one global layout system and refactor all Superadmin pages to use it.
+
+MANDATORY RULE
+All content below the header must align to the same global content container and grid as the admin header/nav system.
+
+GLOBAL LAYOUT SYSTEM TO IMPLEMENT
+
+1. CREATE A SINGLE ADMIN CONTENT CONTAINER
+Implement one reusable layout wrapper for every Superadmin page.
+
+Suggested component name:
+- AdminPageShell
+or
+- AdminContentContainer
+
+This wrapper must:
+- define max width
+- define horizontal padding
+- define responsive breakpoints
+- center content consistently
+- align page titles, filters, cards, tables, drawers, hero panels, and body sections to the same grid
+
+2. DEFINE GLOBAL WIDTH + PADDING RULES
+Use one shared container system for all admin pages.
+
+Recommended behavior:
+- Desktop large: max-width around 1440px–1600px
+- Desktop standard: generous but consistent left/right padding
+- Tablet: reduced but balanced padding
+- Mobile: tight but readable padding
+
+Example target logic:
+- Mobile: 16px horizontal padding
+- Tablet: 24px horizontal padding
+- Desktop: 32px horizontal padding
+- Large desktop: 40px horizontal padding if needed, but still anchored to the same centered container
+
+3. ALIGN THESE ELEMENTS TO THE SAME CONTAINER
+Across ALL admin pages, the following must align perfectly on the same left/right grid:
+- page titles
+- subtitles
+- summary KPI rows
+- quick action cards
+- filter bars
+- search bars
+- tables
+- list cards
+- empty states
+- hero sections
+- section headers
+- tab bars inside page body
+- charts
+- top action buttons
+- forms
+- dashboard content blocks
+
+4. REMOVE FLOATING BODY BLOCKS
+Eliminate any sections where:
+- content starts at a different x-position than the page title
+- tables are wider than their filter bars
+- cards do not align with their surrounding page container
+- some pages use full-width while others use inset width without a system reason
+
+5. STANDARDIZE PAGE VERTICAL RHYTHM
+Apply consistent spacing between:
+- top nav and page header
+- page header and KPI cards
+- KPI cards and filters
+- filters and tables
+- section title and section body
+
+Suggested vertical spacing scale:
+- 16
+- 24
+- 32
+- 48
+Use a clear rhythm across all pages.
+
+6. RESPONSIVE REQUIREMENTS
+Test and fix across:
+- mobile
+- tablet
+- laptop
+- large desktop
+
+On all devices:
+- content must not hug the viewport edge awkwardly
+- body content must not appear narrower or wider than the header system
+- tables and card grids must collapse cleanly
+- search/filter rows must wrap gracefully
+- CTA buttons must remain aligned within the same content frame
+
+7. APPLY TO ALL CURRENT SUPERADMIN TABS
+This alignment fix must apply to all pages including but not limited to:
+- Overview
+- Experiences
+- Series
+- Profiles
+- Sponsorship
+- Analytics
+- Orders
+- Memberships
+- IR Documents
+- Hiring
+- Compensation
+- Partners
+- Conversion
+- Streetside
+- Integrations — INVU
+- Table Sessions
+- Review Queue
+
+8. IMPLEMENT A SHARED PAGE STRUCTURE
+Each page should use the same high-level structure:
+
+AdminPageShell
+- PageHeader
+- Optional KpiRow
+- Optional FilterBar
+- MainContentBlock(s)
+
+No page should invent its own outer alignment rules.
+
+9. QA PASS REQUIRED
+After implementation, visually verify:
+- left edges line up
+- right edges line up
+- container widths match
+- tables align with filters and headers
+- no page feels offset from the admin navigation
+- body content feels locked to the same master grid
+
+10. OUTPUT REQUIRED
+Return:
+- the shared layout component created
+- the spacing/container tokens used
+- which pages were updated
+- confirmation that all Superadmin modules now inherit one consistent responsive alignment system
+
+SUCCESS CRITERIA
+The redesign is successful when every Superadmin page feels like it belongs to one cohesive dashboard framework, with body content perfectly aligned to the same responsive margins and content container as the header/navigation.

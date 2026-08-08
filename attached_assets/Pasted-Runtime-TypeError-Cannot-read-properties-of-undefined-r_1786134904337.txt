@@ -1,0 +1,51 @@
+Runtime TypeError
+
+
+Cannot read properties of undefined (reading 'name')
+
+src/app/admin/spaces/page.tsx (288:75) @ SpaceRow
+
+
+  286 |               <strong style={{ color: "#0f172a" }}>{space.capacity}</strong> covers
+  287 |             </span>
+> 288 |             <span style={{ fontSize: 12, color: "#64748b" }}>{space.venue.name}</span>
+      |                                                                           ^
+  289 |             <span style={{ fontSize: 12, color: "#64748b" }}>Sort: {space.sortOrder}</span>
+  290 |             {space._count !== undefined && (
+  291 |               <span style={{ fontSize: 12, color: space._count.capacityHolds > 0 ? "#059669" : "#94a3b8" }}>
+Call Stack
+16
+
+Hide 12 ignore-listed frame(s)
+SpaceRow
+src/app/admin/spaces/page.tsx (288:75)
+Object.react_stack_bottom_frame
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (23583:1)
+renderWithHooks
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (6792:1)
+updateFunctionComponent
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (9246:1)
+beginWork
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (10857:1)
+runWithFiberInDEV
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (871:1)
+performUnitOfWork
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (15726:1)
+workLoopSync
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (15546:39)
+renderRootSync
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (15526:1)
+performWorkOnRoot
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (15033:1)
+performWorkOnRootViaSchedulerTask
+node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (16815:1)
+MessagePort.performWorkUntilDeadline
+node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js (45:1)
+eval
+src/app/admin/spaces/page.tsx (192:13)
+Array.map
+<anonymous>
+SpacesAdminPage
+src/app/admin/spaces/page.tsx (191:19)
+ClientPageRoot
+../src/client/components/client-page.tsx (60:12)

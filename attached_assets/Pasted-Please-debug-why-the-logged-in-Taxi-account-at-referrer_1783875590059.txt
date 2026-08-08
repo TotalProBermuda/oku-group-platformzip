@@ -1,0 +1,48 @@
+Please debug why the logged-in Taxi account at /referrer/dashboard still shows “No Referrer Profile” after unresolved organizations were marked sole proprietor.
+
+Important:
+Organization resolution and referrer profile linking are separate concerns.
+
+Marking Taxi Juan / Taxi Maria / Taxi Roberto as sole proprietor should resolve parent-entity rollup ambiguity, but it does not by itself link the logged-in User account to a governed referrer identity.
+
+Please audit the identity chain for the current logged-in Taxi user:
+
+1. User account
+- What is the User.id, email/name, roles, and active status?
+- Does this User have role REFERRER / TAXI_DRIVER / equivalent?
+- Which API does /referrer/dashboard call to find the profile?
+
+2. Referrer profile / ReferralActor
+- Is there a Referrer row for this person?
+- Is there a ReferralActor row for this person?
+- Does ReferralActor.userId equal the logged-in User.id?
+- If not, is the actor only legacy-linked, assignment-linked, or free-text seeded?
+
+3. ReferralLink / QR
+- Does the actor own an active ReferralLink?
+- Is the referralCode shown in the dashboard sourced from Referrer.referralCode or ReferralLink.code?
+- If the code exists but userId is missing, dashboard should explain “profile exists but not linked,” not “no profile.”
+
+4. Sole proprietor resolution
+- Confirm that marking as sole proprietor updated only entity/org resolution fields.
+- It should not be expected to create or link User → ReferralActor unless explicitly designed to do so.
+
+5. Required admin action
+Add or expose an admin action:
+“Link user to referrer profile”
+or
+“Create governed referrer profile for this user”
+
+This action should:
+- link User.id to the correct ReferralActor.userId if an actor already exists, OR
+- create ReferralActor + ReferralLink for this User if no actor exists
+- preserve raw organization / sole proprietor status
+- write an audit log
+- avoid creating duplicate actors/codes
+
+Acceptance:
+- Logged-in Taxi account no longer sees “No Referrer Profile” if a matching Taxi referrer exists.
+- Admin can link Taxi account to Taxi Juan / Taxi Maria / Taxi Roberto profile explicitly.
+- After linking, /referrer/dashboard shows the PureReferrerConsole with QR/code, Activity, Earnings/Profile tabs as allowed.
+- Entity/sole-proprietor status remains separate from commission eligibility.
+- No commission visibility is granted unless a commission rule/assignment exists.

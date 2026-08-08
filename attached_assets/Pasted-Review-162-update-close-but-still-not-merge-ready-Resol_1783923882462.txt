@@ -1,0 +1,74 @@
+Review #162 update: close, but still not merge-ready.
+
+Resolved from prior review:
+- `not_applicable` / `merge_required` states were added.
+- Actor stealing is blocked.
+- Legacy-linked actor ownership mismatch is handled.
+- No active referral code has its own user-facing state.
+- Legacy referral code reuse is attempted.
+- `Completed`/commission/org concerns remain out of scope.
+
+Remaining blockers:
+
+P1 — Referrer-capable role gate is too narrow.
+`REFERRER_CAPABLE_ROLES` currently includes:
+REFERRER, INFLUENCER, PARTNER, STREETSIDE_HOST, RESTAURANT_HOST
+
+But the bug is specifically about taxi, concierge, hotel concierge, tour guide, promoter, and similar pure referrer accounts.
+
+If those users have role keys like:
+- TAXI_DRIVER
+- HOTEL_CONCIERGE
+- CONCIERGE
+- TOUR_GUIDE
+- PROMOTER
+- PRIVATE_NETWORK
+- INFLUENCER_SUB_REFERRER
+
+then unresolved users will be incorrectly classified as `not_applicable`, and the admin will not get the “Create Referrer Profile” action.
+
+Fix:
+Expand the referrer-capable role/actor detection to include all pure referrer-capable roles and/or derive capability from known actorTypeCode/persona fields.
+
+Acceptance:
+A Taxi or Concierge user with no actor and no legacy Referrer must return `unresolved`, not `not_applicable`.
+
+P1 — `deriveActorType()` still defaults non-legacy Taxi/Concierge/Tour Guide users to OTHER.
+The updated function maps STREETSIDE_HOST and INFLUENCER roles, and maps legacyReferrerType. But if a modern user has role TAXI_DRIVER / HOTEL_CONCIERGE / TOUR_GUIDE / PROMOTER and no legacy row, create mode will still create actorType OTHER.
+
+Fix:
+Map direct role keys too:
+- TAXI_DRIVER → ReferralActorType.TAXI_DRIVER
+- HOTEL_CONCIERGE / CONCIERGE → ReferralActorType.HOTEL_CONCIERGE or appropriate enum
+- TOUR_GUIDE → TOUR_GUIDE
+- PROMOTER → PROMOTER
+- PRIVATE_NETWORK → PRIVATE_NETWORK
+- INFLUENCER_SUB_REFERRER → INFLUENCER_SUB_REFERRER
+
+Acceptance:
+Creating a profile for Taxi Juan creates/links an actor with actorType TAXI_DRIVER, not OTHER.
+Creating a profile for a concierge creates/links the correct concierge actor type, not OTHER.
+
+P2 — Admin card returns null for `not_applicable`, but the parent “Referrer Profile” heading still renders.
+If this section is rendered for every user, normal non-referrer users may still see an empty “Referrer Profile” block. Either:
+- gate the whole section, or
+- make the card render a quiet “not applicable” note without action buttons.
+
+P2 — Remove unrelated generated mockup artifact from this task.
+`artifacts/mockup-sandbox/src/.generated/mockup-components.ts` is still in the review diff. Remove unless intentionally required.
+
+Must-verify because the pasted diff shows interleaved old/new code:
+- Run scoped typecheck on:
+  - `src/app/api/v1/referrer/dashboard/route.ts`
+  - `src/app/referrer/dashboard/page.tsx`
+  - `src/app/api/v1/admin/users/[id]/referrer-resolution/route.ts`
+  - `src/app/api/v1/admin/users/[id]/referrer-resolution/resolve/route.ts`
+  - `src/components/admin/PersonaProfilePanel.tsx`
+
+Manual QA:
+1. Taxi user with no actor returns unresolved, admin can create profile, actorType TAXI_DRIVER.
+2. Concierge user with no actor returns unresolved, admin can create profile, actorType concierge/hotel concierge.
+3. Taxi user with actor.userId + active link opens `/referrer/dashboard`.
+4. Actor linked but no active link shows “No active referral code.”
+5. Non-referrer user does not get a create action.
+6. Actor linked to another user returns merge_required / blocked.

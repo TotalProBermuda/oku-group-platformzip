@@ -1,0 +1,72 @@
+#229 - RBAC Security Pass: Separate Owners, F&B Director, and Restaurant Supervisor
+
+Goal:
+Fix the current overbroad Admin Commercial permissions before building more dashboard/profile UI.
+
+Blocking concerns:
+- ADMIN_COMMERCIAL currently has payout write, compensation write, revenue write, user edit, refund, and audit access.
+- This role is being used as if it represents F&B/commercial operations, but those permissions expose ProofPay governance and sensitive finance controls.
+- Restaurant Supervisor should operate live service, not access the admin console.
+- F&B Director should manage restaurant operations, not ProofPay economics.
+
+Implement:
+1. Add role keys:
+   - FB_DIRECTOR
+   - RESTAURANT_SUPERVISOR
+
+2. Treat ADMIN_COMMERCIAL as legacy-safe:
+   - Remove payout write
+   - Remove compensation read/write
+   - Remove revenue write
+   - Remove users edit
+   - Remove refunds
+   - Remove audit/security access
+   - Keep only safe restaurant ops permissions or migrate demo persona to FB_DIRECTOR
+
+3. Owner-only modules:
+   SUPERADMIN only:
+   - Payments / Cybersource
+   - Payouts
+   - Commission Rules
+   - Compensation
+   - Beneficiaries
+   - Security
+   - Audit Trail
+   - User permission management
+   - ProofPay ledger/governance views
+
+4. FB_DIRECTOR allowed modules:
+   - Menus
+   - Experiences / events
+   - Tickets / reservations visibility
+   - Spaces
+   - Operational analytics
+   - Capacity configuration
+   - Campaign/offer draft visibility only if explicitly approved later
+
+5. RESTAURANT_SUPERVISOR allowed modules:
+   - /host/dashboard
+   - /host/operations
+   - reservations
+   - floor/table assignment
+   - INVU binding
+   - no-show/completion controls
+   - guest recovery
+   - capacity execution
+   No /admin shell access.
+
+6. Update login personas:
+   - “Admin Commercial” → “F&B Director”
+   - “Rafael Núñez” → “Restaurant Supervisor”
+   - Update EN/ES/PT copy.
+
+7. Add regression tests:
+   - FB_DIRECTOR cannot access /admin/payouts
+   - FB_DIRECTOR cannot access /admin/payments
+   - FB_DIRECTOR cannot access /admin/commission-rules or compensation pages
+   - RESTAURANT_SUPERVISOR cannot access /admin
+   - RESTAURANT_SUPERVISOR can access /host/dashboard and /host/operations
+   - SUPERADMIN can access all restricted modules
+
+Hard boundary:
+Do not create a second admin console or duplicate dashboard. Refactor existing roles, middleware, nav visibility, and permission checks.

@@ -1,0 +1,286 @@
+Good — this is a critical governance layer, not just a feature detail. It needs to be explicitly enforced at system, ledger, and permissions level, otherwise you create financial liability for the platform.
+
+Below is a refined, Replit-ready implementation brief that:
+
+integrates your existing functionality (not rebuilding from scratch)
+enforces financial responsibility boundaries
+clearly separates platform vs partner liability
+introduces guardrails against abuse
+formalizes the “no cash” rule at system level
+Task: Partner Co-Host Seats + Referrer Commission System (With Ledger Separation & Compliance Rules)
+1. Objective
+
+Extend the existing Partner Dashboard and Event System to allow:
+
+Partners to invite Co-Hosts (session or series scoped)
+Partners to optionally enable Referrer Capabilities
+Partners to define commission models
+System to track referrals and commissions
+BUT ensure:
+Commission liability sits with the Partner
+Platform (Super Admin) is only responsible for net payable to Partner
+No internal commission payouts are handled by the platform
+No cash transactions are allowed anywhere in the system (except Super Admin override)
+2. Critical Business Rules (Non-Negotiable)
+
+These must be enforced in backend logic, not just UI.
+
+Rule 1: Ledger Separation
+
+All co-host/referrer commissions are tracked in a Partner-Owned Ledger, not the platform ledger.
+
+Meaning:
+Platform tracks:
+total ticket sales
+platform fees
+net payable to partner
+Partner tracks:
+co-host commissions
+referral payouts
+internal distribution
+System implication:
+Commission data is informational + reportable, NOT payable by platform
+No “payout” button for co-hosts exists in platform
+Rule 2: Platform Liability Boundary
+
+The Super Admin is only responsible for payouts to the Partner — not to co-hosts or referrers.
+
+Enforce:
+No direct payment flows to co-hosts
+No split payout logic (Stripe Connect style) in MVP
+No financial obligations recorded against platform for co-host commissions
+Rule 3: No Cash Sales — Ever
+
+All tickets and bookings must be processed digitally. Cash is strictly prohibited across all users except Super Admin.
+
+Enforce at system level:
+Remove / disable any “manual payment” or “cash” options
+API must reject:
+payment_method = "cash"
+Exception:
+Super Admin ONLY can log manual/cash entries (for reconciliation purposes)
+Rule 4: Abuse Enforcement
+
+Any attempt to:
+
+bypass payment system
+manipulate referral attribution
+operate off-platform sales
+misuse commission tracking
+
+→ results in:
+
+immediate suspension of partner account
+revocation of all co-host seats
+System implication:
+audit logs must exist
+suspicious activity flags should be loggable (MVP: log only, no auto-ban required yet)
+3. Build Strategy (IMPORTANT FOR REPLIT)
+DO NOT rebuild core systems
+
+Replit must:
+
+Analyze existing:
+event system
+ticketing system
+partner dashboard
+reporting/analytics
+Extend them with:
+co-host seat layer
+referral attribution layer
+partner ledger layer
+Explicit instruction:
+
+Reuse existing booking, ticketing, and revenue tracking pipelines. Inject referral tracking and co-host attribution into existing transaction flow rather than duplicating it.
+
+4. Data Model Additions
+4.1 partner_cohost_seats
+id
+partner_id
+event_id (nullable)
+series_id (nullable)
+
+first_name
+last_name
+email
+phone_number
+
+role_scope -- 'session' | 'series'
+
+referrer_enabled BOOLEAN
+
+commission_model_type
+flat_amount
+per_seat_amount
+percentage_rate
+
+status -- invited | active | revoked | expired | removed
+
+created_at
+accepted_at
+4.2 referral_attributions
+
+Tracks which co-host generated a booking.
+
+id
+cohost_seat_id
+booking_id
+user_id (customer)
+
+attribution_source -- link | manual | qr
+
+created_at
+4.3 partner_commission_ledger (Partner-Owned Ledger)
+id
+partner_id
+cohost_seat_id
+booking_id
+
+commission_model_type
+flat_amount
+per_seat_amount
+percentage_rate
+
+calculated_commission_amount
+
+status -- pending | confirmed | voided
+
+created_at
+Important:
+
+This is NOT a payout ledger.
+This is a tracking/reporting ledger only.
+
+5. API Requirements
+5.1 Create Co-Host
+POST /partner/cohosts/invite
+
+Must:
+
+create seat
+generate invite
+attach commission config (if enabled)
+5.2 Track Referral
+POST /referrals/track
+
+Triggered when:
+
+booking is made via:
+referral link
+QR code
+assigned co-host flow
+5.3 Generate Commission Record
+
+Triggered automatically on booking confirmation:
+
+IF cohost_seat.referrer_enabled = true
+THEN
+  calculate commission
+  insert into partner_commission_ledger
+6. Commission Calculation Logic
+Per Seat
+commission = seats × per_seat_amount
+Flat + Per Seat
+commission = flat_amount + (seats × per_seat_amount)
+Percentage
+commission = booking_total × percentage_rate
+Flat + Percentage
+commission = flat_amount + (booking_total × percentage_rate)
+7. UI Requirements
+Invite Co-Host Modal
+
+Must include:
+
+First Name
+Last Name
+Email
+Phone Number
+Role Scope (Session / Series)
+Referrer Capabilities (Yes/No)
+
+If Yes:
+
+Commission Model selector
+Conditional fields
+Co-Host Dashboard (Partner View)
+
+Show:
+
+Co-Host Name
+Scope
+Status
+Referral Sales
+Commission (calculated)
+No payout controls
+
+Label clearly:
+
+“Commission is managed by you (Partner). Platform does not process these payments.”
+
+Co-Host View
+
+If referrer enabled:
+
+show:
+referral link
+seats sold
+estimated commission
+
+Label clearly:
+
+“Commissions are tracked here but paid directly by the Partner.”
+
+8. Payment System Enforcement
+Must enforce:
+all bookings go through:
+Stripe / online gateway
+Block:
+manual booking completion without payment
+offline settlement
+“mark as paid” (except Super Admin)
+9. System Safeguards
+Required checks
+On booking:
+must have payment confirmation
+must have payment method != cash
+On referral:
+must link to valid co-host seat
+must belong to correct event scope
+On commission:
+must only calculate if referrer_enabled = true
+10. Acceptance Criteria
+Functional
+partner can create co-host with full details
+co-host can accept invite and access assigned scope
+referral tracking works per booking
+commission records are generated correctly
+commission visible to partner and co-host
+Financial Governance
+platform never creates payable to co-host
+platform only tracks payable to partner
+commission ledger is isolated per partner
+Compliance
+no cash payments allowed
+system rejects invalid payment methods
+audit logs exist for bookings + referrals
+11. Critical Dev Instruction (Challenge to Replit)
+
+Include this verbatim in prompt:
+
+Before implementation, audit the existing event, booking, and payment systems. Identify all points where referral attribution and commission logic can be injected without duplicating flows. This feature must extend current pipelines, not recreate them.
+
+And:
+
+Ensure strict separation between platform revenue accounting and partner commission tracking. Under no circumstances should co-host commissions be treated as platform liabilities.
+
+12. Done Looks Like
+Partners can invite co-hosts with full identity + commercial config
+Co-hosts can drive bookings via referral
+System tracks performance + commissions
+Platform only pays Partner
+Partner handles internal payouts
+No cash leakage exists anywhere in system
+
+If you want next level precision, I can now:
+
+map this into your existing schema and endpoints
