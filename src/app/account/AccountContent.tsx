@@ -41,7 +41,7 @@ const roleKeys: Record<string, string> = {
   SUPERADMIN:            "Superadmin",
   FB_DIRECTOR:           "F&B Director",
   RESTAURANT_SUPERVISOR: "Restaurant Supervisor",
-  ADMIN_COMMERCIAL:      "Admin Commercial",
+  ADMIN_COMMERCIAL:      "F&B Director",
   ADMIN_IR:              "Admin IR",
   ADMIN_HR:              "Admin HR",
   INFLUENCER:            "Influencer",

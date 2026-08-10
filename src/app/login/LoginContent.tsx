@@ -1,19 +1,29 @@
 "use client";
 
 import { ChevronRight, ExternalLink } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 import { useEffect, useState } from "react";
+import type { MouseEvent } from "react";
+
+type Persona = {
+  email: string;
+  label: string;
+  person?: string;
+  descKey: string;
+  color: string;
+  tag: string;
+  destination: string;
+};
 
 const EMPLOYEE_PERSONAS = [
-  { email: "admin@oku.local",       label: "Superadmin",        descKey: "personaSuperadminDesc",        color: "#c41e3a", tag: "SUPERADMIN",  destination: "/admin" },
-  { email: "commercial@oku.local",  label: "F&B Director",      descKey: "personaFBDirectorDesc",        color: "#7c3aed", tag: "F&B DIR",      destination: "/admin" },
-  { email: "hr@oku.local",          label: "Admin HR",          descKey: "personaAdminHRDesc",           color: "#059669", tag: "ADMIN",        destination: "/admin/hr" },
-  { email: "ir@oku.local",          label: "Admin IR",          descKey: "personaAdminIRDesc",           color: "#1d4ed8", tag: "ADMIN",        destination: "/admin/ir" },
-  { email: "staff1@oku.local",      label: "Staff (OKÜ)",       descKey: "personaStaffDesc",             color: "#64748b", tag: "STAFF",        destination: "/staff" },
-  { email: "host1@oku.local",       label: "Rafael Núñez",      descKey: "personaRestaurantSupervisorDesc", color: "#c8a96e", tag: "SUPERVISOR",  destination: "/host/dashboard" },
-  { email: "sidehost@oku.local",    label: "Diego Rivera",      descKey: "personaStreetsideHostDesc",    color: "#a78bfa", tag: "STREETSIDE",   destination: "/host/streetside" },
-];
+  { email: "admin@oku.local",       label: "Superadmin",             descKey: "personaSuperadminDesc",        color: "#c41e3a", tag: "SUPERADMIN",  destination: "/admin" },
+  { email: "commercial@oku.local",  label: "F&B Director",           person: "Carlos Mendez", descKey: "personaFBDirectorDesc",        color: "#7c3aed", tag: "F&B DIR",      destination: "/admin" },
+  { email: "hr@oku.local",          label: "Admin HR",               descKey: "personaAdminHRDesc",           color: "#059669", tag: "ADMIN",        destination: "/admin/hr" },
+  { email: "ir@oku.local",          label: "Admin IR",               descKey: "personaAdminIRDesc",           color: "#1d4ed8", tag: "ADMIN",        destination: "/admin/ir" },
+  { email: "staff1@oku.local",      label: "Staff (OKÜ)",            descKey: "personaStaffDesc",             color: "#64748b", tag: "STAFF",        destination: "/staff" },
+  { email: "host1@oku.local",       label: "Restaurant Supervisor",  person: "Rafael Núñez", descKey: "personaRestaurantSupervisorDesc", color: "#c8a96e", tag: "SUPERVISOR",  destination: "/host/dashboard" },
+  { email: "sidehost@oku.local",    label: "Streetside Host",        person: "Diego Rivera", descKey: "personaStreetsideHostDesc",    color: "#a78bfa", tag: "STREETSIDE",   destination: "/host/streetside" },
+] satisfies Persona[];
 
 const EXTERNAL_PERSONAS = [
   { email: "influencer@oku.local",  label: "Influencer",          descKey: "personaInfluencerDesc",        color: "#c41e3a", tag: "CREATOR",      destination: "/influencer/dashboard" },
@@ -24,14 +34,10 @@ const EXTERNAL_PERSONAS = [
   { email: "sophie@oku.local",      label: "Sophie Chen",         descKey: "personaReferrerHotelDesc",     color: "#4c1d6b", tag: "REFERRER",     destination: "/referrer/dashboard" },
   { email: "panama@oku.local",      label: "Panama City Tours",   descKey: "personaReferrerTourDesc",      color: "#065f46", tag: "REFERRER",     destination: "/referrer/dashboard" },
   { email: "attendee@oku.local",    label: "Attendee",            descKey: "personaAttendeeDesc",          color: "#c41e3a", tag: "GUEST",        destination: "/experiences" },
-];
-
-type Persona = typeof EMPLOYEE_PERSONAS[0];
+] satisfies Persona[];
 
 export function LoginContent({ demoEnabled = false }: { demoEnabled?: boolean }) {
   const t = useTranslation();
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl");
   const [isInIframe, setIsInIframe] = useState(false);
 
   useEffect(() => {
@@ -47,20 +53,26 @@ export function LoginContent({ demoEnabled = false }: { demoEnabled?: boolean })
     return `/api/auth/demo-login?${params.toString()}`;
   };
 
-  const handleLogin = (email: string, destination: string) => {
+  const handleLoginClick = (event: MouseEvent<HTMLAnchorElement>, email: string, destination: string) => {
+    if (!isInIframe) return;
+
+    event.preventDefault();
     const url = buildLoginUrl(email, destination);
-    if (isInIframe) {
-      window.open(url, "_blank", "noopener");
-    } else {
+    const opened = window.open(url, "_blank", "noopener");
+    if (!opened) {
       window.location.href = url;
     }
   };
 
-  const PersonaCard = ({ p }: { p: Persona }) => (
-    <button
+  const PersonaCard = ({ p }: { p: Persona }) => {
+    const href = buildLoginUrl(p.email, p.destination);
+    return (
+    <a
       key={p.email}
-      onClick={() => handleLogin(p.email, p.destination)}
+      href={href}
+      onClick={(event) => handleLoginClick(event, p.email, p.destination)}
       className="persona-card-affordance"
+      aria-label={`Sign in as ${p.label}${p.person ? `, ${p.person}` : ""}`}
     >
       <div className="accent-bar" style={{ background: p.color }} />
       <div style={{ flex: 1, padding: "0 16px", display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 0 }}>
@@ -78,7 +90,7 @@ export function LoginContent({ demoEnabled = false }: { demoEnabled?: boolean })
           </span>
         </div>
         <span style={{ fontSize: 13, color: "#9ca3af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {t("auth", p.descKey)}
+          {p.person ? `${p.person} · ` : ""}{t("auth", p.descKey)}
         </span>
       </div>
       <div style={{ padding: "0 16px 0 8px" }}>
@@ -87,8 +99,9 @@ export function LoginContent({ demoEnabled = false }: { demoEnabled?: boolean })
           : <ChevronRight size={20} className="pca-chevron" />
         }
       </div>
-    </button>
-  );
+    </a>
+    );
+  };
 
   const SectionLabel = ({ text }: { text: string }) => (
     <div style={{

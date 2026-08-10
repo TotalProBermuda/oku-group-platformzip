@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isDemoModeEnabled, DEMO_DISABLED_MESSAGE } from "@/lib/demoMode";
 import { resolveAuthSecret } from "@/lib/authSecret";
 import { sameSiteForEnv } from "@/lib/cookieSecurity";
+import { sanitizeCallbackUrlForRoles } from "@/lib/routePolicy";
 
 const ALLOWED_DEMO_DOMAIN = "oku.local";
 
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
 
   if (!user) return NextResponse.redirect(loginUrl);
 
+  const roles = user.roles.map((r) => r.roleKey);
   const secret = resolveAuthSecret();
   const maxAge = 30 * 24 * 60 * 60;
   const COOKIE_NAME = "next-auth.session-token";
@@ -58,7 +60,7 @@ export async function GET(req: NextRequest) {
       email: user.email,
       name: user.name ?? user.email,
       picture: user.imageUrl ?? null,
-      roles: user.roles.map((r) => r.roleKey),
+      roles,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + maxAge,
     },
@@ -67,10 +69,11 @@ export async function GET(req: NextRequest) {
     salt: COOKIE_NAME,
   } as any);
 
-  // Build destination using the public base — never localhost
-  const dest = callbackUrl.startsWith("/")
-    ? `${base}${callbackUrl}`
-    : callbackUrl;
+  // Build destination using the public base — never localhost.
+  // If a stale callback points to a portal this persona cannot access, land on
+  // the role's correct dashboard instead of bouncing through middleware.
+  const safeCallbackUrl = sanitizeCallbackUrlForRoles(callbackUrl, roles);
+  const dest = `${base}${safeCallbackUrl}`;
 
   const res = NextResponse.redirect(dest);
 

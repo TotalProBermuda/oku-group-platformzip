@@ -110,7 +110,7 @@ async function main() {
     STAFF_CATCH: "Staff CATCH",
     RESTAURANT_HOST:       "Restaurant Host",
     STREETSIDE_HOST:       "Streetside Host",
-    ADMIN_COMMERCIAL:      "Admin Commercial",
+    ADMIN_COMMERCIAL:      "F&B Director",
     ADMIN_IR:              "Admin IR",
     ADMIN_HR:              "Admin HR",
     SUPERADMIN:            "Superadmin",

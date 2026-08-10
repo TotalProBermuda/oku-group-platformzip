@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 function deriveCategory(roleKeys: string[]): string {
-  if (roleKeys.includes("SUPERADMIN")) return "admin";
+  if (roleKeys.includes("SUPERADMIN") || roleKeys.includes("FB_DIRECTOR")) return "admin";
   if (roleKeys.some(r => r.startsWith("ADMIN_"))) return "admin";
   if (roleKeys.includes("INFLUENCER")) return "influencer";
   if (roleKeys.includes("PARTNER")) return "partner";
   if (roleKeys.includes("INVESTOR")) return "investor";
   if (roleKeys.includes("STAFF_OKU") || roleKeys.includes("STAFF_CATCH")) return "staff";
-  if (roleKeys.includes("RESTAURANT_HOST")) return "host";
+  if (roleKeys.includes("RESTAURANT_HOST") || roleKeys.includes("RESTAURANT_SUPERVISOR")) return "host";
   if (roleKeys.includes("STREETSIDE_HOST")) return "referrer";
   if (roleKeys.includes("REFERRER")) return "referrer";
   if (roleKeys.includes("ATTENDEE")) return "attendee";
@@ -27,8 +26,7 @@ function mapUserStatus(s: string): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:audit:read");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const { searchParams } = new URL(req.url);
     const q                   = searchParams.get("q") ?? "";
@@ -249,8 +247,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { session, roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    const { session } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const body = await req.json();
     const { profileType, displayName, legalName, slug, primaryCategory, categories,
       bio, shortDescription, email, phone, websiteUrl, instagramUrl, twitterUrl,

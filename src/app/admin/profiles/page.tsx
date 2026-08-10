@@ -28,7 +28,7 @@ const CATEGORY_OPTIONS = [
 ];
 const STATUS_OPTIONS = ["ACTIVE","SUSPENDED","INACTIVE","ARCHIVED","PENDING"];
 
-function ActionMenu({ profile, onView }: { profile: UnifiedProfile; onView: () => void }) {
+function ActionMenu({ profile, onView, portalHref }: { profile: UnifiedProfile; onView: () => void; portalHref?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -46,6 +46,17 @@ function ActionMenu({ profile, onView }: { profile: UnifiedProfile; onView: () =
       </button>
       {open && (
         <div style={{ position: "absolute", right: 0, top: "100%", marginTop: 4, background: "white", border: "1px solid #e5e0d8", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 160, overflow: "hidden" }}>
+          {portalHref && (
+            <a
+              href={portalHref}
+              onClick={() => setOpen(false)}
+              style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1614", textDecoration: "none" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = "none")}
+            >
+              Open Portal
+            </a>
+          )}
           <button onClick={() => { setOpen(false); onView(); }}
             style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#1a1614" }}
             onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
@@ -102,6 +113,76 @@ const STATUS_STYLE: Record<string, { background: string; color: string }> = {
 };
 
 const catLabel = (c: string) => CATEGORY_OPTIONS.find(o => o[0] === c)?.[1] ?? c.replace(/_/g, " ").replace(/\b\w/g, x => x.toUpperCase());
+
+const ROLE_LABELS: Record<string, string> = {
+  SUPERADMIN: "Superadmin",
+  FB_DIRECTOR: "F&B Director",
+  ADMIN_COMMERCIAL: "Commercial Admin",
+  ADMIN_HR: "Admin HR",
+  ADMIN_IR: "Admin IR",
+  ADMIN_FINANCE: "Finance Admin",
+  RESTAURANT_SUPERVISOR: "Restaurant Supervisor",
+  RESTAURANT_HOST: "Restaurant Host",
+  STREETSIDE_HOST: "Streetside Host",
+  STAFF_OKU: "OKU Staff",
+  STAFF_CATCH: "Catch Staff",
+  INFLUENCER: "Influencer",
+  PARTNER: "Partner",
+  INVESTOR: "Investor",
+  REFERRER: "Referrer",
+  ATTENDEE: "Attendee",
+  MEMBER: "Member",
+};
+
+const ROLE_PRIORITY = [
+  "SUPERADMIN",
+  "FB_DIRECTOR",
+  "RESTAURANT_SUPERVISOR",
+  "RESTAURANT_HOST",
+  "STREETSIDE_HOST",
+  "ADMIN_COMMERCIAL",
+  "ADMIN_HR",
+  "ADMIN_IR",
+  "ADMIN_FINANCE",
+  "INFLUENCER",
+  "PARTNER",
+  "INVESTOR",
+  "REFERRER",
+  "STAFF_OKU",
+  "STAFF_CATCH",
+  "ATTENDEE",
+  "MEMBER",
+];
+
+function primaryRole(profile: UnifiedProfile): string {
+  return ROLE_PRIORITY.find(role => profile.roles.includes(role)) ?? profile.roles[0] ?? "";
+}
+
+function roleLabel(role: string): string {
+  return ROLE_LABELS[role] ?? role.replace(/_/g, " ").replace(/\b\w/g, x => x.toUpperCase());
+}
+
+function canonicalPortal(profile: UnifiedProfile): string | null {
+  const roles = profile.roles;
+  if (roles.includes("SUPERADMIN") || roles.includes("FB_DIRECTOR") || roles.some(r => r.startsWith("ADMIN_"))) return "/admin";
+  if (roles.includes("RESTAURANT_SUPERVISOR") || roles.includes("RESTAURANT_HOST")) return "/host/dashboard";
+  if (roles.includes("STREETSIDE_HOST")) return "/host/streetside";
+  if (roles.includes("PARTNER")) return "/partner/dashboard";
+  if (roles.includes("INFLUENCER")) return "/influencer/dashboard";
+  if (roles.includes("REFERRER")) return "/referrer/dashboard";
+  if (roles.includes("INVESTOR")) return "/investor";
+  return null;
+}
+
+function categoryHelp(category: string): string | null {
+  if (category === "admin") {
+    return "Admin shows owner and back-office operators such as F&B Director. Restaurant Supervisor is a Host profile; select Host or clear filters to view it.";
+  }
+  if (category === "host") {
+    return "Host shows live-service operators such as Restaurant Supervisor. F&B Director remains under Admin.";
+  }
+  return null;
+}
 
 function Chip({ label, active, onClick, color }: { label: string; active: boolean; onClick: () => void; color?: string }) {
   const accent = color ?? "#c41e3a";
@@ -380,20 +461,27 @@ export default function ProfilesPage() {
 
       {/* Active filter summary */}
       {hasFilters && !loading && (
-        <div style={{ fontSize: 12, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6 }}>
-          <span>Showing <strong style={{ color: "#1a1614" }}>{total}</strong> {total === 1 ? "profile" : "profiles"}</span>
-          {[
-            typeFilter && `type: ${typeFilter.toLowerCase()}`,
-            categoryFilter && `category: ${categoryFilter}`,
-            statusFilter && `status: ${statusFilter.toLowerCase()}`,
-            accessFilter === "true" && "has access",
-            accessFilter === "false" && "no access",
-            compFilter === "true" && "compensation eligible",
-            compFilter === "false" && "not eligible",
-            search && `"${search}"`,
-          ].filter(Boolean).map((tag, i) => (
-            <span key={i} style={{ padding: "2px 8px", background: "#f3f4f6", borderRadius: 4, color: "#4b5563", fontSize: 11 }}>{tag as string}</span>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 12, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span>Showing <strong style={{ color: "#1a1614" }}>{total}</strong> {total === 1 ? "profile" : "profiles"}</span>
+            {[
+              typeFilter && `type: ${typeFilter.toLowerCase()}`,
+              categoryFilter && `category: ${categoryFilter}`,
+              statusFilter && `status: ${statusFilter.toLowerCase()}`,
+              accessFilter === "true" && "has access",
+              accessFilter === "false" && "no access",
+              compFilter === "true" && "compensation eligible",
+              compFilter === "false" && "not eligible",
+              search && `"${search}"`,
+            ].filter(Boolean).map((tag, i) => (
+              <span key={i} style={{ padding: "2px 8px", background: "#f3f4f6", borderRadius: 4, color: "#4b5563", fontSize: 11 }}>{tag as string}</span>
+            ))}
+          </div>
+          {categoryFilter && categoryHelp(categoryFilter) && (
+            <div style={{ fontSize: 12, color: "#7c7168", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 10px" }}>
+              {categoryHelp(categoryFilter)}
+            </div>
+          )}
         </div>
       )}
 
@@ -403,7 +491,7 @@ export default function ProfilesPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#fafaf9", borderBottom: "2px solid #e5e0d8" }}>
-                {["Name","Type","Category","Company / Parent","Access","Series","Compensation","Status",""].map((h, i) => (
+                {["Name","Type","Role / Category","Company / Parent","Access","Series","Compensation","Status",""].map((h, i) => (
                   <th key={i} style={{ padding: "11px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#9ca3af", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -425,6 +513,8 @@ export default function ProfilesPage() {
                 const catStyle = CATEGORY_COLOR[p.primaryCategory] ?? CATEGORY_COLOR.visitor;
                 const stStyle  = STATUS_STYLE[p.status] ?? STATUS_STYLE.INACTIVE;
                 const avatar   = p.avatarUrl ?? p.logoUrl;
+                const topRole  = primaryRole(p);
+                const portal   = canonicalPortal(p);
                 return (
                   <tr
                     key={p.id}
@@ -456,9 +546,21 @@ export default function ProfilesPage() {
                       </span>
                     </td>
                     <td style={{ padding: "13px 14px" }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, letterSpacing: "0.03em", ...catStyle }}>
-                        {catLabel(p.primaryCategory)}
-                      </span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-start" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1614" }}>
+                          {topRole ? roleLabel(topRole) : catLabel(p.primaryCategory)}
+                        </span>
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, letterSpacing: "0.03em", ...catStyle }}>
+                            {catLabel(p.primaryCategory)}
+                          </span>
+                          {portal && (
+                            <span style={{ fontSize: 10, color: "#6b7280", background: "#f3f4f6", padding: "3px 7px", borderRadius: 20 }}>
+                              {portal}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td style={{ padding: "13px 14px", maxWidth: 160 }}>
                       {p.companyParent ? (
@@ -480,7 +582,7 @@ export default function ProfilesPage() {
                       <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4, letterSpacing: "0.04em", ...stStyle }}>{p.status}</span>
                     </td>
                     <td style={{ padding: "13px 14px" }} onClick={e => e.stopPropagation()}>
-                      <ActionMenu profile={p} onView={() => setSelectedProfile(p)} />
+                      <ActionMenu profile={p} onView={() => setSelectedProfile(p)} portalHref={portal ?? undefined} />
                     </td>
                   </tr>
                 );
