@@ -29,12 +29,12 @@ type CardEntry = {
 
 const ACTION_CARDS: CardEntry[] = [
   // Operations — FB_DIRECTOR and SUPERADMIN
-  { labelKey: "experiences",  descKey: "cardExperiencesDesc",  href: "/admin/experiences",           iconSrc: "/icons/flaticon/sparkle.png",   roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-  { labelKey: "series",       descKey: "browseSeries",         href: "/admin/series",                Icon: LayoutGrid,                          roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-  { labelKey: "analytics",    descKey: "cardAnalyticsDesc",    href: "/admin/analytics/experiences", iconSrc: "/icons/flaticon/analytics.png",  roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-  { labelKey: "orders",       descKey: "cardOrdersDesc",       href: "/admin/orders",                iconSrc: "/icons/flaticon/orders.png",     roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-  { labelKey: "memberships",  descKey: "cardMembershipsDesc",  href: "/admin/memberships",           iconSrc: "/icons/flaticon/crown.png",      roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-  { labelKey: "menus",        descKey: "cardMenusDesc",        href: "/admin/menus",                 Icon: LayoutGrid,                          roles: ["SUPERADMIN", "FB_DIRECTOR"] },
+  { labelKey: "experiences",  descKey: "cardExperiencesDesc",  href: "/admin/experiences",           iconSrc: "/icons/flaticon/sparkle.png",   roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+  { labelKey: "series",       descKey: "browseSeries",         href: "/admin/series",                Icon: LayoutGrid,                          roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+  { labelKey: "analytics",    descKey: "cardAnalyticsDesc",    href: "/admin/analytics/experiences", iconSrc: "/icons/flaticon/analytics.png",  roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+  { labelKey: "orders",       descKey: "cardOrdersDesc",       href: "/admin/orders",                iconSrc: "/icons/flaticon/orders.png",     roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+  { labelKey: "memberships",  descKey: "cardMembershipsDesc",  href: "/admin/memberships",           iconSrc: "/icons/flaticon/crown.png",      roles: ["SUPERADMIN"] },
+  { labelKey: "menus",        descKey: "cardMenusDesc",        href: "/admin/menus",                 Icon: LayoutGrid,                          roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
   // Finance / governance — SUPERADMIN only
   { labelKey: "users",        descKey: "cardUsersDesc",        href: "/admin/users",                 iconSrc: "/icons/flaticon/users.png",      roles: ["SUPERADMIN"] },
   { labelKey: "payouts",      descKey: "cardPayoutsDesc",      href: "/admin/payouts",               iconSrc: "/icons/flaticon/briefcase.png",  roles: ["SUPERADMIN"] },
@@ -65,6 +65,8 @@ export default function AdminPage() {
   const t = useTranslation();
   const locale = useLocale();
   const dateLocale = locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
+  const isSuperadmin = roles.includes("SUPERADMIN");
+  const isFBDirector = roles.some((r) => r === "FB_DIRECTOR" || r === "ADMIN_COMMERCIAL");
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,11 +74,16 @@ export default function AdminPage() {
   const cards = ACTION_CARDS.filter((c) => c.roles.some((r) => roles.includes(r)));
 
   const load = useCallback(() => {
+    if (!isSuperadmin) {
+      setLoading(false);
+      return;
+    }
+
     fetch("/api/v1/admin/stats")
       .then((r) => r.json())
       .then((d) => { if (d.ok) setStats(d.data); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [isSuperadmin]);
 
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(load, 180_000);
@@ -86,39 +93,53 @@ export default function AdminPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-      {/* KPI Strip */}
-      <div className="kpi-grid">
-        <KPIStatCard
-          label={t("admin", "totalOrders")}
-          value={loading ? "—" : stats?.totalOrders ?? "—"}
-          loading={loading}
-          icon={<img src="/icons/flaticon/orders.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
-          accent="var(--color-primary)"
-        />
-        <KPIStatCard
-          label={t("admin", "revenuePaid")}
-          value={loading ? "—" : stats ? fmtRevenue(stats.revenueCents) : "—"}
-          loading={loading}
-          icon={<img src="/icons/flaticon/wallet.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
-          accent="#0d7a4e"
-        />
-        <KPIStatCard
-          label={t("admin", "platformUsers")}
-          value={loading ? "—" : stats?.totalUsers ?? "—"}
-          loading={loading}
-          icon={<img src="/icons/flaticon/users.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
-          accent="#1d4ed8"
-        />
-        <KPIStatCard
-          label={t("admin", "activeSeries")}
-          value={loading ? "—" : stats?.activeSeries ?? "—"}
-          loading={loading}
-          icon={<img src="/icons/flaticon/calendar.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
-          accent="var(--color-warning)"
-        />
-      </div>
+      {isSuperadmin && (
+        <div className="kpi-grid">
+          <KPIStatCard
+            label={t("admin", "totalOrders")}
+            value={loading ? "—" : stats?.totalOrders ?? "—"}
+            loading={loading}
+            icon={<img src="/icons/flaticon/orders.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
+            accent="var(--color-primary)"
+          />
+          <KPIStatCard
+            label={t("admin", "revenuePaid")}
+            value={loading ? "—" : stats ? fmtRevenue(stats.revenueCents) : "—"}
+            loading={loading}
+            icon={<img src="/icons/flaticon/wallet.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
+            accent="#0d7a4e"
+          />
+          <KPIStatCard
+            label={t("admin", "platformUsers")}
+            value={loading ? "—" : stats?.totalUsers ?? "—"}
+            loading={loading}
+            icon={<img src="/icons/flaticon/users.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
+            accent="#1d4ed8"
+          />
+          <KPIStatCard
+            label={t("admin", "activeSeries")}
+            value={loading ? "—" : stats?.activeSeries ?? "—"}
+            loading={loading}
+            icon={<img src="/icons/flaticon/calendar.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />}
+            accent="var(--color-warning)"
+          />
+        </div>
+      )}
 
-      {!loading && !stats && (
+      {isFBDirector && (
+        <div className="alert-strip alert-strip-info">
+          <span className="alert-strip-icon">ℹ</span>
+          <div>
+            <strong>F&amp;B Operations Workspace</strong>
+            <div>
+              Manage menus, experiences, spaces, tickets, orders, and operational analytics. Owner-only finance,
+              payout, user, and ProofPay governance modules stay hidden.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSuperadmin && !loading && !stats && (
         <div className="alert-strip alert-strip-error">
           <TriangleAlert size={16} className="alert-strip-icon" />
           {t("admin", "failedLoadStats")}
