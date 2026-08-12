@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-
-function isAdmin(session: any) {
-  return session?.user?.roles?.some((r: string) =>
-    ["SUPERADMIN", "FB_DIRECTOR"].includes(r)
-  );
-}
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  await requireAdminRoles(req, ["SUPERADMIN"]);
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q") ?? "";

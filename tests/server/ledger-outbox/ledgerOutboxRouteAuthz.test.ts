@@ -9,7 +9,8 @@
  *   GET  (read):   SUPERADMIN ✓  ADMIN_FINANCE ✓  others ✗
  *   POST (retry):  SUPERADMIN ✓  ADMIN_FINANCE ✓  others ✗
  *
- * ADMIN_COMMERCIAL is now a zero-permission legacy role — denied everywhere.
+ * ADMIN_COMMERCIAL is a legacy F&B Director alias, but ledger outbox is a
+ * governance/finance surface — denied here.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -80,7 +81,7 @@ describe("GET /api/v1/admin/ledger-outbox — read access", () => {
     expect(body.ok).toBe(true);
   });
 
-  it("returns 403 for ADMIN_COMMERCIAL (zero-permission legacy role)", async () => {
+  it("returns 403 for ADMIN_COMMERCIAL (F&B alias denied from governance outbox)", async () => {
     sessionMock.requireSessionFn.mockRejectedValue(
       Object.assign(new Error("Forbidden"), { status: 403 }),
     );
@@ -130,7 +131,7 @@ describe("POST /api/v1/admin/ledger-outbox — retry access", () => {
     expect(body.ok).toBe(true);
   });
 
-  it("returns 403 for ADMIN_COMMERCIAL (legacy zero-permission role)", async () => {
+  it("returns 403 for ADMIN_COMMERCIAL (F&B alias denied from outbox details)", async () => {
     sessionMock.requireSessionFn.mockRejectedValue(
       Object.assign(new Error("Forbidden: retry requires SUPERADMIN or ADMIN_FINANCE"), { status: 403 }),
     );

@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function isAdmin(roles: string[]) {
-  return roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR"].includes(r));
+  return roles.some((r) => ["SUPERADMIN"].includes(r));
 }
 
 export async function GET(req: NextRequest) {

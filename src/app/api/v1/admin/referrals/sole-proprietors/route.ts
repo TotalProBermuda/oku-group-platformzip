@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { listSoleProprietors } from "@/server/referrals/organizationResolver";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:audit:read");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const items = await listSoleProprietors();
     return NextResponse.json({ ok: true, items });

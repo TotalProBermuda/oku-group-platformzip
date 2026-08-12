@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import {
   migrateReferrersToActors,
   migrateEventReferrersToActors,
@@ -17,10 +16,9 @@ import {
  *   3. Reclassify previously-migrated actors as sole proprietors where applicable.
  *   4. Resolve any free-text organizationName values to a real Entity.
  */
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:compensation:write");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const referrers = await migrateReferrersToActors();
     const events = await migrateEventReferrersToActors();

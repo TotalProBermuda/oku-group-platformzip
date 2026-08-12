@@ -1,5 +1,5 @@
 // CRUD: GET (read), PATCH (update), DELETE (soft-delete = RETIRED) for a
-// single ReferralAssignment. SUPERADMIN / ADMIN_FINANCE.
+// single ReferralAssignment. SUPERADMIN only.
 // All writes audited under `referrer.assignment.*`.
 
 import { NextResponse } from "next/server";
@@ -9,7 +9,7 @@ import { requireSession } from "@/server/auth/session";
 import { ReferralCompensationMode, OfferType } from "@prisma/client";
 import { logReferrerAssignmentAction } from "@/server/referrals/referrerAssignmentAudit";
 
-const ADMIN_ROLES = new Set(["SUPERADMIN", "ADMIN_FINANCE"]);
+const ADMIN_ROLES = new Set(["SUPERADMIN"]);
 
 async function authorize() {
   let userId: string;

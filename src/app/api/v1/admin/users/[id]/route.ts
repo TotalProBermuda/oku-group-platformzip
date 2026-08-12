@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
 import {
   commissionWhereForEarner,
@@ -76,8 +75,7 @@ async function attachCommissionCount<T extends UserWithReferrer>(user: T): Promi
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit"); // user detail is staff-management, not audit; SUPERADMIN + ADMIN_HR only
+    await requireAdminRoles(_req, ["SUPERADMIN"]);
     const { id } = await params;
 
     const userBase = await prisma.user.findUniqueOrThrow({
@@ -94,8 +92,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId, roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
     const body = await req.json();
 

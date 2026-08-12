@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
-import { requireAnyPermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac";
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { roles } = await requireSession();
-    requireAnyPermission(roles, "admin:audit:read", "admin:orders:read");
+    requirePermission(roles, "admin:orders:read");
     const { id } = await params;
 
     const events = await prisma.orderEvent.findMany({

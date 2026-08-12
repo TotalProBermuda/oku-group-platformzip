@@ -34,7 +34,7 @@ function UsersPageContent() {
     STAFF_CATCH: "Staff (Catch)",
     FB_DIRECTOR:           "F&B Director",
     RESTAURANT_SUPERVISOR: "Restaurant Supervisor",
-    ADMIN_COMMERCIAL:      "Admin · Commercial (legacy)",
+    ADMIN_COMMERCIAL:      "F&B Director",
     ADMIN_IR:              "Admin · IR",
     ADMIN_HR:              "Admin · HR",
     SUPERADMIN:            "Superadmin",

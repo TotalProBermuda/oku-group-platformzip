@@ -25,8 +25,8 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN_IR:              "Admin · IR",
   ADMIN_HR:              "Admin · HR",
   SUPERADMIN:            "Superadmin",
-  // Legacy label — kept so existing DB rows render cleanly
-  ADMIN_COMMERCIAL:      "Admin · Commercial (legacy)",
+  // Legacy role retained as an F&B Director alias until seeded/live users migrate.
+  ADMIN_COMMERCIAL:      "F&B Director",
 };
 
 const ROLE_TINTS: Record<string, { bg: string; fg: string }> = {

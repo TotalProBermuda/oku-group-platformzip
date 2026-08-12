@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:audit:read");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
 
     const links = await prisma.accountProfileLink.findMany({
@@ -31,8 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
     const { userId, relationshipType, canManage, isPrimary, isPublicRepresentative } = await req.json();
 
@@ -58,8 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
     const { linkId } = await req.json();
 

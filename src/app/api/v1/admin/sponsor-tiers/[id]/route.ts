@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  await requireAdminRoles(req, ["SUPERADMIN"]);
 
   const { id } = await params;
   const body = await req.json();

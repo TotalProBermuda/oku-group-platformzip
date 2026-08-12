@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { ReferralActorType, ReferralCompensationMode } from "@prisma/client";
 
 function slugify(s: string): string {
@@ -13,11 +12,10 @@ function slugify(s: string): string {
 
 export async function GET(req: NextRequest) {
   // The operator-type catalog is only used by admin tooling (the AddOperator
-  // modal and the /admin/operator-types CRUD page), so we require an
-  // authenticated session with the same admin permission as POST/PATCH.
+  // modal and the /admin/operator-types CRUD page). It controls ProofPay
+  // referrer identity architecture, so only owners can read or mutate it.
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
   } catch (e) {
     const status = (e as { status?: number })?.status ?? 401;
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status });
@@ -32,8 +30,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { roles, userId } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const body = await req.json();
     const label = String(body?.label ?? "").trim();
     if (!label) return NextResponse.json({ ok: false, error: "label is required" }, { status: 400 });
@@ -84,8 +81,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
     const body = await req.json();
     const code = String(body?.code ?? "").trim();
     if (!code) return NextResponse.json({ ok: false, error: "code is required" }, { status: 400 });
@@ -123,8 +119,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
     const code = req.nextUrl.searchParams.get("code")?.trim();
     if (!code) return NextResponse.json({ ok: false, error: "code is required" }, { status: 400 });
 

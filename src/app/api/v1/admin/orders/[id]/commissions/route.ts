@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requireAnyPermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { roles } = await requireSession();
-    requireAnyPermission(roles, "admin:audit:read", "admin:orders:read");
+    await requireAdminRoles(_req, ["SUPERADMIN"]);
     const { id } = await params;
 
     const ledgerEntries = await prisma.ledgerEntry.findMany({

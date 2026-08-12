@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 function randCode(prefix: string, len = 6) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -12,8 +11,7 @@ function randCode(prefix: string, len = 6) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit"); // user list is staff-management, not audit; SUPERADMIN + ADMIN_HR only
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const { searchParams } = new URL(req.url);
     const search   = searchParams.get("search") ?? "";
@@ -45,8 +43,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const body = await req.json();
     const { name, email, phone, initialRole, referrerType, organizationName, referrerPhone } = body;

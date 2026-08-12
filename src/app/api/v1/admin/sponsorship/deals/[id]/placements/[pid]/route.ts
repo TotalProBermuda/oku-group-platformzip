@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
 function isAdmin(s: any) {
-  return s?.user?.roles?.some((r: string) => ["SUPERADMIN", "FB_DIRECTOR"].includes(r));
+  return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; pid: string }> }) {

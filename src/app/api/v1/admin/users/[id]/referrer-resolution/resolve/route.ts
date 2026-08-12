@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { prisma } from "@/lib/prisma";
 import { ReferralActorType } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -101,8 +100,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { userId: adminUserId, roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    const { userId: adminUserId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id: targetUserId } = await ctx.params;
 
     const parsed = Body.safeParse(await req.json().catch(() => null));

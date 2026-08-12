@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
-import { requireAnyPermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac";
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +9,8 @@ export async function GET(
 ) {
   try {
     const { roles } = await requireSession();
-    requireAnyPermission(roles, "admin:audit:read", "admin:orders:read");
+    requirePermission(roles, "admin:orders:read");
+    const isOwner = roles.includes("SUPERADMIN");
     const { id } = await params;
 
     const order = await prisma.order.findUniqueOrThrow({
@@ -73,12 +74,25 @@ export async function GET(
       sourceType = "REFERRER";
     }
 
-    const result = {
-      ...order,
-      sourceName,
-      sourceType,
-      userOrderCount: order.user.orders?.length ?? 0,
-    };
+    const operationalOrder = { ...order } as Record<string, unknown>;
+    delete operationalOrder.LedgerEntry;
+    delete operationalOrder.attribution;
+    delete operationalOrder.attributedInfluencer;
+    delete operationalOrder.attributedEventReferrerAssignment;
+    delete operationalOrder.commissionCents;
+    delete operationalOrder.netRevenueCents;
+
+    const result = isOwner
+      ? {
+          ...order,
+          sourceName,
+          sourceType,
+          userOrderCount: order.user.orders?.length ?? 0,
+        }
+      : {
+          ...operationalOrder,
+          userOrderCount: order.user.orders?.length ?? 0,
+        };
 
     return NextResponse.json({ ok: true, data: result });
   } catch (e: any) {

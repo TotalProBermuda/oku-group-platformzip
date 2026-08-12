@@ -7,14 +7,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import type { CommissionTierType, CommissionScopeType } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:revenue:read");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const { searchParams } = new URL(req.url);
     const tier = searchParams.get("tier") as CommissionTierType | null;
@@ -34,18 +32,14 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, data: rules });
   } catch (e: unknown) {
-    const err = e as Error;
-    return NextResponse.json({ ok: false, error: err.message }, { status: 401 });
+    const err = e as Error & { status?: number };
+    return NextResponse.json({ ok: false, error: err.message }, { status: err.status ?? 401 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:revenue:write");
-    if (!roles.some((r) => ["SUPERADMIN", "ADMIN_FINANCE"].includes(r))) {
-      return NextResponse.json({ ok: false, error: "Forbidden: SUPERADMIN or ADMIN_FINANCE required to create commission rules." }, { status: 403 });
-    }
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const body = await req.json();
     const {
@@ -107,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, data: rule }, { status: 201 });
   } catch (e: unknown) {
-    const err = e as Error;
-    return NextResponse.json({ ok: false, error: err.message }, { status: 400 });
+    const err = e as Error & { status?: number };
+    return NextResponse.json({ ok: false, error: err.message }, { status: err.status ?? 400 });
   }
 }

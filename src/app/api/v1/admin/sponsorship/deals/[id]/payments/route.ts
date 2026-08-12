@@ -3,8 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-// Sponsorship payment creation is a financial write — SUPERADMIN only.
-// FB_DIRECTOR may read and manage deal metadata but must not record payments.
+// Sponsorship payment creation is a financial/governance write — SUPERADMIN only.
 function isAdmin(s: any) {
   return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
 }

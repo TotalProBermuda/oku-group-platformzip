@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { getBatchDetail } from "@/server/payouts/payoutBatchService";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:audit:read");
+    await requireAdminRoles(_req, ["SUPERADMIN", "ADMIN_FINANCE"]);
     const { id } = await params;
     const batch = await getBatchDetail(id);
     if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });

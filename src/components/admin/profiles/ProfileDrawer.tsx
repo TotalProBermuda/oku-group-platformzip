@@ -58,7 +58,7 @@ const ROLE_LABEL: Record<string, string> = {
   SUPERADMIN:            "Superadmin",
   FB_DIRECTOR:           "F&B Director",
   RESTAURANT_SUPERVISOR: "Restaurant Supervisor",
-  ADMIN_COMMERCIAL:      "Admin — Commercial (legacy)",
+  ADMIN_COMMERCIAL:      "F&B Director",
   ADMIN_IR:              "Admin — IR",
   ADMIN_HR:              "Admin — HR",
   INFLUENCER:            "Influencer",
@@ -138,8 +138,8 @@ export default function ProfileDrawer({ profile, onClose, onRefresh }: ProfileDr
   // Derive the effective category from live platform roles when available,
   // so the badge stays accurate after role changes without needing a DB sync.
   function roleToCategory(roleKeys: string[]): string {
-    if (roleKeys.some(r => ["SUPERADMIN","FB_DIRECTOR","ADMIN_IR","ADMIN_HR"].includes(r))) return "admin";
-    if (roleKeys.some(r => ["RESTAURANT_HOST","STREETSIDE_HOST"].includes(r))) return "host";
+    if (roleKeys.some(r => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL","ADMIN_IR","ADMIN_HR"].includes(r))) return "admin";
+    if (roleKeys.some(r => ["RESTAURANT_HOST","STREETSIDE_HOST","RESTAURANT_SUPERVISOR"].includes(r))) return "host";
     if (roleKeys.includes("INFLUENCER"))  return "influencer";
     if (roleKeys.includes("REFERRER"))    return "referrer";
     if (roleKeys.includes("PARTNER"))     return "partner";
@@ -379,7 +379,7 @@ function OverviewTab({ profile, extUser, fmt }: { profile: UnifiedProfile; extUs
 const ALL_ROLES: { key: string; label: string; group: string }[] = [
   { key: "SUPERADMIN",       label: "Superadmin",          group: "Admin" },
   { key: "FB_DIRECTOR",           label: "F&B Director",           group: "Admin" },
-  { key: "RESTAURANT_SUPERVISOR", label: "Restaurant Supervisor",  group: "Admin" },
+  { key: "RESTAURANT_SUPERVISOR", label: "Restaurant Supervisor",  group: "Host" },
   { key: "ADMIN_IR",         label: "Admin — IR",          group: "Admin" },
   { key: "ADMIN_HR",         label: "Admin — HR",          group: "Admin" },
   { key: "STAFF_OKU",        label: "Staff (OKÜ)",         group: "Staff" },
@@ -1159,4 +1159,3 @@ function ActivityTab({ auditLogs, loading, fmt }: { auditLogs: any[]; loading: b
     </div>
   );
 }
-

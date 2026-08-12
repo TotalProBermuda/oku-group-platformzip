@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 export async function GET(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:audit:read");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q") ?? "";

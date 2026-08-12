@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { prisma } from "@/lib/prisma";
 import { normaliseEmail, normalisePhone } from "@/server/referrals/referralActorIdentityService";
 
@@ -275,12 +274,11 @@ export async function resolveReferrerResolution(
  * Used by the admin user drawer to render the diagnostic card.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await ctx.params;
 
     const result = await resolveReferrerResolution(id);

@@ -14,7 +14,7 @@ interface Props {
 }
 
 function getDashboardHref(roles: string[]): string {
-  if (roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"].includes(r))) return "/admin";
+  if (roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r))) return "/admin";
   if (roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST")) return "/host/streetside";
   if (roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r))) return "/host/dashboard";
   if (roles.includes("INFLUENCER"))  return "/influencer/dashboard";
@@ -25,7 +25,7 @@ function getDashboardHref(roles: string[]): string {
 }
 
 function getDashboardLabel(roles: string[]): string {
-  if (roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"].includes(r))) return "Admin Console";
+  if (roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r))) return "Admin Console";
   if (roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST")) return "Streetside";
   if (roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r))) return "Host Dashboard";
   if (roles.includes("INFLUENCER"))  return "My Dashboard";
@@ -38,6 +38,7 @@ function getDashboardLabel(roles: string[]): string {
 function getRoleLabel(roles: string[]): string {
   if (roles.includes("SUPERADMIN"))              return "Superadmin";
   if (roles.includes("FB_DIRECTOR"))             return "F&B Director";
+  if (roles.includes("ADMIN_COMMERCIAL"))        return "F&B Director";
   if (roles.includes("ADMIN_HR"))                return "Admin — HR";
   if (roles.includes("ADMIN_IR"))                return "Admin — IR";
   if (roles.includes("RESTAURANT_SUPERVISOR"))   return "Restaurant Supervisor";
@@ -55,7 +56,7 @@ export default function NavbarAuth({ session, locale = "en", signInLabel = "Sign
 
   const roles: string[] = session?.user?.roles ?? [];
   const isEmployee = roles.some((r) =>
-    ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR",
+    ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR",
      "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r) ||
     r.startsWith("STAFF_")
   );

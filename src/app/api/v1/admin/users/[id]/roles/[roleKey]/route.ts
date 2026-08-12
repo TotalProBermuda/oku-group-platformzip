@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; roleKey: string }> }
 ) {
   try {
-    const { userId, roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id, roleKey } = await params;
 
     await prisma.userRole.deleteMany({

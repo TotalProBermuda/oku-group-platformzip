@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
-import { requireAnyPermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
   try {
     const { roles } = await requireSession();
-    requireAnyPermission(roles, "admin:audit:read", "admin:orders:read");
+    requirePermission(roles, "admin:orders:read");
+    const isOwner = roles.includes("SUPERADMIN");
 
     const { searchParams } = req.nextUrl;
     const status    = searchParams.get("status") || undefined;
@@ -77,8 +78,6 @@ export async function GET(req: NextRequest) {
         feesCents: o.feesCents,
         taxCents: o.taxCents,
         discountCents: o.discountCents,
-        commissionCents: o.commissionCents,
-        netRevenueCents: o.netRevenueCents,
         totalCents: o.totalCents,
         coversCount: o.coversCount,
         currency: o.currency,
@@ -91,8 +90,14 @@ export async function GET(req: NextRequest) {
         series: o.series,
         payment: o.payment,
         itemCount: o.lineItems.length,
-        sourceName,
-        attribution: o.attribution ? { refCode: o.attribution.refCode } : null,
+        ...(isOwner
+          ? {
+              commissionCents: o.commissionCents,
+              netRevenueCents: o.netRevenueCents,
+              sourceName,
+              attribution: o.attribution ? { refCode: o.attribution.refCode } : null,
+            }
+          : {}),
       };
     });
 

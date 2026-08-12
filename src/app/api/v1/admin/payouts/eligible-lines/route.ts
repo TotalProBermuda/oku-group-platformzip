@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { previewBatch } from "@/server/payouts/payoutBatchService";
 
 export async function GET(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:audit:read");
+    await requireAdminRoles(req, ["SUPERADMIN", "ADMIN_FINANCE"]);
 
     const url = new URL(req.url);
     const fromStr = url.searchParams.get("from");

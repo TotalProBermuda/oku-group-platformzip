@@ -875,6 +875,7 @@ select.form-input { cursor: pointer; }
   width: 100%;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
   position: relative;
   transition: background 0.2s, border-color 0.2s, transform 0.1s;
   font-family: var(--font-body);

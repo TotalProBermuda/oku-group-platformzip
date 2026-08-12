@@ -2,7 +2,7 @@
  * Admin Commission Rules — single rule
  *
  * PATCH /api/v1/admin/commission-rules/[id]
- *   Deactivate or relabel a rule (SUPERADMIN / ADMIN_FINANCE only).
+ *   Deactivate or relabel a rule (SUPERADMIN only).
  *   Economics (percentageBps, perPersonCents, etc.) cannot be patched on an
  *   existing rule — create a new version instead. This preserves the audit
  *   trail for every allocation that references a specific ruleVersionId.
@@ -10,10 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
-
-const SUPERADMIN_ROLES = ["SUPERADMIN", "ADMIN_FINANCE"] as const;
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 export async function PATCH(
   req: NextRequest,
@@ -21,14 +18,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:revenue:write");
-    if (!roles.some((r) => SUPERADMIN_ROLES.includes(r as (typeof SUPERADMIN_ROLES)[number]))) {
-      return NextResponse.json(
-        { ok: false, error: "Forbidden: SUPERADMIN or ADMIN_FINANCE required to update commission rules." },
-        { status: 403 }
-      );
-    }
+    await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const body = await req.json();
 

@@ -1,5 +1,28 @@
 import type { RoleKey, PermissionKey } from "@/types/roles";
 
+const FB_DIRECTOR_PERMISSIONS: PermissionKey[] = [
+  "public:read",
+  "account:read",
+  "account:write",
+  "series:read",
+  // Operational reads — orders list/detail and series list for this venue's events.
+  // Uses admin:orders:read (scoped) NOT admin:audit:read (which also gates user/payout/referral APIs).
+  "admin:orders:read",
+  "admin:menus:read",
+  "admin:menus:edit",
+  "admin:tickets:read",
+  "admin:tickets:write",
+  "tickets:checkin",
+  "admin:spaces:read",
+  "admin:spaces:write",
+  "admin:operations:read",
+  "admin:operations:write",
+  "admin:analytics:operations:read",
+  // Operational writes — cancel/reopen orders, publish/unpublish series.
+  "admin:orders:write",
+  "admin:experiences:write",
+];
+
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   VISITOR: ["public:read", "series:read"],
   ATTENDEE: ["public:read", "account:read", "account:write", "series:read", "series:purchase"],
@@ -9,12 +32,13 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   STAFF_OKU: ["public:read", "account:read", "staff:sops:read", "staff:sops:ack", "tickets:checkin"],
   STAFF_CATCH: ["public:read", "account:read", "staff:sops:read", "staff:sops:ack", "tickets:checkin"],
 
-  // ─── Legacy role — FAIL CLOSED ────────────────────────────────────────────
+  // ─── Legacy role — F&B compatibility alias ────────────────────────────────
   // ADMIN_COMMERCIAL is retained in the DB enum for backward-compat with any
-  // existing session tokens or DB rows, but grants zero access. Any session
-  // still carrying this role will be refused by every permission and role check.
-  // All active demo personas have been migrated to FB_DIRECTOR or SUPERADMIN.
-  ADMIN_COMMERCIAL: [],
+  // existing session tokens or DB rows. Treat it as the same narrow F&B ops
+  // role as FB_DIRECTOR so stale demo/live users do not get stranded, while
+  // still excluding finance, ProofPay governance, referrer intelligence,
+  // payouts, compensation, user-edit, refunds, audit, and security access.
+  ADMIN_COMMERCIAL: FB_DIRECTOR_PERMISSIONS,
 
   ADMIN_IR: ["public:read", "account:read", "ir:read", "ir:write", "admin:audit:read"],
   ADMIN_HR: ["public:read", "account:read", "hr:read", "hr:write", "admin:audit:read", "admin:users:edit"],
@@ -22,32 +46,9 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
 
   // ─── Restaurant F&B operations ────────────────────────────────────────────
   // Covers: menus, experiences, series, spaces, operational analytics, tickets,
-  // capacity. Does NOT grant ProofPay economics, payouts, compensation, revenue,
-  // user-edit, refunds, audit, or security access.
-  FB_DIRECTOR: [
-    "public:read",
-    "account:read",
-    "account:write",
-    "series:read",
-    "influencer:read",
-    "partner:read",
-    // Operational reads — orders list/detail and series list for this venue's events.
-    // Uses admin:orders:read (scoped) NOT admin:audit:read (which also gates user/payout/referral APIs).
-    "admin:orders:read",
-    "admin:menus:read",
-    "admin:menus:edit",
-    "admin:tickets:read",
-    "admin:tickets:write",
-    "tickets:checkin",
-    "admin:spaces:read",
-    "admin:spaces:write",
-    "admin:operations:read",
-    "admin:operations:write",
-    "admin:analytics:operations:read",
-    // Operational writes — cancel/reopen orders, publish/unpublish series
-    "admin:orders:write",
-    "admin:experiences:write",
-  ],
+  // capacity. Does NOT grant ProofPay economics, referrer/partner intelligence,
+  // payouts, compensation, revenue, user-edit, refunds, audit, or security access.
+  FB_DIRECTOR: FB_DIRECTOR_PERMISSIONS,
 
   // ─── Live-service host portal only ────────────────────────────────────────
   // RESTAURANT_SUPERVISOR accesses /host/* routes only.

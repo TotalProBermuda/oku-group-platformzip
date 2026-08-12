@@ -10,7 +10,7 @@ import {
 import { logReferrerAssignmentAction } from "@/server/referrals/referrerAssignmentAudit";
 import { generateReferralLink } from "@/server/referrals/referralLinkService";
 
-const ADMIN_ROLES = new Set(["SUPERADMIN", "ADMIN_FINANCE"]);
+const ADMIN_ROLES = new Set(["SUPERADMIN"]);
 
 const Body = z.object({
   referralActorId: z.string().min(1),
@@ -38,13 +38,13 @@ const Body = z.object({
  * POST /api/v1/admin/referrals/assignments
  *
  * Creates a ReferralAssignment with an offerType (RESTAURANT/EVENT/...) and
- * optionally a fresh ReferralLink. Admin-only. Audited under
+ * optionally a fresh ReferralLink. Owner-only. Audited under
  * `referrer.assignment.assignment.created` and (if a link is generated)
  * `referrer.assignment.link.generated`.
  */
 /**
  * GET — paginated list of all ReferralAssignments. Filter by referralActorId,
- * offerType, status. Read-only; admin-scoped (same role gate as POST).
+ * offerType, status. Read-only; owner-scoped (same role gate as POST).
  */
 export async function GET(req: Request) {
   let roles: string[];

@@ -1,23 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logReferralOrgAction } from "@/server/referrals/organizationAudit";
 
 /**
  * Create a new approved Entity from an unresolved organizationName, then
  * link the actor's assignments to it.
  *
- * Permission: `admin:compensation:write` (see ./link/route.ts for the
- * permission-key rationale).
+ * Owner-only because this creates a payable referral organization mapping.
  */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ actorId: string }> },
 ) {
   try {
-    const session = await requireSession();
-    requirePermission(session.roles, "admin:compensation:write");
+    const session = await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const { actorId } = await params;
     const body = (await req.json().catch(() => ({}))) as {

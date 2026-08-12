@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+export async function GET(req: Request) {
+  await requireAdminRoles(req, ["SUPERADMIN"]);
 
   const tiers = await prisma.sponsorTier.findMany({
     orderBy: { displayOrder: "asc" },
@@ -14,8 +12,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  await requireAdminRoles(req, ["SUPERADMIN"]);
 
   const body = await req.json();
   const tier = await prisma.sponsorTier.create({

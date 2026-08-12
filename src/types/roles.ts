@@ -7,7 +7,7 @@ export type RoleKey =
   | "REFERRER"
   | "STAFF_OKU"
   | "STAFF_CATCH"
-  | "ADMIN_COMMERCIAL"   // Legacy — stripped to empty permissions; do not assign to new users
+  | "ADMIN_COMMERCIAL"   // Legacy F&B Director alias; migrate live users to FB_DIRECTOR
   | "ADMIN_IR"
   | "ADMIN_HR"
   | "ADMIN_FINANCE"

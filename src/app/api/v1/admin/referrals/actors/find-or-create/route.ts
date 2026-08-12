@@ -7,7 +7,7 @@ import {
   findOrLinkReferralActor,
 } from "@/server/referrals/referralActorDedupeService";
 
-const ADMIN_ROLES = new Set(["SUPERADMIN", "ADMIN_FINANCE"]);
+const ADMIN_ROLES = new Set(["SUPERADMIN"]);
 
 const Body = z.object({
   actorType: z.nativeEnum(ReferralActorType),
@@ -22,8 +22,8 @@ const Body = z.object({
 /**
  * POST /api/v1/admin/referrals/actors/find-or-create
  *
- * De-duplicates: returns the existing ReferralActor when an inviter (admin
- * or partner) tries to add a person who is already in the system. This
+ * De-duplicates: returns the existing ReferralActor when an owner tries to
+ * add a person who is already in the system. This
  * prevents two sibling actors when two operators independently invite the
  * same taxi driver.
  *

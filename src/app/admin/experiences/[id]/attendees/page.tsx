@@ -10,7 +10,7 @@ import { AttendeesTable } from "@/components/checkin/AttendeesTable";
 
 export default async function AttendeesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<any> }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR"].includes(r))) {
+  if (!session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r))) {
     redirect("/login");
   }
 

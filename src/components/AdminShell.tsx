@@ -25,6 +25,7 @@ interface AdminNavLabels {
   scorecards: string;
   sponsorship: string;
   launchReadiness: string;
+  commissionRules: string;
 }
 
 interface Props {

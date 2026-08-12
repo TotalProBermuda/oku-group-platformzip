@@ -9,7 +9,7 @@ import { requireSession } from "@/server/auth/session";
 import { ReferralAssignmentStatus } from "@prisma/client";
 import { logReferrerAssignmentAction } from "@/server/referrals/referrerAssignmentAudit";
 
-const ADMIN_ROLES = new Set(["SUPERADMIN", "ADMIN_FINANCE"]);
+const ADMIN_ROLES = new Set(["SUPERADMIN"]);
 
 const Body = z.object({
   status: z.nativeEnum(ReferralAssignmentStatus),

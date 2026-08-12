@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { checkInEmitter } from "@/lib/checkInEmitter";
 
 function isAdmin(session: any) {
-  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR"].includes(r));
+  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r));
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

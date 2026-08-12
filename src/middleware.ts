@@ -5,7 +5,11 @@ import { isValidLocale } from "@/i18n/config";
 import { detectLocaleFromHeader } from "@/i18n/utils";
 import type { Locale } from "@/types/i18n";
 import { logRequest } from "@/server/security/requestLogger";
-import { ROLE_ROUTES } from "@/lib/routePolicy";
+import {
+  ROLE_ROUTES,
+  canonicalDestinationForRoles,
+  routePolicyMatches,
+} from "@/lib/routePolicy";
 
 const PROTECTED_PREFIXES = [
   "/admin", "/influencer", "/partner", "/investor",
@@ -41,6 +45,7 @@ const SECRET = resolveAuthSecret();
 const ADMIN_API_ALLOWED_ROLES = new Set([
   "SUPERADMIN",
   "FB_DIRECTOR",
+  "ADMIN_COMMERCIAL",
   "ADMIN_IR",
   "ADMIN_HR",
   "ADMIN_FINANCE",
@@ -213,12 +218,12 @@ export async function middleware(req: NextRequest) {
     // ── 3. Role-based access control ────────────────────────────────────────
     const roles: string[] = (token.roles as string[]) ?? [];
     for (const rule of ROLE_ROUTES) {
-      if (pathForCheck.startsWith(rule.prefix)) {
+      if (routePolicyMatches(pathForCheck, rule.prefix)) {
         const allowed = roles.some((r) => rule.allowed.includes(r));
         if (!allowed) {
           const url = req.nextUrl.clone();
-          url.pathname = `/${detectedLocale}/login`;
-          url.searchParams.set("callbackUrl", pathname);
+          url.pathname = canonicalDestinationForRoles(roles);
+          url.search = "";
           return NextResponse.redirect(url);
         }
         break;

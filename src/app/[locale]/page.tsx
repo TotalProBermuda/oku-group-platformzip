@@ -78,7 +78,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
   const common = t.common as Record<string, string>;
 
   const roles: string[] = (session?.user as Record<string, unknown>)?.roles as string[] || [];
-  const isAdmin      = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"].includes(r));
+  const isAdmin      = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r));
   const isHost       = roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r));
   const isStreetsideHost = roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST");
   const isInfluencer = roles.includes("INFLUENCER");

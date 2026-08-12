@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
 
 const VALID_CYCLES = ["DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY"] as const;
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId: actorId, roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    const { userId: actorId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
 
     const body = await req.json();

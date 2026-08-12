@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
-import { requireAnyPermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac";
 
 const Body = z.object({
   slug: z.string().min(3),
@@ -17,7 +17,7 @@ const Body = z.object({
 export async function GET() {
   try {
     const { roles } = await requireSession();
-    requireAnyPermission(roles, "admin:audit:read", "admin:orders:read");
+    requirePermission(roles, "admin:orders:read");
 
     const series = await prisma.series.findMany({
       orderBy: { createdAt: "desc" },

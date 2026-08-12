@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
-import { requireAnyPermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac";
 
 export async function POST(
   req: NextRequest,
@@ -9,7 +9,7 @@ export async function POST(
 ) {
   try {
     const { roles, userId } = await requireSession();
-    requireAnyPermission(roles, "admin:audit:read", "admin:orders:read");
+    requirePermission(roles, "admin:orders:write");
     const { id } = await params;
 
     const body = await req.json();

@@ -23,7 +23,7 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
   const [open, setOpen] = useState(false);
 
   const roles: string[] = session?.user?.roles ?? [];
-  const isAdmin      = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"].includes(r));
+  const isAdmin      = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r));
   const isInfluencer = roles.includes("INFLUENCER");
   const isPartner    = roles.includes("PARTNER");
   const isInvestor   = roles.includes("INVESTOR");

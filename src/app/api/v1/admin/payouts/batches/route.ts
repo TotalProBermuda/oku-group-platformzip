@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { listBatches, createDraft } from "@/server/payouts/payoutBatchService";
-import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
-    const { roles } = await requireSession();
-    requirePermission(roles, "admin:audit:read");
+    await requireAdminRoles(req, ["SUPERADMIN", "ADMIN_FINANCE"]);
 
     const url = new URL(req.url);
     const status = url.searchParams.get("status") ?? undefined;
@@ -22,8 +19,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, roles } = await requireSession();
-    requirePermission(roles, "admin:payouts:write");
+    const { userId } = await requireAdminRoles(req, ["SUPERADMIN", "ADMIN_FINANCE"]);
 
     const body = await req.json();
     const { name, notes, from, to, ledgerEntryIds, currency } = body ?? {};

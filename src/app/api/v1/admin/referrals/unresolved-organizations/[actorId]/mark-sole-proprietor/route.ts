@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logReferralOrgAction } from "@/server/referrals/organizationAudit";
 
 /**
@@ -9,15 +8,14 @@ import { logReferralOrgAction } from "@/server/referrals/organizationAudit";
  * from the unresolved-organizations review queue and surfaces them under
  * the "Self-managed" filter instead.
  *
- * Permission: `admin:compensation:write`.
+ * Owner-only because this removes the actor from referral-organization review.
  */
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ actorId: string }> },
 ) {
   try {
-    const session = await requireSession();
-    requirePermission(session.roles, "admin:compensation:write");
+    const session = await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const { actorId } = await params;
     const actor = await prisma.referralActor.findUnique({

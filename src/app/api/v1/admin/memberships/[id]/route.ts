@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { handleMembershipWelcomeEmail } from "@/server/jobs/commerceHandlers";
 
 function isAdmin(roles: string[]) {
-  return roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR"].includes(r));
+  return roles.some((r) => ["SUPERADMIN"].includes(r));
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

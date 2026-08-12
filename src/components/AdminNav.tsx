@@ -33,6 +33,7 @@ interface AdminNavLabels {
   revenueEvents: string;
   launchReadiness: string;
   referralMergeConflicts: string;
+  commissionRules: string;
 }
 
 interface AdminNavProps {
@@ -46,8 +47,8 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN_IR:              "Admin — IR",
   ADMIN_HR:              "Admin — HR",
   ADMIN_FINANCE:         "Admin — Finance",
-  // Legacy — kept so existing sessions still render a label before expiry
-  ADMIN_COMMERCIAL:      "Admin — Commercial (legacy)",
+  // Legacy role retained as an F&B Director alias until seeded/live users migrate.
+  ADMIN_COMMERCIAL:      "F&B Director",
 };
 
 export default function AdminNav({ labels = {} }: AdminNavProps) {
@@ -83,50 +84,86 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
     revenueEvents:       labels.revenueEvents       || "Events",
     launchReadiness:        labels.launchReadiness        || "Launch Readiness",
     referralMergeConflicts: labels.referralMergeConflicts || "Referral Merge Conflicts",
+    commissionRules:        labels.commissionRules        || "Commission Rules",
   };
 
-  const ALL_TABS = [
-    // Operations — visible to FB_DIRECTOR and SUPERADMIN
-    { label: l.overview,     href: "/admin",                        roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"] },
-    { label: l.experiences,  href: "/admin/experiences",            roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: l.series,       href: "/admin/series",                 roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: l.profiles,     href: "/admin/profiles",               roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: l.sponsorship,  href: "/admin/sponsorship",            roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: l.analytics,    href: "/admin/analytics/experiences",  roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: l.orders,       href: "/admin/orders",                 roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: l.memberships,  href: "/admin/memberships",            roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: l.menus,        href: "/admin/menus",                  roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: "Tickets",             href: "/admin/tickets",                   roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    { label: "Spaces",              href: "/admin/spaces",                    roles: ["SUPERADMIN", "FB_DIRECTOR"] },
-    // Role-specific non-finance departments
-    { label: l.irDocuments,  href: "/admin/ir",                     roles: ["SUPERADMIN", "ADMIN_IR"] },
-    { label: l.hiring,       href: "/admin/hiring",                 roles: ["SUPERADMIN", "ADMIN_HR"] },
-    // Finance / governance — SUPERADMIN only (or shared with ADMIN_FINANCE for payouts)
-    { label: l.compensation, href: "/admin/compensation",           roles: ["SUPERADMIN"] },
-    { label: l.partners,     href: "/admin/partners/reports",       roles: ["SUPERADMIN"] },
-    { label: "Conversion",    href: "/admin/operations/conversion",  roles: ["SUPERADMIN"] },
-    { label: "Ledger Outbox", href: "/admin/operations/ledger-outbox", roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
-    { label: "Streetside",   href: "/admin/streetside",             roles: ["SUPERADMIN"] },
-    { label: l.referralMergeConflicts,   href: "/admin/referrals",           roles: ["SUPERADMIN"] },
-    { label: l.integrations + " — INVU", href: "/admin/integrations/invu", roles: ["SUPERADMIN"] },
-    { label: l.tableSessions, href: "/admin/table-sessions",        roles: ["SUPERADMIN"] },
-    { label: l.reviewQueue,   href: "/admin/review-queue",          roles: ["SUPERADMIN"] },
-    { label: l.revenue,             href: "/admin/revenue",              roles: ["SUPERADMIN"] },
-    { label: l.revenueSessions,     href: "/admin/revenue/sessions",     roles: ["SUPERADMIN"] },
-    { label: l.revenueObligations,  href: "/admin/revenue/obligations",  roles: ["SUPERADMIN"] },
-    { label: l.revenueReview,       href: "/admin/revenue/review",       roles: ["SUPERADMIN"] },
-    { label: l.revenueEvents,       href: "/admin/revenue/events",       roles: ["SUPERADMIN"] },
-    { label: "Payments",            href: "/admin/payments",                  roles: ["SUPERADMIN"] },
-    { label: "Payment Ledger",      href: "/admin/payments/payment-ledger",   roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
-    { label: l.launchReadiness,     href: "/admin/launch-readiness",          roles: ["SUPERADMIN"] },
-    { label: "Payouts",             href: "/admin/payouts",                   roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
-    { label: "Beneficiaries",       href: "/admin/payouts/beneficiaries",     roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
-    { label: "Commerce",            href: "/admin/commerce/settings",         roles: ["SUPERADMIN"] },
-    { label: "Security",            href: "/admin/security",                  roles: ["SUPERADMIN"] },
-    { label: "Attribution Review",  href: "/admin/attribution-anchor",        roles: ["SUPERADMIN"] },
+  const NAV_GROUPS = [
+    {
+      label: "Core",
+      tabs: [
+        { label: l.overview, href: "/admin", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"] },
+        { label: l.launchReadiness, href: "/admin/launch-readiness", roles: ["SUPERADMIN"] },
+      ],
+    },
+    {
+      label: "Restaurant Ops",
+      tabs: [
+        { label: l.experiences, href: "/admin/experiences", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+        { label: l.series, href: "/admin/series", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+        { label: l.menus, href: "/admin/menus", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+        { label: "Tickets", href: "/admin/tickets", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+        { label: "Spaces", href: "/admin/spaces", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+        { label: l.analytics, href: "/admin/analytics/experiences", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+        { label: l.orders, href: "/admin/orders", roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+      ],
+    },
+    {
+      label: "ProofPay",
+      tabs: [
+        { label: l.commissionRules, href: "/admin/commission-rules", roles: ["SUPERADMIN"] },
+        { label: l.compensation, href: "/admin/compensation", roles: ["SUPERADMIN"] },
+        { label: l.tableSessions, href: "/admin/table-sessions", roles: ["SUPERADMIN"] },
+        { label: l.reviewQueue, href: "/admin/review-queue", roles: ["SUPERADMIN"] },
+        { label: "Attribution Review", href: "/admin/attribution-anchor", roles: ["SUPERADMIN"] },
+        { label: l.referralMergeConflicts, href: "/admin/referrals", roles: ["SUPERADMIN"] },
+        { label: "Ledger Outbox", href: "/admin/operations/ledger-outbox", roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
+      ],
+    },
+    {
+      label: "Finance",
+      tabs: [
+        { label: "Payments", href: "/admin/payments", roles: ["SUPERADMIN"] },
+        { label: "Payment Ledger", href: "/admin/payments/payment-ledger", roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
+        { label: "Payouts", href: "/admin/payouts", roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
+        { label: "Beneficiaries", href: "/admin/payouts/beneficiaries", roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
+        { label: l.revenue, href: "/admin/revenue", roles: ["SUPERADMIN"] },
+        { label: l.revenueSessions, href: "/admin/revenue/sessions", roles: ["SUPERADMIN"] },
+        { label: l.revenueObligations, href: "/admin/revenue/obligations", roles: ["SUPERADMIN"] },
+        { label: l.revenueReview, href: "/admin/revenue/review", roles: ["SUPERADMIN"] },
+        { label: l.revenueEvents, href: "/admin/revenue/events", roles: ["SUPERADMIN"] },
+      ],
+    },
+    {
+      label: "Governance",
+      tabs: [
+        { label: l.users, href: "/admin/users", roles: ["SUPERADMIN"] },
+        { label: l.profiles, href: "/admin/profiles", roles: ["SUPERADMIN"] },
+        { label: l.accounts, href: "/admin/accounts", roles: ["SUPERADMIN"] },
+        { label: "Security", href: "/admin/security", roles: ["SUPERADMIN"] },
+        { label: "Commerce", href: "/admin/commerce/settings", roles: ["SUPERADMIN"] },
+        { label: l.integrations + " — INVU", href: "/admin/integrations/invu", roles: ["SUPERADMIN"] },
+        { label: "Conversion", href: "/admin/operations/conversion", roles: ["SUPERADMIN"] },
+        { label: "Streetside", href: "/admin/streetside", roles: ["SUPERADMIN"] },
+      ],
+    },
+    {
+      label: "Departments",
+      tabs: [
+        { label: l.irDocuments, href: "/admin/ir", roles: ["SUPERADMIN", "ADMIN_IR"] },
+        { label: l.hiring, href: "/admin/hiring", roles: ["SUPERADMIN", "ADMIN_HR"] },
+        { label: l.sponsorship, href: "/admin/sponsorship", roles: ["SUPERADMIN"] },
+        { label: l.partners, href: "/admin/partners/reports", roles: ["SUPERADMIN"] },
+        { label: l.memberships, href: "/admin/memberships", roles: ["SUPERADMIN"] },
+      ],
+    },
   ];
 
-  const tabs = ALL_TABS.filter((t) => t.roles.some((r) => roles.includes(r)));
+  const groups = NAV_GROUPS
+    .map((group) => ({
+      ...group,
+      tabs: group.tabs.filter((t) => t.roles.some((r) => roles.includes(r))),
+    }))
+    .filter((group) => group.tabs.length > 0);
   const roleLabel = ROLE_LABELS[roles.find((r) => r in ROLE_LABELS) ?? ""] ?? "Admin";
 
   const isActive = (href: string) => {
@@ -153,18 +190,27 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
             <span className="badge badge-neutral" style={{ fontSize: 10, letterSpacing: "0.08em" }}>{roleLabel}</span>
           </div>
         </div>
-        {/* Horizontally scrollable tabs — no wrapping, no scrollbar visible */}
+        {/* Grouped, horizontally scrollable workspaces — no wrapping, no scrollbar visible */}
         <div className="admin-nav-tabs-scroller" style={{ overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-          <div className="tabs" style={{ borderBottom: "none", paddingBottom: 0, flexWrap: "nowrap", whiteSpace: "nowrap", display: "flex", gap: 0 }}>
-            {tabs.map((t) => (
-              <Link
-                key={t.href}
-                href={t.href}
-                className={`tab ${isActive(t.href) ? "active" : ""}`}
-                style={{ flexShrink: 0 }}
-              >
-                {t.label}
-              </Link>
+          <div style={{ display: "flex", gap: 22, alignItems: "flex-end", minWidth: "max-content", paddingBottom: 0 }}>
+            {groups.map((group) => (
+              <div key={group.label} style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--color-text-muted)", paddingLeft: 8 }}>
+                  {group.label}
+                </div>
+                <div className="tabs" style={{ borderBottom: "none", paddingBottom: 0, flexWrap: "nowrap", whiteSpace: "nowrap", display: "flex", gap: 0 }}>
+                  {group.tabs.map((t) => (
+                    <Link
+                      key={t.href}
+                      href={t.href}
+                      className={`tab ${isActive(t.href) ? "active" : ""}`}
+                      style={{ flexShrink: 0, paddingLeft: 10, paddingRight: 10 }}
+                    >
+                      {t.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </div>

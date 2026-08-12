@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
 
-const ADMIN_ROLES = ["SUPERADMIN", "FB_DIRECTOR"];
+const ADMIN_ROLES = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"];
 function isSpacesAdmin(roles: string[]) {
   return roles.some((r) => ADMIN_ROLES.includes(r));
 }

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
-import { requirePermission } from "@/lib/rbac";
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId, roles } = await requireSession();
-    requirePermission(roles, "admin:users:edit");
+    const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
 
     await prisma.user.update({

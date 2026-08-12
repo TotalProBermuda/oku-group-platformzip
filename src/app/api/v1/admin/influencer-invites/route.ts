@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { randomBytes } from "crypto";
 import { sendInfluencerInviteEmail } from "@/server/influencer/inviteEmail";
-
-function isAdmin(session: any) {
-  return session?.user?.roles?.some((r: string) =>
-    ["SUPERADMIN", "FB_DIRECTOR"].includes(r)
-  );
-}
+import { requireAdminRoles } from "@/server/auth/adminGuard";
 
 function randRefCode(prefix: string) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -19,8 +12,7 @@ function randRefCode(prefix: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  await requireAdminRoles(req, ["SUPERADMIN"]);
 
   const { searchParams } = new URL(req.url);
   const seriesId = searchParams.get("seriesId");
@@ -38,8 +30,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { session } = await requireAdminRoles(req, ["SUPERADMIN"]);
 
   const body = await req.json().catch(() => ({}));
   const { invitedEmail, invitedName, commissionPct, seriesId } = body;

@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!session?.user) redirect("/login?callbackUrl=/admin");
 
   const roles: string[] = (session.user as any)?.roles ?? [];
-  const adminRoles = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR", "ADMIN_FINANCE"];
+  const adminRoles = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "ADMIN_FINANCE"];
   if (!roles.some((r) => adminRoles.includes(r))) {
     redirect("/login?callbackUrl=/admin");
   }
@@ -60,6 +60,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     compensation:   c.adminNavCompensation  || "Compensation",
     partners:       c.adminNavPartners      || "Partners",
     scorecards:     c.adminNavScorecards    || "Scorecards",
+    commissionRules: "Commission Rules",
     launchReadiness:        adm.launchReadiness?.navLabel              || "Launch Readiness",
     referralMergeConflicts: (translations.referrals as Record<string, Record<string, string>> | undefined)?.mergeConflicts?.navLabel || "Referral Merge Conflicts",
   };
