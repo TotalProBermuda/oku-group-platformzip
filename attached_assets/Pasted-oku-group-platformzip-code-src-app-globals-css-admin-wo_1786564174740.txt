@@ -1,0 +1,145 @@
+oku-group-platformzip-code/src/app/globals.css
+
+.admin-workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 4px 0 18px;
+}
+
+.admin-workspace-menu {
+  position: relative;
+  flex: 0 1 220px;
+  min-width: 180px;
+  z-index: 2;
+}
+
+.admin-workspace-menu[open] {
+  z-index: 30;
+}
+
+.admin-workspace-summary {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 34px 12px 14px;
+  border: 1px solid var(--color-border, #e7dfd8);
+  border-radius: 14px;
+  background: var(--layer-0, #fffaf7);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 4%);
+  cursor: pointer;
+  list-style: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.admin-workspace-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-workspace-summary::after {
+  content: "";
+  position: absolute;
+  top: 19px;
+  right: 16px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--color-text-muted, #9b928c);
+  border-bottom: 2px solid var(--color-text-muted, #9b928c);
+  transform: rotate(45deg);
+  transition:
+    top 0.15s ease,
+    transform 0.15s ease;
+}
+
+.admin-workspace-menu[open] .admin-workspace-summary::after {
+  top: 22px;
+  transform: rotate(225deg);
+}
+
+.admin-workspace-summary:hover {
+  border-color: var(--color-text-muted, #9b928c);
+}
+
+.admin-workspace-summary.active {
+  border-color: var(--color-primary, #cf1238);
+  box-shadow: 0 12px 30px rgb(196 30 58 / 8%);
+}
+
+.admin-workspace-kicker {
+  color: var(--color-text-muted, #9b928c);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-workspace-current {
+  color: var(--color-text, #211b18);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.admin-workspace-summary.active .admin-workspace-current {
+  color: var(--color-primary, #cf1238);
+}
+
+.admin-workspace-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--color-border, #e7dfd8);
+  border-radius: 14px;
+  background: var(--layer-0, #fffaf7);
+  box-shadow: 0 14px 32px rgb(15 23 42 / 8%);
+}
+
+.admin-workspace-link {
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--color-text-muted, #9b928c);
+  font-weight: 650;
+  text-decoration: none;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.admin-workspace-link:hover {
+  color: var(--color-text, #211b18);
+  background: var(--layer-1, #f7f1ec);
+  text-decoration: none;
+}
+
+.admin-workspace-link.active {
+  color: var(--color-primary, #cf1238);
+  background: var(--layer-1, #f7f1ec);
+}
+
+@media (max-width: 1023px) {
+  .admin-nav-container { --admin-gutter: 16px; }
+
+  .admin-workspace-nav {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-workspace-menu {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-workspace-dropdown {
+    position: static;
+    margin-top: 8px;
+  }
+}
+oku-group-platformzip-code/src/components/AdminNav.tsx
