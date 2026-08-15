@@ -49,6 +49,17 @@ export interface RateLimitResult {
   remaining: number;
 }
 
+/** Build the standard rate-limit response for routes that do not accept a body. */
+export function rateLimitedResponse(result: RateLimitResult): Response {
+  return Response.json(
+    { ok: false, error: "Too many requests. Please try again shortly." },
+    {
+      status: 429,
+      headers: { "Retry-After": String(result.retryAfterSeconds ?? 60) },
+    },
+  );
+}
+
 function checkRateLimitInMemory(opts: RateLimitOptions): RateLimitResult {
   const now = Date.now();
   if (now - lastSweep > SWEEP_MS) {
@@ -165,10 +176,7 @@ export function gatePublicPost(
   if (!r.ok) {
     return {
       ok: false,
-      response: Response.json(
-        { ok: false, error: "Too many requests. Please try again shortly." },
-        { status: 429, headers: { "Retry-After": String(r.retryAfterSeconds ?? 60) } },
-      ),
+      response: rateLimitedResponse(r),
     };
   }
   return { ok: true };
@@ -193,10 +201,7 @@ export async function gatePublicPostAsync(
   if (!r.ok) {
     return {
       ok: false,
-      response: Response.json(
-        { ok: false, error: "Too many requests. Please try again shortly." },
-        { status: 429, headers: { "Retry-After": String(r.retryAfterSeconds ?? 60) } },
-      ),
+      response: rateLimitedResponse(r),
     };
   }
   return { ok: true };

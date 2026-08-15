@@ -79,8 +79,11 @@ export async function authenticate(
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`INVU auth failed (${res.status}): ${text}`);
+    // Vendor error payloads may echo credentials or access tokens. Keep the
+    // useful HTTP status but never attach the body to an Error that can reach
+    // application logs, error reporting, or a test script's output.
+    await res.text().catch(() => "");
+    throw new Error(`INVU auth failed (${res.status})`);
   }
 
   const data = await res.json();
@@ -91,7 +94,9 @@ export async function authenticate(
     data?.data?.token ??
     data?.data?.authorization;
   if (!token) {
-    throw new Error(`INVU auth succeeded but no token in response: ${JSON.stringify(data)}`);
+    // A successful response can still contain token-shaped fields under an
+    // unexpected name. Do not serialize it into a thrown error.
+    throw new Error("INVU auth succeeded but no usable token was returned");
   }
   return { token };
 }
