@@ -5,6 +5,7 @@ import { isDemoModeEnabled, DEMO_DISABLED_MESSAGE } from "@/lib/demoMode";
 import { resolveAuthSecret } from "@/lib/authSecret";
 import { sameSiteForEnv } from "@/lib/cookieSecurity";
 import { sanitizeCallbackUrlForRoles } from "@/lib/routePolicy";
+import { checkRateLimitAsync, clientIp, rateLimitedResponse } from "@/server/rateLimit";
 
 const ALLOWED_DEMO_DOMAIN = "oku.local";
 
@@ -29,6 +30,16 @@ export async function GET(req: NextRequest) {
       { status: 403 },
     );
   }
+
+  // This endpoint creates a session. Limit attempts before looking up an
+  // address so demo users cannot be enumerated or mass-signed-in from one IP.
+  const rateLimit = await checkRateLimitAsync({
+    key: `demo-login:${clientIp(req)}`,
+    limit: 10,
+    windowMs: 15 * 60_000,
+    requireDistributed: true,
+  });
+  if (!rateLimit.ok) return rateLimitedResponse(rateLimit);
 
   const { searchParams } = req.nextUrl;
   const email = searchParams.get("email") ?? "";

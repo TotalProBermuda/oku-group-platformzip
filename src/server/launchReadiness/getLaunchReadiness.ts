@@ -306,6 +306,28 @@ function checkDemoModeOff(): ReadinessGate {
   });
 }
 
+function checkRedisForRateLimiting(): ReadinessGate {
+  if (envPresent("REDIS_URL")) {
+    return gate({
+      name: "environment.redis_rate_limit",
+      category: "environment",
+      label: "REDIS_URL set for distributed rate limiting",
+      status: "pass",
+      severity: "blocking",
+      remediation: "OK",
+    });
+  }
+  return gate({
+    name: "environment.redis_rate_limit",
+    category: "environment",
+    label: "REDIS_URL set for distributed rate limiting",
+    status: "fail",
+    severity: "blocking",
+    remediation:
+      "Set REDIS_URL to the production Redis service. Authentication and public chat writes fail closed without shared rate limiting.",
+  });
+}
+
 async function checkResend(): Promise<ReadinessGate> {
   try {
     const r = await getResendClient();
@@ -464,6 +486,7 @@ export async function getLaunchReadiness(): Promise<LaunchReadinessSnapshot> {
   const gates: ReadinessGate[] = [
     checkNodeEnv(),
     checkDemoModeOff(),
+    checkRedisForRateLimiting(),
     checkEnvVar({
       name: "environment.database_url",
       varName: "DATABASE_URL",

@@ -41,12 +41,31 @@ export interface RateLimitOptions {
   key: string;
   limit: number;
   windowMs: number;
+  /** In production, reject instead of silently falling back to per-instance memory. */
+  requireDistributed?: boolean;
 }
 
 export interface RateLimitResult {
   ok: boolean;
   retryAfterSeconds?: number;
   remaining: number;
+  unavailable?: boolean;
+}
+
+/** Build the standard rate-limit response for routes that do not accept a body. */
+export function rateLimitedResponse(result: RateLimitResult): Response {
+  return Response.json(
+    {
+      ok: false,
+      error: result.unavailable
+        ? "Request protection is temporarily unavailable. Please try again shortly."
+        : "Too many requests. Please try again shortly.",
+    },
+    {
+      status: result.unavailable ? 503 : 429,
+      headers: { "Retry-After": String(result.retryAfterSeconds ?? 60) },
+    },
+  );
 }
 
 function checkRateLimitInMemory(opts: RateLimitOptions): RateLimitResult {
@@ -90,12 +109,21 @@ async function checkRateLimitRedis(client: IORedis, opts: RateLimitOptions): Pro
 
 export async function checkRateLimitAsync(opts: RateLimitOptions): Promise<RateLimitResult> {
   const client = getRedis();
-  if (!client) return checkRateLimitInMemory(opts);
+  const mustBeDistributed = opts.requireDistributed && process.env.NODE_ENV === "production";
+  if (!client) {
+    return mustBeDistributed
+      ? { ok: false, retryAfterSeconds: 60, remaining: 0, unavailable: true }
+      : checkRateLimitInMemory(opts);
+  }
   try {
     return await checkRateLimitRedis(client, opts);
   } catch {
-    // Fail open to in-memory rather than failing the request.
-    return checkRateLimitInMemory(opts);
+    // Authentication and public-chat limits must not become per-instance in a
+    // production fleet when Redis is unavailable. Local/dev still has the
+    // in-memory fallback for a usable developer experience.
+    return mustBeDistributed
+      ? { ok: false, retryAfterSeconds: 60, remaining: 0, unavailable: true }
+      : checkRateLimitInMemory(opts);
   }
 }
 
@@ -152,7 +180,7 @@ export function gatePublicPost(
   req: Request,
   body: unknown,
   routeKey: string,
-  opts: { limit?: number; windowMs?: number; botSuccessBody?: unknown } = {},
+  opts: { limit?: number; windowMs?: number; botSuccessBody?: unknown; requireDistributed?: boolean } = {},
 ): { ok: true } | { ok: false; response: Response } {
   const limit = opts.limit ?? 10;
   const windowMs = opts.windowMs ?? 60_000;
@@ -165,10 +193,7 @@ export function gatePublicPost(
   if (!r.ok) {
     return {
       ok: false,
-      response: Response.json(
-        { ok: false, error: "Too many requests. Please try again shortly." },
-        { status: 429, headers: { "Retry-After": String(r.retryAfterSeconds ?? 60) } },
-      ),
+      response: rateLimitedResponse(r),
     };
   }
   return { ok: true };
@@ -180,7 +205,13 @@ export async function gatePublicPostAsync(
   req: Request,
   body: unknown,
   routeKey: string,
-  opts: { limit?: number; windowMs?: number; botSuccessBody?: unknown } = {},
+  opts: {
+    limit?: number;
+    windowMs?: number;
+    botSuccessBody?: unknown;
+    /** Fail closed in production when the shared Redis limiter is unavailable. */
+    requireDistributed?: boolean;
+  } = {},
 ): Promise<{ ok: true } | { ok: false; response: Response }> {
   const limit = opts.limit ?? 10;
   const windowMs = opts.windowMs ?? 60_000;
@@ -189,14 +220,16 @@ export async function gatePublicPostAsync(
     return { ok: false, response: Response.json(opts.botSuccessBody ?? { ok: true }) };
   }
 
-  const r = await checkRateLimitAsync({ key: `${routeKey}:${clientIp(req)}`, limit, windowMs });
+  const r = await checkRateLimitAsync({
+    key: `${routeKey}:${clientIp(req)}`,
+    limit,
+    windowMs,
+    requireDistributed: opts.requireDistributed,
+  });
   if (!r.ok) {
     return {
       ok: false,
-      response: Response.json(
-        { ok: false, error: "Too many requests. Please try again shortly." },
-        { status: 429, headers: { "Retry-After": String(r.retryAfterSeconds ?? 60) } },
-      ),
+      response: rateLimitedResponse(r),
     };
   }
   return { ok: true };
