@@ -431,6 +431,65 @@ tr:last-child td { border-bottom: none; }
   padding-right: var(--admin-gutter);
 }
 
+/* ── Admin nav grouped dropdowns ─────────────────────────────────────────── */
+.admin-nav-group-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 14px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px; /* sit flush on the border-bottom of the nav container */
+}
+.admin-nav-group-btn:hover,
+.admin-nav-group-btn[data-active="true"] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary);
+}
+
+.admin-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 0;
+  z-index: 200;
+  background: var(--layer-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.10);
+  min-width: 190px;
+  padding: 6px 0;
+}
+
+.admin-nav-dropdown-item {
+  display: block;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+.admin-nav-dropdown-item:hover {
+  background: var(--layer-2);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.admin-nav-dropdown-item.active {
+  color: var(--color-primary);
+  font-weight: 600;
+  background: var(--layer-2);
+}
+
 @media (max-width: 1023px) {
   .admin-shell-container,
   .admin-nav-container { --admin-gutter: 24px; }
