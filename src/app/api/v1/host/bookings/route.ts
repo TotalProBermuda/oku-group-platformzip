@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await requireSession();
+    const { userId, roles } = await requireSession();
+    const isHost = roles.some((role) =>
+      ["SUPERADMIN", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "STREETSIDE_HOST"].includes(role),
+    );
+    if (!isHost) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     const body = await req.json();
 
     const {
