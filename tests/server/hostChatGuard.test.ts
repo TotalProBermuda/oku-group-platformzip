@@ -10,7 +10,12 @@ vi.mock("@/lib/prisma", () => ({
   prisma: { restaurantHostProfile: { findUnique: mocks.findUnique } },
 }));
 
-import { assertHostChatVenue, requireHostChatAccess } from "@/server/auth/hostChatGuard";
+import {
+  assertHostCanManageChatSession,
+  assertHostChatVenue,
+  requireHostBookingAccess,
+  requireHostChatAccess,
+} from "@/server/auth/hostChatGuard";
 
 describe("host chat access guard", () => {
   beforeEach(() => {
@@ -41,5 +46,35 @@ describe("host chat access guard", () => {
     mocks.requireSession.mockResolvedValue({ userId: "admin-1", roles: ["SUPERADMIN"] });
     await expect(requireHostChatAccess()).resolves.toMatchObject({ isSuperadmin: true, venueId: null });
     expect(mocks.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("allows a Streetside host only when that host has a venue profile", async () => {
+    mocks.requireSession.mockResolvedValue({ userId: "street-1", roles: ["STREETSIDE_HOST"] });
+    mocks.findUnique.mockResolvedValue({ venueId: "venue-a" });
+    await expect(requireHostBookingAccess()).resolves.toMatchObject({
+      userId: "street-1",
+      venueId: "venue-a",
+      isSuperadmin: false,
+    });
+  });
+
+  it("does not treat a Streetside host as a chat operator", async () => {
+    mocks.requireSession.mockResolvedValue({ userId: "street-1", roles: ["STREETSIDE_HOST"] });
+    await expect(requireHostChatAccess()).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("prevents a normal host from changing a chat claimed by another host", async () => {
+    mocks.requireSession.mockResolvedValue({ userId: "host-1", roles: ["RESTAURANT_HOST"] });
+    mocks.findUnique.mockResolvedValue({ venueId: "venue-a" });
+    const access = await requireHostChatAccess();
+    expect(() => assertHostCanManageChatSession(access, "host-2")).toThrow(/Forbidden/);
+    expect(() => assertHostCanManageChatSession(access, null)).not.toThrow();
+  });
+
+  it("allows a restaurant supervisor to manage a venue chat claimed by another host", async () => {
+    mocks.requireSession.mockResolvedValue({ userId: "supervisor-1", roles: ["RESTAURANT_SUPERVISOR"] });
+    mocks.findUnique.mockResolvedValue({ venueId: "venue-a" });
+    const access = await requireHostChatAccess();
+    expect(() => assertHostCanManageChatSession(access, "host-2")).not.toThrow();
   });
 });

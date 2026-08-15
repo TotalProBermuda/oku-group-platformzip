@@ -2,14 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { createStreetsideBooking } from "@/server/host/hostService";
 import { prisma } from "@/lib/prisma";
+import { requireHostBookingAccess } from "@/server/auth/hostChatGuard";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, roles } = await requireSession();
-    const isHost = roles.some((role) =>
-      ["SUPERADMIN", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "STREETSIDE_HOST"].includes(role),
-    );
-    if (!isHost) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    const access = await requireHostBookingAccess();
     const body = await req.json();
 
     const {
@@ -32,11 +29,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "guestName, guestEmail, and partySize are required" }, { status: 400 });
     }
 
-    const venue = await prisma.venue.findFirst({
-      where: venueSlug ? { slug: venueSlug } : undefined,
-    });
+    const venue = access.isSuperadmin
+      ? await prisma.venue.findFirst({ where: venueSlug ? { slug: venueSlug } : undefined })
+      : await prisma.venue.findUnique({ where: { id: access.venueId! } });
     if (!venue) {
       return NextResponse.json({ error: "Venue not found" }, { status: 404 });
+    }
+    if (!access.isSuperadmin && venueSlug && venue.slug !== venueSlug) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const reservation = await createStreetsideBooking({
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       occasion: occasion ?? null,
       notes: notes ?? null,
       requestedTime: requestedTime ?? null,
-      sourceUserId: userId,
+      sourceUserId: access.userId,
     });
 
     return NextResponse.json({ ok: true, data: reservation }, { status: 201 });
@@ -64,35 +64,13 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   try {
     const { userId, roles } = await requireSession();
-    const isRestaurantStaff = roles.some(r => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"].includes(r));
-    const isSuperAdmin = roles.includes("SUPERADMIN");
-
-    // Resolve venue — RESTAURANT_HOST and RESTAURANT_SUPERVISOR must have a profile
-    // to avoid cross-venue data disclosure. SUPERADMIN falls back to the first venue.
-    let venueId: string | null = null;
-    if (isSuperAdmin) {
-      const venue = await prisma.venue.findFirst({ select: { id: true } });
-      venueId = venue?.id ?? null;
-    } else if (isRestaurantStaff) {
-      const profile = await prisma.restaurantHostProfile.findUnique({
-        where: { userId },
-        select: { venueId: true },
-      });
-      if (!profile?.venueId) {
-        return NextResponse.json(
-          { ok: false, error: "Forbidden: no host profile associated with your account" },
-          { status: 403 }
-        );
-      }
-      venueId = profile.venueId;
-    } else {
-      // STREETSIDE_HOST and others: fall back to first venue (host their own bookings only)
-      const venue = await prisma.venue.findFirst({ select: { id: true } });
-      venueId = venue?.id ?? null;
-    }
+    const access = await requireHostBookingAccess();
+    const venueId = access.isSuperadmin
+      ? (await prisma.venue.findFirst({ select: { id: true } }))?.id ?? null
+      : access.venueId;
     if (!venueId) return NextResponse.json({ ok: true, data: [] });
 
-    const isAdmin = isSuperAdmin || isRestaurantStaff;
+    const isAdmin = access.isSuperadmin || roles.some(r => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"].includes(r));
 
     const reservations = await prisma.reservation.findMany({
       where: isAdmin

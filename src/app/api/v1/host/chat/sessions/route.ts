@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
+import { requireHostChatAccess } from "@/server/auth/hostChatGuard";
+import { gatePublicPostAsync } from "@/server/rateLimit";
 
 export async function GET() {
   try {
-    const { userId, roles } = await requireSession();
-    const isHost = roles.some((r) =>
-      ["SUPERADMIN", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "STREETSIDE_HOST"].includes(r)
-    );
-    if (!isHost) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-
-    const venue = await prisma.venue.findFirst();
+    const access = await requireHostChatAccess();
+    const venue = access.isSuperadmin
+      ? await prisma.venue.findFirst({ select: { id: true } })
+      : { id: access.venueId! };
     if (!venue) return NextResponse.json({ ok: true, data: [] });
 
     const sessions = await prisma.hostChatSession.findMany({
@@ -37,10 +35,16 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { guestName, guestPhone, guestEmail, language, reservationId } = body;
+    const body = await req.json().catch(() => ({}));
+    const gate = await gatePublicPostAsync(req, body, "public-host-chat-session", {
+      limit: 5,
+      windowMs: 10 * 60_000,
+      requireDistributed: true,
+    });
+    if (!gate.ok) return gate.response;
+    const { guestName, guestPhone, guestEmail, language } = body;
 
-    if (!guestName) {
+    if (typeof guestName !== "string" || !guestName.trim() || guestName.trim().length > 120) {
       return NextResponse.json({ ok: false, error: "guestName required" }, { status: 400 });
     }
 
@@ -49,12 +53,11 @@ export async function POST(req: NextRequest) {
 
     const session = await prisma.hostChatSession.create({
       data: {
-        guestName,
-        guestPhone: guestPhone ?? null,
-        guestEmail: guestEmail ?? null,
-        language: language ?? "en",
+        guestName: guestName.trim(),
+        guestPhone: typeof guestPhone === "string" ? guestPhone.slice(0, 40) : null,
+        guestEmail: typeof guestEmail === "string" ? guestEmail.slice(0, 254) : null,
+        language: language === "es" || language === "pt" ? language : "en",
         venueId: venue.id,
-        reservationId: reservationId ?? null,
         status: "OPEN",
       },
     });
@@ -64,8 +67,8 @@ export async function POST(req: NextRequest) {
         sessionId: session.id,
         senderRole: "BOT",
         content: language === "es"
-          ? `¡Hola ${guestName}! ¿En qué le puedo ayudar? Un anfitrión se unirá pronto.`
-          : `Hi ${guestName}! A host will join you shortly. How can we help?`,
+          ? `¡Hola ${guestName.trim()}! ¿En qué le puedo ayudar? Un anfitrión se unirá pronto.`
+          : `Hi ${guestName.trim()}! A host will join you shortly. How can we help?`,
       },
     });
 

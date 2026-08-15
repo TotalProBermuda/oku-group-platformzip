@@ -30,7 +30,9 @@ async function callInvuList(
   });
   const text = await res.text().catch(() => "");
   if (!res.ok) {
-    throw new Error(`INVU ${method} failed (${res.status}): ${text.slice(0, 300)}`);
+    // Provider errors can contain credentials, tokens, order details, or raw
+    // customer data. Retain only the operation and HTTP status in any error.
+    throw new Error(`INVU ${method} failed (${res.status})`);
   }
   let parsed: unknown = text;
   try { parsed = JSON.parse(text); } catch { /* keep as text */ }

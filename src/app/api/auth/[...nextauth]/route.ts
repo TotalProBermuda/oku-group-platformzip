@@ -14,6 +14,7 @@ export async function POST(req: NextRequest, context: { params: { nextauth: stri
     key: `nextauth-post:${clientIp(req)}`,
     limit: 30,
     windowMs: 60_000,
+    requireDistributed: true,
   });
   if (!rateLimit.ok) return rateLimitedResponse(rateLimit);
   return handler(req, context);

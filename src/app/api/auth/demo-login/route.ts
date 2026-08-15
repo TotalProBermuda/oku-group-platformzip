@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
     key: `demo-login:${clientIp(req)}`,
     limit: 10,
     windowMs: 15 * 60_000,
+    requireDistributed: true,
   });
   if (!rateLimit.ok) return rateLimitedResponse(rateLimit);
 
