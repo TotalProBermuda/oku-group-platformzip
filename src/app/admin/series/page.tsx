@@ -9,6 +9,7 @@ import ActionMenu, { ActionItem } from "@/components/entities/ActionMenu";
 import { useEntityDrawer } from "@/hooks/useEntityDrawer";
 import EntityDrawerHost from "@/components/drawers/EntityDrawerHost";
 import { Search, Plus } from "lucide-react";
+import { seriesLocationLabel } from "@/lib/locations";
 
 function SeriesPageContent() {
   const t = useTranslation();
@@ -23,7 +24,9 @@ function SeriesPageContent() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ slug: "", title: "", hostType: "OKU", venue: "OKU" });
+  const [venues, setVenues] = useState<any[]>([]);
+  const [spaces, setSpaces] = useState<any[]>([]);
+  const [form, setForm] = useState({ slug: "", title: "", hostType: "OKU", venueId: "", spaceId: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const load = () => {
@@ -35,6 +38,14 @@ function SeriesPageContent() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    Promise.all([fetch("/api/v1/admin/venues").then((r) => r.json()), fetch("/api/v1/admin/spaces").then((r) => r.json())])
+      .then(([venueResponse, spaceResponse]) => {
+        const nextVenues = venueResponse.venues ?? [];
+        setVenues(nextVenues); setSpaces(spaceResponse.data ?? []);
+        if (nextVenues.length === 1) setForm((current) => ({ ...current, venueId: current.venueId || nextVenues[0].id }));
+      }).catch(() => {});
+  }, []);
 
   const filtered = useMemo(() => {
     return series.filter((s) => {
@@ -55,7 +66,7 @@ function SeriesPageContent() {
     const d = await res.json();
     if (d.ok) {
       setShowForm(false);
-      setForm({ slug: "", title: "", hostType: "OKU", venue: "OKU" });
+      setForm({ slug: "", title: "", hostType: "OKU", venueId: venues.length === 1 ? venues[0].id : "", spaceId: "" });
       load();
     }
     setSubmitting(false);
@@ -139,7 +150,7 @@ function SeriesPageContent() {
       width: "90px",
       render: (s) => (
         <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-          {s.venue || "—"}
+          {seriesLocationLabel(s) || "—"}
         </span>
       ),
     },
@@ -268,21 +279,28 @@ function SeriesPageContent() {
               </select>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">{t("admin", "venue")}</label>
+              <label className="form-label">Operational venue</label>
               <select
                 className="form-input"
-                value={form.venue}
-                onChange={(e) => setForm({ ...form, venue: e.target.value })}
+                value={form.venueId}
+                onChange={(e) => setForm({ ...form, venueId: e.target.value, spaceId: "" })}
               >
-                <option value="OKU">OKÜ</option>
-                <option value="CATCH">CATCH</option>
+                <option value="">Select a venue</option>
+                {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Physical space <span style={{ fontWeight: 400 }}>(optional)</span></label>
+              <select className="form-input" value={form.spaceId} onChange={(e) => setForm({ ...form, spaceId: e.target.value })} disabled={!form.venueId}>
+                <option value="">Entire venue — no physical space assigned</option>
+                {spaces.filter((space) => space.venueId === form.venueId && space.isActive).map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
               </select>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               className="btn btn-primary btn-sm"
-              disabled={submitting || !form.title || !form.slug}
+              disabled={submitting || !form.title || !form.slug || !form.venueId}
               onClick={handleCreate}
             >
               {submitting ? t("admin", "creating") : t("admin", "createSeries")}

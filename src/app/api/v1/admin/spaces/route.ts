@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
+import { normalizeSpaceConceptKey } from "@/lib/locations";
 
 const ADMIN_ROLES = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"];
 function isSpacesAdmin(roles: string[]) {
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { venueId, name, capacity, reservable, requiresApproval, weatherSensitive, sortOrder } = body;
+  const { venueId, name, conceptKey, capacity, reservable, requiresApproval, weatherSensitive, sortOrder } = body;
 
   if (!venueId || !name || capacity == null) {
     return NextResponse.json({ ok: false, error: "venueId, name, and capacity are required" }, { status: 400 });
@@ -53,6 +54,8 @@ export async function POST(req: NextRequest) {
   if (typeof capacity !== "number" || capacity < 1) {
     return NextResponse.json({ ok: false, error: "capacity must be a positive number" }, { status: 400 });
   }
+  const normalizedConceptKey = normalizeSpaceConceptKey(conceptKey || name);
+  if (!normalizedConceptKey) return NextResponse.json({ ok: false, error: "A valid operational key is required" }, { status: 400 });
 
   // Check venue exists
   const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { id: true } });
@@ -63,6 +66,7 @@ export async function POST(req: NextRequest) {
       data: {
         venueId,
         name,
+        conceptKey: normalizedConceptKey,
         capacity: Number(capacity),
         reservable: reservable ?? true,
         requiresApproval: requiresApproval ?? false,

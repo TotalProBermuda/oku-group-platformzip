@@ -4,6 +4,7 @@ import { isValidLocale } from "@/i18n/config";
 import { localePath } from "@/i18n/utils";
 import { getSeriesContent } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
+import { seriesLocationLabel } from "@/lib/locations";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
@@ -104,16 +105,17 @@ function SeriesCard({ series, locale, c }: { series: any; locale: Locale; c: Rec
   const content = getSeriesContent(series.slug, locale);
   const title = content?.title ?? series.title;
   const description = content?.description ?? series.description;
+  const locationLabel = seriesLocationLabel(series);
 
   return (
     <Link href={localePath(locale, `/series/${series.slug}`)} className="series-card" style={{ textDecoration: "none" }}>
       <div className="series-card-image" style={{ background: venueGradients[series.venue] ?? venueGradients.OKU, position: "relative" }}>
         <span style={{ fontFamily: "var(--font-heading)", fontSize: 52, color: "rgba(255,255,255,0.07)", fontWeight: 400, letterSpacing: "-0.02em", userSelect: "none" }}>
-          {series.venue === "CATCH" ? "CATCH" : "OKÜ"}
+          {locationLabel ?? "OKÜ"}
         </span>
         <div style={{ position: "absolute", top: 12, right: 12 }}>
-          {series.venue && (
-            <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>{series.venue}</span>
+          {locationLabel && (
+            <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>{locationLabel}</span>
           )}
         </div>
       </div>

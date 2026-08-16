@@ -75,6 +75,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       description: original.description,
       category: original.category,
       venue: original.venue,
+      venueId: original.venueId,
+      spaceId: original.spaceId,
       hostType: original.hostType,
       city: original.city,
       country: original.country,

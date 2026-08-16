@@ -13,6 +13,7 @@
 import { prisma } from "@/lib/prisma";
 import type { CapacityHoldStatus } from "@prisma/client";
 import { emitLedgerEvent } from "@/server/services/ledger/ledgerEventService";
+import { assertNoBlockingOccupancy } from "@/server/events/eventOccupancyService";
 
 export const DEFAULT_DURATION_MINUTES = 120;
 
@@ -372,7 +373,7 @@ export async function assignSpace(opts: {
     // ── Re-read reservation under lock ─────────────────────────────────────
     const reservation = await tx.reservation.findUniqueOrThrow({
       where: { id: reservationId },
-      select: { partySize: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true, status: true },
+      select: { partySize: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true, status: true, venueId: true },
     });
 
     // Invariant: reservation must not be terminal
@@ -402,6 +403,15 @@ export async function assignSpace(opts: {
     const endAt = new Date(
       startAt.getTime() + (reservation.durationMinutes ?? DEFAULT_DURATION_MINUTES) * 60_000
     );
+
+    // Host assignment is a write path too: it must obey the same event/buyout
+    // rules as public bookings, even when a manager is moving an existing guest.
+    await assertNoBlockingOccupancy(tx, {
+      venueId: reservation.venueId,
+      spaceId: newSpaceId,
+      startAt,
+      endAt,
+    });
 
     // ── Capacity check under space advisory lock ────────────────────────────
     capacity = space.capacity;

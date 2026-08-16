@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTranslation } from "@/components/i18n/LocaleProvider";
+import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
 
 export type ConceptKey = "OKU" | "CATCH" | "TERRACE" | "";
 export type VisitorType = "Resident" | "Frequent Panama Visitor" | "Visitor" | "";
@@ -33,6 +33,7 @@ type SpaceOption = {
   requiresApproval: boolean;
   weatherSensitive: boolean;
   conceptKey: string;
+  eventConflict: null | { kind: "PUBLIC_EVENT" | "PRIVATE_BLOCK"; title?: string; imageUrl?: string | null; href?: string; message: string };
 };
 
 type Props = {
@@ -153,6 +154,7 @@ export function GuestBookingForm({
   venueSlug = "gold-house",
 }: Props) {
   const t = useTranslation();
+  const locale = useLocale();
 
   const [form, setForm] = useState<GuestBookingFormData & { customPartySize: string }>(
     makeEmptyForm(initialConcept, lockedConcept)
@@ -187,6 +189,7 @@ export function GuestBookingForm({
       date: form.reservationDate,
       time: form.reservationTime,
       partySize: String(form.partySize),
+      locale,
     });
     fetch(`/api/v1/spaces/available?${qs}`)
       .then(r => (r.ok ? r.json() : Promise.reject()))
@@ -206,7 +209,7 @@ export function GuestBookingForm({
       });
 
     return () => { cancelled = true; };
-  }, [showDateTimePicker, form.reservationDate, form.reservationTime, form.partySize, venueSlug]);
+  }, [showDateTimePicker, form.reservationDate, form.reservationTime, form.partySize, venueSlug, locale, t]);
 
   const conceptIsLocked = lockedConcept !== null && lockedConcept !== undefined;
   const visibleConcepts = conceptIsLocked
@@ -470,7 +473,9 @@ export function GuestBookingForm({
                     const statusBg = avail
                       ? (space.requiresApproval ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.12)")
                       : (space.requiresApproval ? "rgba(248,113,113,0.12)" : "rgba(245,158,11,0.12)");
-                    const statusText = avail
+                    const statusText = space.eventConflict
+                      ? space.eventConflict.message
+                      : avail
                       ? (space.requiresApproval
                           ? (t("host", "streetForm.spaceRequestThis") as string)
                           : `${space.available} ${t("host", "streetForm.spaceAvailableCovers") as string}`)
@@ -528,6 +533,24 @@ export function GuestBookingForm({
                   })}
                 </div>
               )}
+
+              {/* A same-venue event can make one area unavailable while other
+                  physical spaces remain bookable. Keep those alternatives in
+                  place and show a small, privacy-safe event card rather than
+                  sending the guest through a dead end. */}
+              {!spacesLoading && !spacesError && (() => {
+                const event = spaces.find((space) => space.eventConflict)?.eventConflict;
+                return event ? (
+                  <div role="status" style={{ marginTop: 10, padding: 12, borderRadius: 12, background: "rgba(200,169,110,0.08)", border: "1px solid rgba(200,169,110,0.28)", display: "flex", gap: 10, alignItems: "center" }}>
+                    {event.imageUrl && <img src={event.imageUrl} alt="" style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      {event.title && <div style={{ color: "#fff", fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{event.title}</div>}
+                      <div style={{ color: "#d1d5db", fontSize: 12, lineHeight: 1.35, marginTop: event.title ? 3 : 0 }}>{event.message}</div>
+                      {event.href && <a href={event.href} style={{ display: "inline-block", color: "#c8a96e", fontSize: 12, fontWeight: 800, marginTop: 6 }}>View event</a>}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
 
               {/* ── Full-capacity fallback ─────────────────────────── */}
               {!spacesLoading && !spacesError && spaces.length > 0 &&

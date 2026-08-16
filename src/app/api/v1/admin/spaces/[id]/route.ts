@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
+import { normalizeSpaceConceptKey } from "@/lib/locations";
 
 const ADMIN_ROLES = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"];
 function isSpacesAdmin(roles: string[]) {
@@ -55,13 +56,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json();
-  const { name, capacity, reservable, requiresApproval, weatherSensitive, sortOrder, isActive, depositRequiredCents } = body;
+  const { name, conceptKey, capacity, reservable, requiresApproval, weatherSensitive, sortOrder, isActive, depositRequiredCents } = body;
 
   const existing = await prisma.restaurantSpace.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ ok: false, error: "Space not found" }, { status: 404 });
 
   const update: Record<string, unknown> = {};
   if (name !== undefined) update.name = name;
+  if (conceptKey !== undefined) {
+    const normalized = normalizeSpaceConceptKey(conceptKey);
+    if (!normalized) return NextResponse.json({ ok: false, error: "A valid operational key is required" }, { status: 400 });
+    update.conceptKey = normalized;
+  }
   if (capacity !== undefined) {
     if (typeof capacity !== "number" || capacity < 1)
       return NextResponse.json({ ok: false, error: "capacity must be a positive number" }, { status: 400 });

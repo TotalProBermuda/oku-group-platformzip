@@ -15,14 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getHeldCovers, DEFAULT_DURATION_MINUTES } from "@/server/spaces/capacityService";
-
-/** Derive a Zone conceptKey from a RestaurantSpace name. */
-function deriveConceptKey(spaceName: string): string {
-  const lower = spaceName.toLowerCase();
-  if (lower.includes("catch")) return "CATCH";
-  if (lower.includes("terrace")) return "TERRACE";
-  return "OKU"; // OKÜ Dining Room, VIP, or any unlabelled space
-}
+import { findBlockingOccupancy } from "@/server/events/eventOccupancyService";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -30,6 +23,7 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get("date");        // YYYY-MM-DD
   const time = searchParams.get("time");        // HH:MM
   const partySize = Math.max(1, parseInt(searchParams.get("partySize") ?? "2", 10));
+  const locale = searchParams.get("locale") ?? "en";
 
   if (!date || !time) {
     return NextResponse.json(
@@ -60,6 +54,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true,
       name: true,
+      conceptKey: true,
       capacity: true,
       requiresApproval: true,
       weatherSensitive: true,
@@ -69,7 +64,10 @@ export async function GET(req: NextRequest) {
   // Compute availability in parallel — same overlap formula as capacityService
   const result = await Promise.all(
     spaces.map(async (s) => {
-      const held = await getHeldCovers(s.id, startAt, endAt);
+      const [held, occupancy] = await Promise.all([
+        getHeldCovers(s.id, startAt, endAt),
+        findBlockingOccupancy(prisma, { venueId: venue.id, spaceId: s.id, startAt, endAt, locale }),
+      ]);
       const available = s.capacity - held;
       return {
         id: s.id,
@@ -77,11 +75,15 @@ export async function GET(req: NextRequest) {
         capacity: s.capacity,
         held,
         available: Math.max(0, available),
-        isAvailable: available >= partySize,
+        // Event/buyout occupancy always wins over ordinary dining capacity.
+        isAvailable: !occupancy && available >= partySize,
         requiresApproval: s.requiresApproval,
         weatherSensitive: s.weatherSensitive,
-        /** Derived from space name — used by the frontend to set conceptRequested. */
-        conceptKey: deriveConceptKey(s.name),
+        /** Stable data key used by the booking flow and POS mapping. */
+        conceptKey: s.conceptKey,
+        // Safe public descriptor only. Private events never expose their title,
+        // image, URL, ticket status, or any reservation/customer data.
+        eventConflict: occupancy?.card ?? null,
       };
     })
   );

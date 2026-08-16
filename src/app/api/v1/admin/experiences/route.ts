@@ -18,6 +18,8 @@ export async function GET(_req: NextRequest) {
       sessions: { orderBy: { startsAt: "asc" } },
       experienceInfluencer: { include: { influencer: { select: { displayName: true, handle: true } } } },
       addons: { where: { isActive: true } },
+      operationalVenue: { select: { id: true, name: true, slug: true } },
+      eventSpace: { select: { id: true, name: true, conceptKey: true } },
       _count: { select: { Order: true, waitlists: true } },
     },
   });
@@ -30,15 +32,19 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const { slug, title, subtitle, description, category, venue, hostType, city, country, venueAddress,
-          heroImageUrl, capacityTotal, availableSeatsMode, attendeeListMode, showCountdown, countdownLabel,
+          heroImageUrl, capacityTotal, availableSeatsMode, attendeeListMode, showCountdown, countdownLabel, venueId, spaceId,
           publicReleaseAt, earlyReleaseAt, newsletterCaptureEnabled, waitlistEnabled, membershipRuleMode,
           isFeatured, seoTitle, seoDescription, startsAt, endsAt } = body;
 
-  if (!slug || !title || !hostType) return NextResponse.json({ error: "slug, title, hostType required" }, { status: 400 });
+  if (!slug || !title || !hostType || !venueId) return NextResponse.json({ error: "slug, title, hostType, venueId required" }, { status: 400 });
+  const operationalVenue = await prisma.venue.findUnique({ where: { id: venueId }, select: { id: true } });
+  if (!operationalVenue) return NextResponse.json({ error: "Venue not found" }, { status: 404 });
+  const eventSpace = spaceId ? await prisma.restaurantSpace.findFirst({ where: { id: spaceId, venueId, isActive: true }, select: { conceptKey: true } }) : null;
+  if (spaceId && !eventSpace) return NextResponse.json({ error: "Space must belong to the selected venue" }, { status: 400 });
 
   const series = await prisma.series.create({
     data: {
-      slug, title, subtitle, description, category, venue: venue ?? undefined, hostType,
+      slug, title, subtitle, description, category, venue: eventSpace?.conceptKey === "OKU" || eventSpace?.conceptKey === "CATCH" ? eventSpace.conceptKey : undefined, venueId, spaceId: spaceId ?? null, hostType,
       city, country, venueAddress, heroImageUrl,
       capacityTotal: capacityTotal ?? 0,
       availableSeatsMode: availableSeatsMode ?? "HIDDEN",

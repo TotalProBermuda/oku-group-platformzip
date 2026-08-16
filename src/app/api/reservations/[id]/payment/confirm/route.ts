@@ -48,6 +48,7 @@ import {
   DEFAULT_DURATION_MINUTES,
   FAR_FUTURE_EXPIRY,
 } from "@/server/spaces/capacityService";
+import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
 
 const Body = z.object({
   paymentIntentId: z.string(),
@@ -149,8 +150,11 @@ export async function POST(
     // This covers the common case; a second check runs post-auth to close the
     // narrow race window between this transaction's commit and the hold write.
     if (spaceId) {
-      const spaceAvailable = await prisma.$transaction(async (tx) => {
+      let spaceAvailable: boolean;
+      try {
+        spaceAvailable = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${spaceId}))`;
+        await assertNoBlockingOccupancy(tx, { venueId: reservation.venueId, spaceId, startAt, endAt });
         const competingHolds = await tx.capacityHold.findMany({
           where: {
             spaceId,
@@ -169,7 +173,13 @@ export async function POST(
         const available = (spaceRow?.capacity ?? 0) - heldCovers;
         // requiresApproval spaces bypass capacity — they queue for host review
         return available >= reservation.partySize || requiresApproval;
-      });
+        });
+      } catch (err) {
+        if (err instanceof EventOccupancyConflictError) {
+          return NextResponse.json({ error: err.card.message, code: "EVENT_UNAVAILABLE", eventConflict: err.card }, { status: 409 });
+        }
+        throw err;
+      }
 
       if (!spaceAvailable) {
         return NextResponse.json(
@@ -210,6 +220,7 @@ export async function POST(
     // create capacity hold (CONFIRMED path), emit ledger events.
     // The advisory lock is re-acquired here to close the race window.
     let spaceFullPostAuth = false;
+    let eventConflictPostAuth: EventOccupancyConflictError | null = null;
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -229,6 +240,7 @@ export async function POST(
         // b. Re-acquire advisory lock + re-check capacity
         if (spaceId) {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${spaceId}))`;
+          await assertNoBlockingOccupancy(tx, { venueId: reservation.venueId, spaceId, startAt, endAt });
           const competingHolds = await tx.capacityHold.findMany({
             where: {
               spaceId,
@@ -309,12 +321,14 @@ export async function POST(
     } catch (txErr: any) {
       if (txErr?.message === "__SPACE_FULL_POST_AUTH__") {
         spaceFullPostAuth = true;
+      } else if (txErr instanceof EventOccupancyConflictError) {
+        eventConflictPostAuth = txErr;
       } else {
         throw txErr;
       }
     }
 
-    if (spaceFullPostAuth) {
+    if (spaceFullPostAuth || eventConflictPostAuth) {
       // Void the authorization OUTSIDE any transaction — the transaction above
       // already rolled back, so no void attempt inside it could have survived.
       try {
@@ -329,9 +343,12 @@ export async function POST(
         {
           ok: false,
           error:
-            "This space reached capacity between authorization and confirmation. " +
+          eventConflictPostAuth
+            ? `${eventConflictPostAuth.card.message} Your authorization will be voided and no charge will appear.`
+            : "This space reached capacity between authorization and confirmation. " +
             "Your authorization will be voided and no charge will appear.",
-          code: "SPACE_FULL",
+          code: eventConflictPostAuth ? "EVENT_UNAVAILABLE" : "SPACE_FULL",
+          ...(eventConflictPostAuth ? { eventConflict: eventConflictPostAuth.card } : {}),
         },
         { status: 409 },
       );

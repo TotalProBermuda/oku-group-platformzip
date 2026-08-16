@@ -112,6 +112,8 @@ export default function ReferralLandingPage() {
           ? tt("errorSpaceInvalid", "The selected space is not available for this venue.")
           : code === "SPACE_FULL"
             ? tt("errorSpaceFull", "This space is at full capacity for the selected time.")
+            : code === "EVENT_UNAVAILABLE"
+              ? (body?.eventConflict?.message || tt("errorEventUnavailable", "This area is unavailable because of an event. Please choose another dining area."))
             : body?.error || "Failed to submit reservation";
       return { ok: false, error: errorMsg };
     } catch (e: any) {

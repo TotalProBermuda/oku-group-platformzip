@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { seriesLocationLabel } from "@/lib/locations";
 
 async function getSeries() {
   const base = process.env.APP_BASE_URL || "http://localhost:5000";
@@ -102,6 +103,7 @@ export default async function SeriesPage() {
 }
 
 function PrivateShellCard({ series: s }: { series: any }) {
+  const locationLabel = seriesLocationLabel(s);
   return (
     <div
       className="series-card"
@@ -152,7 +154,7 @@ function PrivateShellCard({ series: s }: { series: any }) {
         </div>
         <div className="series-card-desc" style={{ color: "var(--color-text-muted)" }}>
           {s.startsAt ? new Date(s.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Date TBD"}
-          {s.venue && ` · ${s.venue}`}
+          {locationLabel && ` · ${locationLabel}`}
         </div>
         <div className="series-card-footer">
           <span style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>
@@ -170,16 +172,17 @@ function SeriesCard({ series: s }: { series: any }) {
   }
 
   const priceRange = getPriceRange(s.ticketTypes);
+  const locationLabel = seriesLocationLabel(s);
   return (
     <Link href={`/series/${s.slug}`} className="series-card">
       <div className="series-card-image" style={{ background: venueGradients[s.venue || "OKU"] }}>
         <span style={{ fontFamily: "var(--font-heading)", fontSize: 52, color: "rgba(255,255,255,0.07)", fontWeight: 400, letterSpacing: "-0.02em", userSelect: "none", position: "absolute" }}>
-          {s.venue === "CATCH" ? "CATCH" : "OKÜ"}
+          {locationLabel ?? "OKÜ"}
         </span>
         <div style={{ position: "absolute", top: 14, right: 14, display: "flex", gap: 6 }}>
-          {s.venue && (
+          {locationLabel && (
             <span className={`badge ${s.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>
-              {s.venue}
+              {locationLabel}
             </span>
           )}
           {s.hostType === "INFLUENCER" && (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
+import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
 
 export async function POST(req: NextRequest) {
   // Creating walk-in waitlist entries / attribution reservations is operational
@@ -25,6 +26,18 @@ export async function POST(req: NextRequest) {
     if (!venue) return NextResponse.json({ error: "Venue not found." }, { status: 500 });
 
     const zone = await prisma.zone.findFirst({ where: { venueId: venue.id, conceptKey: concept } });
+
+    // A whole-restaurant event blocks new walk-ins too. Space-specific events
+    // are handled later when the floor team assigns a physical space.
+    try {
+      const startAt = new Date();
+      await assertNoBlockingOccupancy(prisma, { venueId: venue.id, startAt, endAt: new Date(startAt.getTime() + 120 * 60_000) });
+    } catch (err) {
+      if (err instanceof EventOccupancyConflictError) {
+        return NextResponse.json({ error: err.card.message, code: "EVENT_UNAVAILABLE", eventConflict: err.card }, { status: 409 });
+      }
+      throw err;
+    }
 
     // Create waitlist entry or walk-in reservation
     const entry = await prisma.resWaitlistEntry.create({

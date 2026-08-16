@@ -13,6 +13,7 @@ import SeriesSponsorManager from "@/components/admin/SeriesSponsorManager";
 import SeriesInfluencerManager from "@/components/admin/SeriesInfluencerManager";
 import ReservationBlocksPanel from "@/components/admin/ReservationBlocksPanel";
 import SeriesMenusPanel from "@/components/admin/SeriesMenusPanel";
+import EventOccupancyPanel from "@/components/admin/EventOccupancyPanel";
 import MediaUpload from "@/components/ui/MediaUpload";
 
 const SECTION_TABS = [
@@ -31,6 +32,7 @@ const SECTION_TABS = [
   { id: "operators",         label: "Operators" },
   { id: "attendees",         label: "Attendees" },
   { id: "reservationBlocks", label: "Reservation Blocks" },
+  { id: "diningAvailability", label: "Dining Availability" },
   { id: "menus",             label: "Menus" },
   { id: "analytics",         label: "Analytics" },
 ];
@@ -50,6 +52,8 @@ export default function AdminExperienceEditPage() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateTitle, setDuplicateTitle] = useState("");
   const [duplicating, setDuplicating] = useState(false);
+  const [venues, setVenues] = useState<any[]>([]);
+  const [spaces, setSpaces] = useState<any[]>([]);
 
   const loadSeries = useCallback(async () => {
     const res = await fetch(`/api/v1/admin/experiences/${id}`);
@@ -60,6 +64,11 @@ export default function AdminExperienceEditPage() {
   }, [id]);
 
   useEffect(() => { loadSeries(); }, [loadSeries]);
+  useEffect(() => {
+    Promise.all([fetch("/api/v1/admin/venues").then((r) => r.json()), fetch("/api/v1/admin/spaces").then((r) => r.json())])
+      .then(([venueResponse, spaceResponse]) => { setVenues(venueResponse.venues ?? []); setSpaces(spaceResponse.data ?? []); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -244,7 +253,20 @@ export default function AdminExperienceEditPage() {
               {field("slug", t("admin", "url_slug") ?? "URL Slug")}
               {field("description", t("admin", "description") ?? "Description", "textarea", { rows: 6 })}
               {field("category", t("admin", "category") ?? "Category", "text", { options: ["Food & Drink", "Wellness", "Design & Art", "Music", "Business", "Community"] })}
-              {field("venue", t("admin", "venue") ?? "Venue", "text", { options: ["OKU", "CATCH"] })}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Operational venue</label>
+                <select value={form.venueId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, venueId: e.target.value, spaceId: "" }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                  <option value="">Select a venue</option>
+                  {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
+                </select>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Physical space (optional)</label>
+                <select value={form.spaceId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, spaceId: e.target.value || null }))} disabled={!form.venueId} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                  <option value="">Entire venue — no physical space assigned</option>
+                  {spaces.filter((space) => space.venueId === form.venueId && space.isActive).map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
+                </select>
+              </div>
               {field("city", t("admin", "city") ?? "City")}
               {field("country", t("admin", "country") ?? "Country")}
               {field("venueAddress", t("admin", "venue_address") ?? "Venue Address")}
@@ -409,6 +431,16 @@ export default function AdminExperienceEditPage() {
                 sessions={series.sessions ?? []}
               />
             </div>
+          )}
+
+          {tab === "diningAvailability" && (
+            <EventOccupancyPanel
+              seriesId={id}
+              venueId={series?.venueId}
+              seriesSpaceId={series?.spaceId}
+              spaces={spaces}
+              isPublished={series?.status === "PUBLISHED"}
+            />
           )}
 
           {tab === "operators" && (

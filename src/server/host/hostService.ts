@@ -7,7 +7,8 @@ import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService
 // Capacity hold lifecycle is handled inline in transitionStatus using the
 // prisma client directly so the mutations are atomic with the reservation update.
 // createCapacityHold / assignSpace are used by the dedicated assign-space route.
-import { FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
+import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
+import { assertNoBlockingOccupancy } from "@/server/events/eventOccupancyService";
 
 export const INCLUDE_FULL = {
   zone: true,
@@ -120,12 +121,21 @@ export async function createStreetsideBooking(data: {
   // Wrap reservation creation + durable outbox intent in one transaction so
   // the proof-trail intent and the business write commit atomically.
   const reservation = await prisma.$transaction(async (tx) => {
+    const startAt = data.requestedTime ? new Date(data.requestedTime) : new Date();
+    // A host-created request may not have a physical space yet, but it cannot
+    // be used to bypass a whole-restaurant exclusive event. Space-specific
+    // policy is enforced again at manual assignment.
+    await assertNoBlockingOccupancy(tx, {
+      venueId: data.venueId,
+      startAt,
+      endAt: new Date(startAt.getTime() + DEFAULT_DURATION_MINUTES * 60_000),
+    });
     const res = await tx.reservation.create({
       data: {
         venueId: data.venueId,
         source: "STREETSIDE_HOST",
         status: "PENDING",
-        reservationDate: data.requestedTime ? new Date(data.requestedTime) : new Date(),
+        reservationDate: startAt,
         partySize: data.partySize,
         conceptRequested: data.conceptRequested ?? null,
         occasion: data.occasion ?? null,
@@ -513,6 +523,16 @@ export async function transitionStatus(
 
       const startAt = new Date(existing.reservationDate);
       const endAt = new Date(startAt.getTime() + (existing.durationMinutes ?? 120) * 60_000);
+
+      // Confirming a pending approval is another reservation write path. It
+      // cannot turn a guest request into a confirmed dining hold inside an
+      // exclusive event/buyout window.
+      await assertNoBlockingOccupancy(tx, {
+        venueId: existing.venueId,
+        spaceId: effectiveSpaceId,
+        startAt,
+        endAt,
+      });
 
       // Overlap-aware capacity check under the space lock.
       const space = await tx.restaurantSpace.findUnique({

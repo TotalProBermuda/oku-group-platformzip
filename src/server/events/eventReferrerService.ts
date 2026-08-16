@@ -682,6 +682,7 @@ export async function writeTicketAttributionSession(orderId: string): Promise<vo
           title: true,
           slug: true,
           venue: true,
+          venueId: true,
         },
       },
     },
@@ -696,25 +697,10 @@ export async function writeTicketAttributionSession(orderId: string): Promise<vo
   });
   if (!actor) return;
 
-  // Resolve venue id: Series.venue is a VenueKey enum (OKU/CATCH). Look up
-  // the Venue row whose slug contains the key (case-insensitive).
-  //
-  // IMPORTANT: We do NOT fall back to "first venue in DB". An arbitrary
-  // fallback would attach this attribution session to the wrong venue, which
-  // corrupts ProofPay proof-chain data and is harder to audit/recover than a
-  // clean skip. If the series has no venue or the venue cannot be resolved,
-  // we write an AuditLog entry and return without creating a session — the
-  // checkout still succeeds; this path is non-fatal.
-  const venueKey = order.series?.venue;
-  let venueId: string | null = null;
-
-  if (venueKey) {
-    const venue = await prisma.venue.findFirst({
-      where: { slug: { contains: venueKey.toLowerCase(), mode: "insensitive" } },
-      select: { id: true },
-    });
-    venueId = venue?.id ?? null;
-  }
+  // Use the Series operational-venue foreign key.  This is intentionally not
+  // inferred from a label: ProofPay attribution must never be written against
+  // a different restaurant because two spaces share a display name.
+  const venueId = order.series?.venueId ?? null;
 
   if (!venueId) {
     await prisma.auditLog.create({
@@ -724,10 +710,8 @@ export async function writeTicketAttributionSession(orderId: string): Promise<vo
         metadata: {
           orderId,
           seriesId: order.series?.id ?? null,
-          venueKey: venueKey ?? null,
-          reason: venueKey
-            ? `No venue found with slug containing "${venueKey.toLowerCase()}"`
-            : "Series has no venue key set",
+          legacyVenue: order.series?.venue ?? null,
+          reason: "Series has no operational venue assigned",
         } as object,
       },
     });

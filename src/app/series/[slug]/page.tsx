@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { seriesLocationLabel } from "@/lib/locations";
 
 async function getSeries(slug: string) {
   const base = process.env.APP_BASE_URL || "http://localhost:5000";
@@ -39,6 +40,7 @@ export default async function SeriesDetail({ params }: { params: Promise<{ slug:
   const minPrice = series.ticketTypes?.length
     ? Math.min(...series.ticketTypes.map((t: any) => t.priceCents))
     : null;
+  const locationLabel = seriesLocationLabel(series);
 
   return (
     <div>
@@ -51,9 +53,9 @@ export default async function SeriesDetail({ params }: { params: Promise<{ slug:
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 30% 50%, rgba(196,30,58,0.12) 0%, transparent 60%)" }} />
         <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-            {series.venue && (
+            {locationLabel && (
               <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>
-                {series.venue}
+                {locationLabel}
               </span>
             )}
             {series.hostType === "INFLUENCER" && (

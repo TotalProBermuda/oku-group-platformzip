@@ -108,21 +108,19 @@ export async function POST(req: NextRequest) {
         checkedInAt: true,
         orderId: true,
         ticketType: { select: { name: true } },
-        session: { select: { id: true, title: true } },
+        session: { select: { id: true, title: true, series: { select: { venueId: true } } } },
       },
     });
     if (!ticket) {
       return NextResponse.json({ ok: false, kind: "UNKNOWN", error: "Ticket code not found" }, { status: 404 });
     }
 
-    // Note: tickets are NOT venue-scoped here. Events live on Series with a
-    // VenueKey enum (OKU / CATCH) — there's no Venue.id FK to compare with
-    // the host's venueId. Practically the leak surface is also much smaller:
-    // ticket QRs surface attendee name + ticket type for an event the host
-    // already needs to know about (events are cross-venue OKÜ programming),
-    // not private guest-of-relationship data the way reservations do. If the
-    // venue-scoping requirement tightens for events, add a VenueKey →
-    // Venue.id resolver and re-instate the guard here.
+    // Ticket scans are now scoped through Series.venueId.  As with
+    // reservations, a foreign hit is reported as unknown to avoid confirming
+    // an attendee's existence to a host at another venue.
+    if (!isSuperadmin && hostVenueId && ticket.session?.series?.venueId !== hostVenueId) {
+      return NextResponse.json({ ok: false, kind: "UNKNOWN", error: "Ticket code not found" }, { status: 404 });
+    }
 
     const siblings = await prisma.ticket.count({
       where: {

@@ -3,6 +3,7 @@ import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { assignSpace, CapacityExceededError, SpaceAssignmentError, getAvailableCovers } from "@/server/spaces/capacityService";
 import { prisma } from "@/lib/prisma";
+import { EventOccupancyConflictError, findBlockingOccupancy } from "@/server/events/eventOccupancyService";
 
 const DEFAULT_DURATION_MINUTES = 120;
 
@@ -116,6 +117,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const endAt = new Date(
       startAt.getTime() + (reservation.durationMinutes ?? DEFAULT_DURATION_MINUTES) * 60_000
     );
+    const eventConflict = await findBlockingOccupancy(prisma, { venueId: reservation.venueId, spaceId, startAt, endAt });
+    if (eventConflict) {
+      return NextResponse.json({ ok: false, code: "EVENT_UNAVAILABLE", error: eventConflict.card.message, eventConflict: eventConflict.card }, { status: 409 });
+    }
     const { available, capacity } = await getAvailableCovers(spaceId, startAt, endAt, reservationId);
     if (reservation.partySize > available) {
       return NextResponse.json(
@@ -173,6 +178,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if (e instanceof SpaceAssignmentError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
+    }
+    if (e instanceof EventOccupancyConflictError) {
+      return NextResponse.json({ ok: false, code: "EVENT_UNAVAILABLE", error: e.card.message, eventConflict: e.card }, { status: 409 });
     }
     console.error("[PATCH /api/v1/host/bookings/[id]/assign-space]", e);
     return NextResponse.json({ ok: false, error: "Failed to assign space" }, { status: 500 });

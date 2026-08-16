@@ -20,6 +20,8 @@ export async function GET(req: Request) {
     include: {
       sessions: true,
       ticketTypes: true,
+      operationalVenue: { select: { id: true, name: true, slug: true } },
+      eventSpace: { select: { id: true, name: true, conceptKey: true } },
     },
     orderBy: { createdAt: "desc" },
   });

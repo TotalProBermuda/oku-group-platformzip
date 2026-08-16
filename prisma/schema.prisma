@@ -120,6 +120,8 @@ enum SeriesStatus {
   DRAFT
   SCHEDULED
   PUBLISHED
+  PAUSED
+  POSTPONED
   SOLD_OUT
   COMPLETED
   CANCELLED
@@ -129,8 +131,37 @@ enum SeriesStatus {
 enum SessionStatus {
   SCHEDULED
   SOLD_OUT
+  PAUSED
+  POSTPONED
   CANCELLED
   COMPLETED
+}
+
+enum EventOccupancyScope {
+  SPACE
+  VENUE
+}
+
+enum EventOccupancyPolicy {
+  // Prevents ordinary dining reservations in the covered scope.
+  EXCLUSIVE
+  // Keeps the event visible operationally without closing dining capacity.
+  COEXIST
+}
+
+enum EventOccupancyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  POSTPONED
+  CANCELLED
+}
+
+enum EventReservationConflictStatus {
+  OPEN
+  ACKNOWLEDGED
+  REACCOMMODATED
+  CANCELLED
 }
 
 enum OrderStatus {
@@ -1052,7 +1083,12 @@ model Series {
   subtitle    String?
   description String?
   category    String?
+  // Legacy concept label retained while existing integrations are migrated.
   venue       VenueKey?
+  // A Series always targets an operational venue; a physical space is optional.
+  // Null spaceId means the event uses the venue as a whole, not a buyout.
+  venueId     String?
+  spaceId     String?
   hostType    SeriesHostType
   status      SeriesStatus   @default(DRAFT)
 
@@ -1127,6 +1163,8 @@ model Series {
   influencer      InfluencerProfile? @relation("SeriesHost", fields: [influencerId], references: [id])
   partner         PartnerProfile?    @relation(fields: [partnerId], references: [id])
   commercialOwner InfluencerProfile? @relation("SeriesCommercialOwner", fields: [commercialOwnerInfluencerId], references: [id])
+  operationalVenue Venue? @relation("SeriesOperationalVenue", fields: [venueId], references: [id], onDelete: SetNull)
+  eventSpace       RestaurantSpace? @relation("SeriesEventSpace", fields: [spaceId], references: [id], onDelete: SetNull)
 
   sessions               Session[]
   ticketTypes            TicketType[]
@@ -1143,6 +1181,10 @@ model Series {
   sponsorshipSlots       SponsorshipSlot[]
   profileAssignments     SeriesProfileAssignment[]
   reservationBlocks      ReservationBlock[]
+  occupancies            EventSpaceOccupancy[]
+
+  @@index([venueId])
+  @@index([spaceId])
   influencerInvites      InfluencerInvite[]
   hostInfluencerContacts HostInfluencerContact[]
   eventMenuLinks         EventMenuLink[]
@@ -1193,6 +1235,7 @@ model Session {
   reservationBlocks  ReservationBlock[]
   delegateSeats      PartnerDelegateSeat[]
   eventAccessGrants  UserEventAccess[]
+  occupancies        EventSpaceOccupancy[]
 
   @@index([seriesId, startsAt])
 }
@@ -2491,6 +2534,8 @@ model Venue {
   invuCredential         InvuIntegrationCredential?
   branchMappings         IntegrationBranchMapping[]
   attributionSessions    AttributionSession[]
+  series                 Series[]                 @relation("SeriesOperationalVenue")
+  eventOccupancies       EventSpaceOccupancy[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2503,6 +2548,7 @@ model RestaurantSpace {
   id                 String   @id @default(cuid())
   venueId            String
   name               String
+  conceptKey         String
   capacity           Int      // maximum simultaneous covers
   reservable         Boolean  @default(true)
   requiresApproval   Boolean  @default(false)
@@ -2519,11 +2565,14 @@ model RestaurantSpace {
   capacityHolds    CapacityHold[]
   requestedByReservations Reservation[] @relation("ReservationRequestedSpace")
   assignedToReservations  Reservation[] @relation("ReservationAssignedSpace")
+  series                  Series[]      @relation("SeriesEventSpace")
+  eventOccupancies        EventSpaceOccupancy[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([venueId, name])
+  @@unique([venueId, conceptKey])
   @@index([venueId])
 }
 
@@ -2551,6 +2600,67 @@ model CapacityHold {
   @@unique([spaceId, reservationId])
   @@index([spaceId, status, startAt, endAt])
   @@index([status, expiresAt])
+}
+
+// Operational event occupancy is intentionally distinct from a reservation
+// CapacityHold.  An event can close one physical space or the entire venue,
+// may include setup/reset time, and must retain a conflict/audit trail rather
+// than pretending to be a very large table reservation.
+model EventSpaceOccupancy {
+  id        String          @id @default(cuid())
+  seriesId  String
+  sessionId String?
+  venueId   String
+  spaceId   String?
+
+  scope     EventOccupancyScope
+  policy    EventOccupancyPolicy @default(EXCLUSIVE)
+  status    EventOccupancyStatus @default(DRAFT)
+
+  eventStartsAt DateTime
+  eventEndsAt   DateTime
+  blockStartsAt DateTime
+  blockEndsAt   DateTime
+  setupMinutes  Int @default(0)
+  resetMinutes  Int @default(0)
+
+  // Optional, editor-owned guest copy. Server-side validation keeps these
+  // concise; presentation is responsive and never relies on pixel limits.
+  guestMessageEn String? @db.VarChar(160)
+  guestMessageEs String? @db.VarChar(160)
+  guestMessagePt String? @db.VarChar(160)
+  createdByUserId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  space RestaurantSpace? @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  reservationConflicts EventReservationConflict[]
+
+  @@index([venueId, status, blockStartsAt, blockEndsAt])
+  @@index([spaceId, status, blockStartsAt, blockEndsAt])
+  @@index([seriesId])
+  @@index([sessionId])
+}
+
+model EventReservationConflict {
+  id          String   @id @default(cuid())
+  occupancyId String
+  reservationId String
+  status      EventReservationConflictStatus @default(OPEN)
+  notedByUserId String?
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  occupancy EventSpaceOccupancy @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@unique([occupancyId, reservationId])
+  @@index([reservationId, status])
+  @@index([occupancyId, status])
 }
 
 model Zone {
@@ -2755,6 +2865,7 @@ model Reservation {
   ledgerEvents          LedgerEvent[]              @relation("LedgerEventReservation")
   ledgerEventOutboxRows LedgerEventOutbox[]        @relation("LedgerEventOutboxReservation")
   capacityHolds         CapacityHold[]
+  eventConflicts        EventReservationConflict[]
   // Payments P215 — populated when the space requires a deposit
   paymentIntent         PaymentIntent?             @relation("ReservationPaymentIntent")
 

@@ -5,6 +5,7 @@ import { isValidLocale } from "@/i18n/config";
 import { getTranslations } from "@/i18n/getTranslations";
 import type { Locale } from "@/types/i18n";
 import Link from "next/link";
+import { seriesLocationLabel } from "@/lib/locations";
 import ArchiveExperienceButton from "@/components/admin/ArchiveExperienceButton";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(0)}`; }
@@ -120,7 +121,7 @@ export default async function AdminExperiencesPage({ searchParams }: Props) {
                     <td style={{ padding: "14px 16px" }}>
                       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: sc.text, background: sc.bg, padding: "3px 8px", borderRadius: 6 }}>{s.status}</span>
                     </td>
-                    <td style={{ padding: "14px 16px", fontSize: 13, color: "#6b7280" }}>{s.venue ?? "—"}</td>
+                    <td style={{ padding: "14px 16px", fontSize: 13, color: "#6b7280" }}>{seriesLocationLabel(s) ?? "—"}</td>
                     <td style={{ padding: "14px 16px", fontSize: 13, color: "#6b7280" }}>
                       {s.hostType === "INFLUENCER" && inf ? inf.displayName : s.hostType}
                     </td>

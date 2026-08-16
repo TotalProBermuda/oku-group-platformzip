@@ -9,6 +9,7 @@ import {
 import { gatePublicPostAsync } from "@/server/rateLimit";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
+import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     });
     if (!gate.ok) return gate.response as NextResponse;
 
-    const { conceptKey, reservationDate, partySize, occasion, seatingPreference, notes, addons, contactName, contactEmail, contactPhone, referralCode, requestedSpaceId, source } = body;
+    const { conceptKey, reservationDate, partySize, occasion, seatingPreference, notes, addons, contactName, contactEmail, contactPhone, referralCode, requestedSpaceId, source, locale } = body;
 
     if (!contactName || !contactEmail || !conceptKey || !reservationDate || !partySize) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
@@ -80,12 +81,10 @@ export async function POST(req: NextRequest) {
 
     const pendingApproval = requestedSpace?.requiresApproval ?? false;
 
-    // Pre-compute the booking window for capacity checks and hold creation.
-    // Only relevant when a specific space was requested.
-    const reservationStartAt = requestedSpaceId ? new Date(reservationDate) : null;
-    const reservationEndAt = reservationStartAt
-      ? new Date(reservationStartAt.getTime() + DEFAULT_DURATION_MINUTES * 60_000)
-      : null;
+    // Every request has a window. No-preference requests may wait for host
+    // assignment, but must still honour a venue-wide exclusive event block.
+    const reservationStartAt = new Date(reservationDate);
+    const reservationEndAt = new Date(reservationStartAt.getTime() + DEFAULT_DURATION_MINUTES * 60_000);
 
     let confirmationCode = genCode();
     let attempts = 0;
@@ -129,8 +128,19 @@ export async function POST(req: NextRequest) {
         // both create CONFIRMED reservations for an already-full space.
         // Lock category 2 matches the convention in capacityService.assignSpace.
         let depositCents = 0; // Payments P215 — set when space has depositRequiredCents > 0
-        if (requestedSpaceId && reservationStartAt && reservationEndAt) {
+        if (requestedSpaceId) {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${requestedSpaceId}))`;
+
+          // Event/buyout occupancy is a hard availability boundary. This is
+          // intentionally inside the same space lock/transaction as capacity
+          // creation so a calendar UI or forged request cannot bypass it.
+          await assertNoBlockingOccupancy(tx, {
+            venueId: venue.id,
+            spaceId: requestedSpaceId,
+            startAt: reservationStartAt,
+            endAt: reservationEndAt,
+            locale: typeof locale === "string" ? locale : "en",
+          });
 
           // Re-read capacity under the lock. We sum ACTIVE holds that overlap our
           // window — identical overlap logic to getHeldCovers() in capacityService.
@@ -158,6 +168,13 @@ export async function POST(req: NextRequest) {
             throw new Error("__SPACE_FULL__");
           }
           // requiresApproval + full → fall through; booking becomes PENDING_APPROVAL.
+        } else {
+          await assertNoBlockingOccupancy(tx, {
+            venueId: venue.id,
+            startAt: reservationStartAt,
+            endAt: reservationEndAt,
+            locale: typeof locale === "string" ? locale : "en",
+          });
         }
 
         // Payments P215 — when the space requires a deposit, the reservation
@@ -291,6 +308,12 @@ export async function POST(req: NextRequest) {
         return res;
       }, { timeout: 10_000 });
     } catch (txErr: unknown) {
+      if (txErr instanceof EventOccupancyConflictError) {
+        return NextResponse.json(
+          { error: txErr.card.message, code: "EVENT_UNAVAILABLE", eventConflict: txErr.card },
+          { status: 409 }
+        );
+      }
       if (txErr instanceof Error && txErr.message === "__SPACE_FULL__") {
         return NextResponse.json(
           { error: "This space is at full capacity for the selected time.", code: "SPACE_FULL" },
