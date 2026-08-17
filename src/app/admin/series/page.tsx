@@ -10,6 +10,28 @@ import { useEntityDrawer } from "@/hooks/useEntityDrawer";
 import EntityDrawerHost from "@/components/drawers/EntityDrawerHost";
 import { Search, Plus } from "lucide-react";
 
+function getCreateError(payload: unknown) {
+  const fallback = "Could not create the series. Please check the details and try again.";
+  if (!payload || typeof payload !== "object") return fallback;
+
+  const { error, fields } = payload as {
+    error?: unknown;
+    fields?: Record<string, unknown>;
+  };
+
+  if (fields && typeof fields === "object") {
+    for (const fieldErrors of Object.values(fields)) {
+      if (!Array.isArray(fieldErrors)) continue;
+      const message = fieldErrors.find(
+        (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+      );
+      if (message) return message;
+    }
+  }
+
+  return typeof error === "string" && error.trim().length > 0 ? error : fallback;
+}
+
 function SeriesPageContent() {
   const t = useTranslation();
   const locale = useLocale();
@@ -25,6 +47,7 @@ function SeriesPageContent() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ slug: "", title: "", hostType: "OKU", venue: "OKU" });
   const [submitting, setSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -47,18 +70,27 @@ function SeriesPageContent() {
 
   const handleCreate = async () => {
     setSubmitting(true);
-    const res = await fetch("/api/v1/admin/series", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const d = await res.json();
-    if (d.ok) {
+    setCreateError(null);
+    try {
+      const res = await fetch("/api/v1/admin/series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, slug: form.slug.trim().toLowerCase() }),
+      });
+      const payload: unknown = await res.json().catch(() => null);
+      if (!res.ok || !payload || typeof payload !== "object" || (payload as { ok?: unknown }).ok !== true) {
+        setCreateError(getCreateError(payload));
+        return;
+      }
+
       setShowForm(false);
       setForm({ slug: "", title: "", hostType: "OKU", venue: "OKU" });
       load();
+    } catch {
+      setCreateError("Could not create the series. Please check your connection and try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const fmtDate = (d: string) =>
@@ -225,7 +257,10 @@ function SeriesPageContent() {
         </div>
         <button
           className="btn btn-primary btn-sm"
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setShowForm(!showForm);
+            setCreateError(null);
+          }}
           style={{ display: "flex", alignItems: "center", gap: 6 }}
         >
           <Plus size={13} />
@@ -252,6 +287,8 @@ function SeriesPageContent() {
                 value={form.slug}
                 onChange={(e) => setForm({ ...form, slug: e.target.value })}
                 placeholder="e.g. chefs-table"
+                autoCapitalize="none"
+                spellCheck={false}
               />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
@@ -279,6 +316,11 @@ function SeriesPageContent() {
               </select>
             </div>
           </div>
+          {createError && (
+            <p role="alert" style={{ color: "#b42318", fontSize: 13, margin: "0 0 12px" }}>
+              {createError}
+            </p>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
             <button
               className="btn btn-primary btn-sm"
@@ -287,7 +329,7 @@ function SeriesPageContent() {
             >
               {submitting ? t("admin", "creating") : t("admin", "createSeries")}
             </button>
-            <button className="btn btn-sm" onClick={() => setShowForm(false)}>
+            <button className="btn btn-sm" onClick={() => { setShowForm(false); setCreateError(null); }}>
               {t("admin", "cancel")}
             </button>
           </div>

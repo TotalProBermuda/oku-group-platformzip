@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getTranslations } from "@/i18n/getTranslations";
 import { isValidLocale } from "@/i18n/config";
 import { localePath } from "@/i18n/utils";
-import { getSeriesContent, getSessionTitle, getTicketTypeName } from "@/data/seriesTranslations";
+import { getPublicExperienceBySlug } from "@/server/experiences/publicSeries";
 import type { Locale } from "@/types/i18n";
 import EventPageSponsorBlock from "@/components/sponsors/EventPageSponsorBlock";
 import EventMenusSection from "@/components/experiences/EventMenusSection";
@@ -16,11 +16,10 @@ import type { Metadata } from "next";
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
 
+export const dynamic = "force-dynamic";
+
 async function getSeries(slug: string) {
-  const res = await fetch(`${BASE}/api/v1/experiences?slug=${slug}`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.series?.[0] ?? null;
+  return getPublicExperienceBySlug(slug);
 }
 
 async function getAvailability(slug: string) {
@@ -44,9 +43,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const series = await getSeries(slug);
   if (!series) return {};
 
-  const content = getSeriesContent(series.slug, safeLocale);
-  const title = content?.title ?? series.title;
-  const description = content?.description ?? series.description ?? "";
+  const title = series.title;
+  const description = series.description ?? "";
   const imageUrl = series.heroImageUrl ?? undefined;
   const canonicalUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
 
@@ -102,9 +100,8 @@ export default async function ExperienceDetailPage({ params }: Props) {
   const firstSession = sessions[0];
   const isCountdownActive = series.showCountdown && series.earlyReleaseAt && new Date() < new Date(series.earlyReleaseAt);
 
-  const content = getSeriesContent(series.slug, safeLocale);
-  const title = content?.title ?? series.title;
-  const description = content?.description ?? series.description;
+  const title = series.title;
+  const description = series.description;
 
   const pageUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
   const locationStr = [series.venue, series.venueAddress, series.city].filter(Boolean).join(", ");
@@ -123,7 +120,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
             {series.category && <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#f9a8d4", textTransform: "uppercase" }}>{series.category}</span>}
           </div>
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(32px, 5vw, 60px)", fontWeight: 400, color: "white", letterSpacing: "-0.02em", margin: "0 0 12px", lineHeight: 1.1 }}>{title}</h1>
-          {series.subtitle && <p style={{ fontSize: 18, color: "rgba(255,255,255,0.7)", margin: "0 0 24px", maxWidth: 560 }}>{content?.subtitle ?? series.subtitle}</p>}
+          {series.subtitle && <p style={{ fontSize: 18, color: "rgba(255,255,255,0.7)", margin: "0 0 24px", maxWidth: 560 }}>{series.subtitle}</p>}
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 20 }}>
             {series.city && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>📍 {series.city}{series.venueAddress ? ` — ${series.venueAddress}` : ""}</span>}
             {firstSession && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>📅 {fmtDate(firstSession.startsAt)}</span>}
@@ -176,7 +173,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                       <div>
                         <div style={{ fontWeight: 600, color: "#1a1614", marginBottom: 4 }}>
-                          {getSessionTitle(s.title ?? c.sessionLabel, safeLocale)}
+                          {s.title ?? c.sessionLabel}
                         </div>
                         <div style={{ fontSize: 13, color: "#6b7280" }}>{fmtDate(s.startsAt)} · {fmtTime(s.startsAt)} – {fmtTime(s.endsAt)}</div>
                       </div>
@@ -314,7 +311,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
                 {ticketTypes.map((t: any) => (
                   <div key={t.id} style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{getTicketTypeName(t.name, safeLocale)}</div>
+                      <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{t.name}</div>
                       <div style={{ fontWeight: 700, color: "#c41e3a" }}>{fmt(t.priceCents)}</div>
                     </div>
                     {t.description && <div style={{ fontSize: 12, color: "#9ca3af" }}>{t.description}</div>}

@@ -2,17 +2,10 @@ import Link from "next/link";
 import { getTranslations } from "@/i18n/getTranslations";
 import { isValidLocale } from "@/i18n/config";
 import { localePath } from "@/i18n/utils";
-import { getSeriesContent } from "@/data/seriesTranslations";
+import { listPublicExperiences } from "@/server/experiences/publicSeries";
 import type { Locale } from "@/types/i18n";
 
-const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
-
-async function getExperiences() {
-  const res = await fetch(`${BASE}/api/v1/experiences`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.series ?? [];
-}
+export const dynamic = "force-dynamic";
 
 const venueGrad: Record<string, string> = {
   OKU:  "linear-gradient(135deg, #1a1614 0%, #2d1f1a 100%)",
@@ -25,7 +18,7 @@ export default async function ExperiencesPage({ params }: Props) {
   const { locale } = await params;
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
   const [experiences, translations] = await Promise.all([
-    getExperiences(),
+    listPublicExperiences(),
     getTranslations(safeLocale, ["common"]),
   ]);
 
@@ -60,9 +53,8 @@ export default async function ExperiencesPage({ params }: Props) {
         ) : (
           <div className="card-grid">
             {experiences.map((s: any) => {
-              const content = getSeriesContent(s.slug, safeLocale);
-              const title = content?.title ?? s.title;
-              const description = content?.description ?? s.description;
+          const title = s.title;
+          const description = s.description;
               const minPrice = s.ticketTypes?.length
                 ? Math.min(...s.ticketTypes.map((t: any) => t.priceCents))
                 : null;
