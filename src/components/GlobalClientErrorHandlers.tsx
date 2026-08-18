@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isKnownInjectedExtensionError } from "@/lib/clientErrorFilters";
 
 // React error boundaries don't catch async or event-handler errors.
 // Hook window.onerror + unhandledrejection so those still land in the
@@ -16,6 +17,15 @@ export function GlobalClientErrorHandlers() {
     }
 
     function onError(event: ErrorEvent) {
+      if (isKnownInjectedExtensionError({
+        message: event.message,
+        filename: event.filename,
+        stack: event.error instanceof Error ? event.error.stack : undefined,
+      })) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       post({
         message: event.message || "window.onerror",
         stack: event.error instanceof Error ? event.error.stack : undefined,
@@ -29,6 +39,14 @@ export function GlobalClientErrorHandlers() {
       const reason = event.reason as unknown;
       const message =
         reason instanceof Error ? reason.message : typeof reason === "string" ? reason : "unhandledrejection";
+      if (isKnownInjectedExtensionError({
+        message,
+        stack: reason instanceof Error ? reason.stack : undefined,
+      })) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       post({
         message,
         stack: reason instanceof Error ? reason.stack : undefined,
