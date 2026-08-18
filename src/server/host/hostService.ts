@@ -9,6 +9,7 @@ import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService
 // createCapacityHold / assignSpace are used by the dedicated assign-space route.
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
 import { assertNoBlockingOccupancy } from "@/server/events/eventOccupancyService";
+import { deliverReservationStateEmail } from "@/server/reservations/reservationNotificationService";
 
 export const INCLUDE_FULL = {
   zone: true,
@@ -323,6 +324,9 @@ export async function transitionStatus(
   actorId: string,
   opts?: {
     tableLabel?: string;
+    assignedSpaceId?: string;
+    /** ISO timestamp selected by the host when approving a request. */
+    reservationDate?: string;
     lossReason?: string;
     lossReasonNotes?: string;
     internalNotes?: string;
@@ -338,6 +342,24 @@ export async function transitionStatus(
     where: { id: reservationId },
     include: { venue: true, handoffs: true },
   });
+
+  if (existing.status === "PENDING_APPROVAL" && toStatus === "CONFIRMED") {
+    if (!(opts?.assignedSpaceId || existing.assignedSpaceId || existing.requestedSpaceId)) {
+      const e = new Error("Choose a final dining space before confirming this request") as Error & { status?: number };
+      e.status = 400;
+      throw e;
+    }
+    if (!opts?.reservationDate) {
+      const e = new Error("Confirm the reservation date and time before accepting this request") as Error & { status?: number };
+      e.status = 400;
+      throw e;
+    }
+    if (!opts?.tableLabel?.trim()) {
+      const e = new Error("Assign a table or joined-table plan before confirming this request") as Error & { status?: number };
+      e.status = 400;
+      throw e;
+    }
+  }
 
   // Hard guard (Apr 28 2026): SEATED requires a tableLabel either now or
   // already on the row. The Operations Board UI enforces this client-side,
@@ -356,6 +378,18 @@ export async function transitionStatus(
 
   const now = new Date();
   const update: Record<string, unknown> = { status: toStatus };
+  const confirmedReservationDate = opts?.reservationDate ? new Date(opts.reservationDate) : null;
+  if (confirmedReservationDate && Number.isNaN(confirmedReservationDate.getTime())) {
+    const e = new Error("confirmedReservationDate must be a valid ISO timestamp") as Error & { status?: number };
+    e.status = 400;
+    throw e;
+  }
+  if (confirmedReservationDate) update.reservationDate = confirmedReservationDate;
+  if (toStatus === "CONFIRMED" && opts?.tableLabel?.trim()) {
+    // This is the planned table/table-combination. Hosts may still move the
+    // party later; assignedTableLabel remains editable at seating time.
+    update.assignedTableLabel = opts.tableLabel.trim();
+  }
 
   // Detect reverse moves up-front so we can gate forward-stamping on
   // !isReverse — otherwise SEATED→ARRIVED would re-stamp arrivalConfirmedAt
@@ -448,6 +482,7 @@ export async function transitionStatus(
   let confirmedSpaceId: string | null = null;
   let confirmedOverCapacity = false;
   let releasedHoldIds: string[] = [];
+  let reassignedHoldIds: string[] = [];
   const holdReleaseStatus: "RELEASED" | "CANCELLED" =
     toStatus === "CANCELLED" ? "CANCELLED" : "RELEASED";
 
@@ -509,11 +544,12 @@ export async function transitionStatus(
       existing.status === "PENDING_APPROVAL" &&
       toStatus === "CONFIRMED" &&
       !existing.assignedSpaceId &&
-      !!existing.requestedSpaceId;
+      !!(opts?.assignedSpaceId || existing.requestedSpaceId);
 
     // Effective space: prefer assignedSpaceId; fall back to requestedSpaceId
     // only for the PENDING_APPROVAL promotion path.
     const effectiveSpaceId: string | null =
+      opts?.assignedSpaceId ??
       existing.assignedSpaceId ??
       (isPendingApprovalPromotion ? (existing.requestedSpaceId ?? null) : null);
 
@@ -521,7 +557,17 @@ export async function transitionStatus(
       // Acquire space advisory lock (category 2, same order as assignSpace).
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${effectiveSpaceId}))`;
 
-      const startAt = new Date(existing.reservationDate);
+      const selectedSpace = await tx.restaurantSpace.findFirst({
+        where: { id: effectiveSpaceId, venueId: existing.venueId, isActive: true, reservable: true },
+        select: { capacity: true },
+      });
+      if (!selectedSpace) {
+        const e = new Error("Assigned space is not active and reservable at this venue") as Error & { status?: number };
+        e.status = 400;
+        throw e;
+      }
+
+      const startAt = confirmedReservationDate ?? new Date(existing.reservationDate);
       const endAt = new Date(startAt.getTime() + (existing.durationMinutes ?? 120) * 60_000);
 
       // Confirming a pending approval is another reservation write path. It
@@ -535,10 +581,6 @@ export async function transitionStatus(
       });
 
       // Overlap-aware capacity check under the space lock.
-      const space = await tx.restaurantSpace.findUnique({
-        where: { id: effectiveSpaceId },
-        select: { capacity: true },
-      });
       const competing = await tx.capacityHold.findMany({
         where: {
           spaceId: effectiveSpaceId,
@@ -551,7 +593,7 @@ export async function transitionStatus(
         select: { partySize: true },
       });
       const held = competing.reduce((s, h) => s + h.partySize, 0);
-      const available = (space?.capacity ?? 0) - held;
+      const available = selectedSpace.capacity - held;
       confirmedOverCapacity = existing.partySize > available;
 
       if (confirmedOverCapacity && isPendingApprovalPromotion) {
@@ -569,8 +611,23 @@ export async function transitionStatus(
 
       // Promote requestedSpaceId → assignedSpaceId for PENDING_APPROVAL transitions
       // so the reservation row reflects the space that is now holding capacity.
-      if (isPendingApprovalPromotion) {
+      if (isPendingApprovalPromotion || opts?.assignedSpaceId) {
         update.assignedSpaceId = effectiveSpaceId;
+      }
+
+      // If a supervisor moved the group to a different space, retire any old
+      // hold before writing the new one. The immutable requestedSpaceId remains
+      // intact so the guest request and operational reassignment are auditable.
+      const supersededHolds = await tx.capacityHold.findMany({
+        where: { reservationId, spaceId: { not: effectiveSpaceId }, status: "ACTIVE" },
+        select: { id: true },
+      });
+      reassignedHoldIds = supersededHolds.map((hold) => hold.id);
+      if (reassignedHoldIds.length > 0) {
+        await tx.capacityHold.updateMany({
+          where: { id: { in: reassignedHoldIds } },
+          data: { status: "RELEASED" },
+        });
       }
 
       const hold = await tx.capacityHold.upsert({
@@ -654,6 +711,17 @@ export async function transitionStatus(
         capacityHoldId: holdId,
         reservationId,
         payload: { toStatus: holdReleaseStatus },
+      });
+    }
+    for (const holdId of reassignedHoldIds) {
+      await enqueueLedgerEvent(tx, {
+        eventType: "CAPACITY_HOLD_RELEASED",
+        source: { system: "host_status_transition" },
+        confidenceClass: "PARTNER_REPORTED_EVENT",
+        idempotencyKey: `capacity_hold:${holdId}:released:reassignment`,
+        capacityHoldId: holdId,
+        reservationId,
+        payload: { reason: "SPACE_REASSIGNED", replacementSpaceId: confirmedSpaceId },
       });
     }
 
@@ -803,6 +871,18 @@ export async function transitionStatus(
   // Status transition and capacity hold ledger events are now written as
   // durable outbox rows inside the $transaction above. No post-transaction
   // best-effort emitLedgerEvent calls needed for these events.
+
+  // The guest's confirmation is a consequence of the committed state change,
+  // never of the initial request. Keep this best-effort so an email provider
+  // outage cannot roll back the host's operational decision; the durable
+  // ReservationCommunication row remains visible for retry.
+  if (existing.status !== "CONFIRMED" && toStatus === "CONFIRMED") {
+    try {
+      await deliverReservationStateEmail(reservationId, "CONFIRMATION");
+    } catch (emailError) {
+      console.error("[transitionStatus] confirmation email failed", { reservationId, emailError });
+    }
+  }
 
   return reservation;
 }

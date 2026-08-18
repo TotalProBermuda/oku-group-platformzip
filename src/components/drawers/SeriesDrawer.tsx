@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import RightDetailDrawer from "./RightDetailDrawer";
 import StatusBadge from "@/components/entities/StatusBadge";
 import EntityLink from "@/components/entities/EntityLink";
 import ActionMenu, { ActionItem } from "@/components/entities/ActionMenu";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
-import { Globe, EyeOff, Users, DollarSign, Calendar, Plus } from "lucide-react";
+import { Globe, EyeOff, Users, DollarSign, Calendar, Plus, Settings } from "lucide-react";
 
 type Tab = "overview" | "sessions" | "orders";
 
@@ -50,7 +51,7 @@ export default function SeriesDrawer({
   const [tab, setTab] = useState<Tab>("overview");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [showSessionForm, setShowSessionForm] = useState(false);
-  const [sessionForm, setSessionForm] = useState({ title: "", startsAt: "", endsAt: "", capacity: "" });
+  const [sessionForm, setSessionForm] = useState({ title: "", startsAt: "", endsAt: "", capacity: "", occupancyScope: "VENUE", setupMinutes: "0", resetMinutes: "0" });
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
@@ -117,6 +118,9 @@ export default function SeriesDrawer({
           startsAt: new Date(sessionForm.startsAt).toISOString(),
           endsAt: new Date(sessionForm.endsAt).toISOString(),
           capacity: Number(sessionForm.capacity),
+          occupancyScope: sessionForm.occupancyScope,
+          setupMinutes: Number(sessionForm.setupMinutes),
+          resetMinutes: Number(sessionForm.resetMinutes),
         }),
       });
       const payload: unknown = await response.json().catch(() => null);
@@ -124,11 +128,12 @@ export default function SeriesDrawer({
         setSessionError(responseError(payload, t("admin", "createEventFailed")));
         return;
       }
-      setSessionForm({ title: "", startsAt: "", endsAt: "", capacity: "" });
+      const result = payload as { conflictCount?: number };
+      setSessionForm({ title: "", startsAt: "", endsAt: "", capacity: "", occupancyScope: series?.spaceId ? "SPACE" : "VENUE", setupMinutes: "0", resetMinutes: "0" });
       setShowSessionForm(false);
       await fetchSeries();
       onUpdated?.();
-      flash(t("admin", "eventCreated"));
+      flash(result.conflictCount ? `${t("admin", "eventCreated")} ${result.conflictCount} reservation conflict(s) need review.` : t("admin", "eventCreated"));
     } catch {
       setSessionError(t("admin", "createEventFailed"));
     } finally {
@@ -137,14 +142,19 @@ export default function SeriesDrawer({
   };
 
   const doAction = async (endpoint: string) => {
-    const r = await fetch(`/api/v1/admin/series/${seriesId}/${endpoint}`, { method: "POST" });
-    const d = await r.json();
-    if (d.ok) {
-      flash(t("admin", "actionSuccess"));
-      fetchSeries();
-      onUpdated?.();
-    } else {
-      flash(d.error || t("admin", "actionFailed"), false);
+    try {
+      const r = await fetch(`/api/v1/admin/series/${seriesId}/${endpoint}`, { method: "POST" });
+      const d = await r.json().catch(() => null);
+      if (r.ok && d?.ok) {
+        flash(t("admin", "actionSuccess"));
+        fetchSeries();
+        onUpdated?.();
+      } else {
+        const issues = Array.isArray(d?.issues) ? d.issues.map((issue: { message?: string }) => issue.message).filter(Boolean).join(" ") : "";
+        flash(issues || d?.error || t("admin", "actionFailed"), false);
+      }
+    } catch {
+      flash(t("admin", "actionFailed"), false);
     }
   };
 
@@ -184,6 +194,15 @@ export default function SeriesDrawer({
       year: "numeric",
     });
 
+  const fmtDateTime = (d: string) =>
+    new Date(d).toLocaleString(dateLocale, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
   const fmtMoney = (cents: number) =>
     new Intl.NumberFormat(dateLocale, { style: "currency", currency: "USD" }).format(
       cents / 100
@@ -212,7 +231,7 @@ export default function SeriesDrawer({
           <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
             <span style={{ fontSize: 12, color: "var(--color-text-secondary)", flex: 1 }}>
               {series.hostType}
-              {series.venue ? ` · ${series.venue}` : ""}
+              {(series.eventSpace?.name || series.operationalVenue?.name || series.venue) ? ` · ${series.eventSpace?.name || series.operationalVenue?.name || series.venue}` : ""}
             </span>
             <ActionMenu items={buildActions()} align="right" />
           </div>
@@ -238,13 +257,18 @@ export default function SeriesDrawer({
       {series && tab === "overview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <Section title={t("admin", "details")}>
+            <Link href={`/admin/experiences/${series.id}`} className="btn btn-primary btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
+              <Settings size={13} />
+              {t("admin", "editFullExperience")}
+            </Link>
             <DetailRow label={t("admin", "status")}>
               <StatusBadge status={series.status} dot />
             </DetailRow>
             <DetailRow label={t("admin", "hostType")}>{series.hostType}</DetailRow>
-            {series.venue && (
-              <DetailRow label={t("admin", "venue")}>{series.venue}</DetailRow>
+            {(series.operationalVenue?.name || series.venue) && (
+              <DetailRow label={t("admin", "venue")}>{series.operationalVenue?.name || series.venue}</DetailRow>
             )}
+            {series.eventSpace?.name && <DetailRow label={t("admin", "physicalSpace")}>{series.eventSpace.name}</DetailRow>}
             {series.category && (
               <DetailRow label={t("admin", "category")}>{series.category}</DetailRow>
             )}
@@ -305,6 +329,7 @@ export default function SeriesDrawer({
               onClick={() => {
                 setShowSessionForm((current) => !current);
                 setSessionError(null);
+                if (!showSessionForm) setSessionForm((current) => ({ ...current, occupancyScope: series?.spaceId ? "SPACE" : "VENUE" }));
               }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
@@ -338,6 +363,26 @@ export default function SeriesDrawer({
                 <label className="form-label" htmlFor="new-event-capacity">{t("admin", "capacity")}</label>
                 <input id="new-event-capacity" type="number" min={1} max={100000} step={1} className="form-input" value={sessionForm.capacity} onChange={(event) => setSessionForm({ ...sessionForm, capacity: event.target.value })} />
               </div>
+              <div className="form-group" style={{ margin: "12px 0" }}>
+                <label className="form-label" htmlFor="new-event-occupancy">{t("admin", "diningImpact")}</label>
+                <select id="new-event-occupancy" className="form-input" value={sessionForm.occupancyScope} onChange={(event) => setSessionForm({ ...sessionForm, occupancyScope: event.target.value })}>
+                  {series?.spaceId && <option value="SPACE">{t("admin", "selectedSpaceExclusive")}</option>}
+                  <option value="VENUE">{t("admin", "wholeVenueExclusive")}</option>
+                  <option value="NONE">{t("admin", "ticketOnlyEvent")}</option>
+                </select>
+              </div>
+              {sessionForm.occupancyScope !== "NONE" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" htmlFor="new-event-setup">{t("admin", "setupMinutes")}</label>
+                    <input id="new-event-setup" type="number" min={0} max={720} className="form-input" value={sessionForm.setupMinutes} onChange={(event) => setSessionForm({ ...sessionForm, setupMinutes: event.target.value })} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" htmlFor="new-event-reset">{t("admin", "resetMinutes")}</label>
+                    <input id="new-event-reset" type="number" min={0} max={720} className="form-input" value={sessionForm.resetMinutes} onChange={(event) => setSessionForm({ ...sessionForm, resetMinutes: event.target.value })} />
+                  </div>
+                </div>
+              )}
               {sessionError && <p role="alert" style={{ color: "#b42318", fontSize: 13, margin: "0 0 12px" }}>{sessionError}</p>}
               <button
                 type="button"
@@ -372,18 +417,18 @@ export default function SeriesDrawer({
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: "var(--color-text-secondary)", fontWeight: sess.title ? 400 : 600 }}>
-                    {fmtDate(sess.startsAt)}
+                    {fmtDateTime(sess.startsAt)}
                   </div>
                   {sess.endsAt && (
                     <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 1 }}>
-                      {t("admin", "until")} {fmtDate(sess.endsAt)}
+                      {t("admin", "until")} {fmtDateTime(sess.endsAt)}
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                    {sess.capacityOverride != null && (
+                    {sess.capacity != null && (
                       <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--color-text-muted)" }}>
                         <Users size={11} />
-                        <span>Cap: {sess.capacityOverride}</span>
+                        <span>Cap: {sess.capacity}</span>
                       </div>
                     )}
                     {sess._count?.tickets != null && (
@@ -393,6 +438,11 @@ export default function SeriesDrawer({
                       </div>
                     )}
                   </div>
+                  {sess.occupancies?.map((occupancy: any) => (
+                    <div key={occupancy.id} style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 6 }}>
+                      {occupancy.scope === "VENUE" ? t("admin", "wholeVenueExclusive") : occupancy.space?.name || t("admin", "selectedSpaceExclusive")} · {occupancy.status}
+                    </div>
+                  ))}
                 </div>
                 <StatusBadge status={sess.status} size="xs" />
               </div>

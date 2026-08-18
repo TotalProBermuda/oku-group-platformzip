@@ -39,10 +39,12 @@ function SeriesPageContent() {
   const [showForm, setShowForm] = useState(false);
   const [venues, setVenues] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
-  const [form, setForm] = useState({ slug: "", title: "", hostType: "OKU", venueId: "", spaceId: "" });
+  const [hostOptions, setHostOptions] = useState<{ influencers: any[]; partners: any[] }>({ influencers: [], partners: [] });
+  const [form, setForm] = useState({ slug: "", title: "", hostType: "OKU", venueId: "", spaceId: "", influencerId: "", partnerId: "" });
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -70,11 +72,17 @@ function SeriesPageContent() {
         if (!r.ok) throw new Error(apiError(payload, "Could not load spaces."));
         return payload;
       }),
+      fetch("/api/v1/admin/series/host-options").then(async (r) => {
+        const payload = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(apiError(payload, "Could not load host options."));
+        return payload;
+      }),
     ])
-      .then(([venueResponse, spaceResponse]) => {
+      .then(([venueResponse, spaceResponse, hostResponse]) => {
         const nextVenues = venueResponse.venues ?? [];
         setLocationError(null);
         setVenues(nextVenues); setSpaces(spaceResponse.data ?? []);
+        setHostOptions(hostResponse.data ?? { influencers: [], partners: [] });
         if (nextVenues.length === 1) setForm((current) => ({ ...current, venueId: current.venueId || nextVenues[0].id }));
       }).catch((error: unknown) => {
         setLocationError(error instanceof Error ? error.message : "Could not load venue options.");
@@ -105,7 +113,7 @@ function SeriesPageContent() {
         return;
       }
       setShowForm(false);
-      setForm({ slug: "", title: "", hostType: "OKU", venueId: venues.length === 1 ? venues[0].id : "", spaceId: "" });
+      setForm({ slug: "", title: "", hostType: "OKU", venueId: venues.length === 1 ? venues[0].id : "", spaceId: "", influencerId: "", partnerId: "" });
       load();
     } catch {
       setCreateError("Could not reach the server. Check your connection and try again.");
@@ -127,6 +135,22 @@ function SeriesPageContent() {
     return s.hostType;
   };
 
+  const runSeriesAction = async (seriesId: string, endpoint: "publish" | "unpublish") => {
+    setActionError(null);
+    try {
+      const response = await fetch(`/api/v1/admin/series/${seriesId}/${endpoint}`, { method: "POST" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        const issues = Array.isArray(payload?.issues) ? payload.issues.map((issue: { message?: string }) => issue.message).filter(Boolean).join(" ") : "";
+        setActionError(issues || apiError(payload, `Could not ${endpoint} this series.`));
+        return;
+      }
+      load();
+    } catch {
+      setActionError(`Could not ${endpoint} this series. Check your connection and try again.`);
+    }
+  };
+
   const buildActions = (s: any): ActionItem[] => {
     const items: ActionItem[] = [
       {
@@ -140,10 +164,7 @@ function SeriesPageContent() {
       items.push({
         key: "publish",
         label: t("admin", "publishSeries"),
-        onClick: async () => {
-          await fetch(`/api/v1/admin/series/${s.id}/publish`, { method: "POST" });
-          load();
-        },
+        onClick: () => runSeriesAction(s.id, "publish"),
       });
     }
 
@@ -154,8 +175,7 @@ function SeriesPageContent() {
         danger: true,
         onClick: async () => {
           if (!confirm(t("admin", "unpublishConfirm"))) return;
-          await fetch(`/api/v1/admin/series/${s.id}/unpublish`, { method: "POST" });
-          load();
+          await runSeriesAction(s.id, "unpublish");
         },
       });
     }
@@ -313,7 +333,7 @@ function SeriesPageContent() {
               <select
                 className="form-input"
                 value={form.hostType}
-                onChange={(e) => setForm({ ...form, hostType: e.target.value })}
+                onChange={(e) => setForm({ ...form, hostType: e.target.value, influencerId: "", partnerId: "" })}
               >
                 <option value="OKU">OKÜ</option>
                 <option value="CATCH">CATCH</option>
@@ -321,6 +341,32 @@ function SeriesPageContent() {
                 <option value="PARTNER">Partner</option>
               </select>
             </div>
+            {form.hostType === "INFLUENCER" && (
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Influencer host</label>
+                <select className="form-input" value={form.influencerId} onChange={(e) => setForm({ ...form, influencerId: e.target.value })}>
+                  <option value="">Select an influencer</option>
+                  {hostOptions.influencers.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.displayName || profile.user?.name || profile.handle || profile.user?.email}{profile.approved ? "" : " (not approved)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {form.hostType === "PARTNER" && (
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Partner host</label>
+                <select className="form-input" value={form.partnerId} onChange={(e) => setForm({ ...form, partnerId: e.target.value })}>
+                  <option value="">Select a partner</option>
+                  {hostOptions.partners.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name || profile.user?.name || profile.user?.email}{profile.approved ? "" : " (not approved)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Operational venue</label>
               <select
@@ -345,7 +391,7 @@ function SeriesPageContent() {
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              disabled={submitting || !form.title || !form.slug || !form.venueId}
+              disabled={submitting || !form.title || !form.slug || !form.venueId || (form.hostType === "INFLUENCER" && !form.influencerId) || (form.hostType === "PARTNER" && !form.partnerId)}
               onClick={handleCreate}
             >
               {submitting ? t("admin", "creating") : t("admin", "createSeries")}
@@ -359,6 +405,12 @@ function SeriesPageContent() {
               {createError}
             </p>
           )}
+        </div>
+      )}
+
+      {actionError && (
+        <div role="alert" style={{ color: "var(--color-danger)", background: "var(--color-danger-bg)", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13 }}>
+          {actionError}
         </div>
       )}
 

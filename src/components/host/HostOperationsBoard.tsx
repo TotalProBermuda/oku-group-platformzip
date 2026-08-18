@@ -86,7 +86,7 @@ type VenueZone = {
   conceptKey: string;
   capacityCovers: number;
   currentWaitMinutes: number | null;
-  tables: Array<{ id: string; name: string; seats: number; isVip: boolean }>;
+  tables: Array<{ id: string; name: string; seats: number; minPartySize?: number; maxPartySize?: number; mergeable?: boolean; isVip: boolean }>;
 };
 
 const CONCEPT_BG: Record<string, string> = { oku: "#1a1614", catch: "#1e3a5f", terrace: "#2d4a1e", vip: "#4a1e1e" };
@@ -170,6 +170,12 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
+function toDateTimeLocalValue(iso: string) {
+  const date = new Date(iso);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 function StatusBadge({ status }: { status: string }) {
   const c = STATUS_COLOR[status] ?? { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" };
   return (
@@ -231,7 +237,8 @@ function GuestDrawer({
   const t = useTranslation();
   const [tab, setTab] = useState<"journey" | "actions">("actions");
   const [tableLabel, setTableLabel] = useState(res.assignedTableLabel ?? "");
-  const [selectedSpaceId, setSelectedSpaceId] = useState(res.assignedSpace?.id ?? "");
+  const [selectedSpaceId, setSelectedSpaceId] = useState(res.assignedSpace?.id ?? res.requestedSpace?.id ?? "");
+  const [confirmedReservationDate, setConfirmedReservationDate] = useState(toDateTimeLocalValue(res.reservationDate));
   const [spaceWarning, setSpaceWarning] = useState<{ overCapacity: boolean; available: number; capacity?: number; partySize?: number } | null>(null);
   const [assigningSpace, setAssigningSpace] = useState(false);
   const [lossReason, setLossReason] = useState("");
@@ -405,29 +412,61 @@ function GuestDrawer({
               </div>
             )}
 
-            {res.status === "ARRIVED" && (
+            {res.status === "PENDING_APPROVAL" && (
+              <div style={{ marginBottom: 8, padding: "12px 14px", background: "#fdf4ff", border: "1px solid #e9d5ff", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#7e22ce", marginBottom: 8 }}>Confirmation plan</div>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#64748b", marginBottom: 4 }}>Confirmed date and time</label>
+                <input
+                  type="datetime-local"
+                  value={confirmedReservationDate}
+                  onChange={(event) => setConfirmedReservationDate(event.target.value)}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 7, border: "1.5px solid #e2e8f0", background: "#fff", color: "#0f172a", fontSize: 12 }}
+                />
+                <div style={{ marginTop: 8, fontSize: 10, color: "#64748b", lineHeight: 1.4 }}>
+                  Select the final dining space above and enter a table or joined-table plan below. The requested space remains in the audit trail if the group is moved.
+                </div>
+              </div>
+            )}
+
+            {["PENDING_APPROVAL", "ARRIVED"].includes(res.status) && (
               <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", marginBottom: 6 }}>{t("host", "operations.tableAssignment")}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
+                  {res.status === "PENDING_APPROVAL" ? "Table / joined-table plan" : t("host", "operations.tableAssignment")}
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input value={tableLabel} onChange={e => setTableLabel(e.target.value)} placeholder={t("host", "operations.tablePlaceholder")} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 12, color: "#0f172a" }} />
                 </div>
                 <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-                  {zones.flatMap(z => z.tables).slice(0, 8).map(tb => (
+                  {zones.flatMap(z => z.tables).slice(0, 12).map(tb => (
                     <button key={tb.id} onClick={() => setTableLabel(tb.name)} style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid #e2e8f0", background: tableLabel === tb.name ? "#0f172a" : "#fff", color: tableLabel === tb.name ? "#fff" : "#475569", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
-                      {tb.name}{tb.isVip ? " ✦" : ""}
+                      {tb.name} · {tb.seats} seats{tb.mergeable ? " · mergeable" : ""}{tb.isVip ? " ✦" : ""}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {actions.map(a => (
-              <button key={a.status}
-                onClick={() => a.isLoss ? triggerLoss(a.status) : onAction(res.id, a.status, a.status === "SEATED" ? { tableLabel } : {})}
-                style={{ padding: "12px 16px", borderRadius: 10, border: `2px solid ${a.color}`, background: a.status === "SEATED" ? a.color : "transparent", color: a.status === "SEATED" ? "#fff" : a.color, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
+            {actions.map(a => {
+              const confirmingApproval = res.status === "PENDING_APPROVAL" && a.status === "CONFIRMED";
+              const confirmationReady = !!selectedSpaceId && !!tableLabel.trim() && !!confirmedReservationDate;
+              return <button key={a.status}
+                disabled={confirmingApproval && !confirmationReady}
+                onClick={() => {
+                  if (a.isLoss) return triggerLoss(a.status);
+                  if (confirmingApproval) {
+                    return onAction(res.id, a.status, {
+                      tableLabel: tableLabel.trim(),
+                      assignedSpaceId: selectedSpaceId,
+                      confirmedReservationDate: new Date(confirmedReservationDate).toISOString(),
+                    });
+                  }
+                  return onAction(res.id, a.status, a.status === "SEATED" ? { tableLabel } : {});
+                }}
+                style={{ padding: "12px 16px", borderRadius: 10, border: `2px solid ${a.color}`, background: a.status === "SEATED" ? a.color : "transparent", color: a.status === "SEATED" ? "#fff" : a.color, fontSize: 13, fontWeight: 700, cursor: confirmingApproval && !confirmationReady ? "not-allowed" : "pointer", opacity: confirmingApproval && !confirmationReady ? 0.45 : 1, textAlign: "left" }}>
                 {t("host", a.labelKey)}
-              </button>
-            ))}
+                {confirmingApproval && !confirmationReady ? " · select space, time and table" : ""}
+              </button>;
+            })}
           </div>
         )}
 
@@ -619,6 +658,9 @@ export default function HostOperationsBoard({
         const d = await r.json();
         setReservations(prev => prev.map(res => res.id === id ? { ...res, ...d.data } : res));
         setActiveRes(prev => prev?.id === id ? { ...prev, ...d.data } : prev);
+      } else {
+        const d = await r.json().catch(() => ({}));
+        alert(d.error ?? "Could not update this reservation.");
       }
     } finally {
       setBusy(false);

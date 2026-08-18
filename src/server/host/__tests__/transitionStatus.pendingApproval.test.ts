@@ -9,8 +9,7 @@
  *      promoted, ACTIVE CapacityHold created.
  *   2. Capacity exhausted: PENDING_APPROVAL accept throws 409 and rolls back — no
  *      CONFIRMED reservation or CapacityHold written.
- *   3. No requestedSpaceId: PENDING_APPROVAL → CONFIRMED with no space info doesn't
- *      create a hold.
+ *   3. No requestedSpaceId: acceptance is rejected until the host assigns one.
  *
  * Run with: npx tsx src/server/host/__tests__/transitionStatus.pendingApproval.test.ts
  */
@@ -68,7 +67,9 @@ async function test_pendingApproval_accept_happyPath() {
   const reservationDate = new Date("2026-09-01T20:00:00.000Z");
   const ids = await setup({ partySize: 2, reservationDate, requestedSpaceId: "test-space-approval" });
   try {
-    const result = await transitionStatus(ids.resId, "CONFIRMED", "system:test");
+    const result = await transitionStatus(ids.resId, "CONFIRMED", "system:test", {
+      reservationDate: reservationDate.toISOString(), tableLabel: "T1",
+    });
     assert(result.status === "CONFIRMED", `status should be CONFIRMED, got ${result.status}`);
     assert(result.assignedSpaceId === "test-space-approval",
       `assignedSpaceId should be promoted from requestedSpaceId, got ${result.assignedSpaceId}`);
@@ -115,7 +116,9 @@ async function test_pendingApproval_accept_capacityExhausted() {
   try {
     let threw409 = false;
     try {
-      await transitionStatus(ids.resId, "CONFIRMED", "system:test");
+      await transitionStatus(ids.resId, "CONFIRMED", "system:test", {
+        reservationDate: reservationDate.toISOString(), tableLabel: "T1",
+      });
     } catch (e: unknown) {
       const err = e as { status?: number; message?: string };
       assert(err.status === 409, `Expected status 409, got ${err.status}: ${err.message}`);
@@ -138,15 +141,24 @@ async function test_pendingApproval_accept_capacityExhausted() {
   }
 }
 
-// ── Scenario 3: No requestedSpaceId — no hold created on acceptance ───────────
+// ── Scenario 3: No requestedSpaceId — approval must remain pending ───────────
 
 async function test_pendingApproval_accept_noSpaceId_noHold() {
   const reservationDate = new Date("2026-09-03T20:00:00.000Z");
   const ids = await setup({ partySize: 2, reservationDate }); // no requestedSpaceId
   try {
-    const result = await transitionStatus(ids.resId, "CONFIRMED", "system:test");
-    assert(result.status === "CONFIRMED", `status should be CONFIRMED, got ${result.status}`);
-    assert(result.assignedSpaceId === null, `No space: assignedSpaceId should remain null`);
+    let rejected = false;
+    try {
+      await transitionStatus(ids.resId, "CONFIRMED", "system:test", {
+        reservationDate: reservationDate.toISOString(), tableLabel: "T1",
+      });
+    } catch (error) {
+      rejected = (error as { status?: number }).status === 400;
+    }
+    assert(rejected, "A request without a final space must not be confirmed");
+
+    const result = await prisma.reservation.findUniqueOrThrow({ where: { id: ids.resId } });
+    assert(result.status === "PENDING_APPROVAL", `status should remain PENDING_APPROVAL, got ${result.status}`);
 
     const hold = await prisma.capacityHold.findFirst({ where: { reservationId: ids.resId } });
     assert(hold === null, "No CapacityHold should be created when there is no requestedSpaceId");

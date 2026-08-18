@@ -167,6 +167,7 @@ export function GuestBookingForm({
   const [spaces, setSpaces] = useState<SpaceOption[]>([]);
   const [spacesLoading, setSpacesLoading] = useState(false);
   const [spacesError, setSpacesError] = useState("");
+  const [eventDetails, setEventDetails] = useState<SpaceOption["eventConflict"]>(null);
 
   // Today's ISO date string for the date picker min attribute
   const minDate = typeof window !== "undefined"
@@ -467,10 +468,14 @@ export function GuestBookingForm({
                     //  available +  requiresApproval  → amber  "Request this space"
                     //  full      + !requiresApproval  → amber  "Full"
                     //  full      +  requiresApproval  → red    "Full — request review"
-                    const statusColor = avail
+                    const statusColor = space.eventConflict
+                      ? "#f59e0b"
+                      : avail
                       ? (space.requiresApproval ? "#f59e0b" : "#10b981")
                       : (space.requiresApproval ? "#f87171" : "#f59e0b");
-                    const statusBg = avail
+                    const statusBg = space.eventConflict
+                      ? "rgba(245,158,11,0.12)"
+                      : avail
                       ? (space.requiresApproval ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.12)")
                       : (space.requiresApproval ? "rgba(248,113,113,0.12)" : "rgba(245,158,11,0.12)");
                     const statusText = space.eventConflict
@@ -487,7 +492,12 @@ export function GuestBookingForm({
                       <button
                         key={space.id}
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          if (space.eventConflict) {
+                            setEventDetails(space.eventConflict);
+                            return;
+                          }
+                          if (!space.isAvailable) return;
                           setForm((f) => ({
                             ...f,
                             requestedSpaceId: space.id,
@@ -495,10 +505,14 @@ export function GuestBookingForm({
                             conceptRequested: conceptIsLocked
                               ? (lockedConcept as ConceptKey)
                               : ((space.conceptKey as ConceptKey) || f.conceptRequested),
-                          }))
-                        }
+                          }));
+                        }}
+                        aria-haspopup={space.eventConflict ? "dialog" : undefined}
+                        aria-disabled={!space.isAvailable}
                         style={{
-                          padding: "10px 14px", borderRadius: 10, textAlign: "left", cursor: "pointer",
+                          padding: "10px 14px", borderRadius: 10, textAlign: "left",
+                          cursor: space.eventConflict ? "pointer" : (space.isAvailable ? "pointer" : "not-allowed"),
+                          opacity: !space.isAvailable && !space.eventConflict ? 0.72 : 1,
                           display: "flex", justifyContent: "space-between", alignItems: "center",
                           border: selected
                             ? "1px solid rgba(200,169,110,0.5)"
@@ -533,24 +547,6 @@ export function GuestBookingForm({
                   })}
                 </div>
               )}
-
-              {/* A same-venue event can make one area unavailable while other
-                  physical spaces remain bookable. Keep those alternatives in
-                  place and show a small, privacy-safe event card rather than
-                  sending the guest through a dead end. */}
-              {!spacesLoading && !spacesError && (() => {
-                const event = spaces.find((space) => space.eventConflict)?.eventConflict;
-                return event ? (
-                  <div role="status" style={{ marginTop: 10, padding: 12, borderRadius: 12, background: "rgba(200,169,110,0.08)", border: "1px solid rgba(200,169,110,0.28)", display: "flex", gap: 10, alignItems: "center" }}>
-                    {event.imageUrl && <img src={event.imageUrl} alt="" style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      {event.title && <div style={{ color: "#fff", fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{event.title}</div>}
-                      <div style={{ color: "#d1d5db", fontSize: 12, lineHeight: 1.35, marginTop: event.title ? 3 : 0 }}>{event.message}</div>
-                      {event.href && <a href={event.href} style={{ display: "inline-block", color: "#c8a96e", fontSize: 12, fontWeight: 800, marginTop: 6 }}>View event</a>}
-                    </div>
-                  </div>
-                ) : null;
-              })()}
 
               {/* ── Full-capacity fallback ─────────────────────────── */}
               {!spacesLoading && !spacesError && spaces.length > 0 &&
@@ -693,6 +689,50 @@ export function GuestBookingForm({
           </span>
         </label>
       </GlassCard>
+
+      {eventDetails && (
+        <div
+          role="presentation"
+          onClick={() => setEventDetails(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.78)", display: "flex", alignItems: "center", justifyContent: "center", padding: 22 }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="event-conflict-title"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "100%", maxWidth: 390, overflow: "hidden", borderRadius: 18, background: "#171512", border: "1px solid rgba(200,169,110,0.35)", boxShadow: "0 24px 80px rgba(0,0,0,0.55)" }}
+          >
+            {eventDetails.kind === "PUBLIC_EVENT" && eventDetails.imageUrl ? (
+              <img src={eventDetails.imageUrl} alt="" style={{ width: "100%", height: 190, objectFit: "cover", display: "block" }} />
+            ) : (
+              <div aria-hidden="true" style={{ height: 190, display: "grid", placeItems: "center", background: "linear-gradient(145deg,#2d271d,#11100e)", color: "#c8a96e", fontSize: 54 }}>
+                {eventDetails.kind === "PRIVATE_BLOCK" ? "🔒" : "✦"}
+              </div>
+            )}
+            <div style={{ padding: 22 }}>
+              <div id="event-conflict-title" style={{ color: "#fff", fontFamily: "var(--font-serif)", fontSize: 26, lineHeight: 1.15 }}>
+                {eventDetails.kind === "PRIVATE_BLOCK" ? "Private event" : eventDetails.title ?? "Special event"}
+              </div>
+              <div style={{ color: "#b8b1a7", fontSize: 14, lineHeight: 1.5, marginTop: 10 }}>{eventDetails.message}</div>
+              {eventDetails.kind === "PUBLIC_EVENT" && eventDetails.href ? (
+                <a href={eventDetails.href} style={{ display: "block", marginTop: 18, padding: "13px 16px", borderRadius: 10, background: "#c8a96e", color: "#171512", textAlign: "center", textDecoration: "none", fontSize: 14, fontWeight: 800 }}>
+                  View tickets and join →
+                </a>
+              ) : (
+                <div style={{ marginTop: 16, color: "#8f887f", fontSize: 12 }}>
+                  {eventDetails.kind === "PRIVATE_BLOCK"
+                    ? "This event is private and cannot be joined from the reservation page."
+                    : "This event is not currently open for public ticket booking."}
+                </div>
+              )}
+              <button type="button" onClick={() => setEventDetails(null)} style={{ width: "100%", marginTop: 10, padding: "11px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                Choose another space
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Party Size (non-QR mode only — in QR mode it renders before date/time) */}
       {!showDateTimePicker && <GlassCard style={{ marginBottom: 12 }}>

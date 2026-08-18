@@ -38,6 +38,37 @@ function localisedMessage(
   return translated || "This dining area is unavailable at the selected time. Please choose another available area.";
 }
 
+export function buildGuestEventCard(
+  series: {
+    slug: string;
+    title: string;
+    heroImageUrl: string | null;
+    status: string;
+    seriesVisibilityMode: string;
+    ticketTypes: Array<{ id: string }>;
+  },
+  message: string,
+  privateMessage = "This space is reserved for a private event at the selected time. Please choose another available area.",
+): PublicEventCard {
+  const isPublic = series.status === "PUBLISHED" && series.seriesVisibilityMode === "PUBLIC";
+  const canJoin = isPublic && series.ticketTypes.length > 0;
+  return isPublic
+    ? {
+        kind: "PUBLIC_EVENT",
+        title: series.title,
+        imageUrl: series.heroImageUrl,
+        href: canJoin ? `/series/${series.slug}` : undefined,
+        message,
+      }
+    : { kind: "PRIVATE_BLOCK", message: privateMessage };
+}
+
+function privateEventMessage(locale = "en") {
+  if (locale === "es") return "Este espacio está reservado para un evento privado a la hora seleccionada. Elige otra área disponible.";
+  if (locale === "pt") return "Este espaço está reservado para um evento privado no horário selecionado. Escolha outra área disponível.";
+  return "This space is reserved for a private event at the selected time. Please choose another available area.";
+}
+
 /** Half-open interval overlap: an arrival exactly at an event's end is valid. */
 export function timeWindowsOverlap(startA: Date, endA: Date, startB: Date, endB: Date) {
   return startA < endB && endA > startB;
@@ -64,23 +95,33 @@ export async function findBlockingOccupancy(
       OR: input.spaceId ? [{ scope: "VENUE" }, { scope: "SPACE", spaceId: input.spaceId }] : [{ scope: "VENUE" }],
     },
     orderBy: { blockStartsAt: "asc" },
-    include: { series: { select: { slug: true, title: true, heroImageUrl: true, status: true, seriesVisibilityMode: true } } },
+    include: {
+      series: {
+        select: {
+          slug: true,
+          title: true,
+          heroImageUrl: true,
+          status: true,
+          seriesVisibilityMode: true,
+          ticketTypes: {
+            where: { ticketStatus: "ACTIVE", visibilityMode: "VISIBLE" },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      },
+    },
   });
   if (!occupancy) return null;
 
   // An operational block can be public only when the underlying event is
   // actually public. An invite-only/private event must never reveal its name,
   // image or destination to a guest who is merely trying to make a reservation.
-  const isPublic = occupancy.series.status === "PUBLISHED" && occupancy.series.seriesVisibilityMode === "PUBLIC";
-  const card: PublicEventCard = isPublic
-    ? {
-        kind: "PUBLIC_EVENT",
-        title: occupancy.series.title,
-        imageUrl: occupancy.series.heroImageUrl,
-        href: `/series/${occupancy.series.slug}`,
-        message: localisedMessage(occupancy, input.locale),
-      }
-    : { kind: "PRIVATE_BLOCK", message: localisedMessage(occupancy, input.locale) };
+  const card = buildGuestEventCard(
+    occupancy.series,
+    localisedMessage(occupancy, input.locale),
+    privateEventMessage(input.locale),
+  );
   return { occupancy, card };
 }
 

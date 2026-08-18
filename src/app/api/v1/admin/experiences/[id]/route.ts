@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createReservationConflictRecords } from "@/server/events/eventOccupancyService";
+import { assertSeriesReadyForPublication, SeriesPublicationError, syncSeriesOccupanciesForStatus } from "@/server/series/publicationLifecycle";
 
 function isAdmin(session: any) {
   return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r));
@@ -36,13 +36,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
 
-  const allowed = ["title","subtitle","description","category","venue","venueId","spaceId","hostType","city","country","venueAddress",
+  const allowed = ["title","subtitle","description","category","venue","venueId","spaceId","hostType","influencerId","partnerId","city","country","venueAddress",
     "heroImageUrl","capacityTotal","availableSeatsMode","attendeeListMode","showCountdown","countdownLabel",
     "publicReleaseAt","earlyReleaseAt","newsletterCaptureEnabled","waitlistEnabled","membershipRuleMode",
     "isFeatured","seoTitle","seoDescription","status","startsAt","endsAt","communityUrl"];
   const data: any = {};
   for (const k of allowed) if (k in body) data[k] = body[k];
-  const existing = await prisma.series.findUnique({ where: { id }, select: { venueId: true, spaceId: true } });
+  const existing = await prisma.series.findUnique({ where: { id }, select: { venueId: true, spaceId: true, hostType: true, influencerId: true, partnerId: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const targetVenueId = data.venueId ?? existing.venueId;
   if ("venueId" in data) {
@@ -62,6 +62,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (Object.prototype.hasOwnProperty.call(data, "spaceId")) {
     data.venue = selectedSpace?.conceptKey === "OKU" || selectedSpace?.conceptKey === "CATCH" ? selectedSpace.conceptKey : null;
   }
+  const targetHostType = data.hostType ?? existing.hostType;
+  const targetInfluencerId = Object.prototype.hasOwnProperty.call(data, "influencerId") ? data.influencerId : existing.influencerId;
+  const targetPartnerId = Object.prototype.hasOwnProperty.call(data, "partnerId") ? data.partnerId : existing.partnerId;
+  if (targetHostType === "INFLUENCER") {
+    if (!targetInfluencerId) return NextResponse.json({ error: "Select an influencer host" }, { status: 400 });
+    const influencer = await prisma.influencerProfile.findUnique({ where: { id: targetInfluencerId }, select: { id: true } });
+    if (!influencer) return NextResponse.json({ error: "Influencer host not found" }, { status: 404 });
+    data.influencerId = targetInfluencerId;
+    data.partnerId = null;
+  } else if (targetHostType === "PARTNER") {
+    if (!targetPartnerId) return NextResponse.json({ error: "Select a partner host" }, { status: 400 });
+    const partner = await prisma.partnerProfile.findUnique({ where: { id: targetPartnerId }, select: { id: true } });
+    if (!partner) return NextResponse.json({ error: "Partner host not found" }, { status: 404 });
+    data.partnerId = targetPartnerId;
+    data.influencerId = null;
+  } else if (Object.prototype.hasOwnProperty.call(data, "hostType")) {
+    data.influencerId = null;
+    data.partnerId = null;
+  }
   if (data.publicReleaseAt) data.publicReleaseAt = new Date(data.publicReleaseAt);
   if (data.earlyReleaseAt)  data.earlyReleaseAt  = new Date(data.earlyReleaseAt);
   if (data.startsAt)        data.startsAt        = new Date(data.startsAt);
@@ -70,33 +89,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Publishing activates its deliberate occupancy blocks only after the admin
   // has created them. Pausing/postponing immediately releases future public
   // availability while preserving the event and its reservation-conflict audit.
-  const series = await prisma.$transaction(async (tx) => {
-    const updated = await tx.series.update({ where: { id }, data });
+  try {
+    const series = await prisma.$transaction(async (tx) => {
+      const updated = await tx.series.update({ where: { id }, data });
+      if (data.status === "PUBLISHED") await assertSeriesReadyForPublication(tx, id);
     if (data.status) {
-      const occupancies = await tx.eventSpaceOccupancy.findMany({
-        where: { seriesId: id, status: data.status === "PUBLISHED" ? "DRAFT" : "ACTIVE" },
-        orderBy: { spaceId: "asc" },
-      });
-      for (const occupancy of occupancies) {
-        // Same category-2 space lock used by reservation creation/assignment.
-        // Venue-wide blocks lock every physical space, preventing a booking
-        // from slipping through while the series state changes.
-        const ids = occupancy.scope === "VENUE"
-          ? (await tx.restaurantSpace.findMany({ where: { venueId: occupancy.venueId }, select: { id: true }, orderBy: { id: "asc" } })).map((s) => s.id)
-          : occupancy.spaceId ? [occupancy.spaceId] : [];
-        for (const spaceId of ids) await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${spaceId}))`;
-        if (data.status === "PUBLISHED") {
-          await tx.eventSpaceOccupancy.update({ where: { id: occupancy.id }, data: { status: "ACTIVE" } });
-          await createReservationConflictRecords(tx, occupancy);
-        } else {
-          // Any non-public series state releases its dining block. Preserve a
-          // deliberate postpone/cancel decision; otherwise treat it as paused.
-          await tx.eventSpaceOccupancy.update({ where: { id: occupancy.id }, data: { status: data.status === "POSTPONED" ? "POSTPONED" : data.status === "CANCELLED" ? "CANCELLED" : "PAUSED" } });
-        }
-      }
+      await syncSeriesOccupanciesForStatus(tx, id, data.status);
     }
     await tx.auditLog.create({ data: { actorId, action: "EXPERIENCE_UPDATED", metadata: { seriesId: id, fields: Object.keys(data) } } });
     return updated;
-  });
-  return NextResponse.json({ series });
+    });
+    return NextResponse.json({ series });
+  } catch (error) {
+    if (error instanceof SeriesPublicationError) {
+      return NextResponse.json({ error: "This series is not ready to publish.", issues: error.issues }, { status: 409 });
+    }
+    throw error;
+  }
 }

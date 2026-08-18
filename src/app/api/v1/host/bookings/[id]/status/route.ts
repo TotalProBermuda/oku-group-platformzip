@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { transitionStatus } from "@/server/host/hostService";
+import { prisma } from "@/lib/prisma";
 import type { ReservationStatus } from "@prisma/client";
 
 const VALID_STATUSES: ReservationStatus[] = [
@@ -16,18 +17,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // ANY reservation's status. Referral-only roles (STREETSIDE_HOST) are
   // read-only here.
   let userId: string;
+  let roles: string[];
   try {
     const s = await requireSession();
     userId = s.userId;
+    roles = s.roles;
     requirePermission(s.roles, "host:reservations:checkin");
   } catch (e) {
     const err = e as { message?: string; status?: number };
     return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
   }
   const { id } = await params;
+
+  // Restaurant hosts and supervisors may approve only their own venue's
+  // requests. SUPERADMIN retains cross-venue operational access.
+  if (!roles!.includes("SUPERADMIN")) {
+    const [profile, target] = await Promise.all([
+      prisma.restaurantHostProfile.findUnique({ where: { userId }, select: { venueId: true } }),
+      prisma.reservation.findUnique({ where: { id }, select: { venueId: true } }),
+    ]);
+    if (!target) return NextResponse.json({ ok: false, error: "Reservation not found" }, { status: 404 });
+    if (!profile?.venueId || profile.venueId !== target.venueId) {
+      return NextResponse.json({ ok: false, error: "Forbidden: reservation belongs to a different venue" }, { status: 403 });
+    }
+  }
   const body = await req.json();
 
-  const { status, tableLabel, lossReason, lossReasonNotes, internalNotes, arrivedHeadcount } = body;
+  const { status, tableLabel, assignedSpaceId, confirmedReservationDate, lossReason, lossReasonNotes, internalNotes, arrivedHeadcount } = body;
   if (!status || !VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
@@ -47,6 +63,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const reservation = await transitionStatus(id, status as ReservationStatus, userId, {
       tableLabel,
+      assignedSpaceId,
+      reservationDate: confirmedReservationDate,
       lossReason,
       lossReasonNotes,
       internalNotes,

@@ -54,6 +54,7 @@ export default function AdminExperienceEditPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [venues, setVenues] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
+  const [hostOptions, setHostOptions] = useState<{ influencers: any[]; partners: any[] }>({ influencers: [], partners: [] });
 
   const loadSeries = useCallback(async () => {
     const res = await fetch(`/api/v1/admin/experiences/${id}`);
@@ -65,8 +66,16 @@ export default function AdminExperienceEditPage() {
 
   useEffect(() => { loadSeries(); }, [loadSeries]);
   useEffect(() => {
-    Promise.all([fetch("/api/v1/admin/venues").then((r) => r.json()), fetch("/api/v1/admin/spaces").then((r) => r.json())])
-      .then(([venueResponse, spaceResponse]) => { setVenues(venueResponse.venues ?? []); setSpaces(spaceResponse.data ?? []); })
+    Promise.all([
+      fetch("/api/v1/admin/venues").then((r) => r.json()),
+      fetch("/api/v1/admin/spaces").then((r) => r.json()),
+      fetch("/api/v1/admin/series/host-options").then((r) => r.json()),
+    ])
+      .then(([venueResponse, spaceResponse, hostResponse]) => {
+        setVenues(venueResponse.venues ?? []);
+        setSpaces(spaceResponse.data ?? []);
+        setHostOptions(hostResponse.data ?? { influencers: [], partners: [] });
+      })
       .catch(() => {});
   }, []);
 
@@ -92,7 +101,10 @@ export default function AdminExperienceEditPage() {
       body: JSON.stringify(form),
     });
     const data = await res.json();
-    if (!res.ok) { setError(data.error ?? t("admin", "save_failed") ?? "Save failed"); }
+    if (!res.ok) {
+      const issues = Array.isArray(data.issues) ? data.issues.map((issue: { message?: string }) => issue.message).filter(Boolean).join(" ") : "";
+      setError(issues || data.error || t("admin", "save_failed") || "Save failed");
+    }
     else         { setSuccess(t("admin", "saved") ?? "Saved successfully"); setSeries(data.series); setForm(data.series); }
     setSaving(false);
   }
@@ -254,6 +266,30 @@ export default function AdminExperienceEditPage() {
               {field("description", t("admin", "description") ?? "Description", "textarea", { rows: 6 })}
               {field("category", t("admin", "category") ?? "Category", "text", { options: ["Food & Drink", "Wellness", "Design & Art", "Music", "Business", "Community"] })}
               <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Host type</label>
+                <select value={form.hostType ?? "OKU"} onChange={(e) => setForm((p: any) => ({ ...p, hostType: e.target.value, influencerId: null, partnerId: null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                  <option value="OKU">OKÜ</option><option value="CATCH">CATCH</option><option value="INFLUENCER">Influencer</option><option value="PARTNER">Partner</option>
+                </select>
+              </div>
+              {form.hostType === "INFLUENCER" && (
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Influencer host</label>
+                  <select value={form.influencerId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, influencerId: e.target.value || null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                    <option value="">Select an influencer</option>
+                    {hostOptions.influencers.map((profile) => <option key={profile.id} value={profile.id}>{profile.displayName || profile.user?.name || profile.handle || profile.user?.email}{profile.approved ? "" : " (not approved)"}</option>)}
+                  </select>
+                </div>
+              )}
+              {form.hostType === "PARTNER" && (
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Partner host</label>
+                  <select value={form.partnerId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, partnerId: e.target.value || null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                    <option value="">Select a partner</option>
+                    {hostOptions.partners.map((profile) => <option key={profile.id} value={profile.id}>{profile.name || profile.user?.name || profile.user?.email}{profile.approved ? "" : " (not approved)"}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={{ marginBottom: 20 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Operational venue</label>
                 <select value={form.venueId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, venueId: e.target.value, spaceId: "" }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
                   <option value="">Select a venue</option>
@@ -341,10 +377,11 @@ export default function AdminExperienceEditPage() {
                 <div style={{ fontWeight: 600, color: "#dc2626", marginBottom: 8 }}>{t("admin", "publish_checklist") ?? "Publish Checklist"}</div>
                 {[
                   { ok: !!form.title,         label: t("admin", "check_title") ?? "Title set" },
-                  { ok: !!form.description,   label: t("admin", "check_description") ?? "Description written" },
-                  { ok: !!form.startsAt,      label: t("admin", "check_start_date") ?? "Start date set" },
-                  { ok: (form.capacityTotal ?? 0) > 0, label: t("admin", "check_capacity") ?? "Capacity > 0" },
+                  { ok: !!form.venueId,       label: "Operational venue selected" },
+                  { ok: (series.sessions?.length ?? 0) > 0, label: "At least 1 event session" },
                   { ok: (series.ticketTypes?.length ?? 0) > 0, label: t("admin", "check_ticket_type") ?? "At least 1 ticket type" },
+                  { ok: form.hostType !== "INFLUENCER" || !!form.influencerId, label: "Influencer host selected when required" },
+                  { ok: form.hostType !== "PARTNER" || !!form.partnerId, label: "Partner host selected when required" },
                 ].map((c) => (
                   <div key={c.label} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
                     <span style={{ color: c.ok ? "#16a34a" : "#9ca3af", fontSize: 16 }}>{c.ok ? "✓" : "○"}</span>
