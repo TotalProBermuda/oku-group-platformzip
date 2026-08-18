@@ -25,4 +25,11 @@ export const createSeriesInputSchema = z.object({
   influencerId: z.preprocess(blankToUndefined, z.string().trim().min(1).optional()),
   partnerId: z.preprocess(blankToUndefined, z.string().trim().min(1).optional()),
   communityUrl: z.preprocess(blankToUndefined, z.string().url("Enter a valid community URL.").optional()),
+}).superRefine((value, ctx) => {
+  if (value.hostType === "INFLUENCER" && !value.influencerId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["influencerId"], message: "Select an influencer host." });
+  }
+  if (value.hostType === "PARTNER" && !value.partnerId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["partnerId"], message: "Select a partner host." });
+  }
 });

@@ -13,6 +13,8 @@ const dbMock = vi.hoisted(() => {
     prisma: {
       venue: { findUnique: vi.fn() },
       restaurantSpace: { findFirst: vi.fn() },
+      influencerProfile: { findUnique: vi.fn() },
+      partnerProfile: { findUnique: vi.fn() },
       series: { findUnique: vi.fn(), findMany: vi.fn() },
       $transaction: vi.fn((operation: (client: typeof tx) => unknown) => operation(tx)),
     },
@@ -44,6 +46,8 @@ beforeEach(() => {
   dbMock.prisma.venue.findUnique.mockResolvedValue({ id: "venue-1" });
   dbMock.prisma.restaurantSpace.findFirst.mockResolvedValue({ conceptKey: "TERRACE" });
   dbMock.prisma.series.findUnique.mockResolvedValue(null);
+  dbMock.prisma.influencerProfile.findUnique.mockResolvedValue({ id: "influencer-1" });
+  dbMock.prisma.partnerProfile.findUnique.mockResolvedValue({ id: "partner-1" });
   dbMock.tx.series.create.mockResolvedValue({ id: "series-1", ...validBody, status: "DRAFT" });
   dbMock.tx.auditLog.create.mockResolvedValue({ id: "audit-1" });
 });
@@ -80,5 +84,15 @@ describe("POST /api/v1/admin/series", () => {
     const response = await POST(request(validBody));
     expect(response.status).toBe(409);
     expect(dbMock.tx.series.create).not.toHaveBeenCalled();
+  });
+
+  it("requires and persists the selected partner host", async () => {
+    const missing = await POST(request({ ...validBody, hostType: "PARTNER" }));
+    expect(missing.status).toBe(400);
+    const response = await POST(request({ ...validBody, hostType: "PARTNER", partnerId: "partner-1" }));
+    expect(response.status).toBe(201);
+    expect(dbMock.tx.series.create).toHaveBeenLastCalledWith({
+      data: expect.objectContaining({ hostType: "PARTNER", partnerId: "partner-1", influencerId: null }),
+    });
   });
 });

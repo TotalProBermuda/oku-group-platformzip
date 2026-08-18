@@ -30,7 +30,13 @@ export async function GET() {
     const series = await prisma.series.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        sessions: { include: { _count: { select: { tickets: true } } } },
+        sessions: {
+          include: {
+            _count: { select: { tickets: true } },
+            occupancies: { select: { id: true, scope: true, status: true, space: { select: { id: true, name: true } } } },
+          },
+          orderBy: { startsAt: "asc" },
+        },
         ticketTypes: true,
         influencer: { include: { user: { select: { id: true, name: true, email: true } } } },
         partner: { include: { user: { select: { id: true, name: true, email: true } } } },
@@ -64,12 +70,27 @@ export async function POST(req: Request) {
       ? await prisma.restaurantSpace.findFirst({ where: { id: body.spaceId, venueId: body.venueId, isActive: true }, select: { conceptKey: true } })
       : null;
     if (body.spaceId && !space) return NextResponse.json({ ok: false, error: "Select an active space belonging to the chosen venue" }, { status: 400 });
+    if (body.hostType === "INFLUENCER") {
+      const influencer = await prisma.influencerProfile.findUnique({ where: { id: body.influencerId! }, select: { id: true } });
+      if (!influencer) return NextResponse.json({ ok: false, error: "Select a valid influencer host." }, { status: 400 });
+    }
+    if (body.hostType === "PARTNER") {
+      const partner = await prisma.partnerProfile.findUnique({ where: { id: body.partnerId! }, select: { id: true } });
+      if (!partner) return NextResponse.json({ ok: false, error: "Select a valid partner host." }, { status: 400 });
+    }
     const existing = await prisma.series.findUnique({ where: { slug: body.slug }, select: { id: true } });
     if (existing) return NextResponse.json({ ok: false, error: "That slug is already in use. Choose a different one." }, { status: 409 });
     const legacyVenue = space?.conceptKey === "OKU" || space?.conceptKey === "CATCH" ? space.conceptKey : undefined;
     const series = await prisma.$transaction(async (tx) => {
       const created = await tx.series.create({
-        data: { ...body, spaceId: body.spaceId ?? null, venue: legacyVenue, status: "DRAFT" },
+        data: {
+          ...body,
+          influencerId: body.hostType === "INFLUENCER" ? body.influencerId : null,
+          partnerId: body.hostType === "PARTNER" ? body.partnerId : null,
+          spaceId: body.spaceId ?? null,
+          venue: legacyVenue,
+          status: "DRAFT",
+        },
       });
       await tx.auditLog.create({
         data: {

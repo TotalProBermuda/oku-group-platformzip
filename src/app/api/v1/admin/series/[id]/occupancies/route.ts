@@ -37,7 +37,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id: seriesId } = await params;
   const occupancies = await prisma.eventSpaceOccupancy.findMany({
     where: { seriesId }, orderBy: { blockStartsAt: "asc" },
-    include: { space: { select: { id: true, name: true } }, session: { select: { id: true, startsAt: true, endsAt: true, status: true } }, _count: { select: { reservationConflicts: true } } },
+    include: { space: { select: { id: true, name: true } }, session: { select: { id: true, title: true, startsAt: true, endsAt: true, status: true } }, _count: { select: { reservationConflicts: true } } },
   });
   return NextResponse.json({ occupancies });
 }
