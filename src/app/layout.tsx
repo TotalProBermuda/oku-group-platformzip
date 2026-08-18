@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Providers } from "@/components/Providers";
+import { injectedExtensionErrorGuardScript } from "@/lib/clientErrorFilters";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -49,6 +50,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={`${inter.variable} ${cormorant.variable}`}
     >
       <head>
+        {/* Chrome extensions execute in the page context. Install this before
+            Next's dev overlay so a known MetaMask injection failure cannot be
+            misreported as an OKÜ application crash. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: injectedExtensionErrorGuardScript }}
+        />
         {/* Anti-flash: apply saved theme before React hydration */}
         <script
           suppressHydrationWarning
