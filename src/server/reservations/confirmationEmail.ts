@@ -9,6 +9,7 @@ export interface ReservationConfirmationInput {
   venueName: string;
   venueCity: string | null;
   zoneName: string | null;
+  tableLabel?: string | null;
   occasion: string | null;
   seatingPreference: string | null;
   notes: string | null;
@@ -21,6 +22,8 @@ export interface ReservationConfirmationResult {
   bodySnapshot: string;
   subject: string;
 }
+
+export type ReservationEmailKind = "REQUEST_RECEIVED" | "CONFIRMATION";
 
 const PANAMA_TZ = "America/Panama";
 
@@ -62,6 +65,7 @@ function buildHtml(props: ReservationConfirmationInput): string {
     { label: "Party size", value: `${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}` },
   ];
   if (props.zoneName) detailsRows.push({ label: "Seating", value: escapeHtml(props.zoneName) });
+  if (props.tableLabel) detailsRows.push({ label: "Table plan", value: escapeHtml(props.tableLabel) });
   if (props.occasion) detailsRows.push({ label: "Occasion", value: escapeHtml(props.occasion) });
   if (props.seatingPreference) detailsRows.push({ label: "Preference", value: escapeHtml(props.seatingPreference) });
   if (props.addons.length > 0) {
@@ -134,6 +138,7 @@ function buildText(props: ReservationConfirmationInput): string {
     `Party size:  ${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}`,
   ];
   if (props.zoneName) lines.push(`Seating:     ${props.zoneName}`);
+  if (props.tableLabel) lines.push(`Table plan:  ${props.tableLabel}`);
   if (props.occasion) lines.push(`Occasion:    ${props.occasion}`);
   if (props.seatingPreference) lines.push(`Preference:  ${props.seatingPreference}`);
   if (props.addons.length > 0) lines.push(`Add-ons:     ${props.addons.map((a) => a.label).join(", ")}`);
@@ -151,8 +156,74 @@ function buildText(props: ReservationConfirmationInput): string {
   return lines.join("\n");
 }
 
+function buildRequestHtml(props: ReservationConfirmationInput): string {
+  const { dateLine, timeLine } = formatReservationDateTime(props.reservationDate);
+  const firstName = escapeHtml(props.contactName.split(" ")[0] || props.contactName);
+  const venueLine = props.venueCity
+    ? `${escapeHtml(props.venueName)} · ${escapeHtml(props.venueCity)}`
+    : escapeHtml(props.venueName);
+
+  return `<!DOCTYPE html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f0ea;margin:0;padding:24px;color:#1a1614">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;border:1px solid #e5dccf">
+    <div style="text-align:center;margin-bottom:24px"><span style="font-size:11px;font-weight:700;letter-spacing:0.18em;color:#c41e3a">OKÜ HOSPITALITY GROUP</span></div>
+    <h1 style="font-size:24px;line-height:1.25;margin:0 0 4px;color:#1a1614">Reservation request received</h1>
+    <p style="font-size:14px;color:#8a7d70;margin:0 0 24px">${venueLine}</p>
+    <p style="font-size:15px;line-height:1.55;color:#4a423b;margin:0 0 8px">Hi ${firstName},</p>
+    <p style="font-size:15px;line-height:1.55;color:#4a423b;margin:0 0 20px">We received your request for <strong>${escapeHtml(props.venueName)}</strong>. This is not yet a confirmed reservation. Our host team will review the space, time and table plan and send a separate confirmation if it is accepted.</p>
+    <div style="background:#f9f5ef;border:1px solid #e5dccf;border-radius:8px;padding:18px;margin:0 0 22px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#8a7d70;margin-bottom:8px">REQUEST REFERENCE</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:0.1em;font-family:'SF Mono','Menlo',monospace">${escapeHtml(props.confirmationCode)}</div>
+      <div style="font-size:13px;color:#6b5e54;margin-top:12px">${dateLine} · ${timeLine} · ${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}</div>
+    </div>
+    <p style="font-size:13px;color:#6b5e54;line-height:1.55;margin:0">Plans can change while the request is reviewed, especially for large groups or joined tables. Please rely on the confirmation email for the final time and table arrangements.</p>
+  </div>
+</body></html>`;
+}
+
+export function buildReservationRequestText(props: ReservationConfirmationInput): string {
+  const { dateLine, timeLine } = formatReservationDateTime(props.reservationDate);
+  return [
+    `Hi ${props.contactName.split(" ")[0] || props.contactName},`,
+    "",
+    `We received your reservation request for ${props.venueName}.`,
+    "This is not yet a confirmed reservation. Our host team will review the space, time and table plan and send a separate confirmation if it is accepted.",
+    "",
+    `REQUEST REFERENCE: ${props.confirmationCode}`,
+    `Requested date: ${dateLine}`,
+    `Requested time: ${timeLine}`,
+    `Party size: ${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}`,
+    "",
+    "For large groups or joined tables, the final table assignment may change. Please rely on the confirmation email for final arrangements.",
+  ].join("\n");
+}
+
 export function buildReservationConfirmationSubject(props: Pick<ReservationConfirmationInput, "venueName" | "confirmationCode">): string {
   return `Your reservation at ${props.venueName} — ${props.confirmationCode}`;
+}
+
+export function buildReservationRequestSubject(props: Pick<ReservationConfirmationInput, "venueName" | "confirmationCode">): string {
+  return `Request received at ${props.venueName} — ${props.confirmationCode}`;
+}
+
+export async function sendReservationRequestReceivedEmail(
+  props: ReservationConfirmationInput
+): Promise<ReservationConfirmationResult> {
+  const subject = buildReservationRequestSubject(props);
+  const html = buildRequestHtml(props);
+  const text = buildReservationRequestText(props);
+
+  if (!isResendConfigured()) {
+    return { sent: false, reason: "RESEND_NOT_CONFIGURED", bodySnapshot: text, subject };
+  }
+
+  try {
+    const { client, fromEmail } = await getResendClient();
+    await client.emails.send({ from: fromEmail, to: props.contactEmail, subject, html, text });
+    return { sent: true, bodySnapshot: text, subject };
+  } catch (e) {
+    return { sent: false, reason: e instanceof Error ? e.message : "send_failed", bodySnapshot: text, subject };
+  }
 }
 
 export async function sendReservationConfirmationEmail(

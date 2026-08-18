@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createAttributionSession } from "@/server/services/invu/identityService";
 import { resolveActorFromCode } from "@/server/referrals/referralActorService";
-import {
-  sendReservationConfirmationEmail,
-  buildReservationConfirmationSubject,
-} from "@/server/reservations/confirmationEmail";
+import { deliverReservationStateEmail } from "@/server/reservations/reservationNotificationService";
 import { gatePublicPostAsync } from "@/server/rateLimit";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
@@ -79,7 +76,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const pendingApproval = requestedSpace?.requiresApproval ?? false;
+    // "No preference — host will assign" is also an approval workflow. It
+    // cannot be CONFIRMED without a space/hold and then depend on a host fixing
+    // it later. The host must choose the final space, time and table plan first.
+    const pendingApproval = requestedSpace ? requestedSpace.requiresApproval : true;
 
     // Every request has a window. No-preference requests may wait for host
     // assignment, but must still honour a venue-wide exclusive event block.
@@ -579,73 +579,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Log confirmation communication, then attempt to actually send it.
-    // We persist a PENDING row up front so that even if the Resend call
-    // throws or the process dies mid-send, the booking still has an
-    // audit trail of "we owed this guest an email" — ops can replay it
-    // later from the admin queue.
-    const subjectLine = buildReservationConfirmationSubject({
-      venueName: venue.name,
-      confirmationCode,
-    });
-    const commRow = await prisma.reservationCommunication.create({
-      data: {
-        reservationId: reservation.id,
-        type: "EMAIL",
-        templateKey: "CONFIRMATION",
-        recipient: contactEmail,
-        subject: subjectLine,
-        status: "PENDING",
-      },
-    });
-
-    // Send-and-forget: do NOT block the booking response on the email
-    // round-trip. The diner already has their confirmation code in the
-    // JSON response below; the email is a courtesy, and Resend has its
-    // own retry logic. We still await long enough to update the comm
-    // row's terminal status before returning so the admin queue is
-    // accurate when the page reloads.
+    // Email copy follows the persisted state. Approval/payment requests get a
+    // receipt that explicitly says they are not confirmed; only an actually
+    // CONFIRMED reservation gets the arrival confirmation and code wording.
     try {
-      const result = await sendReservationConfirmationEmail({
-        contactName,
-        contactEmail,
-        confirmationCode,
-        reservationDate: reservation.reservationDate,
-        partySize: reservation.partySize,
-        venueName: venue.name,
-        venueCity: venue.city,
-        zoneName: zone?.name ?? null,
-        occasion: reservation.occasion,
-        seatingPreference: reservation.seatingPreference,
-        notes: reservation.notes,
-        addons: ((addons as string[] | undefined) ?? []).map((key) => ({
-          label: key.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()),
-        })),
-      });
-      await prisma.reservationCommunication.update({
-        where: { id: commRow.id },
-        data: {
-          status: result.sent ? "SENT" : "FAILED",
-          sentAt: result.sent ? new Date() : null,
-          bodySnapshot: result.bodySnapshot,
-        },
-      });
-      if (!result.sent) {
-        console.warn(
-          "[POST /api/reservations] confirmation email not sent",
-          { reservationId: reservation.id, reason: result.reason }
-        );
+      const emailKind = reservation.status === "CONFIRMED" ? "CONFIRMATION" : "REQUEST_RECEIVED";
+      const result = await deliverReservationStateEmail(reservation.id, emailKind);
+      if (!("skipped" in result) || !result.skipped) {
+        if ("sent" in result && !result.sent) {
+          console.warn("[POST /api/reservations] reservation email not sent", {
+            reservationId: reservation.id,
+            emailKind,
+            reason: result.reason,
+          });
+        }
       }
     } catch (emailErr) {
-      // Defensive: even sendReservationConfirmationEmail's own error
-      // wrapping could be bypassed by an unexpected throw. Don't fail
-      // the booking — just mark the comm row failed and log.
-      await prisma.reservationCommunication.update({
-        where: { id: commRow.id },
-        data: { status: "FAILED" },
-      }).catch(() => null);
       console.error(
-        "[POST /api/reservations] unexpected error sending confirmation email",
+        "[POST /api/reservations] unexpected error sending reservation email",
         { reservationId: reservation.id, err: emailErr }
       );
     }

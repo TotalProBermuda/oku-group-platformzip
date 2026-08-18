@@ -113,7 +113,9 @@ async function main() {
     // ── The acceptance must NOT be blocked by the expired hold ───────────────
     let acceptError: Error | null = null;
     try {
-      await transitionStatus(reservation.id, "CONFIRMED", HOST_ID);
+      await transitionStatus(reservation.id, "CONFIRMED", HOST_ID, {
+        reservationDate: start.toISOString(), tableLabel: "T1",
+      });
     } catch (err: any) {
       acceptError = err;
     }
@@ -164,7 +166,9 @@ async function main() {
 
     let blockError: Error | null = null;
     try {
-      await transitionStatus(blockedReservation.id, "CONFIRMED", HOST_ID);
+      await transitionStatus(blockedReservation.id, "CONFIRMED", HOST_ID, {
+        reservationDate: start.toISOString(), tableLabel: "T1",
+      });
     } catch (err: any) {
       blockError = err;
     }
