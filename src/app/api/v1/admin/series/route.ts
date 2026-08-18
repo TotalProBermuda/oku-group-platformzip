@@ -1,19 +1,26 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
+import { createSeriesInputSchema } from "@/server/series/createSeriesInput";
 
-const Body = z.object({
-  slug: z.string().min(3),
-  title: z.string().min(3),
-  hostType: z.enum(["OKU", "CATCH", "INFLUENCER", "PARTNER"]),
-  venueId: z.string().min(1),
-  spaceId: z.string().min(1).nullable().optional(),
-  influencerId: z.string().optional(),
-  partnerId: z.string().optional(),
-  communityUrl: z.string().url().optional(),
-});
+function failure(error: unknown) {
+  const status = typeof (error as { status?: unknown })?.status === "number"
+    ? (error as { status: number }).status
+    : 500;
+  if (status < 500) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Request denied" },
+      { status },
+    );
+  }
+  console.error("Unable to manage admin series", error);
+  return NextResponse.json(
+    { ok: false, error: "Unable to complete this request. Please try again." },
+    { status: 500 },
+  );
+}
 
 export async function GET() {
   try {
@@ -33,29 +40,51 @@ export async function GET() {
     });
 
     return NextResponse.json({ ok: true, data: series });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (e) {
+    return failure(e);
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const { roles } = await requireSession();
+    const { roles, userId } = await requireSession();
     requirePermission(roles, "admin:experiences:write");
 
-    const body = Body.parse(await req.json());
+    const parsed = createSeriesInputSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: "Please correct the highlighted details.", fields: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+    const body = parsed.data;
     const venue = await prisma.venue.findUnique({ where: { id: body.venueId }, select: { id: true } });
     if (!venue) return NextResponse.json({ ok: false, error: "Venue not found" }, { status: 404 });
     const space = body.spaceId
       ? await prisma.restaurantSpace.findFirst({ where: { id: body.spaceId, venueId: body.venueId, isActive: true }, select: { conceptKey: true } })
       : null;
     if (body.spaceId && !space) return NextResponse.json({ ok: false, error: "Select an active space belonging to the chosen venue" }, { status: 400 });
+    const existing = await prisma.series.findUnique({ where: { slug: body.slug }, select: { id: true } });
+    if (existing) return NextResponse.json({ ok: false, error: "That slug is already in use. Choose a different one." }, { status: 409 });
     const legacyVenue = space?.conceptKey === "OKU" || space?.conceptKey === "CATCH" ? space.conceptKey : undefined;
-    const series = await prisma.series.create({ data: { ...body, spaceId: body.spaceId ?? null, venue: legacyVenue, status: "DRAFT" } as any });
-    return NextResponse.json({ ok: true, data: series });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+    const series = await prisma.$transaction(async (tx) => {
+      const created = await tx.series.create({
+        data: { ...body, spaceId: body.spaceId ?? null, venue: legacyVenue, status: "DRAFT" },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: "EXPERIENCE_CREATED",
+          metadata: { seriesId: created.id, slug: created.slug },
+        },
+      });
+      return created;
+    });
+    return NextResponse.json({ ok: true, data: series }, { status: 201 });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return NextResponse.json({ ok: false, error: "That slug is already in use. Choose a different one." }, { status: 409 });
+    }
+    return failure(e);
   }
 }
