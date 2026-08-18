@@ -6,9 +6,22 @@ import StatusBadge from "@/components/entities/StatusBadge";
 import EntityLink from "@/components/entities/EntityLink";
 import ActionMenu, { ActionItem } from "@/components/entities/ActionMenu";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
-import { Globe, EyeOff, Users, DollarSign, Calendar } from "lucide-react";
+import { Globe, EyeOff, Users, DollarSign, Calendar, Plus } from "lucide-react";
 
 type Tab = "overview" | "sessions" | "orders";
+
+function responseError(payload: unknown, fallback: string) {
+  if (!payload || typeof payload !== "object") return fallback;
+  const { error, fields } = payload as { error?: unknown; fields?: Record<string, unknown> };
+  if (fields) {
+    for (const errors of Object.values(fields)) {
+      if (!Array.isArray(errors)) continue;
+      const message = errors.find((entry): entry is string => typeof entry === "string" && entry.length > 0);
+      if (message) return message;
+    }
+  }
+  return typeof error === "string" && error.length > 0 ? error : fallback;
+}
 
 interface SeriesDrawerProps {
   seriesId: string | null;
@@ -36,6 +49,10 @@ export default function SeriesDrawer({
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [showSessionForm, setShowSessionForm] = useState(false);
+  const [sessionForm, setSessionForm] = useState({ title: "", startsAt: "", endsAt: "", capacity: "" });
+  const [sessionSaving, setSessionSaving] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const fetchSeries = useCallback(async () => {
     if (!seriesId) return;
@@ -70,6 +87,8 @@ export default function SeriesDrawer({
       setSeries(null);
       setOrders(null);
       setMsg(null);
+      setShowSessionForm(false);
+      setSessionError(null);
       fetchSeries();
     }
   }, [seriesId, fetchSeries]);
@@ -83,6 +102,38 @@ export default function SeriesDrawer({
   const flash = (text: string, ok = true) => {
     setMsg({ text, ok });
     setTimeout(() => setMsg(null), 3500);
+  };
+
+  const createSession = async () => {
+    if (!seriesId) return;
+    setSessionSaving(true);
+    setSessionError(null);
+    try {
+      const response = await fetch(`/api/v1/admin/series/${seriesId}/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: sessionForm.title,
+          startsAt: new Date(sessionForm.startsAt).toISOString(),
+          endsAt: new Date(sessionForm.endsAt).toISOString(),
+          capacity: Number(sessionForm.capacity),
+        }),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok || !payload || typeof payload !== "object" || (payload as { ok?: unknown }).ok !== true) {
+        setSessionError(responseError(payload, t("admin", "createEventFailed")));
+        return;
+      }
+      setSessionForm({ title: "", startsAt: "", endsAt: "", capacity: "" });
+      setShowSessionForm(false);
+      await fetchSeries();
+      onUpdated?.();
+      flash(t("admin", "eventCreated"));
+    } catch {
+      setSessionError(t("admin", "createEventFailed"));
+    } finally {
+      setSessionSaving(false);
+    }
   };
 
   const doAction = async (endpoint: string) => {
@@ -247,6 +298,57 @@ export default function SeriesDrawer({
 
       {tab === "sessions" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                setShowSessionForm((current) => !current);
+                setSessionError(null);
+              }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Plus size={13} />
+              {showSessionForm ? t("admin", "cancel") : t("admin", "newEvent")}
+            </button>
+          </div>
+          {showSessionForm && (
+            <div className="card" style={{ padding: 16 }}>
+              <div className="form-group" style={{ margin: "0 0 12px" }}>
+                <label className="form-label" htmlFor="new-event-title">{t("admin", "eventTitle")}</label>
+                <input
+                  id="new-event-title"
+                  className="form-input"
+                  value={sessionForm.title}
+                  onChange={(event) => setSessionForm({ ...sessionForm, title: event.target.value })}
+                  maxLength={160}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" htmlFor="new-event-start">{t("admin", "eventStarts")}</label>
+                  <input id="new-event-start" type="datetime-local" className="form-input" value={sessionForm.startsAt} onChange={(event) => setSessionForm({ ...sessionForm, startsAt: event.target.value })} />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" htmlFor="new-event-end">{t("admin", "eventEnds")}</label>
+                  <input id="new-event-end" type="datetime-local" className="form-input" value={sessionForm.endsAt} onChange={(event) => setSessionForm({ ...sessionForm, endsAt: event.target.value })} />
+                </div>
+              </div>
+              <div className="form-group" style={{ margin: "12px 0" }}>
+                <label className="form-label" htmlFor="new-event-capacity">{t("admin", "capacity")}</label>
+                <input id="new-event-capacity" type="number" min={1} max={100000} step={1} className="form-input" value={sessionForm.capacity} onChange={(event) => setSessionForm({ ...sessionForm, capacity: event.target.value })} />
+              </div>
+              {sessionError && <p role="alert" style={{ color: "#b42318", fontSize: 13, margin: "0 0 12px" }}>{sessionError}</p>}
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={sessionSaving || !sessionForm.startsAt || !sessionForm.endsAt || !sessionForm.capacity}
+                onClick={createSession}
+              >
+                {sessionSaving ? t("admin", "creating") : t("admin", "createEvent")}
+              </button>
+            </div>
+          )}
           {!series?.sessions?.length && (
             <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--color-text-muted)", fontSize: 13 }}>
               {t("admin", "noSessionsFound")}

@@ -11,6 +11,19 @@ import EntityDrawerHost from "@/components/drawers/EntityDrawerHost";
 import { Search, Plus } from "lucide-react";
 import { seriesLocationLabel } from "@/lib/locations";
 
+function apiError(payload: unknown, fallback: string) {
+  if (!payload || typeof payload !== "object") return fallback;
+  const { error, fields } = payload as { error?: unknown; fields?: Record<string, unknown> };
+  if (fields) {
+    for (const messages of Object.values(fields)) {
+      if (!Array.isArray(messages)) continue;
+      const message = messages.find((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+      if (message) return message;
+    }
+  }
+  return typeof error === "string" && error.trim() ? error : fallback;
+}
+
 function SeriesPageContent() {
   const t = useTranslation();
   const locale = useLocale();
@@ -28,23 +41,44 @@ function SeriesPageContent() {
   const [spaces, setSpaces] = useState<any[]>([]);
   const [form, setForm] = useState({ slug: "", title: "", hostType: "OKU", venueId: "", spaceId: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
     fetch("/api/v1/admin/series")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const payload = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(apiError(payload, "Could not load series."));
+        return payload;
+      })
       .then((d) => { if (d.ok) setSeries(d.data); })
+      .catch(() => setSeries([]))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
   useEffect(() => {
-    Promise.all([fetch("/api/v1/admin/venues").then((r) => r.json()), fetch("/api/v1/admin/spaces").then((r) => r.json())])
+    Promise.all([
+      fetch("/api/v1/admin/venues").then(async (r) => {
+        const payload = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(apiError(payload, "Could not load venues."));
+        return payload;
+      }),
+      fetch("/api/v1/admin/spaces").then(async (r) => {
+        const payload = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(apiError(payload, "Could not load spaces."));
+        return payload;
+      }),
+    ])
       .then(([venueResponse, spaceResponse]) => {
         const nextVenues = venueResponse.venues ?? [];
+        setLocationError(null);
         setVenues(nextVenues); setSpaces(spaceResponse.data ?? []);
         if (nextVenues.length === 1) setForm((current) => ({ ...current, venueId: current.venueId || nextVenues[0].id }));
-      }).catch(() => {});
+      }).catch((error: unknown) => {
+        setLocationError(error instanceof Error ? error.message : "Could not load venue options.");
+      });
   }, []);
 
   const filtered = useMemo(() => {
@@ -58,18 +92,26 @@ function SeriesPageContent() {
 
   const handleCreate = async () => {
     setSubmitting(true);
-    const res = await fetch("/api/v1/admin/series", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const d = await res.json();
-    if (d.ok) {
+    setCreateError(null);
+    try {
+      const res = await fetch("/api/v1/admin/series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, slug: form.slug.trim().toLowerCase() }),
+      });
+      const payload: unknown = await res.json().catch(() => null);
+      if (!res.ok || !payload || typeof payload !== "object" || (payload as { ok?: unknown }).ok !== true) {
+        setCreateError(apiError(payload, "Could not create the series. Please try again."));
+        return;
+      }
       setShowForm(false);
       setForm({ slug: "", title: "", hostType: "OKU", venueId: venues.length === 1 ? venues[0].id : "", spaceId: "" });
       load();
+    } catch {
+      setCreateError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const fmtDate = (d: string) =>
@@ -235,6 +277,7 @@ function SeriesPageContent() {
           </p>
         </div>
         <button
+          type="button"
           className="btn btn-primary btn-sm"
           onClick={() => setShowForm(!showForm)}
           style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -288,6 +331,7 @@ function SeriesPageContent() {
                 <option value="">Select a venue</option>
                 {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
               </select>
+              {locationError && <p role="alert" style={{ color: "var(--color-danger)", fontSize: 12, margin: "6px 0 0" }}>{locationError}</p>}
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Physical space <span style={{ fontWeight: 400 }}>(optional)</span></label>
@@ -299,16 +343,22 @@ function SeriesPageContent() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
+              type="button"
               className="btn btn-primary btn-sm"
               disabled={submitting || !form.title || !form.slug || !form.venueId}
               onClick={handleCreate}
             >
               {submitting ? t("admin", "creating") : t("admin", "createSeries")}
             </button>
-            <button className="btn btn-sm" onClick={() => setShowForm(false)}>
+            <button type="button" className="btn btn-sm" onClick={() => setShowForm(false)}>
               {t("admin", "cancel")}
             </button>
           </div>
+          {createError && (
+            <p role="alert" style={{ color: "var(--color-danger)", fontSize: 13, margin: "10px 0 0" }}>
+              {createError}
+            </p>
+          )}
         </div>
       )}
 
