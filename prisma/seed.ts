@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { LOCAL5_SPACE_SPECS } from "../src/lib/operatingLocation";
 import { ensureStreetsideReferralIdentity } from "@/server/referrals/streetsideReferralService";
 
 const prisma = new PrismaClient();
@@ -1771,25 +1772,31 @@ async function main() {
   }
 
   // ─── Restaurant Spaces (Task #181 — idempotent upsert) ─────────────────────
-  // Four permanent OKÜ dining spaces. Keyed by (venueId, name) so running
-  // the seed twice or on an existing DB never creates duplicate rows.
-  const spaceData = [
-    { name: "OKÜ Dining Room",   capacity: 27, sortOrder: 0, weatherSensitive: false },
-    { name: "Catch Experience",  capacity: 24, sortOrder: 1, weatherSensitive: false },
-    { name: "Terrace",           capacity: 42, sortOrder: 2, weatherSensitive: true  },
-    { name: "VIP",               capacity: 10, sortOrder: 3, weatherSensitive: false, requiresApproval: true },
-  ];
-  for (const s of spaceData) {
+  // Four physical dining spaces inside the one operating location. `conceptKey`
+  // is the stable operational identity; names are presentation and may be
+  // corrected without breaking reservations, capacity holds, or events that
+  // already reference the space ID. Do not use menu concepts as a security or
+  // capacity boundary: both menus may be served in every eligible space.
+  for (const s of LOCAL5_SPACE_SPECS) {
     await prisma.restaurantSpace.upsert({
-      where: { venueId_name: { venueId: goldHouse.id, name: s.name } },
-      update: { capacity: s.capacity, sortOrder: s.sortOrder, weatherSensitive: s.weatherSensitive, requiresApproval: (s as any).requiresApproval ?? false },
-      create: {
-        venueId: goldHouse.id,
+      where: { venueId_conceptKey: { venueId: goldHouse.id, conceptKey: s.conceptKey } },
+      update: {
         name: s.name,
         capacity: s.capacity,
         sortOrder: s.sortOrder,
         weatherSensitive: s.weatherSensitive,
-        requiresApproval: (s as any).requiresApproval ?? false,
+        requiresApproval: s.requiresApproval,
+        reservable: true,
+        isActive: true,
+      },
+      create: {
+        venueId: goldHouse.id,
+        conceptKey: s.conceptKey,
+        name: s.name,
+        capacity: s.capacity,
+        sortOrder: s.sortOrder,
+        weatherSensitive: s.weatherSensitive,
+        requiresApproval: s.requiresApproval,
         reservable: true,
         isActive: true,
       },
