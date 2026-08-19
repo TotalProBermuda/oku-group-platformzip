@@ -16,6 +16,8 @@
     "seed:menus": "tsx scripts/seed-menus.ts",
     "seed:ir": "tsx scripts/seed-ir-sop.ts",
     "seed:sponsors": "tsx scripts/seed-sponsorship.ts",
+    "locations:local5:dry-run": "tsx scripts/sync-local5-spaces.ts",
+    "locations:local5:apply": "tsx scripts/sync-local5-spaces.ts --apply",
     "worker": "tsx worker/index.ts",
     "optimize:images": "node scripts/optimize-oku-images.mjs",
     "optimize:images:dry": "node scripts/optimize-oku-images.mjs --dry-run",
