@@ -4,6 +4,8 @@ import { requirePermission } from "@/lib/rbac";
 import { assignSpace, CapacityExceededError, SpaceAssignmentError, getAvailableCovers } from "@/server/spaces/capacityService";
 import { prisma } from "@/lib/prisma";
 import { EventOccupancyConflictError, findBlockingOccupancy } from "@/server/events/eventOccupancyService";
+import { getCurrentRoles } from "@/server/auth/currentRoles";
+import type { RoleKey } from "@/types/roles";
 
 const DEFAULT_DURATION_MINUTES = 120;
 
@@ -34,15 +36,21 @@ const DEFAULT_DURATION_MINUTES = 120;
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let userId: string;
-  let roles: string[];
+  let roles: RoleKey[];
   try {
     const s = await requireSession();
     userId = s.userId;
-    roles = s.roles;
-    requirePermission(roles as any, "host:reservations:checkin");
+    // Do not trust a potentially stale JWT role claim for a floor-control
+    // mutation. The current DB roles are the security authority.
+    roles = await getCurrentRoles(userId);
+    requirePermission(roles, "host:reservations:checkin");
   } catch (e) {
     const err = e as { message?: string; status?: number };
-    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+    const status = err.status ?? 503;
+    return NextResponse.json(
+      { ok: false, error: status === 503 ? "Authorization state could not be verified" : err.message ?? "Unauthorized" },
+      { status },
+    );
   }
 
   const { id: reservationId } = await params;

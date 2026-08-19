@@ -3,7 +3,9 @@ import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { transitionStatus } from "@/server/host/hostService";
 import { prisma } from "@/lib/prisma";
+import { getCurrentRoles } from "@/server/auth/currentRoles";
 import type { ReservationStatus } from "@prisma/client";
+import type { RoleKey } from "@/types/roles";
 
 const VALID_STATUSES: ReservationStatus[] = [
   "PENDING", "PENDING_APPROVAL", "CONFIRMED", "WAITLISTED", "ACKNOWLEDGED",
@@ -17,15 +19,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // ANY reservation's status. Referral-only roles (STREETSIDE_HOST) are
   // read-only here.
   let userId: string;
-  let roles: string[];
+  let roles: RoleKey[];
   try {
     const s = await requireSession();
     userId = s.userId;
-    roles = s.roles;
-    requirePermission(s.roles, "host:reservations:checkin");
+    // Role claims inside a browser JWT can outlive a role correction. Final
+    // host-control authorization must use current database assignments.
+    roles = await getCurrentRoles(userId);
+    requirePermission(roles, "host:reservations:checkin");
   } catch (e) {
     const err = e as { message?: string; status?: number };
-    return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });
+    const status = err.status ?? 503;
+    return NextResponse.json(
+      { ok: false, error: status === 503 ? "Authorization state could not be verified" : err.message ?? "Unauthorized" },
+      { status },
+    );
   }
   const { id } = await params;
 
