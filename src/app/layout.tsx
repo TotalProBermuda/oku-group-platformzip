@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Providers } from "@/components/Providers";
 import { injectedExtensionErrorGuardScript } from "@/lib/clientErrorFilters";
+import Script from "next/script";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -49,22 +50,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       suppressHydrationWarning
       className={`${inter.variable} ${cormorant.variable}`}
     >
-      <head>
+      <body suppressHydrationWarning>
         {/* Chrome extensions execute in the page context. Install this before
             Next's dev overlay so a known MetaMask injection failure cannot be
-            misreported as an OKÜ application crash. */}
-        <script
+            misreported as an OKÜ application crash. Using next/script
+            beforeInteractive keeps these scripts outside React's hydration
+            reconciliation, avoiding the <head> structural mismatch that an
+            explicit <head> element causes in App Router. */}
+        <Script
+          id="metamask-guard"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: injectedExtensionErrorGuardScript }}
         />
         {/* Anti-flash: apply saved theme before React hydration */}
-        <script
-          suppressHydrationWarning
+        <Script
+          id="theme-anti-flash"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('oku-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();`,
           }}
         />
-      </head>
-      <body suppressHydrationWarning>
         <Providers session={session}>
           {children}
         </Providers>
