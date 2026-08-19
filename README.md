@@ -23,6 +23,13 @@ This folder contains a complete, runnable scaffold:
 
 Then open the web preview.
 
+## Launch
+
+Before taking live reservations or payments, use the automated
+`/admin/launch-readiness` dashboard and complete the human operating,
+customer-journey, data, and deployment gates in
+[the Master Launch Readiness Plan](docs/LAUNCH_READINESS_MASTER_PLAN.md).
+
 ## Important hosting note
 Vercel cannot run long-lived BullMQ workers.
 - Host the **web** on Vercel.
