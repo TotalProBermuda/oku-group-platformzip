@@ -58,7 +58,12 @@ describe("POST /api/v1/admin/series", () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({ ok: true, data: { id: "series-1" } });
     expect(dbMock.tx.series.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ venueId: "venue-1", spaceId: "space-1", status: "DRAFT" }),
+      data: expect.objectContaining({
+        venueId: "venue-1",
+        spaceId: "space-1",
+        venue: undefined,
+        status: "DRAFT",
+      }),
     });
     expect(dbMock.tx.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ actorId: "fb-director-1", action: "EXPERIENCE_CREATED" }),
@@ -72,10 +77,36 @@ describe("POST /api/v1/admin/series", () => {
     expect(dbMock.tx.series.create).not.toHaveBeenCalled();
   });
 
+  it("allows no physical-space preference without treating it as a venue-wide closure", async () => {
+    const response = await POST(request({ ...validBody, spaceId: null }));
+
+    expect(response.status).toBe(201);
+    expect(dbMock.prisma.restaurantSpace.findFirst).not.toHaveBeenCalled();
+    expect(dbMock.tx.series.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        venueId: "venue-1",
+        spaceId: null,
+        venue: undefined,
+        status: "DRAFT",
+      }),
+    });
+  });
+
   it("returns validation details instead of failing silently", async () => {
     const response = await POST(request({ ...validBody, slug: "not a slug" }));
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ ok: false, fields: { slug: expect.any(Array) } });
+    expect(dbMock.prisma.venue.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid capacity before querying operational data", async () => {
+    const response = await POST(request({ ...validBody, capacityTotal: -1 }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      fields: { capacityTotal: expect.any(Array) },
+    });
     expect(dbMock.prisma.venue.findUnique).not.toHaveBeenCalled();
   });
 

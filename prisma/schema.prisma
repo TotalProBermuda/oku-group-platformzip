@@ -1086,7 +1086,7 @@ model Series {
   // Legacy concept label retained while existing integrations are migrated.
   venue       VenueKey?
   // A Series always targets an operational venue; a physical space is optional.
-  // Null spaceId means the event uses the venue as a whole, not a buyout.
+  // Null spaceId means no physical-space preference; it does not create a venue-wide closure or buyout.
   venueId     String?
   spaceId     String?
   hostType    SeriesHostType
