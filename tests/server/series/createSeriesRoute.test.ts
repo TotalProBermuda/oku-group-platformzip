@@ -65,6 +65,10 @@ describe("POST /api/v1/admin/series", () => {
         status: "DRAFT",
       }),
     });
+    expect(dbMock.prisma.restaurantSpace.findFirst).toHaveBeenCalledWith({
+      where: { id: "space-1", venueId: "venue-1", isActive: true },
+      select: { conceptKey: true },
+    });
     expect(dbMock.tx.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ actorId: "fb-director-1", action: "EXPERIENCE_CREATED" }),
     });
@@ -74,6 +78,10 @@ describe("POST /api/v1/admin/series", () => {
     dbMock.prisma.restaurantSpace.findFirst.mockResolvedValue(null);
     const response = await POST(request(validBody));
     expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: "Select an active space belonging to the chosen venue",
+    });
     expect(dbMock.tx.series.create).not.toHaveBeenCalled();
   });
 
