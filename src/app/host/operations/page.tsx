@@ -6,10 +6,11 @@ import HostOperationsBoard from "@/components/host/HostOperationsBoard";
 
 export const dynamic = "force-dynamic";
 
-async function getData() {
-  const venue = await prisma.venue.findFirst({
-    include: { zones: { where: { isBookable: true }, include: { tables: { where: { isActive: true } } }, orderBy: { sortOrder: "asc" } } },
-  });
+async function getData(venueId: string | null) {
+  const include = { zones: { where: { isBookable: true }, include: { tables: { where: { isActive: true } } }, orderBy: { sortOrder: "asc" as const } } };
+  const venue = venueId
+    ? await prisma.venue.findUnique({ where: { id: venueId }, include })
+    : await prisma.venue.findFirst({ include });
   if (!venue) return { reservations: [], waitlist: [], zones: [] };
 
   // Rolling window — must match getHostQueue() in src/server/host/hostService.ts.
@@ -47,11 +48,17 @@ async function getData() {
 export default async function HostOperationsPage() {
   const session = await getOptionalSession();
   if (!session) redirect("/login?callbackUrl=/host/operations");
-  const allowed = ["SUPERADMIN", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"];
+  const allowed = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"];
   if (!(session.roles as string[]).some((r) => allowed.includes(r))) {
     redirect("/login");
   }
 
-  const data = await getData();
+  const isSuperadmin = (session.roles as string[]).includes("SUPERADMIN");
+  const profile = isSuperadmin
+    ? null
+    : await prisma.restaurantHostProfile.findUnique({ where: { userId: session.userId }, select: { venueId: true } });
+  if (!isSuperadmin && !profile?.venueId) redirect("/login");
+
+  const data = await getData(profile?.venueId ?? null);
   return <HostOperationsBoard reservations={data.reservations as any} waitlist={data.waitlist as any} zones={data.zones as any} />;
 }

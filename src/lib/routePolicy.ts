@@ -63,8 +63,8 @@ export const ROLE_ROUTES: { prefix: string; allowed: string[] }[] = [
   // src/app/api/v1/referrer/dashboard/route.ts (Edge runtime cannot import it).
   { prefix: "/referrer",           allowed: ["SUPERADMIN", "REFERRER", "TAXI_DRIVER", "HOTEL_CONCIERGE", "CONCIERGE", "TOUR_GUIDE", "PROMOTER", "PRIVATE_NETWORK", "INFLUENCER_SUB_REFERRER", "INFLUENCER", "PARTNER"] },
   { prefix: "/host/streetside",    allowed: ["SUPERADMIN", "STREETSIDE_HOST"] },
-  { prefix: "/host/dashboard",     allowed: ["SUPERADMIN", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"] },
-  { prefix: "/host",               allowed: ["SUPERADMIN", "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"] },
+  { prefix: "/host/dashboard",     allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"] },
+  { prefix: "/host",               allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"] },
   { prefix: "/account",            allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "INFLUENCER", "PARTNER", "INVESTOR", "STAFF_OKU", "STAFF_CATCH", "ATTENDEE"] },
   { prefix: "/my",                 allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "INFLUENCER", "PARTNER", "INVESTOR", "STAFF_OKU", "STAFF_CATCH", "ATTENDEE"] },
 ];

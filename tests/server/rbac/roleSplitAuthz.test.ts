@@ -60,6 +60,7 @@ describe("ADMIN_COMMERCIAL — legacy F&B Director compatibility alias", () => {
     expect(p).toContain("admin:analytics:operations:read");
     expect(p).toContain("admin:orders:write");
     expect(p).toContain("admin:experiences:write");
+    expect(p).toContain("host:reservations:checkin");
   });
 
   it("does NOT have finance, ProofPay, user, audit, or security permissions", () => {
@@ -75,7 +76,6 @@ describe("ADMIN_COMMERCIAL — legacy F&B Director compatibility alias", () => {
     expect(p).not.toContain("admin:compensation:write");
     expect(p).not.toContain("admin:revenue:read");
     expect(p).not.toContain("admin:revenue:write");
-    expect(p).not.toContain("host:reservations:checkin");
   });
 
   it("can reach the admin shell and safe restaurant ops routes", () => {
@@ -119,9 +119,9 @@ describe("ADMIN_COMMERCIAL — legacy F&B Director compatibility alias", () => {
     }
   });
 
-  it("cannot reach /host routes", () => {
-    expect(canReach("/host/dashboard", ["ADMIN_COMMERCIAL"])).toBe(false);
-    expect(canReach("/host", ["ADMIN_COMMERCIAL"])).toBe(false);
+  it("can reach venue-scoped host operations", () => {
+    expect(canReach("/host/dashboard", ["ADMIN_COMMERCIAL"])).toBe(true);
+    expect(canReach("/host/operations", ["ADMIN_COMMERCIAL"])).toBe(true);
   });
 });
 
@@ -144,6 +144,7 @@ describe("FB_DIRECTOR — F&B operations access", () => {
     expect(p).toContain("admin:analytics:operations:read");
     expect(p).toContain("admin:orders:write");
     expect(p).toContain("admin:experiences:write");
+    expect(p).toContain("host:reservations:checkin");
     expect(p).toContain("tickets:checkin");
     expect(p).not.toContain("influencer:read");
     expect(p).not.toContain("partner:read");
@@ -220,9 +221,9 @@ describe("FB_DIRECTOR — F&B operations access", () => {
     expect(canReach("/admin/hr", ["FB_DIRECTOR"])).toBe(false);
   });
 
-  it("cannot reach /host/dashboard", () => {
-    // FB_DIRECTOR admin role does not get host portal access
-    expect(canReach("/host/dashboard", ["FB_DIRECTOR"])).toBe(false);
+  it("can reach venue-scoped host operations", () => {
+    expect(canReach("/host/dashboard", ["FB_DIRECTOR"])).toBe(true);
+    expect(canReach("/host/operations", ["FB_DIRECTOR"])).toBe(true);
   });
 });
 
@@ -371,8 +372,8 @@ describe("ADMIN_FINANCE — narrow finance visibility", () => {
 // ─── Role isolation — no cross-contamination ─────────────────────────────────
 
 describe("Role isolation — no cross-contamination between new roles", () => {
-  it("FB_DIRECTOR permissions do not include host:reservations:checkin", () => {
-    expect(perms("FB_DIRECTOR")).not.toContain("host:reservations:checkin");
+  it("FB_DIRECTOR includes venue-scoped reservation control", () => {
+    expect(perms("FB_DIRECTOR")).toContain("host:reservations:checkin");
   });
 
   it("RESTAURANT_SUPERVISOR permissions do not include any admin:*:write", () => {
@@ -397,8 +398,9 @@ describe("Role isolation — no cross-contamination between new roles", () => {
     }
   });
 
-  it("FB_DIRECTOR never gets RESTAURANT_SUPERVISOR's host:reservations:checkin", () => {
-    expect(perms("FB_DIRECTOR")).not.toContain("host:reservations:checkin");
+  it("FB_DIRECTOR and the legacy alias receive the same reservation-control permission", () => {
+    expect(perms("FB_DIRECTOR")).toContain("host:reservations:checkin");
+    expect(perms("ADMIN_COMMERCIAL")).toContain("host:reservations:checkin");
   });
 
   it("ROLE_ROUTES is the shared policy — same object imported by middleware", () => {
@@ -423,10 +425,10 @@ describe("Role-aware callbackUrl sanitization", () => {
     expect(sanitizeCallbackUrlForRoles("/en/admin/users", ["RESTAURANT_SUPERVISOR"])).toBe("/host/dashboard");
   });
 
-  it("sends FB_DIRECTOR with stale /host callback to /admin", () => {
+  it("preserves an allowed host callback for FB_DIRECTOR", () => {
     expect(canonicalDestinationForRoles(["FB_DIRECTOR"])).toBe("/admin");
-    expect(sanitizeCallbackUrlForRoles("/host/dashboard", ["FB_DIRECTOR"])).toBe("/admin");
-    expect(sanitizeCallbackUrlForRoles("/en/host/dashboard", ["FB_DIRECTOR"])).toBe("/admin");
+    expect(sanitizeCallbackUrlForRoles("/host/dashboard", ["FB_DIRECTOR"])).toBe("/host/dashboard");
+    expect(sanitizeCallbackUrlForRoles("/en/host/dashboard", ["FB_DIRECTOR"])).toBe("/en/host/dashboard");
   });
 
   it("sends an unknown non-privileged role with a cross-zone callback to public home", () => {
