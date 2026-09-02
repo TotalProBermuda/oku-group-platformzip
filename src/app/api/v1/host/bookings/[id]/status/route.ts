@@ -52,9 +52,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const body = await req.json();
 
-  const { status, tableLabel, assignedSpaceId, confirmedReservationDate, lossReason, lossReasonNotes, internalNotes, arrivedHeadcount } = body;
+  const {
+    status, tableLabel, assignedSpaceId, confirmedReservationDate, lossReason,
+    lossReasonNotes, internalNotes, arrivedHeadcount, confirmCapacityOverride,
+    capacityOverrideReason,
+  } = body;
   if (!status || !VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+
+  if (confirmCapacityOverride) {
+    const mayOverride = roles.some((role) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(role));
+    if (!mayOverride) {
+      return NextResponse.json({ ok: false, error: "Only an F&B Director may override section capacity" }, { status: 403 });
+    }
+    if (typeof capacityOverrideReason !== "string" || capacityOverrideReason.trim().length < 8) {
+      return NextResponse.json({ ok: false, error: "A capacity override reason of at least 8 characters is required" }, { status: 400 });
+    }
   }
 
   // Sanity-check arrivedHeadcount: must be a positive integer if provided.
@@ -78,6 +92,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       lossReasonNotes,
       internalNotes,
       arrivedHeadcount: parsedHeadcount,
+      confirmCapacityOverride: Boolean(confirmCapacityOverride),
+      capacityOverrideReason: typeof capacityOverrideReason === "string" ? capacityOverrideReason.trim() : undefined,
     });
     return NextResponse.json({ ok: true, data: reservation });
   } catch (e: unknown) {

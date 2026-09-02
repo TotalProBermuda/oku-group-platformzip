@@ -55,10 +55,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id: reservationId } = await params;
   const body = await req.json();
-  const { spaceId, confirmOverride = false } = body as { spaceId?: string; confirmOverride?: boolean };
+  const { spaceId, confirmOverride = false, capacityOverrideReason } = body as {
+    spaceId?: string;
+    confirmOverride?: boolean;
+    capacityOverrideReason?: string;
+  };
 
   if (!spaceId) {
     return NextResponse.json({ ok: false, error: "spaceId is required" }, { status: 400 });
+  }
+  if (confirmOverride) {
+    const mayOverride = roles.some((role) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(role));
+    if (!mayOverride) {
+      return NextResponse.json({ ok: false, error: "Only an F&B Director may override section capacity" }, { status: 403 });
+    }
+    if (!capacityOverrideReason || capacityOverrideReason.trim().length < 8) {
+      return NextResponse.json({ ok: false, error: "A capacity override reason of at least 8 characters is required" }, { status: 400 });
+    }
   }
 
   // ── Authorization: resolve host venue ────────────────────────────────────
@@ -155,6 +168,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       newSpaceId: spaceId,
       actorId: userId,
       confirmOverride,
+      capacityOverrideReason: capacityOverrideReason?.trim(),
     });
 
     const updated = await prisma.reservation.findUnique({
