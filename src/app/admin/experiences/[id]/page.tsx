@@ -14,6 +14,7 @@ import SeriesInfluencerManager from "@/components/admin/SeriesInfluencerManager"
 import ReservationBlocksPanel from "@/components/admin/ReservationBlocksPanel";
 import SeriesMenusPanel from "@/components/admin/SeriesMenusPanel";
 import EventOccupancyPanel from "@/components/admin/EventOccupancyPanel";
+import EventScheduleManager from "@/components/admin/EventScheduleManager";
 import MediaUpload from "@/components/ui/MediaUpload";
 
 const SECTION_TABS = [
@@ -55,6 +56,13 @@ export default function AdminExperienceEditPage() {
   const [venues, setVenues] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
   const [hostOptions, setHostOptions] = useState<{ influencers: any[]; partners: any[] }>({ influencers: [], partners: [] });
+
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (requestedTab && SECTION_TABS.some((section) => section.id === requestedTab)) {
+      setTab(requestedTab);
+    }
+  }, []);
 
   const loadSeries = useCallback(async () => {
     const res = await fetch(`/api/v1/admin/experiences/${id}`);
@@ -329,6 +337,14 @@ export default function AdminExperienceEditPage() {
               {field("capacityTotal", t("admin", "total_capacity") ?? "Total Capacity", "number")}
               {field("availableSeatsMode", t("admin", "seats_display") ?? "Available Seats Display", "text", { options: ["HIDDEN", "EXACT", "APPROXIMATE"] })}
               {field("attendeeListMode", t("admin", "attendee_list_mode") ?? "Attendee List Mode", "text", { options: ["HIDDEN", "BUYERS_ONLY", "PARTIAL", "PUBLIC"] })}
+              <EventScheduleManager
+                seriesId={id}
+                sessions={series.sessions ?? []}
+                defaultCapacity={Number(form.capacityTotal) || 1}
+                hasOperationalVenue={Boolean(series.venueId)}
+                hasPhysicalSpace={Boolean(series.spaceId)}
+                onCreated={loadSeries}
+              />
             </div>
           )}
 
