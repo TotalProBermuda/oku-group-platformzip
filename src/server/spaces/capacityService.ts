@@ -355,8 +355,13 @@ export async function assignSpace(opts: {
   newSpaceId: string;
   actorId: string;
   confirmOverride?: boolean;
+  capacityOverrideReason?: string;
 }): Promise<{ overCapacity: boolean; available: number }> {
-  const { reservationId, newSpaceId, actorId, confirmOverride = false } = opts;
+  const { reservationId, newSpaceId, actorId, confirmOverride = false, capacityOverrideReason } = opts;
+
+  if (confirmOverride && (capacityOverrideReason?.trim().length ?? 0) < 8) {
+    throw new SpaceAssignmentError("A capacity override reason of at least 8 characters is required");
+  }
 
   let overCapacity = false;
   let available = 0;
@@ -530,7 +535,7 @@ export async function assignSpace(opts: {
         idempotencyKey: `capacity_hold:${holdId}:override:${actorId}`,
         capacityHoldId: holdId,
         reservationId,
-        payload: { actorId },
+        payload: { actorId, reason: capacityOverrideReason!.trim() },
       }).catch((e) => console.warn("[capacityService] CAPACITY_OVERRIDDEN_BY_HOST event failed", { err: e }));
     }
   }

@@ -338,6 +338,10 @@ export async function transitionStatus(
     // on forward moves so the closed card retains the original head-
     // count audit even after SEATED/COMPLETED.
     arrivedHeadcount?: number;
+    /** Explicit F&B Director approval to exceed the selected space's capacity. */
+    confirmCapacityOverride?: boolean;
+    /** Mandatory operational justification for an over-capacity approval. */
+    capacityOverrideReason?: string;
   }
 ) {
   const existing = await prisma.reservation.findUniqueOrThrow({
@@ -356,6 +360,11 @@ export async function transitionStatus(
     throw e;
   }
   if (confirmedReservationDate) update.reservationDate = confirmedReservationDate;
+  if (opts?.confirmCapacityOverride && (opts.capacityOverrideReason?.trim().length ?? 0) < 8) {
+    const e = new Error("A capacity override reason of at least 8 characters is required") as Error & { status?: number };
+    e.status = 400;
+    throw e;
+  }
   if (toStatus === "CONFIRMED" && opts?.tableLabel?.trim()) {
     // Backwards-compatible for older clients that still provide a tentative
     // plan, but no table is required until the guest is actually seated.
@@ -475,7 +484,9 @@ export async function transitionStatus(
         changedByUserId: actorId,
         lossReason: opts?.lossReason ?? null,
         lossReasonNotes: opts?.lossReasonNotes ?? null,
-        notes: opts?.internalNotes ?? null,
+        notes: opts?.confirmCapacityOverride
+          ? [opts.internalNotes, `Capacity override: ${opts.capacityOverrideReason!.trim()}`].filter(Boolean).join(" · ")
+          : opts?.internalNotes ?? null,
       },
       select: { id: true },
     });
@@ -567,7 +578,7 @@ export async function transitionStatus(
       const available = selectedSpace.capacity - held;
       confirmedOverCapacity = existing.partySize > available;
 
-      if (confirmedOverCapacity && isPendingApprovalPromotion) {
+      if (confirmedOverCapacity && isPendingApprovalPromotion && !opts?.confirmCapacityOverride) {
         // Hard block on the PENDING_APPROVAL acceptance path: the space filled
         // up between the guest's request and the host's accept action. The host
         // must either assign a different space or override explicitly.
@@ -699,6 +710,22 @@ export async function transitionStatus(
           reservationId,
           payload: { spaceId: confirmedSpaceId, partySize: existing.partySize },
         });
+        if (opts?.confirmCapacityOverride) {
+          await enqueueLedgerEvent(tx, {
+            eventType: "CAPACITY_OVERRIDDEN_BY_HOST",
+            source: { system: "host_status_transition" },
+            confidenceClass: "PARTNER_REPORTED_EVENT",
+            idempotencyKey: `capacity_hold:${confirmedHoldId}:override:${actorId}`,
+            capacityHoldId: confirmedHoldId,
+            reservationId,
+            payload: {
+              spaceId: confirmedSpaceId,
+              partySize: existing.partySize,
+              actorId,
+              reason: opts.capacityOverrideReason!.trim(),
+            },
+          });
+        }
       }
     }
     for (const holdId of releasedHoldIds) {

@@ -238,9 +238,10 @@ function JourneyTimeline({ logs }: { logs: StatusLog[] }) {
 }
 
 function GuestDrawer({
-  res, zones, spaces, onClose, onAction,
+  res, zones, spaces, canOverrideCapacity, onClose, onAction,
 }: {
   res: Reservation; zones: VenueZone[]; spaces: SpaceUtilisation[];
+  canOverrideCapacity: boolean;
   onClose: () => void;
   onAction: (
     id: string,
@@ -266,6 +267,7 @@ function GuestDrawer({
   const [scheduledSpacesLoading, setScheduledSpacesLoading] = useState(false);
   const [scheduledSpacesError, setScheduledSpacesError] = useState<string | null>(null);
   const [eventDetails, setEventDetails] = useState<EventConflictCard | null>(null);
+  const [capacityOverrideReason, setCapacityOverrideReason] = useState("");
 
   useEffect(() => {
     if (res.status !== "PENDING_APPROVAL" || !confirmedReservationDate) return;
@@ -315,7 +317,10 @@ function GuestDrawer({
     setSpaceWarning(null);
     try {
       const body: Record<string, unknown> = { spaceId: selectedSpaceId };
-      if (forceOverride) body.confirmOverride = true;
+      if (forceOverride) {
+        body.confirmOverride = true;
+        body.capacityOverrideReason = capacityOverrideReason.trim();
+      }
 
       const r = await fetch(`/api/v1/host/bookings/${res.id}/assign-space`, {
         method: "PATCH",
@@ -492,14 +497,28 @@ function GuestDrawer({
                     <div style={{ fontSize: 10, color: "#92400e", marginBottom: 6 }}>
                       {spaceWarning.partySize ?? res.partySize} guests · {spaceWarning.available ?? 0} covers free of {spaceWarning.capacity ?? "?"}
                     </div>
-                    <button onClick={() => { void handleAssignSpace(true); }} disabled={assigningSpace}
-                      style={{ padding: "5px 12px", borderRadius: 5, border: "1.5px solid #c2410c", background: "#c2410c", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                      {assigningSpace ? "…" : t("host", "operations.spaceWarningOverride")}
-                    </button>
+                    {canOverrideCapacity ? (
+                      <>
+                        <textarea
+                          aria-label="Capacity override reason"
+                          value={capacityOverrideReason}
+                          onChange={(event) => setCapacityOverrideReason(event.target.value)}
+                          placeholder="Explain why this over-capacity move is approved"
+                          rows={2}
+                          style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", borderRadius: 5, border: "1px solid #fdba74", background: "#fff", color: "#0f172a", fontSize: 10, resize: "vertical", marginBottom: 6 }}
+                        />
+                        <button onClick={() => { void handleAssignSpace(true); }} disabled={assigningSpace || capacityOverrideReason.trim().length < 8}
+                          style={{ padding: "5px 12px", borderRadius: 5, border: "1.5px solid #c2410c", background: "#c2410c", color: "#fff", fontSize: 11, fontWeight: 700, cursor: capacityOverrideReason.trim().length >= 8 ? "pointer" : "not-allowed", opacity: capacityOverrideReason.trim().length >= 8 ? 1 : 0.45 }}>
+                          {assigningSpace ? "…" : t("host", "operations.spaceWarningOverride")}
+                        </button>
+                      </>
+                    ) : (
+                      <div role="alert" style={{ fontWeight: 700 }}>Choose another section or ask the F&amp;B Director to approve an override.</div>
+                    )}
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 6 }}>
-                  <select value={selectedSpaceId} onChange={e => { setSelectedSpaceId(e.target.value); setSpaceWarning(null); }}
+                  <select value={selectedSpaceId} onChange={e => { setSelectedSpaceId(e.target.value); setSpaceWarning(null); setCapacityOverrideReason(""); }}
                     style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: "1.5px solid #e2e8f0", fontSize: 12, color: "#0f172a", background: "#fff" }}>
                     <option value="">{t("host", "operations.spacePlaceholder")}</option>
                     {spaces.filter(s => s.isActive && s.reservable).map(s => (
@@ -555,6 +574,7 @@ function GuestDrawer({
                               return;
                             }
                             setSelectedSpaceId(space.id);
+                            setCapacityOverrideReason("");
                             setEventDetails(null);
                           }}
                           style={{ padding: "10px 12px", borderRadius: 9, border: `1.5px solid ${selected ? "#7e22ce" : blocked ? "#f59e0b" : "#e2e8f0"}`, background: selected ? "#faf5ff" : "#fff", textAlign: "left", cursor: blocked ? "help" : "pointer" }}
@@ -568,11 +588,13 @@ function GuestDrawer({
                           <div style={{ marginTop: 3, fontSize: 10, color: "#64748b" }}>
                             {blocked
                               ? "Unavailable due to event — view details"
-                              : requested
-                                ? "Guest requested · recommended when available"
-                                : fits
-                                  ? "Available alternative"
-                                  : "Insufficient capacity — F&B Director override required"}
+                              : !fits
+                                ? canOverrideCapacity
+                                  ? "Full — F&B Director override available"
+                                  : "Full — choose another section"
+                                : requested
+                                  ? "Guest requested · recommended"
+                                  : "Available alternative"}
                           </div>
                         </button>
                       );
@@ -580,6 +602,27 @@ function GuestDrawer({
                     {approvalSpaces.length === 0 && <div role="alert" style={{ fontSize: 11, color: "#be123c" }}>No reservable dining sections are configured for this venue.</div>}
                   </div>
                 )}
+                {(() => {
+                  const selected = approvalSpaces.find((space) => space.id === selectedSpaceId);
+                  if (!selected || selected.eventConflict || selected.available >= res.partySize) return null;
+                  if (!canOverrideCapacity) {
+                    return <div role="alert" style={{ marginTop: 9, padding: 9, borderRadius: 7, background: "#fff1f2", color: "#be123c", fontSize: 11 }}>This section cannot fit the party. Choose another available section or ask the F&amp;B Director to review.</div>;
+                  }
+                  return (
+                    <div style={{ marginTop: 9, padding: 10, borderRadius: 8, border: "1px solid #fda4af", background: "#fff1f2" }}>
+                      <label htmlFor={`capacity-override-${res.id}`} style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#9f1239", marginBottom: 5 }}>F&amp;B Director capacity override reason</label>
+                      <textarea
+                        id={`capacity-override-${res.id}`}
+                        value={capacityOverrideReason}
+                        onChange={(event) => setCapacityOverrideReason(event.target.value)}
+                        placeholder="Explain how this party will be accommodated safely"
+                        rows={2}
+                        style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 7, border: "1px solid #fda4af", background: "#fff", color: "#0f172a", fontSize: 11, resize: "vertical" }}
+                      />
+                      <div style={{ marginTop: 4, fontSize: 9, color: "#9f1239" }}>Required and recorded in the reservation audit trail.</div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -604,7 +647,9 @@ function GuestDrawer({
             {actions.map(a => {
               const confirmingApproval = res.status === "PENDING_APPROVAL" && a.status === "CONFIRMED";
               const selectedApprovalSpace = approvalSpaces.find((space) => space.id === selectedSpaceId);
-              const confirmationReady = !!selectedSpaceId && !!confirmedReservationDate && !scheduledSpacesLoading && !scheduledSpacesError && !!selectedApprovalSpace && !selectedApprovalSpace.eventConflict;
+              const selectedIsOverCapacity = !!selectedApprovalSpace && selectedApprovalSpace.available < res.partySize;
+              const overrideReady = !selectedIsOverCapacity || (canOverrideCapacity && capacityOverrideReason.trim().length >= 8);
+              const confirmationReady = !!selectedSpaceId && !!confirmedReservationDate && !scheduledSpacesLoading && !scheduledSpacesError && !!selectedApprovalSpace && !selectedApprovalSpace.eventConflict && overrideReady;
               return <button key={a.status}
                 disabled={confirmingApproval && !confirmationReady}
                 onClick={() => {
@@ -613,13 +658,21 @@ function GuestDrawer({
                     return onAction(res.id, a.status, {
                       assignedSpaceId: selectedSpaceId,
                       confirmedReservationDate: new Date(confirmedReservationDate).toISOString(),
+                      ...(selectedIsOverCapacity ? {
+                        confirmCapacityOverride: "true",
+                        capacityOverrideReason: capacityOverrideReason.trim(),
+                      } : {}),
                     }, setEventDetails);
                   }
                   return onAction(res.id, a.status, a.status === "SEATED" ? { tableLabel } : {});
                 }}
                 style={{ padding: "12px 16px", borderRadius: 10, border: `2px solid ${a.color}`, background: a.status === "SEATED" ? a.color : "transparent", color: a.status === "SEATED" ? "#fff" : a.color, fontSize: 13, fontWeight: 700, cursor: confirmingApproval && !confirmationReady ? "not-allowed" : "pointer", opacity: confirmingApproval && !confirmationReady ? 0.45 : 1, textAlign: "left" }}>
-                {t("host", a.labelKey)}
-                {confirmingApproval && !confirmationReady ? " · select space and time" : ""}
+                {confirmingApproval && selectedIsOverCapacity && canOverrideCapacity ? "Override capacity & confirm" : t("host", a.labelKey)}
+                {confirmingApproval && !confirmationReady
+                  ? selectedIsOverCapacity && canOverrideCapacity
+                    ? " · add override reason"
+                    : " · select an available space and time"
+                  : ""}
               </button>;
             })}
           </div>
@@ -703,10 +756,12 @@ export default function HostOperationsBoard({
   reservations: initial,
   waitlist: initialWl,
   zones,
+  canOverrideCapacity = false,
 }: {
   reservations: Reservation[];
   waitlist: WaitlistEntry[];
   zones: VenueZone[];
+  canOverrideCapacity?: boolean;
 }) {
   const t = useTranslation();
   const [reservations, setReservations] = useState(initial);
@@ -1120,6 +1175,7 @@ export default function HostOperationsBoard({
           res={activeRes}
           zones={zones}
           spaces={spaces}
+          canOverrideCapacity={canOverrideCapacity}
           onClose={() => setActiveRes(null)}
           onAction={handleAction}
         />
