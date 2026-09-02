@@ -98,7 +98,10 @@ export async function getCurrentUtilisation(spaceId: string): Promise<{
 }
 
 /** Fetch per-space utilisation for the host board. */
-export async function getVenueSpaceUtilisation(venueId: string): Promise<
+export async function getVenueSpaceUtilisation(
+  venueId: string,
+  window?: { startAt: Date; endAt: Date; excludeReservationId?: string },
+): Promise<
   Array<{
     id: string;
     name: string;
@@ -115,12 +118,12 @@ export async function getVenueSpaceUtilisation(venueId: string): Promise<
     orderBy: { sortOrder: "asc" },
     select: { id: true, name: true, capacity: true, isActive: true, reservable: true },
   });
-  const now = new Date();
-  const windowEnd = new Date(now.getTime() + DEFAULT_DURATION_MINUTES * 60_000);
+  const now = window?.startAt ?? new Date();
+  const windowEnd = window?.endAt ?? new Date(now.getTime() + DEFAULT_DURATION_MINUTES * 60_000);
 
   return Promise.all(
     spaces.map(async (s) => {
-      const held = await getHeldCovers(s.id, now, windowEnd);
+      const held = await getHeldCovers(s.id, now, windowEnd, window?.excludeReservationId);
       const available = s.capacity - held;
       return {
         ...s,
