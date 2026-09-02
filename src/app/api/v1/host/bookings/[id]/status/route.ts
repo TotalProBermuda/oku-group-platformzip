@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentRoles } from "@/server/auth/currentRoles";
 import type { ReservationStatus } from "@prisma/client";
 import type { RoleKey } from "@/types/roles";
+import { EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
 
 const VALID_STATUSES: ReservationStatus[] = [
   "PENDING", "PENDING_APPROVAL", "CONFIRMED", "WAITLISTED", "ACKNOWLEDGED",
@@ -80,6 +81,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     return NextResponse.json({ ok: true, data: reservation });
   } catch (e: unknown) {
+    if (e instanceof EventOccupancyConflictError) {
+      return NextResponse.json(
+        { ok: false, code: "EVENT_UNAVAILABLE", error: e.card.message, eventConflict: e.card },
+        { status: 409 },
+      );
+    }
     const err = e as { message?: string; status?: number };
     return NextResponse.json({ ok: false, error: err.message ?? "unknown" }, { status: err.status ?? 500 });
   }

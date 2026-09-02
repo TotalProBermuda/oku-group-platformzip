@@ -26,6 +26,15 @@ type SpaceUtilisation = {
   utilPct: number;
   isActive: boolean;
   reservable: boolean;
+  eventConflict?: EventConflictCard | null;
+};
+
+type EventConflictCard = {
+  kind: "PUBLIC_EVENT" | "PRIVATE_BLOCK";
+  title?: string;
+  imageUrl?: string | null;
+  href?: string;
+  message: string;
 };
 
 type Reservation = {
@@ -232,7 +241,13 @@ function GuestDrawer({
   res, zones, spaces, onClose, onAction,
 }: {
   res: Reservation; zones: VenueZone[]; spaces: SpaceUtilisation[];
-  onClose: () => void; onAction: (id: string, status: string, opts?: Record<string, string>) => void;
+  onClose: () => void;
+  onAction: (
+    id: string,
+    status: string,
+    opts?: Record<string, string>,
+    onConflict?: (conflict: EventConflictCard) => void,
+  ) => void;
 }) {
   const t = useTranslation();
   const [tab, setTab] = useState<"journey" | "actions">("actions");
@@ -247,6 +262,47 @@ function GuestDrawer({
   const [lossNotes, setLossNotes] = useState("");
   const [showLossForm, setShowLossForm] = useState(false);
   const [pendingLossStatus, setPendingLossStatus] = useState("");
+  const [scheduledSpaces, setScheduledSpaces] = useState<SpaceUtilisation[]>([]);
+  const [scheduledSpacesLoading, setScheduledSpacesLoading] = useState(false);
+  const [scheduledSpacesError, setScheduledSpacesError] = useState<string | null>(null);
+  const [eventDetails, setEventDetails] = useState<EventConflictCard | null>(null);
+
+  useEffect(() => {
+    if (res.status !== "PENDING_APPROVAL" || !confirmedReservationDate) return;
+    const startAt = new Date(confirmedReservationDate);
+    if (Number.isNaN(startAt.getTime())) return;
+    const endAt = new Date(startAt.getTime() + 120 * 60_000);
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setScheduledSpacesLoading(true);
+      setScheduledSpacesError(null);
+      try {
+        const params = new URLSearchParams({
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+          reservationId: res.id,
+        });
+        const response = await fetch(`/api/v1/host/spaces/utilisation?${params}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error ?? "Availability could not be loaded");
+        setScheduledSpaces(payload.data ?? []);
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          setScheduledSpaces([]);
+          setScheduledSpacesError(error instanceof Error ? error.message : "Availability could not be loaded");
+        }
+      } finally {
+        if (!controller.signal.aborted) setScheduledSpacesLoading(false);
+      }
+    }, 200);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [confirmedReservationDate, res.id, res.status]);
 
   /**
    * Two-phase space assignment:
@@ -273,7 +329,11 @@ function GuestDrawer({
         setSpaceWarning(d.warning);
         return;
       }
-      if (!r.ok) { alert(d.error ?? "Failed to assign space"); return; }
+      if (!r.ok) {
+        if (d.code === "EVENT_UNAVAILABLE" && d.eventConflict) setEventDetails(d.eventConflict);
+        else alert(d.error ?? "Failed to assign space");
+        return;
+      }
       // Success (possibly with post-hoc override note)
       if (d.warning?.overCapacity) setSpaceWarning(d.warning);
     } catch (e) {
@@ -340,6 +400,7 @@ function GuestDrawer({
   };
 
   const actions = STATUS_ACTIONS[res.status] ?? [];
+  const approvalSpaces = scheduledSpaces.filter((space) => space.isActive && space.reservable);
 
   return (
     <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: 420, background: "#fff", borderLeft: "1px solid #e2e8f0", zIndex: 200, display: "flex", flexDirection: "column", boxShadow: "-8px 0 32px rgba(0,0,0,0.1)" }}>
@@ -393,6 +454,23 @@ function GuestDrawer({
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+        {eventDetails && (
+          <div role="dialog" aria-modal="true" aria-label="Section unavailable due to event" style={{ marginBottom: 12, padding: 14, borderRadius: 10, background: "#fffbeb", border: "1px solid #f59e0b" }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#92400e" }}>
+              {eventDetails.kind === "PUBLIC_EVENT" ? eventDetails.title ?? "Event in this section" : "Section blocked by a private event"}
+            </div>
+            <div style={{ marginTop: 5, fontSize: 11, lineHeight: 1.45, color: "#78350f" }}>{eventDetails.message}</div>
+            {approvalSpaces.some((space) => !space.eventConflict && space.available >= res.partySize) && (
+              <div style={{ marginTop: 8, fontSize: 10, color: "#92400e" }}>
+                Available alternatives: {approvalSpaces.filter((space) => !space.eventConflict && space.available >= res.partySize).map((space) => space.name).join(", ")}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              {eventDetails.href && <a href={eventDetails.href} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 700, color: "#92400e" }}>View event</a>}
+              <button type="button" onClick={() => setEventDetails(null)} style={{ marginLeft: "auto", border: 0, background: "transparent", color: "#92400e", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Choose another section</button>
+            </div>
+          </div>
+        )}
         {tab === "actions" && !showLossForm && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {(res.status === "CONFIRMED" || res.statusLogs.some((log) => log.toStatus === "CONFIRMED")) && (
@@ -405,7 +483,7 @@ function GuestDrawer({
               </div>
             )}
             {/* Space assignment — available for all active reservations */}
-            {spaces.length > 0 && !["CANCELLED", "NO_SHOW", "COMPLETED"].includes(res.status) && (
+            {res.status !== "PENDING_APPROVAL" && spaces.length > 0 && !["CANCELLED", "NO_SHOW", "COMPLETED"].includes(res.status) && (
               <div style={{ marginBottom: 10, padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 8 }}>{t("host", "operations.spaceAssignment")}</div>
                 {spaceWarning?.overCapacity && (
@@ -451,6 +529,51 @@ function GuestDrawer({
                 <div style={{ marginTop: 8, fontSize: 10, color: "#64748b", lineHeight: 1.4 }}>
                   Select the final dining space and time. The exact table is assigned when the guest arrives; the requested space remains in the audit trail if the group is moved.
                 </div>
+                <div style={{ marginTop: 12, fontSize: 10, fontWeight: 700, color: "#64748b" }}>Final dining section</div>
+                {scheduledSpacesLoading && <div role="status" style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>Checking booking-time availability…</div>}
+                {scheduledSpacesError && (
+                  <div role="alert" style={{ marginTop: 8, padding: 9, borderRadius: 7, background: "#fff1f2", color: "#be123c", fontSize: 11 }}>
+                    {scheduledSpacesError}. Change the time to retry or refresh the board.
+                  </div>
+                )}
+                {!scheduledSpacesLoading && !scheduledSpacesError && (
+                  <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
+                    {approvalSpaces.map((space) => {
+                      const selected = selectedSpaceId === space.id;
+                      const requested = res.requestedSpace?.id === space.id;
+                      const blocked = Boolean(space.eventConflict);
+                      const fits = space.available >= res.partySize;
+                      return (
+                        <button
+                          key={space.id}
+                          type="button"
+                          aria-pressed={selected}
+                          aria-haspopup={blocked ? "dialog" : undefined}
+                          onClick={() => {
+                            if (space.eventConflict) {
+                              setEventDetails(space.eventConflict);
+                              return;
+                            }
+                            setSelectedSpaceId(space.id);
+                            setEventDetails(null);
+                          }}
+                          style={{ padding: "10px 12px", borderRadius: 9, border: `1.5px solid ${selected ? "#7e22ce" : blocked ? "#f59e0b" : "#e2e8f0"}`, background: selected ? "#faf5ff" : "#fff", textAlign: "left", cursor: blocked ? "help" : "pointer" }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{space.name}</span>
+                            <span style={{ fontSize: 9, fontWeight: 800, color: blocked ? "#b45309" : fits ? "#15803d" : "#be123c" }}>
+                              {blocked ? "EVENT BLOCK" : `${Math.max(0, space.available)} COVERS FREE`}
+                            </span>
+                          </div>
+                          <div style={{ marginTop: 3, fontSize: 10, color: "#64748b" }}>
+                            {requested ? "Guest requested · recommended when available" : fits ? "Available alternative" : "Insufficient capacity — F&B Director override required"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {approvalSpaces.length === 0 && <div role="alert" style={{ fontSize: 11, color: "#be123c" }}>No reservable dining sections are configured for this venue.</div>}
+                  </div>
+                )}
               </div>
             )}
 
@@ -474,7 +597,8 @@ function GuestDrawer({
 
             {actions.map(a => {
               const confirmingApproval = res.status === "PENDING_APPROVAL" && a.status === "CONFIRMED";
-              const confirmationReady = !!selectedSpaceId && !!confirmedReservationDate;
+              const selectedApprovalSpace = approvalSpaces.find((space) => space.id === selectedSpaceId);
+              const confirmationReady = !!selectedSpaceId && !!confirmedReservationDate && !scheduledSpacesLoading && !scheduledSpacesError && !!selectedApprovalSpace && !selectedApprovalSpace.eventConflict;
               return <button key={a.status}
                 disabled={confirmingApproval && !confirmationReady}
                 onClick={() => {
@@ -483,7 +607,7 @@ function GuestDrawer({
                     return onAction(res.id, a.status, {
                       assignedSpaceId: selectedSpaceId,
                       confirmedReservationDate: new Date(confirmedReservationDate).toISOString(),
-                    });
+                    }, setEventDetails);
                   }
                   return onAction(res.id, a.status, a.status === "SEATED" ? { tableLabel } : {});
                 }}
@@ -691,7 +815,12 @@ export default function HostOperationsBoard({
     return () => clearInterval(interval);
   }, [refresh]);
 
-  async function handleAction(id: string, status: string, opts?: Record<string, string>) {
+  async function handleAction(
+    id: string,
+    status: string,
+    opts?: Record<string, string>,
+    onConflict?: (conflict: EventConflictCard) => void,
+  ) {
     setBusy(true);
     try {
       const r = await fetch(`/api/v1/host/bookings/${id}/status`, {
@@ -705,7 +834,11 @@ export default function HostOperationsBoard({
         setActiveRes(prev => prev?.id === id ? { ...prev, ...d.data } : prev);
       } else {
         const d = await r.json().catch(() => ({}));
-        alert(d.error ?? "Could not update this reservation.");
+        if (d.code === "EVENT_UNAVAILABLE" && d.eventConflict && onConflict) {
+          onConflict(d.eventConflict);
+        } else {
+          alert(d.error ?? "Could not update this reservation.");
+        }
       }
     } finally {
       setBusy(false);
