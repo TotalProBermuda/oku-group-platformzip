@@ -566,7 +566,13 @@ function GuestDrawer({
                             </span>
                           </div>
                           <div style={{ marginTop: 3, fontSize: 10, color: "#64748b" }}>
-                            {requested ? "Guest requested · recommended when available" : fits ? "Available alternative" : "Insufficient capacity — F&B Director override required"}
+                            {blocked
+                              ? "Unavailable due to event — view details"
+                              : requested
+                                ? "Guest requested · recommended when available"
+                                : fits
+                                  ? "Available alternative"
+                                  : "Insufficient capacity — F&B Director override required"}
                           </div>
                         </button>
                       );
