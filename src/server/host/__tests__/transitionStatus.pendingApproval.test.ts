@@ -5,8 +5,8 @@
  * cover the critical business invariants atomically — no auth setup required.
  *
  * Scenarios covered:
- *   1. Happy path: PENDING_APPROVAL + requestedSpaceId → CONFIRMED, assignedSpaceId
- *      promoted, ACTIVE CapacityHold created.
+ *   1. Happy path: PENDING_APPROVAL + requestedSpaceId → CONFIRMED without
+ *      an exact table, assignedSpaceId promoted, ACTIVE CapacityHold created.
  *   2. Capacity exhausted: PENDING_APPROVAL accept throws 409 and rolls back — no
  *      CONFIRMED reservation or CapacityHold written.
  *   3. No requestedSpaceId: acceptance is rejected until the host assigns one.
@@ -68,11 +68,13 @@ async function test_pendingApproval_accept_happyPath() {
   const ids = await setup({ partySize: 2, reservationDate, requestedSpaceId: "test-space-approval" });
   try {
     const result = await transitionStatus(ids.resId, "CONFIRMED", "system:test", {
-      reservationDate: reservationDate.toISOString(), tableLabel: "T1",
+      reservationDate: reservationDate.toISOString(),
     });
     assert(result.status === "CONFIRMED", `status should be CONFIRMED, got ${result.status}`);
     assert(result.assignedSpaceId === "test-space-approval",
       `assignedSpaceId should be promoted from requestedSpaceId, got ${result.assignedSpaceId}`);
+    assert(result.assignedTableLabel === null,
+      `advance confirmation must not invent a table, got ${result.assignedTableLabel}`);
 
     const hold = await prisma.capacityHold.findFirst({
       where: { reservationId: ids.resId },
@@ -117,7 +119,7 @@ async function test_pendingApproval_accept_capacityExhausted() {
     let threw409 = false;
     try {
       await transitionStatus(ids.resId, "CONFIRMED", "system:test", {
-        reservationDate: reservationDate.toISOString(), tableLabel: "T1",
+        reservationDate: reservationDate.toISOString(),
       });
     } catch (e: unknown) {
       const err = e as { status?: number; message?: string };
@@ -150,7 +152,7 @@ async function test_pendingApproval_accept_noSpaceId_noHold() {
     let rejected = false;
     try {
       await transitionStatus(ids.resId, "CONFIRMED", "system:test", {
-        reservationDate: reservationDate.toISOString(), tableLabel: "T1",
+        reservationDate: reservationDate.toISOString(),
       });
     } catch (error) {
       rejected = (error as { status?: number }).status === 400;

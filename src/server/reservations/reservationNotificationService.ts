@@ -12,25 +12,34 @@ import {
  * A request receipt is deliberately not a confirmation; confirmation is sent
  * only after the row has actually reached CONFIRMED.
  */
-export async function deliverReservationStateEmail(reservationId: string, kind: ReservationEmailKind) {
+export async function deliverReservationStateEmail(
+  reservationId: string,
+  kind: ReservationEmailKind,
+  options: { force?: boolean } = {},
+) {
   const reservation = await prisma.reservation.findUniqueOrThrow({
     where: { id: reservationId },
-    include: { venue: true, zone: true, addons: true },
+    include: {
+      venue: true,
+      zone: true,
+      addons: true,
+      statusLogs: { where: { toStatus: "CONFIRMED" }, take: 1 },
+    },
   });
 
-  if (kind === "CONFIRMATION" && reservation.status !== "CONFIRMED") {
+  if (kind === "CONFIRMATION" && reservation.status !== "CONFIRMED" && reservation.statusLogs.length === 0) {
     throw new Error(`Cannot send a confirmation for reservation status ${reservation.status}`);
   }
 
-  const alreadyOwedOrSent = await prisma.reservationCommunication.findFirst({
+  const alreadySent = await prisma.reservationCommunication.findFirst({
     where: {
       reservationId,
       templateKey: kind,
-      status: { in: ["PENDING", "SENT"] },
+      status: "SENT",
     },
     select: { id: true },
   });
-  if (alreadyOwedOrSent) return { skipped: true, communicationId: alreadyOwedOrSent.id };
+  if (alreadySent && !options.force) return { skipped: true, communicationId: alreadySent.id };
 
   const props = {
     contactName: reservation.contactName,
@@ -50,7 +59,13 @@ export async function deliverReservationStateEmail(reservationId: string, kind: 
   const subject = kind === "CONFIRMATION"
     ? buildReservationConfirmationSubject(props)
     : buildReservationRequestSubject(props);
-  const communication = await prisma.reservationCommunication.create({
+  const pending = !options.force
+    ? await prisma.reservationCommunication.findFirst({
+        where: { reservationId, templateKey: kind, status: "PENDING" },
+        orderBy: { createdAt: "asc" },
+      })
+    : null;
+  const communication = pending ?? await prisma.reservationCommunication.create({
     data: {
       reservationId,
       type: "EMAIL",

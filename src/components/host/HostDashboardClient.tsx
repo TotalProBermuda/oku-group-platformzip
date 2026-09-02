@@ -486,7 +486,7 @@ function ReservationCard({ res, onAction }: {
           )}
 
           {/* ── Party Size Adjustment ───────────────────────────────── */}
-          {!isFinal && !isLost && (
+          {["ARRIVED", "SEATED"].includes(res.status) && !isLost && (
             <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.06em", textTransform: "uppercase", flex: 1, minWidth: 80 }}>
                 {t("host", "card.partySize")}
@@ -575,6 +575,18 @@ function ReservationCard({ res, onAction }: {
               first when the guest is already standing in front of them. */}
           {!isFinal && !isLost && !showLoss && !showInvu && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {res.status === "PENDING_APPROVAL" && (
+                <Link
+                  href={`/host/operations?reservationId=${encodeURIComponent(res.id)}`}
+                  style={{
+                    width: "100%", boxSizing: "border-box", padding: "14px 18px", borderRadius: 10,
+                    border: "1px solid rgba(96,165,250,0.55)", background: "rgba(96,165,250,0.14)",
+                    color: "#bfdbfe", fontSize: 15, fontWeight: 800, textDecoration: "none", textAlign: "center",
+                  }}
+                >
+                  Review &amp; confirm
+                </Link>
+              )}
               {/* Primary CTA — "Seat" reachable from any waiting state */}
               {["PENDING", "CONFIRMED", "WAITLISTED", "ACKNOWLEDGED", "ARRIVED"].includes(res.status) && (
                 <button
