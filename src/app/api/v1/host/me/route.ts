@@ -14,13 +14,13 @@ export async function GET() {
     const { userId, roles } = await requireSession();
 
     const isHost = roles.some((r) =>
-      ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "STREETSIDE_HOST", "SUPERADMIN"].includes(r)
+      ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "STREETSIDE_HOST", "SUPERADMIN"].includes(r)
     );
     if (!isHost) {
       return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
-    const isRestaurantHost = roles.some((r) => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "SUPERADMIN"].includes(r));
+    const isRestaurantHost = roles.some((r) => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "SUPERADMIN"].includes(r));
     const isStreetsideHost = roles.includes("STREETSIDE_HOST");
 
     // Streetside hosts are first-class referrers (employed by the

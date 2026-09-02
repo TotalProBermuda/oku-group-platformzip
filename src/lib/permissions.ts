@@ -18,6 +18,9 @@ const FB_DIRECTOR_PERMISSIONS: PermissionKey[] = [
   "admin:operations:read",
   "admin:operations:write",
   "admin:analytics:operations:read",
+  // Venue-scoped reservation approval/floor control. Host APIs still require
+  // RestaurantHostProfile.venueId and enforce reservation/space venue equality.
+  "host:reservations:checkin",
   // Operational writes — cancel/reopen orders, publish/unpublish series.
   "admin:orders:write",
   "admin:experiences:write",

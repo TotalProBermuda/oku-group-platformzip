@@ -63,6 +63,17 @@ describe("host chat access guard", () => {
     await expect(requireHostChatAccess()).rejects.toMatchObject({ status: 403 });
   });
 
+  it("allows a venue-bound F&B Director to operate bookings without granting chat access", async () => {
+    mocks.requireSession.mockResolvedValue({ userId: "director-1", roles: ["FB_DIRECTOR"] });
+    mocks.findUnique.mockResolvedValue({ venueId: "venue-a" });
+    await expect(requireHostBookingAccess()).resolves.toMatchObject({
+      userId: "director-1",
+      venueId: "venue-a",
+      isSuperadmin: false,
+    });
+    await expect(requireHostChatAccess()).rejects.toMatchObject({ status: 403 });
+  });
+
   it("prevents a normal host from changing a chat claimed by another host", async () => {
     mocks.requireSession.mockResolvedValue({ userId: "host-1", roles: ["RESTAURANT_HOST"] });
     mocks.findUnique.mockResolvedValue({ venueId: "venue-a" });
