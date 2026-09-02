@@ -3,6 +3,7 @@ import { getOptionalSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
 import { INCLUDE_FULL } from "@/server/host/hostService";
 import HostOperationsBoard from "@/components/host/HostOperationsBoard";
+import { getCurrentRoles } from "@/server/auth/currentRoles";
 
 export const dynamic = "force-dynamic";
 
@@ -48,17 +49,21 @@ async function getData(venueId: string | null) {
 export default async function HostOperationsPage() {
   const session = await getOptionalSession();
   if (!session) redirect("/login?callbackUrl=/host/operations");
+  const roles = await getCurrentRoles(session.userId);
   const allowed = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"];
-  if (!(session.roles as string[]).some((r) => allowed.includes(r))) {
+  if (!roles.some((r) => allowed.includes(r))) {
     redirect("/login");
   }
 
-  const isSuperadmin = (session.roles as string[]).includes("SUPERADMIN");
+  const isSuperadmin = roles.includes("SUPERADMIN");
+  const canOverrideCapacity = roles.some((role) =>
+    ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(role),
+  );
   const profile = isSuperadmin
     ? null
     : await prisma.restaurantHostProfile.findUnique({ where: { userId: session.userId }, select: { venueId: true } });
   if (!isSuperadmin && !profile?.venueId) redirect("/login");
 
   const data = await getData(profile?.venueId ?? null);
-  return <HostOperationsBoard reservations={data.reservations as any} waitlist={data.waitlist as any} zones={data.zones as any} />;
+  return <HostOperationsBoard reservations={data.reservations as any} waitlist={data.waitlist as any} zones={data.zones as any} canOverrideCapacity={canOverrideCapacity} />;
 }
