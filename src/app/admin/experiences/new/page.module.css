@@ -33,6 +33,12 @@
 .activeStep { color: var(--ink); font-weight: 700; }
 .activeStep .stepNumber { color: #fff; border-color: var(--red); background: var(--red); }
 .error { color: #a3112b; background: #fff0f1; border: 1px solid #f2bcc4; border-radius: 10px; margin: 0 0 18px; padding: 13px 16px; }
+.optionsError { display: flex; align-items: center; justify-content: space-between; gap: 18px; color: #7b1427; background: #fff0f1; border: 1px solid #f2bcc4; border-radius: 10px; margin: 0 0 18px; padding: 13px 16px; }
+.optionsError strong, .optionsError span { display: block; }
+.optionsError strong { font-size: 13px; margin-bottom: 3px; }
+.optionsError span { font-size: 12px; line-height: 1.45; }
+.optionsError button { flex: none; min-height: 36px; color: #7b1427; background: #fff; border: 1px solid #df9daa; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; padding: 8px 11px; }
+.optionsError button:disabled { cursor: wait; opacity: .65; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; align-items: start; }
 .formCard { padding: 0; margin: 0; min-width: 0; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
 .section { padding: 25px; border-bottom: 1px solid var(--line); }
@@ -89,5 +95,6 @@
   .grid { grid-template-columns: 1fr; }
   .fullField { grid-column: auto; }
   .section { padding: 20px; }
+  .optionsError { align-items: stretch; flex-direction: column; }
   .mobileActions { position: fixed; z-index: 20; display: flex; left: 0; right: 0; bottom: 0; padding: 12px 16px; justify-content: flex-end; background: rgba(255, 255, 255, .96); border-top: 1px solid var(--line); backdrop-filter: blur(10px); }
 }
