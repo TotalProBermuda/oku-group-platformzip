@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import type { CapacityHoldStatus } from "@prisma/client";
 import { emitLedgerEvent } from "@/server/services/ledger/ledgerEventService";
 import { assertNoBlockingOccupancy } from "@/server/events/eventOccupancyService";
+import { buildReservationUpdatedSubject } from "@/server/reservations/confirmationEmail";
 
 export const DEFAULT_DURATION_MINUTES = 120;
 
@@ -356,8 +357,9 @@ export async function assignSpace(opts: {
   actorId: string;
   confirmOverride?: boolean;
   capacityOverrideReason?: string;
-}): Promise<{ overCapacity: boolean; available: number }> {
-  const { reservationId, newSpaceId, actorId, confirmOverride = false, capacityOverrideReason } = opts;
+  guestMessage?: string;
+}): Promise<{ overCapacity: boolean; available: number; moved: boolean; communicationId: string | null }> {
+  const { reservationId, newSpaceId, actorId, confirmOverride = false, capacityOverrideReason, guestMessage } = opts;
 
   if (confirmOverride && (capacityOverrideReason?.trim().length ?? 0) < 8) {
     throw new SpaceAssignmentError("A capacity override reason of at least 8 characters is required");
@@ -369,6 +371,8 @@ export async function assignSpace(opts: {
   let partySize = 0;
   let holdId: string | null = null;
   let releasedHoldIds: string[] = [];
+  let moved = false;
+  let communicationId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
     // ── Advisory locks in deterministic order ─────────────────────────────
@@ -381,7 +385,12 @@ export async function assignSpace(opts: {
     // ── Re-read reservation under lock ─────────────────────────────────────
     const reservation = await tx.reservation.findUniqueOrThrow({
       where: { id: reservationId },
-      select: { partySize: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true, status: true, venueId: true },
+      select: {
+        partySize: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true,
+        status: true, venueId: true, contactEmail: true, confirmationCode: true,
+        venue: { select: { name: true } },
+        assignedSpace: { select: { name: true } },
+      },
     });
 
     // Invariant: reservation must not be terminal
@@ -390,11 +399,15 @@ export async function assignSpace(opts: {
         `Cannot assign space to a ${reservation.status} reservation`
       );
     }
+    moved = reservation.status === "CONFIRMED" && Boolean(reservation.assignedSpaceId) && reservation.assignedSpaceId !== newSpaceId;
+    if (moved && (guestMessage?.trim().length ?? 0) < 8) {
+      throw new SpaceAssignmentError("A guest-facing move message of at least 8 characters is required");
+    }
 
     // ── Re-read space under lock ────────────────────────────────────────────
     const space = await tx.restaurantSpace.findUnique({
       where: { id: newSpaceId },
-      select: { capacity: true, isActive: true, reservable: true },
+      select: { capacity: true, isActive: true, reservable: true, name: true },
     });
 
     // Invariant: space must be active and reservable
@@ -465,6 +478,35 @@ export async function assignSpace(opts: {
       where: { id: reservationId },
       data: { assignedSpaceId: newSpaceId },
     });
+
+    if (moved) {
+      const trimmedMessage = guestMessage!.trim();
+      await tx.reservationStatusLog.create({
+        data: {
+          reservationId,
+          fromStatus: reservation.status,
+          toStatus: reservation.status,
+          changedByUserId: actorId,
+          notes: `Dining section moved from ${reservation.assignedSpace?.name ?? "unassigned"} to ${space.name}. Guest notification queued: ${trimmedMessage}`,
+        },
+      });
+      const communication = await tx.reservationCommunication.create({
+        data: {
+          reservationId,
+          type: "EMAIL",
+          templateKey: "RESERVATION_UPDATED",
+          recipient: reservation.contactEmail,
+          subject: buildReservationUpdatedSubject({
+            venueName: reservation.venue.name,
+            confirmationCode: reservation.confirmationCode,
+          }),
+          bodySnapshot: trimmedMessage,
+          status: "PENDING",
+        },
+        select: { id: true },
+      });
+      communicationId = communication.id;
+    }
 
     // ── Create / refresh hold for new space ───────────────────────────────
     const hold = await tx.capacityHold.upsert({
@@ -540,7 +582,7 @@ export async function assignSpace(opts: {
     }
   }
 
-  return { overCapacity, available };
+  return { overCapacity, available, moved, communicationId };
 }
 
 /**

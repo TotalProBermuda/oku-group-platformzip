@@ -3,6 +3,8 @@ import {
   buildReservationConfirmationSubject,
   buildReservationRequestSubject,
   buildReservationRequestText,
+  buildReservationUpdatedSubject,
+  buildReservationUpdatedText,
 } from "@/server/reservations/confirmationEmail";
 import { buildGuestEventCard } from "@/server/events/eventOccupancyService";
 
@@ -36,6 +38,17 @@ describe("reservation approval customer journey", () => {
     expect(buildReservationConfirmationSubject(emailProps)).toBe(
       "Your reservation at Gold House — G9Q64BJB",
     );
+  });
+
+  it("makes a section move explicit while keeping the booking confirmed", () => {
+    const updated = { ...emailProps, zoneName: "CATCH", guestMessage: "We moved your table from OKU to CATCH." };
+    expect(buildReservationUpdatedSubject(updated)).toBe(
+      "Your reservation at Gold House was updated — G9Q64BJB",
+    );
+    const text = buildReservationUpdatedText(updated);
+    expect(text).toContain("remains confirmed");
+    expect(text).toContain("We moved your table from OKU to CATCH.");
+    expect(text).toContain("Dining section: CATCH");
   });
 });
 

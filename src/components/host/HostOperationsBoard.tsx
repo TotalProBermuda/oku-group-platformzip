@@ -268,6 +268,7 @@ function GuestDrawer({
   const [scheduledSpacesError, setScheduledSpacesError] = useState<string | null>(null);
   const [eventDetails, setEventDetails] = useState<EventConflictCard | null>(null);
   const [capacityOverrideReason, setCapacityOverrideReason] = useState("");
+  const [moveGuestMessage, setMoveGuestMessage] = useState("");
 
   useEffect(() => {
     if (res.status !== "PENDING_APPROVAL" || !confirmedReservationDate) return;
@@ -317,6 +318,10 @@ function GuestDrawer({
     setSpaceWarning(null);
     try {
       const body: Record<string, unknown> = { spaceId: selectedSpaceId };
+      const confirmedMove = res.status === "CONFIRMED"
+        && Boolean(res.assignedSpace?.id)
+        && res.assignedSpace?.id !== selectedSpaceId;
+      if (confirmedMove) body.guestMessage = moveGuestMessage.trim();
       if (forceOverride) {
         body.confirmOverride = true;
         body.capacityOverrideReason = capacityOverrideReason.trim();
@@ -341,6 +346,11 @@ function GuestDrawer({
       }
       // Success (possibly with post-hoc override note)
       if (d.warning?.overCapacity) setSpaceWarning(d.warning);
+      if (d.moved) {
+        setEmailNotice(d.notification?.sent
+          ? "Reservation moved and guest notified."
+          : "Reservation moved; update email failed. Use Resend confirmation.");
+      }
     } catch (e) {
       console.error("[assign-space]", e);
     } finally {
@@ -484,13 +494,20 @@ function GuestDrawer({
                   style={{ padding: "7px 11px", borderRadius: 7, border: "1.5px solid #64748b", background: "#fff", color: "#334155", fontSize: 11, fontWeight: 700, cursor: emailBusy ? "wait" : "pointer" }}>
                   {emailBusy ? "Sending…" : "Resend confirmation"}
                 </button>
-                {emailNotice && <span role="status" style={{ fontSize: 10, color: emailNotice.endsWith("sent.") ? "#15803d" : "#be123c" }}>{emailNotice}</span>}
+                {emailNotice && <span role="status" style={{ fontSize: 10, color: emailNotice.includes("sent.") || emailNotice.includes("notified.") ? "#15803d" : "#be123c" }}>{emailNotice}</span>}
               </div>
             )}
             {/* Space assignment — available for all active reservations */}
             {res.status !== "PENDING_APPROVAL" && spaces.length > 0 && !["CANCELLED", "NO_SHOW", "COMPLETED"].includes(res.status) && (
               <div style={{ marginBottom: 10, padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 8 }}>{t("host", "operations.spaceAssignment")}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 4 }}>
+                  {res.status === "CONFIRMED" && res.assignedSpace ? "Move reservation" : t("host", "operations.spaceAssignment")}
+                </div>
+                {res.status === "CONFIRMED" && res.assignedSpace && (
+                  <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8 }}>
+                    Currently confirmed in <strong>{res.assignedSpace.name}</strong>. The original requested section remains in Journey.
+                  </div>
+                )}
                 {spaceWarning?.overCapacity && (
                   <div style={{ padding: "8px 10px", borderRadius: 6, background: "#fff7ed", border: "1px solid #fed7aa", color: "#c2410c", fontSize: 11, marginBottom: 8 }}>
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("host", "operations.spaceWarning")}</div>
@@ -507,7 +524,7 @@ function GuestDrawer({
                           rows={2}
                           style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", borderRadius: 5, border: "1px solid #fdba74", background: "#fff", color: "#0f172a", fontSize: 10, resize: "vertical", marginBottom: 6 }}
                         />
-                        <button onClick={() => { void handleAssignSpace(true); }} disabled={assigningSpace || capacityOverrideReason.trim().length < 8}
+                        <button onClick={() => { void handleAssignSpace(true); }} disabled={assigningSpace || capacityOverrideReason.trim().length < 8 || (res.status === "CONFIRMED" && !!res.assignedSpace && selectedSpaceId !== res.assignedSpace.id && moveGuestMessage.trim().length < 8)}
                           style={{ padding: "5px 12px", borderRadius: 5, border: "1.5px solid #c2410c", background: "#c2410c", color: "#fff", fontSize: 11, fontWeight: 700, cursor: capacityOverrideReason.trim().length >= 8 ? "pointer" : "not-allowed", opacity: capacityOverrideReason.trim().length >= 8 ? 1 : 0.45 }}>
                           {assigningSpace ? "…" : t("host", "operations.spaceWarningOverride")}
                         </button>
@@ -518,7 +535,18 @@ function GuestDrawer({
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 6 }}>
-                  <select value={selectedSpaceId} onChange={e => { setSelectedSpaceId(e.target.value); setSpaceWarning(null); setCapacityOverrideReason(""); }}
+                  <select value={selectedSpaceId} onChange={e => {
+                    const nextSpaceId = e.target.value;
+                    setSelectedSpaceId(nextSpaceId);
+                    setSpaceWarning(null);
+                    setCapacityOverrideReason("");
+                    const nextSpace = spaces.find((space) => space.id === nextSpaceId);
+                    if (res.status === "CONFIRMED" && res.assignedSpace && nextSpaceId !== res.assignedSpace.id && nextSpace) {
+                      setMoveGuestMessage(`Your reservation remains confirmed in ${nextSpace.name} at ${fmtTime(res.reservationDate)}. We are unable to accommodate ${res.assignedSpace.name} at that time.`);
+                    } else {
+                      setMoveGuestMessage("");
+                    }
+                  }}
                     style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: "1.5px solid #e2e8f0", fontSize: 12, color: "#0f172a", background: "#fff" }}>
                     <option value="">{t("host", "operations.spacePlaceholder")}</option>
                     {spaces.filter(s => s.isActive && s.reservable).map(s => (
@@ -527,11 +555,27 @@ function GuestDrawer({
                       </option>
                     ))}
                   </select>
-                  <button onClick={() => { void handleAssignSpace(); }} disabled={!selectedSpaceId || assigningSpace}
+                  <button onClick={() => { void handleAssignSpace(); }} disabled={!selectedSpaceId || assigningSpace || (res.status === "CONFIRMED" && !!res.assignedSpace && (selectedSpaceId === res.assignedSpace.id || moveGuestMessage.trim().length < 8))}
                     style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: selectedSpaceId ? "#0f172a" : "#e2e8f0", color: selectedSpaceId ? "#fff" : "#94a3b8", fontSize: 11, fontWeight: 700, cursor: selectedSpaceId ? "pointer" : "not-allowed" }}>
-                    {assigningSpace ? "…" : t("host", "operations.assignSpace")}
+                    {assigningSpace ? "…" : res.status === "CONFIRMED" && res.assignedSpace ? selectedSpaceId === res.assignedSpace.id ? "Select another section" : "Move & notify" : t("host", "operations.assignSpace")}
                   </button>
                 </div>
+                {res.status === "CONFIRMED" && res.assignedSpace && selectedSpaceId !== res.assignedSpace.id && (
+                  <div style={{ marginTop: 9 }}>
+                    <label htmlFor={`move-message-${res.id}`} style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#475569", marginBottom: 4 }}>Message to guest</label>
+                    <textarea
+                      id={`move-message-${res.id}`}
+                      value={moveGuestMessage}
+                      onChange={(event) => setMoveGuestMessage(event.target.value)}
+                      rows={3}
+                      placeholder="Explain the new dining section to the guest"
+                      style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 7, border: "1.5px solid #cbd5e1", background: "#fff", color: "#0f172a", fontSize: 11, resize: "vertical" }}
+                    />
+                    <div style={{ marginTop: 3, fontSize: 9, color: moveGuestMessage.trim().length >= 8 ? "#15803d" : "#be123c" }}>
+                      Required. This exact message is recorded and emailed with the updated section.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

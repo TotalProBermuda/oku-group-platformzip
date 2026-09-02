@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { EventOccupancyConflictError, findBlockingOccupancy } from "@/server/events/eventOccupancyService";
 import { getCurrentRoles } from "@/server/auth/currentRoles";
 import type { RoleKey } from "@/types/roles";
+import { deliverReservationStateEmail } from "@/server/reservations/reservationNotificationService";
 
 const DEFAULT_DURATION_MINUTES = 120;
 
@@ -55,10 +56,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id: reservationId } = await params;
   const body = await req.json();
-  const { spaceId, confirmOverride = false, capacityOverrideReason } = body as {
+  const { spaceId, confirmOverride = false, capacityOverrideReason, guestMessage } = body as {
     spaceId?: string;
     confirmOverride?: boolean;
     capacityOverrideReason?: string;
+    guestMessage?: string;
   };
 
   if (!spaceId) {
@@ -100,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const [reservation, space] = await Promise.all([
     prisma.reservation.findUnique({
       where: { id: reservationId },
-      select: { id: true, venueId: true, partySize: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true },
+      select: { id: true, venueId: true, partySize: true, status: true, assignedSpaceId: true, reservationDate: true, durationMinutes: true },
     }),
     prisma.restaurantSpace.findUnique({
       where: { id: spaceId },
@@ -125,6 +127,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json(
       { ok: false, error: "Forbidden: reservation belongs to a different venue" },
       { status: 403 }
+    );
+  }
+
+  const isConfirmedMove = reservation.status === "CONFIRMED"
+    && Boolean(reservation.assignedSpaceId)
+    && reservation.assignedSpaceId !== spaceId;
+  if (isConfirmedMove && (guestMessage?.trim().length ?? 0) < 8) {
+    return NextResponse.json(
+      { ok: false, error: "A guest-facing move message of at least 8 characters is required" },
+      { status: 400 },
     );
   }
 
@@ -163,13 +175,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // FK update, hold creation) in a single transaction. Throws
   // CapacityExceededError if capacity is exhausted between preflight and write.
   try {
-    const { overCapacity, available } = await assignSpace({
+    const { overCapacity, available, moved, communicationId } = await assignSpace({
       reservationId,
       newSpaceId: spaceId,
       actorId: userId,
       confirmOverride,
       capacityOverrideReason: capacityOverrideReason?.trim(),
+      guestMessage: guestMessage?.trim(),
     });
+
+    let notification: { sent?: boolean; reason?: string; skipped?: boolean } | null = null;
+    if (moved && communicationId) {
+      try {
+        notification = await deliverReservationStateEmail(reservationId, "RESERVATION_UPDATED", {
+          communicationId,
+          guestMessage: guestMessage!.trim(),
+        });
+      } catch (emailError) {
+        console.error("[assign-space] reservation update email failed", { reservationId, communicationId, emailError });
+        notification = { sent: false, reason: "DELIVERY_FAILED" };
+      }
+    }
 
     const updated = await prisma.reservation.findUnique({
       where: { id: reservationId },
@@ -186,6 +212,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ok: true,
       data: updated,
       warning: overCapacity ? { overCapacity: true, available, capacity: space.capacity } : null,
+      moved,
+      notification,
     });
   } catch (e) {
     if (e instanceof CapacityExceededError) {
