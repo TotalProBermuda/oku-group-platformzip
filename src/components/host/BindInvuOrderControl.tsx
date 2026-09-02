@@ -323,7 +323,7 @@ export default function BindInvuOrderControl({ attributionSession, onBound, comp
           opacity: canBind ? 1 : 0.4,
         }}
       >
-        Open table in INVU
+        Bind INVU check
       </button>
       {session.status ? (
         <StatusChip status={session.status} />

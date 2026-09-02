@@ -10,6 +10,8 @@ import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
 import { assertNoBlockingOccupancy } from "@/server/events/eventOccupancyService";
 import { deliverReservationStateEmail } from "@/server/reservations/reservationNotificationService";
+import { buildReservationConfirmationSubject } from "@/server/reservations/confirmationEmail";
+import { assertTransitionOperationalRequirements } from "@/server/host/transitionRequirements";
 
 export const INCLUDE_FULL = {
   zone: true,
@@ -343,38 +345,7 @@ export async function transitionStatus(
     include: { venue: true, handoffs: true },
   });
 
-  if (existing.status === "PENDING_APPROVAL" && toStatus === "CONFIRMED") {
-    if (!(opts?.assignedSpaceId || existing.assignedSpaceId || existing.requestedSpaceId)) {
-      const e = new Error("Choose a final dining space before confirming this request") as Error & { status?: number };
-      e.status = 400;
-      throw e;
-    }
-    if (!opts?.reservationDate) {
-      const e = new Error("Confirm the reservation date and time before accepting this request") as Error & { status?: number };
-      e.status = 400;
-      throw e;
-    }
-    if (!opts?.tableLabel?.trim()) {
-      const e = new Error("Assign a table or joined-table plan before confirming this request") as Error & { status?: number };
-      e.status = 400;
-      throw e;
-    }
-  }
-
-  // Hard guard (Apr 28 2026): SEATED requires a tableLabel either now or
-  // already on the row. The Operations Board UI enforces this client-side,
-  // but the API was previously permissive — meaning a stale client (or a
-  // direct curl) could land a reservation in SEATED with no table, which
-  // breaks the bind UI and the close-of-sale table-match heuristic.
-  if (toStatus === "SEATED") {
-    const effectiveTable =
-      opts?.tableLabel?.trim() || existing.assignedTableLabel?.trim();
-    if (!effectiveTable) {
-      const e = new Error("tableLabel is required to seat a reservation") as Error & { status?: number };
-      e.status = 400;
-      throw e;
-    }
-  }
+  assertTransitionOperationalRequirements(existing, toStatus, opts);
 
   const now = new Date();
   const update: Record<string, unknown> = { status: toStatus };
@@ -386,8 +357,8 @@ export async function transitionStatus(
   }
   if (confirmedReservationDate) update.reservationDate = confirmedReservationDate;
   if (toStatus === "CONFIRMED" && opts?.tableLabel?.trim()) {
-    // This is the planned table/table-combination. Hosts may still move the
-    // party later; assignedTableLabel remains editable at seating time.
+    // Backwards-compatible for older clients that still provide a tentative
+    // plan, but no table is required until the guest is actually seated.
     update.assignedTableLabel = opts.tableLabel.trim();
   }
 
@@ -678,6 +649,34 @@ export async function transitionStatus(
       include: INCLUDE_FULL,
     });
 
+    // Persist the email obligation atomically with status, capacity and audit.
+    // Provider delivery occurs after commit and reuses this PENDING row.
+    if (existing.status !== "CONFIRMED" && toStatus === "CONFIRMED") {
+      const communicationExists = await tx.reservationCommunication.findFirst({
+        where: {
+          reservationId,
+          templateKey: "CONFIRMATION",
+          status: { in: ["PENDING", "SENT"] },
+        },
+        select: { id: true },
+      });
+      if (!communicationExists) {
+        await tx.reservationCommunication.create({
+          data: {
+            reservationId,
+            type: "EMAIL",
+            templateKey: "CONFIRMATION",
+            recipient: existing.contactEmail,
+            subject: buildReservationConfirmationSubject({
+              venueName: existing.venue.name,
+              confirmationCode: existing.confirmationCode,
+            }),
+            status: "PENDING",
+          },
+        });
+      }
+    }
+
     // ── Durable outbox writes — atomic with the reservation update ───────
     // Capacity hold events use IDs computed above in this transaction.
     if (confirmedHoldId && confirmedSpaceId) {
@@ -873,9 +872,9 @@ export async function transitionStatus(
   // best-effort emitLedgerEvent calls needed for these events.
 
   // The guest's confirmation is a consequence of the committed state change,
-  // never of the initial request. Keep this best-effort so an email provider
-  // outage cannot roll back the host's operational decision; the durable
-  // ReservationCommunication row remains visible for retry.
+  // never of the initial request. Provider delivery remains best-effort so an
+  // outage cannot roll back the host decision; its intent was persisted in the
+  // transaction above and remains visible for retry.
   if (existing.status !== "CONFIRMED" && toStatus === "CONFIRMED") {
     try {
       await deliverReservationStateEmail(reservationId, "CONFIRMATION");

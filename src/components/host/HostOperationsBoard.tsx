@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Brandmark from "@/components/Brandmark";
 import LiveAttendanceFeed from "./LiveAttendanceFeed";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
@@ -241,6 +241,8 @@ function GuestDrawer({
   const [confirmedReservationDate, setConfirmedReservationDate] = useState(toDateTimeLocalValue(res.reservationDate));
   const [spaceWarning, setSpaceWarning] = useState<{ overCapacity: boolean; available: number; capacity?: number; partySize?: number } | null>(null);
   const [assigningSpace, setAssigningSpace] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailNotice, setEmailNotice] = useState<string | null>(null);
   const [lossReason, setLossReason] = useState("");
   const [lossNotes, setLossNotes] = useState("");
   const [showLossForm, setShowLossForm] = useState(false);
@@ -313,6 +315,21 @@ function GuestDrawer({
     setShowLossForm(false);
   }
 
+  async function resendConfirmation() {
+    setEmailBusy(true);
+    setEmailNotice(null);
+    try {
+      const response = await fetch(`/api/v1/host/bookings/${res.id}/resend-confirmation`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error ?? "Confirmation email could not be sent");
+      setEmailNotice("Confirmation email sent.");
+    } catch (error) {
+      setEmailNotice(error instanceof Error ? error.message : "Confirmation email could not be sent");
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
   const STATUS_ACTIONS: Record<string, Array<{ labelKey: string; status: string; color: string; isLoss?: boolean }>> = {
     PENDING:          [{ labelKey: "operations.actAccept", status: "ACKNOWLEDGED", color: "#1d4ed8" }, { labelKey: "operations.actWaitlist", status: "WAITLISTED", color: "#7e22ce" }, { labelKey: "operations.actReject", status: "CANCELLED", color: "#be123c", isLoss: true }],
     PENDING_APPROVAL: [{ labelKey: "operations.actAccept", status: "CONFIRMED",    color: "#1d4ed8" }, { labelKey: "operations.actWaitlist", status: "WAITLISTED", color: "#7e22ce" }, { labelKey: "operations.actReject", status: "CANCELLED", color: "#be123c", isLoss: true }],
@@ -378,6 +395,15 @@ function GuestDrawer({
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
         {tab === "actions" && !showLossForm && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {(res.status === "CONFIRMED" || res.statusLogs.some((log) => log.toStatus === "CONFIRMED")) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => void resendConfirmation()} disabled={emailBusy}
+                  style={{ padding: "7px 11px", borderRadius: 7, border: "1.5px solid #64748b", background: "#fff", color: "#334155", fontSize: 11, fontWeight: 700, cursor: emailBusy ? "wait" : "pointer" }}>
+                  {emailBusy ? "Sending…" : "Resend confirmation"}
+                </button>
+                {emailNotice && <span role="status" style={{ fontSize: 10, color: emailNotice.endsWith("sent.") ? "#15803d" : "#be123c" }}>{emailNotice}</span>}
+              </div>
+            )}
             {/* Space assignment — available for all active reservations */}
             {spaces.length > 0 && !["CANCELLED", "NO_SHOW", "COMPLETED"].includes(res.status) && (
               <div style={{ marginBottom: 10, padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
@@ -423,15 +449,15 @@ function GuestDrawer({
                   style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 7, border: "1.5px solid #e2e8f0", background: "#fff", color: "#0f172a", fontSize: 12 }}
                 />
                 <div style={{ marginTop: 8, fontSize: 10, color: "#64748b", lineHeight: 1.4 }}>
-                  Select the final dining space above and enter a table or joined-table plan below. The requested space remains in the audit trail if the group is moved.
+                  Select the final dining space and time. The exact table is assigned when the guest arrives; the requested space remains in the audit trail if the group is moved.
                 </div>
               </div>
             )}
 
-            {["PENDING_APPROVAL", "ARRIVED"].includes(res.status) && (
+            {res.status === "ARRIVED" && (
               <div style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
-                  {res.status === "PENDING_APPROVAL" ? "Table / joined-table plan" : t("host", "operations.tableAssignment")}
+                  {t("host", "operations.tableAssignment")}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input value={tableLabel} onChange={e => setTableLabel(e.target.value)} placeholder={t("host", "operations.tablePlaceholder")} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 12, color: "#0f172a" }} />
@@ -448,14 +474,13 @@ function GuestDrawer({
 
             {actions.map(a => {
               const confirmingApproval = res.status === "PENDING_APPROVAL" && a.status === "CONFIRMED";
-              const confirmationReady = !!selectedSpaceId && !!tableLabel.trim() && !!confirmedReservationDate;
+              const confirmationReady = !!selectedSpaceId && !!confirmedReservationDate;
               return <button key={a.status}
                 disabled={confirmingApproval && !confirmationReady}
                 onClick={() => {
                   if (a.isLoss) return triggerLoss(a.status);
                   if (confirmingApproval) {
                     return onAction(res.id, a.status, {
-                      tableLabel: tableLabel.trim(),
                       assignedSpaceId: selectedSpaceId,
                       confirmedReservationDate: new Date(confirmedReservationDate).toISOString(),
                     });
@@ -464,7 +489,7 @@ function GuestDrawer({
                 }}
                 style={{ padding: "12px 16px", borderRadius: 10, border: `2px solid ${a.color}`, background: a.status === "SEATED" ? a.color : "transparent", color: a.status === "SEATED" ? "#fff" : a.color, fontSize: 13, fontWeight: 700, cursor: confirmingApproval && !confirmationReady ? "not-allowed" : "pointer", opacity: confirmingApproval && !confirmationReady ? 0.45 : 1, textAlign: "left" }}>
                 {t("host", a.labelKey)}
-                {confirmingApproval && !confirmationReady ? " · select space, time and table" : ""}
+                {confirmingApproval && !confirmationReady ? " · select space and time" : ""}
               </button>;
             })}
           </div>
@@ -557,6 +582,9 @@ export default function HostOperationsBoard({
   const [reservations, setReservations] = useState(initial);
   const [waitlist, setWaitlist] = useState(initialWl);
   const [spaces, setSpaces] = useState<SpaceUtilisation[]>([]);
+  const [spaceLoadError, setSpaceLoadError] = useState<string | null>(null);
+  const [spacesLoading, setSpacesLoading] = useState(false);
+  const deepLinkHandled = useRef(false);
   const [waitlistBusy, setWaitlistBusy] = useState<string | null>(null);
 
   // Mark-lost / remove handler for stale waitlist entries (Apr 29 2026
@@ -599,13 +627,19 @@ export default function HostOperationsBoard({
 
   // Fetch space utilisation on mount and periodically
   const refreshSpaces = useCallback(async () => {
+    setSpacesLoading(true);
     try {
-      const r = await fetch("/api/v1/host/spaces/utilisation");
-      if (r.ok) {
-        const d = await r.json();
-        setSpaces(d.data ?? []);
-      }
-    } catch {}
+      const r = await fetch("/api/v1/host/spaces/utilisation", { cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? `Space availability failed (${r.status})`);
+      setSpaces(d.data ?? []);
+      setSpaceLoadError(null);
+    } catch (error) {
+      setSpaces([]);
+      setSpaceLoadError(error instanceof Error ? error.message : "Space availability could not be loaded");
+    } finally {
+      setSpacesLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -613,6 +647,17 @@ export default function HostOperationsBoard({
     const interval = setInterval(refreshSpaces, 30_000);
     return () => clearInterval(interval);
   }, [refreshSpaces]);
+
+  useEffect(() => {
+    if (deepLinkHandled.current) return;
+    const reservationId = new URLSearchParams(window.location.search).get("reservationId");
+    if (!reservationId) return;
+    const match = reservations.find((reservation) => reservation.id === reservationId);
+    if (match) {
+      setActiveRes(match);
+      deepLinkHandled.current = true;
+    }
+  }, [reservations]);
 
   const refresh = useCallback(async () => {
     try {
@@ -763,6 +808,15 @@ export default function HostOperationsBoard({
 
       {/* Operations View — Zone, Filters, Kanban, Waitlist */}
       {boardView === "operations" && <><div style={{ display: "flex", gap: 8, padding: "12px 20px", borderBottom: "1px solid #e2e8f0", background: "#fff", overflowX: "auto" }}>
+        {spaceLoadError && (
+          <div role="alert" style={{ minWidth: 320, padding: "10px 12px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff1f2", color: "#9f1239", fontSize: 11 }}>
+            <div style={{ fontWeight: 800, marginBottom: 3 }}>Dining-space availability unavailable</div>
+            <div>{spaceLoadError}</div>
+            <button type="button" onClick={() => void refreshSpaces()} disabled={spacesLoading} style={{ marginTop: 7, border: "1px solid #fb7185", borderRadius: 6, background: "#fff", color: "#be123c", padding: "4px 9px", fontSize: 10, fontWeight: 700, cursor: spacesLoading ? "wait" : "pointer" }}>
+              {spacesLoading ? "Retrying…" : "Retry"}
+            </button>
+          </div>
+        )}
         {/* Space utilisation (from CapacityHold — overlap-aware) */}
         {spaces.length > 0 ? spaces.map(s => {
           const bg = s.utilPct > 85 ? "#ef4444" : s.utilPct > 60 ? "#f59e0b" : "#10b981";
