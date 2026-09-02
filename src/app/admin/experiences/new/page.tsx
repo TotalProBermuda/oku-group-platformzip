@@ -1,8 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Building2, Globe2, MapPin, Sparkles, Users } from "lucide-react";
 import styles from "./page.module.css";
 
@@ -72,7 +71,6 @@ const entityLabel = (entity: HostEntity) =>
   entity.displayName || entity.name || entity.handle || entity.id;
 
 export default function NewExperiencePage() {
-  const router = useRouter();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [spaces, setSpaces] = useState<PhysicalSpace[]>([]);
@@ -80,55 +78,82 @@ export default function NewExperiencePage() {
   const [partners, setPartners] = useState<HostEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [optionsRequest, setOptionsRequest] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const submissionInFlight = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     async function loadOptions() {
+      setLoading(true);
+      setOptionsError(null);
+      let lastError: unknown = null;
+
       try {
-        const [venueResponse, spaceResponse, hostResponse] = await Promise.all([
-          fetch("/api/v1/admin/venues"),
-          fetch("/api/v1/admin/spaces"),
-          fetch("/api/v1/admin/series/host-options"),
-        ]);
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const requestInit: RequestInit = { cache: "no-store", signal: controller.signal };
+            const [venueResponse, spaceResponse, hostResponse] = await Promise.all([
+              fetch("/api/v1/admin/venues", requestInit),
+              fetch("/api/v1/admin/spaces", requestInit),
+              fetch("/api/v1/admin/series/host-options", requestInit),
+            ]);
 
-        if (!venueResponse.ok || !spaceResponse.ok || !hostResponse.ok) {
-          throw new Error("Unable to load the operating venue and physical-space options.");
-        }
+            if (!venueResponse.ok || !spaceResponse.ok || !hostResponse.ok) {
+              throw new Error("Unable to load the operating venue and physical-space options.");
+            }
 
-        const venuePayload = asRecord(await venueResponse.json());
-        const spacePayload = asRecord(await spaceResponse.json());
-        const hostPayload = asRecord(await hostResponse.json());
-        const hostData = asRecord(hostPayload.data);
-        const loadedVenues = asArray<Venue>(venuePayload.venues);
-        const loadedSpaces = asArray<PhysicalSpace>(spacePayload.data);
+            const venuePayload = asRecord(await venueResponse.json());
+            const spacePayload = asRecord(await spaceResponse.json());
+            const hostPayload = asRecord(await hostResponse.json());
+            const hostData = asRecord(hostPayload.data);
+            const loadedVenues = asArray<Venue>(venuePayload.venues);
+            const loadedSpaces = asArray<PhysicalSpace>(spacePayload.data);
 
-        if (cancelled) return;
+            if (loadedVenues.length === 0) {
+              throw new Error("No operating venues were returned. Retry the connection before creating an experience.");
+            }
+            if (cancelled) return;
 
-        setVenues(loadedVenues);
-        setSpaces(loadedSpaces);
-        setInfluencers(asArray<HostEntity>(hostData.influencers));
-        setPartners(asArray<HostEntity>(hostData.partners));
-        setForm((current) => {
-          if (current.venueId || loadedVenues.length === 0) return current;
-          const firstVenue = loadedVenues[0];
-          return { ...current, venueId: firstVenue.id, city: firstVenue.city || current.city };
-        });
-      } catch (loadError) {
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Unable to load creation options.");
+            lastError = null;
+            setVenues(loadedVenues);
+            setSpaces(loadedSpaces);
+            setInfluencers(asArray<HostEntity>(hostData.influencers));
+            setPartners(asArray<HostEntity>(hostData.partners));
+            setForm((current) => {
+              if (loadedVenues.some((venue) => venue.id === current.venueId)) return current;
+              const firstVenue = loadedVenues[0];
+              return { ...current, venueId: firstVenue.id, spaceId: "", city: firstVenue.city || current.city };
+            });
+            return;
+          } catch (loadError) {
+            if (controller.signal.aborted) return;
+            lastError = loadError;
+            if (attempt === 0) {
+              await new Promise((resolve) => window.setTimeout(resolve, 200));
+            }
+          }
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          if (lastError) {
+            setVenues([]);
+            setOptionsError(lastError instanceof Error ? lastError.message : "Unable to load creation options.");
+          }
+          setLoading(false);
+        }
       }
     }
 
     void loadOptions();
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, []);
+  }, [optionsRequest]);
 
   const availableSpaces = useMemo(
     () =>
@@ -154,10 +179,13 @@ export default function NewExperiencePage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const intent = submitter?.value === "draft" ? "draft" : "continue";
     setError(null);
     setSubmitting(true);
+    let unlockSubmission = true;
 
     try {
       const response = await fetch("/api/v1/admin/series", {
@@ -187,11 +215,16 @@ export default function NewExperiencePage() {
 
       const series = asRecord(payload.data);
       if (typeof series.id !== "string") throw new Error("The experience was created without an editor link.");
-      router.push(`/admin/experiences/${series.id}${intent === "continue" ? "?tab=dates" : ""}`);
+      const target = `/admin/experiences/${encodeURIComponent(series.id)}?tab=dates`;
+      window.location.assign(target);
+      unlockSubmission = false;
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create this experience.");
     } finally {
-      setSubmitting(false);
+      if (unlockSubmission) {
+        submissionInFlight.current = false;
+        setSubmitting(false);
+      }
     }
   }
 
@@ -200,6 +233,7 @@ export default function NewExperiencePage() {
   const hostLabel = form.hostType === "OKU" ? "OKÜ" : form.hostType === "CATCH" ? "CATCH" : form.hostType === "INFLUENCER"
     ? entityLabel(influencers.find((item) => item.id === form.influencerId) ?? { id: "Influencer pending" })
     : entityLabel(partners.find((item) => item.id === form.partnerId) ?? { id: "Partner pending" });
+  const creationDisabled = loading || submitting || venues.length === 0 || Boolean(optionsError);
 
   return (
     <main className={styles.page}>
@@ -214,8 +248,8 @@ export default function NewExperiencePage() {
             <p>Build the guest-facing details first. Availability, pricing and publishing come next.</p>
           </div>
           <div className={styles.desktopActions}>
-            <button className={styles.secondaryButton} type="submit" value="draft" disabled={loading || submitting || venues.length === 0}>Save draft</button>
-            <button className={styles.primaryButton} type="submit" value="continue" disabled={loading || submitting || venues.length === 0}>
+            <button className={styles.secondaryButton} type="submit" value="draft" disabled={creationDisabled}>Save draft</button>
+            <button className={styles.primaryButton} type="submit" value="continue" disabled={creationDisabled}>
               {submitting ? "Creating…" : "Continue to availability"}
             </button>
           </div>
@@ -231,6 +265,17 @@ export default function NewExperiencePage() {
           ))}
         </div>
 
+        {optionsError ? (
+          <div role="alert" className={styles.optionsError}>
+            <div>
+              <strong>Operating venues are unavailable.</strong>
+              <span>{optionsError}</span>
+            </div>
+            <button type="button" onClick={() => setOptionsRequest((current) => current + 1)} disabled={loading}>
+              {loading ? "Retrying…" : "Retry loading venues"}
+            </button>
+          </div>
+        ) : null}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
 
         <div className={styles.layout}>
@@ -330,7 +375,7 @@ export default function NewExperiencePage() {
 
         <div className={styles.mobileActions}>
           <Link className={styles.secondaryButton} href="/admin/experiences">Cancel</Link>
-          <button className={styles.primaryButton} type="submit" value="continue" disabled={loading || submitting || venues.length === 0}>{submitting ? "Creating…" : "Continue"}</button>
+          <button className={styles.primaryButton} type="submit" value="continue" disabled={creationDisabled}>{submitting ? "Creating…" : "Continue"}</button>
         </div>
       </form>
     </main>
