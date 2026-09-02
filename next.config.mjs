@@ -6,7 +6,7 @@ const nextConfig = {
       allowedOrigins: ["localhost:3000", "0.0.0.0:5000"],
     },
   },
-  allowedDevOrigins: ["*.picard.replit.dev", "*.replit.dev"],
+  allowedDevOrigins: ["127.0.0.1", "*.picard.replit.dev", "*.replit.dev"],
   eslint: {
     ignoreDuringBuilds: true,
   },
