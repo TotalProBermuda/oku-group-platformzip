@@ -36,6 +36,8 @@ export async function requireHostBookingAccess(): Promise<HostVenueAccess> {
   return requireHostVenueAccessForSession(userId, roles, [
     "RESTAURANT_HOST",
     "RESTAURANT_SUPERVISOR",
+    "FB_DIRECTOR",
+    "ADMIN_COMMERCIAL",
     "STREETSIDE_HOST",
   ]);
 }

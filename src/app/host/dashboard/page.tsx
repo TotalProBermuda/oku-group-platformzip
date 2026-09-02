@@ -10,7 +10,7 @@ export default async function HostDashboardPage() {
 
   const roles = session.roles as string[];
   const isRestaurantHost = roles.some((r) =>
-    ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "SUPERADMIN"].includes(r)
+    ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "SUPERADMIN"].includes(r)
   );
   if (!isRestaurantHost) redirect("/login");
 

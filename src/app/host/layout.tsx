@@ -10,7 +10,7 @@ export default async function HostLayout({ children }: { children: React.ReactNo
   const session = await getOptionalSession();
   if (!session) redirect("/login?callbackUrl=/host/dashboard");
 
-  const allowed = ["SUPERADMIN", "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"];
+  const allowed = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"];
   const hasAccess = (session.roles as string[]).some((r) => allowed.includes(r));
   if (!hasAccess) redirect("/login");
 
