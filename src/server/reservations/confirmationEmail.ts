@@ -14,6 +14,7 @@ export interface ReservationConfirmationInput {
   seatingPreference: string | null;
   notes: string | null;
   addons: { label: string }[];
+  guestMessage?: string | null;
 }
 
 export interface ReservationConfirmationResult {
@@ -23,7 +24,7 @@ export interface ReservationConfirmationResult {
   subject: string;
 }
 
-export type ReservationEmailKind = "REQUEST_RECEIVED" | "CONFIRMATION";
+export type ReservationEmailKind = "REQUEST_RECEIVED" | "CONFIRMATION" | "RESERVATION_UPDATED";
 
 const PANAMA_TZ = "America/Panama";
 
@@ -156,6 +157,47 @@ function buildText(props: ReservationConfirmationInput): string {
   return lines.join("\n");
 }
 
+function buildUpdatedHtml(props: ReservationConfirmationInput): string {
+  const { dateLine, timeLine } = formatReservationDateTime(props.reservationDate);
+  const firstName = escapeHtml(props.contactName.split(" ")[0] || props.contactName);
+  const seating = props.zoneName ? escapeHtml(props.zoneName) : "your confirmed dining section";
+  const message = props.guestMessage ? escapeHtml(props.guestMessage) : "Your reservation details have been updated.";
+  return `<!DOCTYPE html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f0ea;margin:0;padding:24px;color:#1a1614">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;border:1px solid #e5dccf">
+    <div style="text-align:center;margin-bottom:24px"><span style="font-size:11px;font-weight:700;letter-spacing:0.18em;color:#c41e3a">OKÜ HOSPITALITY GROUP</span></div>
+    <h1 style="font-size:24px;line-height:1.25;margin:0 0 4px;color:#1a1614">Reservation updated</h1>
+    <p style="font-size:14px;color:#8a7d70;margin:0 0 24px">${escapeHtml(props.venueName)}</p>
+    <p style="font-size:15px;line-height:1.55;color:#4a423b">Hi ${firstName},</p>
+    <p style="font-size:15px;line-height:1.55;color:#4a423b">Your reservation remains confirmed. ${message}</p>
+    <div style="background:#f9f5ef;border:1px solid #e5dccf;border-radius:8px;padding:18px;margin:22px 0">
+      <div style="font-size:14px;color:#1a1614"><strong>${dateLine} · ${timeLine}</strong></div>
+      <div style="font-size:14px;color:#4a423b;margin-top:8px">Dining section: <strong>${seating}</strong></div>
+      <div style="font-size:13px;color:#6b5e54;margin-top:8px">${props.partySize} ${props.partySize === 1 ? "guest" : "guests"} · Confirmation ${escapeHtml(props.confirmationCode)}</div>
+    </div>
+    <p style="font-size:13px;color:#6b5e54;line-height:1.55">Questions? Reply to this email and include your confirmation code.</p>
+  </div>
+</body></html>`;
+}
+
+export function buildReservationUpdatedText(props: ReservationConfirmationInput): string {
+  const { dateLine, timeLine } = formatReservationDateTime(props.reservationDate);
+  return [
+    `Hi ${props.contactName.split(" ")[0] || props.contactName},`,
+    "",
+    `Your reservation at ${props.venueName} remains confirmed.`,
+    props.guestMessage || "Your reservation details have been updated.",
+    "",
+    `Date: ${dateLine}`,
+    `Time: ${timeLine}`,
+    `Dining section: ${props.zoneName || "Confirmed dining section"}`,
+    `Party size: ${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}`,
+    `Confirmation code: ${props.confirmationCode}`,
+    "",
+    "Questions? Reply to this email and include your confirmation code.",
+  ].join("\n");
+}
+
 function buildRequestHtml(props: ReservationConfirmationInput): string {
   const { dateLine, timeLine } = formatReservationDateTime(props.reservationDate);
   const firstName = escapeHtml(props.contactName.split(" ")[0] || props.contactName);
@@ -206,6 +248,10 @@ export function buildReservationRequestSubject(props: Pick<ReservationConfirmati
   return `Request received at ${props.venueName} — ${props.confirmationCode}`;
 }
 
+export function buildReservationUpdatedSubject(props: Pick<ReservationConfirmationInput, "venueName" | "confirmationCode">): string {
+  return `Your reservation at ${props.venueName} was updated — ${props.confirmationCode}`;
+}
+
 export async function sendReservationRequestReceivedEmail(
   props: ReservationConfirmationInput
 ): Promise<ReservationConfirmationResult> {
@@ -254,5 +300,25 @@ export async function sendReservationConfirmationEmail(
       bodySnapshot: text,
       subject,
     };
+  }
+}
+
+export async function sendReservationUpdatedEmail(
+  props: ReservationConfirmationInput
+): Promise<ReservationConfirmationResult> {
+  const subject = buildReservationUpdatedSubject(props);
+  const html = buildUpdatedHtml(props);
+  const text = buildReservationUpdatedText(props);
+
+  if (!isResendConfigured()) {
+    return { sent: false, reason: "RESEND_NOT_CONFIGURED", bodySnapshot: text, subject };
+  }
+
+  try {
+    const { client, fromEmail } = await getResendClient();
+    await client.emails.send({ from: fromEmail, to: props.contactEmail, subject, html, text });
+    return { sent: true, bodySnapshot: text, subject };
+  } catch (e) {
+    return { sent: false, reason: e instanceof Error ? e.message : "send_failed", bodySnapshot: text, subject };
   }
 }
