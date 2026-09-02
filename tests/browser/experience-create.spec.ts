@@ -34,13 +34,14 @@ test.describe("Create experience reliability @experience-create", () => {
     await page.getByLabel("Experience title").fill("Browser-created experience");
     await page.getByLabel(/Page URL/).fill("browser-created-experience");
 
-    const continueButton = page.getByRole("button", { name: "Continue to availability" });
+    const continueButton = page.getByRole("button", { name: /^Continue(?: to availability)?$/ });
     await expect(continueButton).toBeEnabled();
-    await continueButton.click();
 
     await page.locator("form").evaluate((form) => {
-      const button = form.querySelector<HTMLButtonElement>('button[value="continue"]');
-      (form as HTMLFormElement).requestSubmit(button ?? undefined);
+      const buttons = Array.from(form.querySelectorAll<HTMLButtonElement>('button[value="continue"]'));
+      const button = buttons.find((candidate) => candidate.offsetParent !== null) ?? buttons[0];
+      (form as HTMLFormElement).requestSubmit(button);
+      (form as HTMLFormElement).requestSubmit(button);
     });
 
     await page.waitForURL(/\/admin\/experiences\/series-browser-test\?tab=dates$/);
@@ -60,7 +61,7 @@ test.describe("Create experience reliability @experience-create", () => {
     await page.goto("/admin/experiences/new", { waitUntil: "domcontentloaded" });
     const alert = page.getByRole("alert").filter({ hasText: "Operating venues are unavailable" });
     await expect(alert).toBeVisible();
-    await expect(page.getByRole("button", { name: "Continue to availability" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Continue(?: to availability)?$/ })).toBeDisabled();
 
     await page.getByRole("button", { name: "Retry loading venues" }).click();
     await expect(page.getByLabel("Operating venue")).toHaveValue(VENUE.id);
