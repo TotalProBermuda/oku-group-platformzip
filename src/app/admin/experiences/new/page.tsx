@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Building2, Globe2, MapPin, Sparkles, Users } from "lucide-react";
+import styles from "./page.module.css";
 
 type Venue = {
   id: string;
@@ -151,6 +154,8 @@ export default function NewExperiencePage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const intent = submitter?.value === "draft" ? "draft" : "continue";
     setError(null);
     setSubmitting(true);
 
@@ -182,7 +187,7 @@ export default function NewExperiencePage() {
 
       const series = asRecord(payload.data);
       if (typeof series.id !== "string") throw new Error("The experience was created without an editor link.");
-      router.push(`/admin/experiences/${series.id}`);
+      router.push(`/admin/experiences/${series.id}${intent === "continue" ? "?tab=dates" : ""}`);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create this experience.");
     } finally {
@@ -190,102 +195,144 @@ export default function NewExperiencePage() {
     }
   }
 
+  const selectedVenue = venues.find((venue) => venue.id === form.venueId);
+  const selectedSpace = spaces.find((space) => space.id === form.spaceId);
+  const hostLabel = form.hostType === "OKU" ? "OKÜ" : form.hostType === "CATCH" ? "CATCH" : form.hostType === "INFLUENCER"
+    ? entityLabel(influencers.find((item) => item.id === form.influencerId) ?? { id: "Influencer pending" })
+    : entityLabel(partners.find((item) => item.id === form.partnerId) ?? { id: "Partner pending" });
+
   return (
-    <main className="admin-shell-container">
-      <section className="admin-page-content" style={{ maxWidth: 920, margin: "0 auto", padding: "48px 24px" }}>
-        <h1>Create experience</h1>
-        <p>
-          Choose the operating venue first, then optionally record a physical-space preference. The floor team can
-          assign any suitable space within that venue when the reservation is confirmed.
-        </p>
+    <main className={styles.page}>
+      <div className={styles.breadcrumb}>
+        <Link href="/admin/experiences">Experiences</Link><span>›</span><span>New experience</span>
+      </div>
 
-        {error ? <p role="alert" className="form-error">{error}</p> : null}
+      <form onSubmit={handleSubmit}>
+        <div className={styles.heading}>
+          <div>
+            <h1>Create experience</h1>
+            <p>Build the guest-facing details first. Availability, pricing and publishing come next.</p>
+          </div>
+          <div className={styles.desktopActions}>
+            <button className={styles.secondaryButton} type="submit" value="draft" disabled={loading || submitting || venues.length === 0}>Save draft</button>
+            <button className={styles.primaryButton} type="submit" value="continue" disabled={loading || submitting || venues.length === 0}>
+              {submitting ? "Creating…" : "Continue to availability"}
+            </button>
+          </div>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <fieldset disabled={loading || submitting} style={{ border: 0, margin: 0, padding: 0 }}>
-            <label htmlFor="title">Title *</label>
-            <input
-              id="title"
-              required
-              value={form.title}
-              onChange={(event) => {
-                const title = event.target.value;
-                setForm((current) => ({ ...current, title, slug: current.slug || toSlug(title) }));
-              }}
-            />
+        <div className={styles.stepper} aria-label="Creation progress">
+          {[
+            ["1", "Experience details"], ["2", "Availability"], ["3", "Pricing"], ["4", "Review & publish"],
+          ].map(([number, label], index) => (
+            <div className={`${styles.step} ${index === 0 ? styles.activeStep : ""}`} key={number}>
+              <span className={styles.stepNumber}>{number}</span><span>{label}</span>
+            </div>
+          ))}
+        </div>
 
-            <label htmlFor="slug">URL slug *</label>
-            <input id="slug" required value={form.slug} onChange={(event) => updateForm("slug", toSlug(event.target.value))} />
+        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
 
-            <label htmlFor="description">Description</label>
-            <textarea id="description" rows={5} value={form.description} onChange={(event) => updateForm("description", event.target.value)} />
+        <div className={styles.layout}>
+          <fieldset className={styles.formCard} disabled={loading || submitting}>
+            <section className={styles.section}>
+              <div className={styles.sectionHeading}>
+                <span className={styles.sectionIcon}><Sparkles aria-hidden="true" /></span>
+                <div><h2>Guest-facing details</h2><p>This information appears on the public experience page.</p></div>
+              </div>
+              <div className={styles.grid}>
+                <label className={styles.fullField} htmlFor="title">Experience title <span>*</span>
+                  <input id="title" required value={form.title} onChange={(event) => {
+                    const title = event.target.value;
+                    setForm((current) => ({ ...current, title, slug: current.slug || toSlug(title) }));
+                  }} />
+                </label>
+                <label htmlFor="category">Category
+                  <select id="category" value={form.category} onChange={(event) => updateForm("category", event.target.value)}>
+                    <option>Food &amp; Drink</option><option>Private Dining</option><option>Entertainment</option><option>Wellness</option><option>Community</option>
+                  </select>
+                </label>
+                <label htmlFor="slug">Page URL <span>*</span>
+                  <span className={styles.slugInput}><span>/experiences/</span><input id="slug" required value={form.slug} onChange={(event) => updateForm("slug", toSlug(event.target.value))} /></span>
+                </label>
+                <label className={styles.fullField} htmlFor="description">Short description
+                  <textarea id="description" rows={4} value={form.description} onChange={(event) => updateForm("description", event.target.value)} />
+                  <small>Keep this concise; full content and imagery can be added after creation.</small>
+                </label>
+              </div>
+            </section>
 
-            <label htmlFor="category">Category</label>
-            <input id="category" value={form.category} onChange={(event) => updateForm("category", event.target.value)} />
+            <section className={styles.section}>
+              <div className={styles.sectionHeading}>
+                <span className={styles.sectionIcon}><MapPin aria-hidden="true" /></span>
+                <div><h2>Venue &amp; space</h2><p>Choose where the experience operates and how the floor team should assign seating.</p></div>
+              </div>
+              <div className={styles.grid}>
+                <label htmlFor="venue">Operating venue <span>*</span>
+                  <select id="venue" required value={form.venueId} onChange={(event) => selectVenue(event.target.value)}>
+                    <option value="">Select an operating venue</option>
+                    {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
+                  </select>
+                </label>
+                <label htmlFor="space">Preferred physical space
+                  <select id="space" value={form.spaceId} onChange={(event) => updateForm("spaceId", event.target.value)}>
+                    <option value="">Floor team assigns the best space</option>
+                    {availableSpaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
+                  </select>
+                  <small>A preference does not block other reservations or close the venue.</small>
+                </label>
+                <div className={`${styles.fullField} ${styles.sharedChoice}`}>
+                  <strong>Shared venue experience</strong><span>Other guests and reservations may use the venue at the same time. Exclusive coverage is scheduled in Availability.</span>
+                </div>
+              </div>
+            </section>
 
-            <label htmlFor="venue">Operating venue *</label>
-            <select id="venue" required value={form.venueId} onChange={(event) => selectVenue(event.target.value)}>
-              <option value="">Select an operating venue</option>
-              {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
-            </select>
-
-            <label htmlFor="space">Physical-space preference</label>
-            <select id="space" value={form.spaceId} onChange={(event) => updateForm("spaceId", event.target.value)}>
-              <option value="">No physical-space preference — floor team assigns later</option>
-              {availableSpaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
-            </select>
-            <p><small>This does not close the whole venue. Configure a whole-venue closure only in Dining Availability.</small></p>
-
-            <label htmlFor="hostType">Host type *</label>
-            <select
-              id="hostType"
-              value={form.hostType}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                hostType: event.target.value as FormState["hostType"],
-                influencerId: "",
-                partnerId: "",
-              }))}
-            >
-              <option value="OKU">OKÜ</option>
-              <option value="CATCH">CATCH</option>
-              <option value="INFLUENCER">Influencer</option>
-              <option value="PARTNER">Partner</option>
-            </select>
-
-            {form.hostType === "INFLUENCER" ? (
-              <>
-                <label htmlFor="influencer">Influencer *</label>
-                <select id="influencer" required value={form.influencerId} onChange={(event) => updateForm("influencerId", event.target.value)}>
-                  <option value="">Select an influencer</option>
-                  {influencers.map((item) => <option key={item.id} value={item.id}>{entityLabel(item)}</option>)}
-                </select>
-              </>
-            ) : null}
-
-            {form.hostType === "PARTNER" ? (
-              <>
-                <label htmlFor="partner">Partner *</label>
-                <select id="partner" required value={form.partnerId} onChange={(event) => updateForm("partnerId", event.target.value)}>
-                  <option value="">Select a partner</option>
-                  {partners.map((item) => <option key={item.id} value={item.id}>{entityLabel(item)}</option>)}
-                </select>
-              </>
-            ) : null}
-
-            <label htmlFor="city">City</label>
-            <input id="city" value={form.city} onChange={(event) => updateForm("city", event.target.value)} />
-            <label htmlFor="country">Country code</label>
-            <input id="country" maxLength={3} value={form.country} onChange={(event) => updateForm("country", event.target.value.toUpperCase())} />
-            <label htmlFor="capacity">Total capacity</label>
-            <input id="capacity" type="number" min="0" max="100000" value={form.capacityTotal} onChange={(event) => updateForm("capacityTotal", event.target.value)} />
+            <section className={styles.section}>
+              <div className={styles.sectionHeading}>
+                <span className={styles.sectionIcon}><Building2 aria-hidden="true" /></span>
+                <div><h2>Operations</h2><p>Internal ownership and capacity controls.</p></div>
+              </div>
+              <div className={styles.grid}>
+                <label htmlFor="hostType">Host brand <span>*</span>
+                  <select id="hostType" value={form.hostType} onChange={(event) => setForm((current) => ({ ...current, hostType: event.target.value as FormState["hostType"], influencerId: "", partnerId: "" }))}>
+                    <option value="OKU">OKÜ</option><option value="CATCH">CATCH</option><option value="INFLUENCER">Influencer</option><option value="PARTNER">Partner</option>
+                  </select>
+                </label>
+                {form.hostType === "INFLUENCER" ? <label htmlFor="influencer">Influencer <span>*</span><select id="influencer" required value={form.influencerId} onChange={(event) => updateForm("influencerId", event.target.value)}><option value="">Select an influencer</option>{influencers.map((item) => <option key={item.id} value={item.id}>{entityLabel(item)}</option>)}</select></label> : null}
+                {form.hostType === "PARTNER" ? <label htmlFor="partner">Partner <span>*</span><select id="partner" required value={form.partnerId} onChange={(event) => updateForm("partnerId", event.target.value)}><option value="">Select a partner</option>{partners.map((item) => <option key={item.id} value={item.id}>{entityLabel(item)}</option>)}</select></label> : null}
+                <label htmlFor="capacity">Maximum capacity
+                  <input id="capacity" type="number" min="0" max="100000" value={form.capacityTotal} onChange={(event) => updateForm("capacityTotal", event.target.value)} />
+                  <small>Set the programme capacity; each event date can be adjusted next.</small>
+                </label>
+                <label htmlFor="city">City<input id="city" value={form.city} onChange={(event) => updateForm("city", event.target.value)} /></label>
+                <label htmlFor="country">Country code<input id="country" maxLength={3} value={form.country} onChange={(event) => updateForm("country", event.target.value.toUpperCase())} /></label>
+              </div>
+            </section>
           </fieldset>
 
-          <button type="submit" disabled={loading || submitting || venues.length === 0}>
-            {submitting ? "Creating…" : loading ? "Loading…" : "Create experience"}
-          </button>
-        </form>
-      </section>
+          <aside className={styles.aside}>
+            <div className={styles.summary}>
+              <div className={styles.previewCover}><small>Experience preview</small><strong>{form.title || "Untitled experience"}</strong></div>
+              <div className={styles.summaryBody}>
+                <p className={styles.summaryLabel}>Setup summary</p>
+                <div className={styles.summaryList}>
+                  <div><MapPin /><p><strong>{selectedVenue?.name || "Venue pending"}</strong><span>{selectedSpace?.name || "Floor team assigns space"}</span></p></div>
+                  <div><Users /><p><strong>{form.capacityTotal || "—"} guests maximum</strong><span>Shared venue experience</span></p></div>
+                  <div><Globe2 /><p><strong>{form.city || "Location pending"}</strong><span>{form.slug ? `/experiences/${form.slug}` : "Public URL pending"}</span></p></div>
+                  <div><Building2 /><p><strong>{hostLabel}</strong><span>Host brand</span></p></div>
+                </div>
+                <div className={styles.status}><span>Status</span><span>Draft</span></div>
+              </div>
+            </div>
+            <div className={styles.nextNote}><strong>What happens next?</strong><br />Availability defines dates, recurrence, and dining coverage. Pricing can vary by ticket type and add-on.</div>
+          </aside>
+        </div>
+
+        <div className={styles.mobileActions}>
+          <Link className={styles.secondaryButton} href="/admin/experiences">Cancel</Link>
+          <button className={styles.primaryButton} type="submit" value="continue" disabled={loading || submitting || venues.length === 0}>{submitting ? "Creating…" : "Continue"}</button>
+        </div>
+      </form>
     </main>
   );
 }
