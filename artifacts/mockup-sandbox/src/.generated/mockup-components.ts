@@ -2,6 +2,9 @@
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/event-ticket/TicketCard.tsx": () => import("../components/mockups/event-ticket/TicketCard.tsx"),
+  "./components/mockups/platform-demo/AccessibilityFirst.tsx": () => import("../components/mockups/platform-demo/AccessibilityFirst.tsx"),
+  "./components/mockups/platform-demo/AffordanceFirst.tsx": () => import("../components/mockups/platform-demo/AffordanceFirst.tsx"),
+  "./components/mockups/platform-demo/HierarchyClear.tsx": () => import("../components/mockups/platform-demo/HierarchyClear.tsx"),
   "./components/mockups/trust/BeneficiaryStatusPill.tsx": () => import("../components/mockups/trust/BeneficiaryStatusPill.tsx"),
   "./components/mockups/trust/ComplianceHoldBanner.tsx": () => import("../components/mockups/trust/ComplianceHoldBanner.tsx"),
   "./components/mockups/trust/FinanceReviewDrawer.tsx": () => import("../components/mockups/trust/FinanceReviewDrawer.tsx"),
@@ -11,8 +14,5 @@ export const modules: ModuleMap = {
   "./components/mockups/trust/PrivacyNoticePanel.tsx": () => import("../components/mockups/trust/PrivacyNoticePanel.tsx"),
   "./components/mockups/trust/RestrictedDataBanner.tsx": () => import("../components/mockups/trust/RestrictedDataBanner.tsx"),
   "./components/mockups/trust/TrustCard.tsx": () => import("../components/mockups/trust/TrustCard.tsx"),
-  "./components/mockups/trust/VerificationStepper.tsx": () => import("../components/mockups/trust/VerificationStepper.tsx"),
-  "./components/mockups/platform-demo/AccessibilityFirst.tsx": () => import("../components/mockups/platform-demo/AccessibilityFirst.tsx"),
-  "./components/mockups/platform-demo/AffordanceFirst.tsx": () => import("../components/mockups/platform-demo/AffordanceFirst.tsx"),
-  "./components/mockups/platform-demo/HierarchyClear.tsx": () => import("../components/mockups/platform-demo/HierarchyClear.tsx")
+  "./components/mockups/trust/VerificationStepper.tsx": () => import("../components/mockups/trust/VerificationStepper.tsx")
 };
