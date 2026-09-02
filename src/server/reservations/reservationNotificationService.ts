@@ -2,8 +2,11 @@ import { prisma } from "@/lib/prisma";
 import {
   buildReservationConfirmationSubject,
   buildReservationRequestSubject,
+  buildReservationUpdatedSubject,
   sendReservationConfirmationEmail,
   sendReservationRequestReceivedEmail,
+  sendReservationUpdatedEmail,
+  type ReservationConfirmationInput,
   type ReservationEmailKind,
 } from "@/server/reservations/confirmationEmail";
 
@@ -15,13 +18,14 @@ import {
 export async function deliverReservationStateEmail(
   reservationId: string,
   kind: ReservationEmailKind,
-  options: { force?: boolean } = {},
+  options: { force?: boolean; guestMessage?: string; communicationId?: string } = {},
 ) {
   const reservation = await prisma.reservation.findUniqueOrThrow({
     where: { id: reservationId },
     include: {
       venue: true,
       zone: true,
+      assignedSpace: true,
       addons: true,
       statusLogs: { where: { toStatus: "CONFIRMED" }, take: 1 },
     },
@@ -31,17 +35,13 @@ export async function deliverReservationStateEmail(
     throw new Error(`Cannot send a confirmation for reservation status ${reservation.status}`);
   }
 
-  const alreadySent = await prisma.reservationCommunication.findFirst({
-    where: {
-      reservationId,
-      templateKey: kind,
-      status: "SENT",
-    },
+  const alreadySent = kind === "RESERVATION_UPDATED" ? null : await prisma.reservationCommunication.findFirst({
+    where: { reservationId, templateKey: kind, status: "SENT" },
     select: { id: true },
   });
   if (alreadySent && !options.force) return { skipped: true, communicationId: alreadySent.id };
 
-  const props = {
+  const props: ReservationConfirmationInput = {
     contactName: reservation.contactName,
     contactEmail: reservation.contactEmail,
     confirmationCode: reservation.confirmationCode,
@@ -49,7 +49,7 @@ export async function deliverReservationStateEmail(
     partySize: reservation.partySize,
     venueName: reservation.venue.name,
     venueCity: reservation.venue.city,
-    zoneName: reservation.zone?.name ?? null,
+    zoneName: reservation.assignedSpace?.name ?? reservation.zone?.name ?? null,
     tableLabel: reservation.assignedTableLabel,
     occasion: reservation.occasion,
     seatingPreference: reservation.seatingPreference,
@@ -58,10 +58,17 @@ export async function deliverReservationStateEmail(
   };
   const subject = kind === "CONFIRMATION"
     ? buildReservationConfirmationSubject(props)
-    : buildReservationRequestSubject(props);
+    : kind === "RESERVATION_UPDATED"
+      ? buildReservationUpdatedSubject(props)
+      : buildReservationRequestSubject(props);
   const pending = !options.force
     ? await prisma.reservationCommunication.findFirst({
-        where: { reservationId, templateKey: kind, status: "PENDING" },
+        where: {
+          reservationId,
+          templateKey: kind,
+          status: "PENDING",
+          ...(options.communicationId ? { id: options.communicationId } : {}),
+        },
         orderBy: { createdAt: "asc" },
       })
     : null;
@@ -75,11 +82,16 @@ export async function deliverReservationStateEmail(
       status: "PENDING",
     },
   });
+  if (kind === "RESERVATION_UPDATED") {
+    props.guestMessage = options.guestMessage ?? pending?.bodySnapshot ?? null;
+  }
 
   try {
     const result = kind === "CONFIRMATION"
       ? await sendReservationConfirmationEmail(props)
-      : await sendReservationRequestReceivedEmail(props);
+      : kind === "RESERVATION_UPDATED"
+        ? await sendReservationUpdatedEmail(props)
+        : await sendReservationRequestReceivedEmail(props);
     await prisma.reservationCommunication.update({
       where: { id: communication.id },
       data: {

@@ -5,6 +5,7 @@ const create = vi.fn();
 const update = vi.fn();
 const findUniqueOrThrow = vi.fn();
 const sendConfirmation = vi.fn();
+const sendUpdated = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -16,8 +17,10 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/server/reservations/confirmationEmail", () => ({
   buildReservationConfirmationSubject: vi.fn(() => "Reservation confirmed"),
   buildReservationRequestSubject: vi.fn(() => "Request received"),
+  buildReservationUpdatedSubject: vi.fn(() => "Reservation updated"),
   sendReservationConfirmationEmail: sendConfirmation,
   sendReservationRequestReceivedEmail: vi.fn(),
+  sendReservationUpdatedEmail: sendUpdated,
 }));
 
 const reservation = {
@@ -25,6 +28,7 @@ const reservation = {
   contactEmail: "guest@example.com", confirmationCode: "ABC123",
   reservationDate: new Date("2026-09-02T23:00:00.000Z"), partySize: 2,
   venue: { name: "Gold House", city: "Panama City" }, zone: null,
+  assignedSpace: { name: "CATCH" },
   assignedTableLabel: null, occasion: null, seatingPreference: null, notes: null, addons: [],
 };
 
@@ -34,6 +38,23 @@ describe("reservation confirmation delivery", () => {
     findUniqueOrThrow.mockResolvedValue(reservation);
     update.mockResolvedValue({});
     sendConfirmation.mockResolvedValue({ sent: true, reason: null, bodySnapshot: "email body" });
+    sendUpdated.mockResolvedValue({ sent: true, reason: null, bodySnapshot: "updated body" });
+  });
+
+  it("uses the assigned physical space in confirmation email details", async () => {
+    findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "comm-pending", status: "PENDING" });
+    const { deliverReservationStateEmail } = await import("@/server/reservations/reservationNotificationService");
+    await deliverReservationStateEmail("res-1", "CONFIRMATION");
+    expect(sendConfirmation).toHaveBeenCalledWith(expect.objectContaining({ zoneName: "CATCH" }));
+  });
+
+  it("delivers the exact durable move message for a reservation update", async () => {
+    findFirst.mockResolvedValueOnce({ id: "move-1", status: "PENDING", bodySnapshot: "We moved you to CATCH." });
+    const { deliverReservationStateEmail } = await import("@/server/reservations/reservationNotificationService");
+    const result = await deliverReservationStateEmail("res-1", "RESERVATION_UPDATED", { communicationId: "move-1" });
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: "move-1" }) }));
+    expect(sendUpdated).toHaveBeenCalledWith(expect.objectContaining({ guestMessage: "We moved you to CATCH.", zoneName: "CATCH" }));
+    expect(result).toMatchObject({ sent: true, communicationId: "move-1" });
   });
 
   it("delivers the durable pending intent instead of silently skipping it", async () => {

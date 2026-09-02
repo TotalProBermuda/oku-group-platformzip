@@ -4,11 +4,20 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   requireSession: vi.fn(),
   getCurrentRoles: vi.fn(),
+  reservationFindUnique: vi.fn(),
+  spaceFindUnique: vi.fn(),
 }));
 
 vi.mock("@/server/auth/session", () => ({ requireSession: mocks.requireSession }));
 vi.mock("@/server/auth/currentRoles", () => ({ getCurrentRoles: mocks.getCurrentRoles }));
 vi.mock("@/lib/rbac", () => ({ requirePermission: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    restaurantHostProfile: { findUnique: vi.fn() },
+    reservation: { findUnique: mocks.reservationFindUnique },
+    restaurantSpace: { findUnique: mocks.spaceFindUnique },
+  },
+}));
 
 import { PATCH } from "@/app/api/v1/host/bookings/[id]/assign-space/route";
 
@@ -55,6 +64,27 @@ describe("assign-space capacity override authorization", () => {
     await expect(response.json()).resolves.toEqual({
       ok: false,
       error: "A capacity override reason of at least 8 characters is required",
+    });
+  });
+
+  it("requires a guest-facing message before moving a confirmed reservation", async () => {
+    mocks.getCurrentRoles.mockResolvedValue(["SUPERADMIN"]);
+    mocks.reservationFindUnique.mockResolvedValue({
+      id: "res-1", venueId: "venue-1", partySize: 2, status: "CONFIRMED",
+      assignedSpaceId: "space-old", reservationDate: new Date("2026-09-02T23:00:00.000Z"), durationMinutes: 120,
+    });
+    mocks.spaceFindUnique.mockResolvedValue({
+      id: "space-1", name: "CATCH", capacity: 30, venueId: "venue-1", isActive: true,
+    });
+
+    const response = await PATCH(request({ spaceId: "space-1", guestMessage: "short" }), {
+      params: Promise.resolve({ id: "res-1" }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "A guest-facing move message of at least 8 characters is required",
     });
   });
 });
