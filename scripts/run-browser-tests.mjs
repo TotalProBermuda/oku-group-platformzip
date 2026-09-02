@@ -18,11 +18,13 @@ import { spawn } from "node:child_process";
 
 const TRUST_SPEC = "tests/browser/trust-components.spec.ts";
 const LAUNCH_SPEC = "tests/browser/launch-readiness.spec.ts";
+const EXPERIENCE_CREATE_SPEC = "tests/browser/experience-create.spec.ts";
 
 const BATCHES = [
   { name: "beneficiary", spec: TRUST_SPEC, grep: "@beneficiary" },
   { name: "dashboard",   spec: TRUST_SPEC, grep: "@dashboard"   },
   { name: "launch",      spec: LAUNCH_SPEC, grep: "@launch"     },
+  { name: "experience-create", spec: EXPERIENCE_CREATE_SPEC, grep: "@experience-create" },
 ];
 
 function runPlaywright(spec, grep) {
