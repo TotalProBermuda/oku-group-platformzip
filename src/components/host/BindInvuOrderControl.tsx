@@ -31,6 +31,11 @@ export type AttributionSessionForBind = {
   bindings: Array<{ id: string; invuOrderId: string; bindingType: string; createdAt: string }>;
 };
 
+/** A first INVU bind is valid only once service has reached the seated stage. */
+export function isInvuBindingReady(session: AttributionSessionForBind | null): boolean {
+  return session?.status === "SEATED";
+}
+
 // Visual treatment for each lifecycle status — kept in this file because the
 // chip and the bind affordance both consume it.
 const STATUS_PILL: Record<
@@ -129,7 +134,7 @@ export default function BindInvuOrderControl({ attributionSession, onBound, comp
   const persistedBoundId =
     session?.tableSession?.openedInvuOrderId ?? session?.bindings?.[0]?.invuOrderId ?? null;
   const boundOrderId = optimisticBoundId ?? persistedBoundId;
-  const canBind = !!session && !boundOrderId;
+  const canBind = !!session && !boundOrderId && isInvuBindingReady(session);
 
   async function submitBind() {
     if (!session || !invuOrderId.trim()) return;
@@ -198,6 +203,24 @@ export default function BindInvuOrderControl({ attributionSession, onBound, comp
           Bound · #{boundOrderId}
         </div>
         <StatusChip status={session.status} />
+      </div>
+    );
+  }
+
+  if (!isInvuBindingReady(session)) {
+    return (
+      <div
+        style={{
+          fontSize: 11,
+          color: "#9ca3af",
+          padding: "8px 10px",
+          borderRadius: 8,
+          background: "rgba(255,255,255,0.03)",
+          border: "1px dashed rgba(255,255,255,0.1)",
+          lineHeight: 1.45,
+        }}
+      >
+        INVU binding becomes available after the guest is seated and the server has opened the POS table.
       </div>
     );
   }
@@ -298,7 +321,7 @@ export default function BindInvuOrderControl({ attributionSession, onBound, comp
           <div style={{ marginTop: 6, fontSize: 11, color: "#f87171" }}>{bindError}</div>
         )}
         <div style={{ marginTop: 8, fontSize: 10, color: "#9ca3af", lineHeight: 1.4 }}>
-          Ask the server which INVU order id they just opened on this table, then enter it here.
+          Ask the server which INVU order id they opened on this table, then enter it here.
           Until bound, this reservation will only match heuristically and will land in the review queue.
         </div>
       </div>
@@ -323,7 +346,7 @@ export default function BindInvuOrderControl({ attributionSession, onBound, comp
           opacity: canBind ? 1 : 0.4,
         }}
       >
-        Bind INVU check
+        Bind opened INVU check
       </button>
       {session.status ? (
         <StatusChip status={session.status} />

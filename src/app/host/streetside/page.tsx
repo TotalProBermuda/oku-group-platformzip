@@ -197,7 +197,7 @@ function BookingCard({ booking, onUpdateStatus, onBindUpdated, isOperational }: 
     null;
   // Referral-only (non-operational) hosts never bind: INVU table control is a
   // restaurant-host/admin capability, enforced server-side too.
-  const canBind = isOperational && !!session && !boundOrderId;
+  const canBind = isOperational && session?.status === "SEATED" && !boundOrderId;
   const referrerLabel = session ? resolveReferrerLabel(session) : null;
 
   async function submitBind() {
@@ -402,7 +402,7 @@ function BookingCard({ booking, onUpdateStatus, onBindUpdated, isOperational }: 
                 )}
                 {canBind && (
                   <ActionButton
-                    label="Open table in INVU"
+                    label="Bind opened INVU check"
                     color="#fbbf24"
                     disabled={binding}
                     onClick={() => setShowBindForm(true)}
