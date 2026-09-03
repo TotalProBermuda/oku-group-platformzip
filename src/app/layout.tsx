@@ -50,22 +50,24 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       suppressHydrationWarning
       className={`${inter.variable} ${cormorant.variable}`}
     >
-      {/* Chrome extensions execute in the page context. Install this before
-          Next's dev overlay so a known MetaMask injection failure cannot be
-          misreported as an OKÜ application crash. */}
-      <Script
-        id="extension-error-guard"
-        strategy="beforeInteractive"
-        dangerouslySetInnerHTML={{ __html: injectedExtensionErrorGuardScript }}
-      />
-      {/* Anti-flash: apply saved theme before React hydration */}
-      <Script
-        id="theme-initializer"
-        strategy="beforeInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `(function(){try{var t=localStorage.getItem('oku-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();`,
-        }}
-      />
+      <head>
+        {/* Chrome extensions execute in the page context. Install this before
+            Next's dev overlay so a known MetaMask injection failure cannot be
+            misreported as an OKÜ application crash. */}
+        <Script
+          id="extension-error-guard"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: injectedExtensionErrorGuardScript }}
+        />
+        {/* Anti-flash: apply saved theme before React hydration */}
+        <Script
+          id="theme-initializer"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('oku-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body suppressHydrationWarning>
         <Providers session={session}>
           {children}
