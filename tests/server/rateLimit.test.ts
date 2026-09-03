@@ -20,6 +20,27 @@ describe("rate limiting", () => {
     expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
   });
 
+  it("keeps an explicitly local-limited production flow available when Redis is absent", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousRedisUrl = process.env.REDIS_URL;
+    process.env.NODE_ENV = "production";
+    delete process.env.REDIS_URL;
+    try {
+      const result = await checkRateLimitAsync({
+        key: `local-production-test:${crypto.randomUUID()}`,
+        limit: 1,
+        windowMs: 60_000,
+        requireDistributed: false,
+      });
+      expect(result).toMatchObject({ ok: true, remaining: 0 });
+      expect(result.unavailable).toBeUndefined();
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previousRedisUrl === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = previousRedisUrl;
+    }
+  });
+
   it("fails closed for a protected production flow when Redis is absent", async () => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previousRedisUrl = process.env.REDIS_URL;
