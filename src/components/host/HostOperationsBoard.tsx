@@ -238,7 +238,7 @@ function JourneyTimeline({ logs }: { logs: StatusLog[] }) {
 }
 
 function GuestDrawer({
-  res, zones, spaces, canOverrideCapacity, onClose, onAction,
+  res, zones, spaces, canOverrideCapacity, onClose, onAction, onSpaceAssigned,
 }: {
   res: Reservation; zones: VenueZone[]; spaces: SpaceUtilisation[];
   canOverrideCapacity: boolean;
@@ -249,6 +249,7 @@ function GuestDrawer({
     opts?: Record<string, string>,
     onConflict?: (conflict: EventConflictCard) => void,
   ) => void;
+  onSpaceAssigned: (data: Pick<Reservation, "assignedSpace" | "requestedSpace">) => void;
 }) {
   const t = useTranslation();
   const [tab, setTab] = useState<"journey" | "actions">("actions");
@@ -351,6 +352,7 @@ function GuestDrawer({
           ? "Reservation moved and guest notified."
           : "Reservation moved; update email failed. Use Resend confirmation.");
       }
+      if (d.data) onSpaceAssigned(d.data);
     } catch (e) {
       console.error("[assign-space]", e);
     } finally {
@@ -1222,6 +1224,11 @@ export default function HostOperationsBoard({
           canOverrideCapacity={canOverrideCapacity}
           onClose={() => setActiveRes(null)}
           onAction={handleAction}
+          onSpaceAssigned={(data) => {
+            setReservations((prev) => prev.map((reservation) => reservation.id === activeRes.id ? { ...reservation, ...data } : reservation));
+            setActiveRes((prev) => prev ? { ...prev, ...data } : prev);
+            void refreshSpaces();
+          }}
         />
       )}
     </div>
