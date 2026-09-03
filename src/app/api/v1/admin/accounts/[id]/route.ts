@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { assertMayManageUser, isPrimaryOwnerEmail } from "@/server/auth/productionAccount";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -44,16 +45,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdminRoles(req, ["SUPERADMIN"]);
+    const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
     const body = await req.json();
+    const { targetIsPrimaryOwner } = await assertMayManageUser(userId, id);
 
     const { name, email, phone, imageUrl, internalNotes, tags } = body;
+    if (targetIsPrimaryOwner && email !== undefined && !isPrimaryOwnerEmail(email)) {
+      throw Object.assign(new Error("The primary owner email cannot be changed"), { status: 403 });
+    }
     const account = await prisma.user.update({
       where: { id },
       data: {
         ...(name !== undefined && { name }),
-        ...(email !== undefined && { email }),
+        ...(email !== undefined && { email: email.trim().toLowerCase() }),
         ...(phone !== undefined && { phone }),
         ...(imageUrl !== undefined && { imageUrl }),
         ...(internalNotes !== undefined && { internalNotes }),
@@ -65,6 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ account });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = typeof err === "object" && err && "status" in err ? Number(err.status) : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
 import { RoleKey } from "@prisma/client";
+import { assertMayManageUser } from "@/server/auth/productionAccount";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
+    await assertMayManageUser(userId, id);
     const { roleKey } = await req.json();
 
     if (!Object.values(RoleKey).includes(roleKey)) {

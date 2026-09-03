@@ -6,6 +6,7 @@ import { isDemoModeEnabled } from "@/lib/demoMode";
 import { resolveAuthSecret } from "@/lib/authSecret";
 import { sameSiteForEnv } from "@/lib/cookieSecurity";
 import type { NextAuthOptions } from "next-auth";
+import { authorizeProductionAccount } from "@/server/auth/productionAccount";
 
 const useSecureCookies = !!process.env.REPLIT_DEV_DOMAIN || process.env.NODE_ENV === "production";
 
@@ -102,6 +103,23 @@ export const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "credentials") return isDemoModeEnabled();
+
+      const authorized = await authorizeProductionAccount({
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        provider: account?.provider ?? "unknown",
+        emailVerified:
+          account?.provider === "google"
+            ? (profile as { email_verified?: boolean } | undefined)?.email_verified
+            : undefined,
+      });
+      if (!authorized) return false;
+      Object.assign(user, authorized);
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;

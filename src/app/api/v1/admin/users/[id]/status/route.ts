@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
 import { UserStatus, UserAdminAction } from "@prisma/client";
+import { assertMayManageUser } from "@/server/auth/productionAccount";
 
 const STATUS_TO_ACTION: Record<string, UserAdminAction> = {
   SUSPENDED:               "USER_SUSPENDED",
@@ -18,9 +19,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
     const { status, reason } = await req.json();
+    const { targetIsPrimaryOwner } = await assertMayManageUser(userId, id);
 
     if (!Object.values(UserStatus).includes(status)) {
       return NextResponse.json({ ok: false, error: "Invalid status" }, { status: 400 });
+    }
+    if (targetIsPrimaryOwner && status !== "ACTIVE") {
+      throw Object.assign(new Error("The primary owner account must remain active"), { status: 403 });
     }
 
     const prev = await prisma.user.findUniqueOrThrow({ where: { id } });

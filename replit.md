@@ -15,6 +15,8 @@ Full-stack multi-persona hospitality platform with Experiences/Events, IR, HR, I
 **Required Env Vars**:
 - `DATABASE_URL`
 - `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL` / `NEXT_PUBLIC_APP_URL`
+- `PRIMARY_SUPERADMIN_EMAIL` (protected owner; bootstrapped on first verified Google sign-in)
 - `APP_BASE_URL` / `NEXT_PUBLIC_BASE_URL`
 - `NODE_ENV=production` (in production, gates demo back-doors)
 - `RELEASE_SHA=<git-sha>` (in production, tags error-capture records)
@@ -22,7 +24,7 @@ Full-stack multi-persona hospitality platform with Experiences/Events, IR, HR, I
 
 **Optional Env Vars**:
 - `REDIS_URL` (for BullMQ worker and shared rate limiting)
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (required for production team sign-in)
 - `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`
 - `AUTHORIZE_NET_API_LOGIN_ID`, `AUTHORIZE_NET_TRANSACTION_KEY`
 - `DEMO_MODE_ENABLED=true` (for demo back-doors in non-production)
