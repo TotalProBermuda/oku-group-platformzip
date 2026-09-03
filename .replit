@@ -10,14 +10,15 @@ integrations = ["resend:1.0.0", "javascript_object_storage:2.0.0"]
 [userenv]
 
 [userenv.shared]
-AUTH_SECRET = "super-secret-auth-key-1234567890-abcdefghij-klmnopqrstuvwxyz"
-NEXT_PUBLIC_BASE_URL = "https://e77c13d6-de58-4f9f-bc37-5f66ab1e4947-00-suiyfe0i5lz3.picard.replit.dev"
-APP_BASE_URL = "https://e77c13d6-de58-4f9f-bc37-5f66ab1e4947-00-suiyfe0i5lz3.picard.replit.dev"
-INVU_ENCRYPTION_KEY = "4ecae0c4b07b718dd6658e2ef193db9c49c4ac65ff2e35d4a552adda5e741cbc"
 RESEND_FROM_EMAIL = "reservations@okuhospitalitygroup.com"
 
 [userenv.development]
-NEXTAUTH_URL = "https://e77c13d6-de58-4f9f-bc37-5f66ab1e4947-00-suiyfe0i5lz3.picard.replit.dev"
+
+[userenv.production]
+APP_BASE_URL = "https://www.okuhospitalitygroup.com"
+NEXTAUTH_URL = "https://www.okuhospitalitygroup.com"
+NEXT_PUBLIC_APP_URL = "https://www.okuhospitalitygroup.com"
+NEXT_PUBLIC_BASE_URL = "https://www.okuhospitalitygroup.com"
 
 [workflows]
 runButton = "Project"
