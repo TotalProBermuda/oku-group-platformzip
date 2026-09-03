@@ -99,6 +99,7 @@ externalPort = 4200
 
 [deployment]
 deploymentTarget = "autoscale"
+build = ["bash", "-c", "npm run build"]
 run = ["bash", "-c", "npx prisma migrate deploy && npm run start -- -p 5000"]
 
 [postMerge]
