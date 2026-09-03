@@ -4,6 +4,8 @@ import { ChevronRight, ExternalLink } from "lucide-react";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
+import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 
 type Persona = {
   email: string;
@@ -36,9 +38,12 @@ const EXTERNAL_PERSONAS = [
   { email: "attendee@oku.local",    label: "Attendee",            descKey: "personaAttendeeDesc",          color: "#c41e3a", tag: "GUEST",        destination: "/experiences" },
 ] satisfies Persona[];
 
-export function LoginContent({ demoEnabled = false }: { demoEnabled?: boolean }) {
+export function LoginContent({ demoEnabled = false, googleEnabled = false }: { demoEnabled?: boolean; googleEnabled?: boolean }) {
   const t = useTranslation();
   const [isInIframe, setIsInIframe] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const authError = searchParams.get("error");
 
   useEffect(() => {
     try {
@@ -132,12 +137,38 @@ export function LoginContent({ demoEnabled = false }: { demoEnabled?: boolean })
           }}>
             Sign in
           </h1>
-          <p style={{ fontSize: 15, color: "#9ca3af", lineHeight: 1.6, margin: "0 0 24px 0" }}>
-            Account sign-in is not yet available in this environment.
-          </p>
-          <p style={{ fontSize: 13, color: "#5a5a5a", lineHeight: 1.6, margin: 0 }}>
-            If you are an OKÜ team member or partner, please contact your administrator for access.
-          </p>
+          {authError && (
+            <p role="alert" style={{ fontSize: 14, color: "#ff8a9f", lineHeight: 1.6, margin: "0 0 20px 0" }}>
+              This Google account is not approved for OKÜ access. Contact your administrator if you believe this is an error.
+            </p>
+          )}
+          {googleEnabled ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void signIn("google", { callbackUrl })}
+                style={{
+                  width: "100%", padding: "13px 18px", borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.2)", background: "white",
+                  color: "#1a1614", fontSize: 15, fontWeight: 700, cursor: "pointer",
+                }}
+              >
+                Continue with Google
+              </button>
+              <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6, margin: "18px 0 0" }}>
+                Use your approved Google Workspace account. No separate OKÜ password is required.
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 15, color: "#9ca3af", lineHeight: 1.6, margin: "0 0 24px 0" }}>
+                Account sign-in is not yet configured in this environment.
+              </p>
+              <p style={{ fontSize: 13, color: "#5a5a5a", lineHeight: 1.6, margin: 0 }}>
+                If you are an OKÜ team member or partner, please contact your administrator for access.
+              </p>
+            </>
+          )}
         </div>
       </div>
     );

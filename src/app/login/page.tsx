@@ -18,6 +18,7 @@ export default async function LoginPage() {
   // The demo-login API route also re-checks this, so the gate is fail-closed
   // even if the prop is tampered with on the wire.
   const demoEnabled = isDemoModeEnabled();
+  const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
   return (
     <LocaleProvider locale={locale} translations={translations}>
@@ -28,7 +29,7 @@ export default async function LoginPage() {
           </div>
         }
       >
-        <LoginContent demoEnabled={demoEnabled} />
+        <LoginContent demoEnabled={demoEnabled} googleEnabled={googleEnabled} />
       </Suspense>
     </LocaleProvider>
   );
