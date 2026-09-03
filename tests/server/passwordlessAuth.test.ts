@@ -4,8 +4,11 @@ const mocks = vi.hoisted(() => {
   const tx = {
     user: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
+      upsert: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     role: { findUnique: vi.fn() },
     reservation: { findFirst: vi.fn() },
@@ -13,6 +16,7 @@ const mocks = vi.hoisted(() => {
     passwordlessToken: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn(),
     },
   };
@@ -59,6 +63,9 @@ function storedToken(overrides: Record<string, unknown> = {}) {
     expiresAt: new Date(Date.now() + 60_000),
     consumedAt: null,
     revokedAt: null,
+    purpose: "SIGN_IN",
+    locale: "en",
+    callbackUrl: "/account",
     user: activeUser(),
     ...overrides,
   };
@@ -71,6 +78,7 @@ describe("passwordless authentication security", () => {
     mocks.prisma.$transaction.mockImplementation(async (work: any) => work(mocks.tx));
     mocks.send.mockResolvedValue({ data: { id: "email-1" }, error: null });
     mocks.tx.user.update.mockResolvedValue({});
+    mocks.tx.user.updateMany.mockResolvedValue({ count: 1 });
     mocks.tx.passwordlessToken.updateMany.mockResolvedValue({ count: 1 });
   });
 
@@ -83,12 +91,10 @@ describe("passwordless authentication security", () => {
     expect(sanitizePasswordlessCallback("/\r\nLocation: https://evil.example")).toBeNull();
   });
 
-  it("stores only a SHA-256 token hash and creates only ATTENDEE for a known customer", async () => {
+  it("stores only a SHA-256 pending token and creates no User at request time", async () => {
     mocks.tx.user.findFirst.mockResolvedValue(null);
     mocks.tx.reservation.findFirst.mockResolvedValue({ contactName: "Known Guest" });
     mocks.tx.ticket.findFirst.mockResolvedValue(null);
-    mocks.tx.role.findUnique.mockResolvedValue({ key: "ATTENDEE" });
-    mocks.tx.user.create.mockResolvedValue(activeUser("ATTENDEE"));
     mocks.tx.passwordlessToken.create.mockResolvedValue({});
 
     await expect(issuePasswordlessToken({
@@ -99,12 +105,50 @@ describe("passwordless authentication security", () => {
     const createData = mocks.tx.passwordlessToken.create.mock.calls[0][0].data;
     expect(createData.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(createData)).not.toContain("a".repeat(43));
-    expect(mocks.tx.user.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
+    expect(createData).toMatchObject({
+      email: "guest@example.com",
+      userId: null,
+      purpose: "SIGN_IN",
+    });
+    expect(mocks.tx.user.create).not.toHaveBeenCalled();
+    expect(mocks.tx.user.upsert).not.toHaveBeenCalled();
+    expect(mocks.tx.role.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("atomically consumes a pending token, then creates and links exactly one ATTENDEE", async () => {
+    mocks.tx.passwordlessToken.findUnique.mockResolvedValue(storedToken({ user: null }));
+    mocks.tx.user.findFirst.mockResolvedValue(null);
+    mocks.tx.reservation.findFirst.mockResolvedValue({ contactName: "Known Guest" });
+    mocks.tx.ticket.findFirst.mockResolvedValue(null);
+    mocks.tx.role.findUnique.mockResolvedValue({ key: "ATTENDEE" });
+    mocks.tx.user.upsert.mockResolvedValue(activeUser("ATTENDEE"));
+    mocks.tx.user.findUnique.mockResolvedValue(activeUser("ATTENDEE"));
+    mocks.tx.passwordlessToken.update.mockResolvedValue({});
+
+    await expect(consumePasswordlessToken({
+      rawToken: "a".repeat(43),
+      claimedEmail: "guest@example.com",
+    })).resolves.toMatchObject({
+      id: "user-1",
+      roles: ["ATTENDEE"],
+      destination: "/account",
+    });
+
+    expect(mocks.tx.user.upsert).toHaveBeenCalledTimes(1);
+    expect(mocks.tx.user.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { email: "guest@example.com" },
+      create: expect.objectContaining({
+        email: "guest@example.com",
         status: "ACTIVE",
         roles: { create: { roleKey: "ATTENDEE" } },
       }),
     }));
+    expect(mocks.tx.passwordlessToken.update).toHaveBeenCalledWith({
+      where: { id: "token-1" },
+      data: { userId: "user-1" },
+    });
+    expect(mocks.tx.passwordlessToken.updateMany.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.tx.user.upsert.mock.invocationCallOrder[0]);
   });
 
   it("does not create an account or token for an unknown address", async () => {
@@ -115,6 +159,39 @@ describe("passwordless authentication security", () => {
     await expect(issuePasswordlessToken({ email: "unknown@example.com" }))
       .resolves.toEqual({ issued: false });
     expect(mocks.tx.user.create).not.toHaveBeenCalled();
+    expect(mocks.tx.passwordlessToken.create).not.toHaveBeenCalled();
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it("keeps referrer invitations linked to the existing active user", async () => {
+    mocks.tx.user.findFirst.mockResolvedValue(activeUser("REFERRER"));
+    mocks.tx.passwordlessToken.create.mockResolvedValue({});
+
+    await expect(issuePasswordlessToken({
+      email: "guest@example.com",
+      purpose: "REFERRER_INVITE",
+      requireExistingUserId: "user-1",
+      callbackUrl: "/referrer/dashboard",
+    })).resolves.toEqual({ issued: true });
+
+    expect(mocks.tx.passwordlessToken.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: "guest@example.com",
+        userId: "user-1",
+        purpose: "REFERRER_INVITE",
+      }),
+    });
+    expect(mocks.tx.user.upsert).not.toHaveBeenCalled();
+  });
+
+  it("refuses to issue an unlinked referrer invitation", async () => {
+    mocks.tx.user.findFirst.mockResolvedValue(null);
+
+    await expect(issuePasswordlessToken({
+      email: "missing-referrer@example.com",
+      purpose: "REFERRER_INVITE",
+    })).resolves.toEqual({ issued: false });
+
     expect(mocks.tx.passwordlessToken.create).not.toHaveBeenCalled();
     expect(mocks.send).not.toHaveBeenCalled();
   });
@@ -142,19 +219,34 @@ describe("passwordless authentication security", () => {
   });
 
   it("atomically prevents token replay", async () => {
-    mocks.tx.passwordlessToken.findUnique.mockResolvedValue(storedToken());
+    mocks.tx.passwordlessToken.findUnique.mockResolvedValue(storedToken({ user: null }));
     mocks.tx.passwordlessToken.updateMany.mockResolvedValue({ count: 0 });
     await expect(consumePasswordlessToken({
       rawToken: "a".repeat(43),
       claimedEmail: "guest@example.com",
     })).resolves.toBeNull();
-    expect(mocks.tx.user.update).not.toHaveBeenCalled();
+    expect(mocks.tx.user.updateMany).not.toHaveBeenCalled();
+    expect(mocks.tx.user.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a user suspended during final token consumption", async () => {
+    mocks.tx.passwordlessToken.findUnique.mockResolvedValue(storedToken());
+    mocks.tx.user.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(consumePasswordlessToken({
+      rawToken: "a".repeat(43),
+      claimedEmail: "guest@example.com",
+    })).resolves.toBeNull();
+
+    expect(mocks.tx.user.findUnique).not.toHaveBeenCalled();
   });
 
   it("returns only persisted roles after a successful single-use exchange", async () => {
     mocks.tx.passwordlessToken.findUnique.mockResolvedValue(storedToken({
       user: activeUser("REFERRER"),
+      callbackUrl: null,
     }));
+    mocks.tx.user.findUnique.mockResolvedValue(activeUser("REFERRER"));
     await expect(consumePasswordlessToken({
       rawToken: "a".repeat(43),
       claimedEmail: " GUEST@example.com ",

@@ -651,14 +651,15 @@ model PasswordlessToken {
   tokenHash   String                   @unique
   purpose     PasswordlessTokenPurpose @default(SIGN_IN)
   email       String
-  userId      String
+  userId      String?
+  locale      String                   @default("en")
   callbackUrl String?
   expiresAt   DateTime
   consumedAt  DateTime?
   revokedAt   DateTime?
   createdAt   DateTime                 @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([email, purpose, createdAt])
   @@index([userId, purpose, createdAt])

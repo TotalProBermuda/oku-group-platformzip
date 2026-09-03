@@ -176,10 +176,9 @@ async function findActiveUserByEmail(
   });
 }
 
-async function createAttendeeForKnownCustomer(
+async function findKnownCustomerEvidence(
   tx: Prisma.TransactionClient,
   email: string,
-  locale: SupportedLocale,
 ) {
   const [reservation, ticket] = await Promise.all([
     tx.reservation.findFirst({
@@ -191,15 +190,29 @@ async function createAttendeeForKnownCustomer(
       select: { attendeeName: true },
     }),
   ]);
-  if (!reservation && !ticket) return null;
+  return {
+    eligible: Boolean(reservation || ticket),
+    name: reservation?.contactName ?? ticket?.attendeeName ?? null,
+  };
+}
+
+async function createAttendeeForKnownCustomer(
+  tx: Prisma.TransactionClient,
+  email: string,
+  locale: SupportedLocale,
+) {
+  const evidence = await findKnownCustomerEvidence(tx, email);
+  if (!evidence.eligible) return null;
 
   const attendeeRole = await tx.role.findUnique({ where: { key: "ATTENDEE" } });
   if (!attendeeRole) throw new Error("ATTENDEE role is not configured");
 
-  return tx.user.create({
-    data: {
+  return tx.user.upsert({
+    where: { email },
+    update: {},
+    create: {
       email,
-      name: reservation?.contactName ?? ticket?.attendeeName ?? null,
+      name: evidence.name,
       status: "ACTIVE",
       roles: { create: { roleKey: attendeeRole.key } },
       profile: { create: { language: locale } },
@@ -222,21 +235,23 @@ export async function issuePasswordlessToken(input: {
   const tokenHash = hashPasswordlessToken(rawToken);
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
   const callbackUrl = sanitizePasswordlessCallback(input.callbackUrl);
-  const requestedLocale = normalizeLocale(input.locale);
-
-  const user = await prisma.$transaction(async (tx) => {
+  const recipient = await prisma.$transaction(async (tx) => {
     let candidate = await findActiveUserByEmail(tx, email);
+    let evidence: Awaited<ReturnType<typeof findKnownCustomerEvidence>> | null = null;
     if (input.requireExistingUserId && candidate?.id !== input.requireExistingUserId) {
       return null;
     }
     if (!candidate && !input.requireExistingUserId && purpose === "SIGN_IN") {
-      candidate = await createAttendeeForKnownCustomer(tx, email, requestedLocale);
+      evidence = await findKnownCustomerEvidence(tx, email);
+      if (!evidence.eligible) return null;
     }
-    if (!candidate || candidate.status !== "ACTIVE") return null;
+    if (!candidate && purpose !== "SIGN_IN") return null;
+    if (candidate && candidate.status !== "ACTIVE") return null;
+    const locale = normalizeLocale(input.locale ?? candidate?.profile?.language);
 
     await tx.passwordlessToken.updateMany({
       where: {
-        userId: candidate.id,
+        email,
         purpose,
         consumedAt: null,
         revokedAt: null,
@@ -248,21 +263,25 @@ export async function issuePasswordlessToken(input: {
         tokenHash,
         purpose,
         email,
-        userId: candidate.id,
+        userId: candidate?.id ?? null,
+        locale,
         callbackUrl,
         expiresAt,
       },
     });
-    return candidate;
+    return {
+      name: candidate?.name ?? evidence?.name ?? null,
+      locale,
+    };
   });
 
-  if (!user) return { issued: false };
+  if (!recipient) return { issued: false };
   await sendPasswordlessEmail({
     email,
-    name: user.name,
+    name: recipient.name,
     rawToken,
     purpose,
-    locale: normalizeLocale(input.locale ?? user.profile?.language),
+    locale: recipient.locale,
   });
   return { issued: true };
 }
@@ -288,8 +307,9 @@ export async function consumePasswordlessToken(input: {
     if (
       !token ||
       token.email !== claimedEmail ||
-      normalizePasswordlessEmail(token.user.email) !== claimedEmail ||
-      token.user.status !== "ACTIVE" ||
+      (token.user && normalizePasswordlessEmail(token.user.email) !== claimedEmail) ||
+      (token.user && token.user.status !== "ACTIVE") ||
+      (!token.user && token.purpose !== "SIGN_IN") ||
       token.consumedAt ||
       token.revokedAt ||
       token.expiresAt <= now
@@ -308,17 +328,42 @@ export async function consumePasswordlessToken(input: {
     });
     if (claimed.count !== 1) return null;
 
-    await tx.user.update({
-      where: { id: token.user.id },
+    let user = token.user;
+    if (!user) {
+      user = await findActiveUserByEmail(tx, claimedEmail);
+      if (user && user.status !== "ACTIVE") return null;
+      if (!user) {
+        user = await createAttendeeForKnownCustomer(
+          tx,
+          claimedEmail,
+          normalizeLocale(token.locale),
+        );
+      }
+      if (!user || user.status !== "ACTIVE") return null;
+      await tx.passwordlessToken.update({
+        where: { id: token.id },
+        data: { userId: user.id },
+      });
+    }
+
+    const activeClaim = await tx.user.updateMany({
+      where: { id: user.id, status: "ACTIVE" },
       data: { lastLoginAt: now },
     });
+    if (activeClaim.count !== 1) return null;
 
-    const roles = token.user.roles.map((entry) => entry.role.key);
+    const currentUser = await tx.user.findUnique({
+      where: { id: user.id },
+      include: { roles: { include: { role: true } } },
+    });
+    if (!currentUser || currentUser.status !== "ACTIVE") return null;
+
+    const roles = currentUser.roles.map((entry) => entry.role.key);
     return {
-      id: token.user.id,
-      email: token.user.email,
-      name: token.user.name,
-      status: token.user.status,
+      id: currentUser.id,
+      email: currentUser.email,
+      name: currentUser.name,
+      status: currentUser.status,
       roles,
       destination: sanitizeCallbackUrlForRoles(token.callbackUrl, roles),
     };
