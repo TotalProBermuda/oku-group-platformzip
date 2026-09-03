@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
         id: true,
         venueId: true,
         bookingCode: true,
+        status: true,
         hostUserId: true,
         createdByUserId: true,
         tableSession: { select: { id: true, openedInvuOrderId: true } },
@@ -51,6 +52,22 @@ export async function POST(req: NextRequest) {
     }
     if (!attribution.tableSession) {
       return NextResponse.json({ ok: false, error: "attribution has no table session" }, { status: 500 });
+    }
+
+    // A host can only bind an INVU order after the guest has actually been
+    // seated. Before that point there is no operational table/check to bind,
+    // and accepting an arbitrary order id would let an advance reservation
+    // claim an unrelated sale. Existing bindings remain retryable so a safe,
+    // idempotent replay is not blocked after the lifecycle advances.
+    if (!attribution.tableSession.openedInvuOrderId && attribution.status !== "SEATED") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Seat the guest and open their table in INVU before binding the check",
+          code: "INVU_BIND_REQUIRES_SEATED_GUEST",
+        },
+        { status: 409 }
+      );
     }
 
     // Object-level authorization: a regular host may only bind sessions they
