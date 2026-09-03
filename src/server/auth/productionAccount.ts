@@ -1,4 +1,33 @@
 import { prisma } from "@/lib/prisma";
+import { LOCAL5_OPERATING_LOCATION } from "@/lib/operatingLocation";
+
+type BootstrapRoleKey =
+  | "SUPERADMIN"
+  | "FB_DIRECTOR"
+  | "RESTAURANT_SUPERVISOR"
+  | "ADMIN_HR"
+  | "ADMIN_IR";
+
+type BootstrapAccount = {
+  roleKey: BootstrapRoleKey;
+  venueSlug?: string;
+};
+
+const CONFIGURED_BOOTSTRAP_ACCOUNTS = [
+  { envKey: "SECONDARY_SUPERADMIN_EMAIL", roleKey: "SUPERADMIN" },
+  {
+    envKey: "FB_DIRECTOR_EMAIL",
+    roleKey: "FB_DIRECTOR",
+    venueSlug: LOCAL5_OPERATING_LOCATION.legacyVenueSlug,
+  },
+  {
+    envKey: "RESTAURANT_SUPERVISOR_EMAIL",
+    roleKey: "RESTAURANT_SUPERVISOR",
+    venueSlug: LOCAL5_OPERATING_LOCATION.legacyVenueSlug,
+  },
+  { envKey: "ADMIN_HR_EMAIL", roleKey: "ADMIN_HR" },
+  { envKey: "ADMIN_IR_EMAIL", roleKey: "ADMIN_IR" },
+] as const;
 
 export function configuredPrimaryOwnerEmail(): string | null {
   const email = process.env.PRIMARY_SUPERADMIN_EMAIL?.trim().toLowerCase();
@@ -8,6 +37,24 @@ export function configuredPrimaryOwnerEmail(): string | null {
 export function isPrimaryOwnerEmail(email: string | null | undefined): boolean {
   const ownerEmail = configuredPrimaryOwnerEmail();
   return !!ownerEmail && email?.trim().toLowerCase() === ownerEmail;
+}
+
+function configuredBootstrapAccount(email: string): BootstrapAccount | null {
+  if (isPrimaryOwnerEmail(email)) {
+    return { roleKey: "SUPERADMIN" };
+  }
+
+  for (const config of CONFIGURED_BOOTSTRAP_ACCOUNTS) {
+    const configuredEmail = process.env[config.envKey]?.trim().toLowerCase();
+    if (configuredEmail && configuredEmail === email) {
+      return {
+        roleKey: config.roleKey,
+        ...("venueSlug" in config ? { venueSlug: config.venueSlug } : {}),
+      };
+    }
+  }
+
+  return null;
 }
 
 type OAuthIdentity = {
@@ -29,31 +76,68 @@ export async function authorizeProductionAccount(identity: OAuthIdentity) {
   if (!email) return null;
   if (identity.provider === "google" && identity.emailVerified !== true) return null;
 
+  const bootstrapAccount =
+    identity.provider === "google" && identity.emailVerified === true
+      ? configuredBootstrapAccount(email)
+      : null;
+
   let account = await prisma.user.findUnique({
     where: { email },
     include: { roles: { select: { roleKey: true } } },
   });
 
-  if (!account && isPrimaryOwnerEmail(email)) {
-    await prisma.user.upsert({
-      where: { email },
-      update: {},
-      create: {
-        email,
-        name: identity.name?.trim() || "Primary Owner",
-        imageUrl: identity.image || null,
-        status: "ACTIVE",
-      },
-    });
-    const owner = await prisma.user.findUniqueOrThrow({ where: { email } });
-    await prisma.userRole.upsert({
-      where: { userId_roleKey: { userId: owner.id, roleKey: "SUPERADMIN" } },
-      create: { userId: owner.id, roleKey: "SUPERADMIN" },
-      update: {},
-    });
-    account = await prisma.user.findUnique({
-      where: { email },
-      include: { roles: { select: { roleKey: true } } },
+  if (account && account.status !== "ACTIVE") return null;
+
+  if (bootstrapAccount) {
+    account = await prisma.$transaction(async (tx) => {
+      const venue = bootstrapAccount.venueSlug
+        ? await tx.venue.findUnique({
+            where: { slug: bootstrapAccount.venueSlug },
+            select: { id: true },
+          })
+        : null;
+      if (bootstrapAccount.venueSlug && !venue) return null;
+
+      const bootstrapUser = await tx.user.upsert({
+        where: { email },
+        update: {},
+        create: {
+          email,
+          name: identity.name?.trim() || email.split("@")[0],
+          imageUrl: identity.image || null,
+          status: "ACTIVE",
+        },
+      });
+      await tx.userRole.upsert({
+        where: {
+          userId_roleKey: {
+            userId: bootstrapUser.id,
+            roleKey: bootstrapAccount.roleKey,
+          },
+        },
+        create: {
+          userId: bootstrapUser.id,
+          roleKey: bootstrapAccount.roleKey,
+        },
+        update: {},
+      });
+      if (venue) {
+        await tx.restaurantHostProfile.upsert({
+          where: { userId: bootstrapUser.id },
+          update: { venueId: venue.id },
+          create: {
+            userId: bootstrapUser.id,
+            venueId: venue.id,
+            displayName: identity.name?.trim() || email.split("@")[0],
+            isActive: true,
+          },
+        });
+      }
+
+      return tx.user.findUnique({
+        where: { email },
+        include: { roles: { select: { roleKey: true } } },
+      });
     });
   }
 
