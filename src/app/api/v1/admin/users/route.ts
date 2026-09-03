@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { issuePasswordlessToken } from "@/server/auth/passwordless";
+import { findOrCreateReferralActor } from "@/server/referrals/referralActorIdentityService";
+import { mapReferrerTypeToActorType } from "@/server/referrals/referralActorService";
+import { generateReferralLink } from "@/server/referrals/referralLinkService";
+import type { ReferrerType } from "@prisma/client";
 
 function randCode(prefix: string, len = 6) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -43,7 +48,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdminRoles(req, ["SUPERADMIN"]);
+    const adminAuth = await requireAdminRoles(req, ["SUPERADMIN"]);
 
     const body = await req.json();
     const { name, email, phone, initialRole, referrerType, organizationName, referrerPhone } = body;
@@ -92,6 +97,26 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        const actorResult = await findOrCreateReferralActor({
+          actorType: mapReferrerTypeToActorType(referrerType as ReferrerType),
+          displayName: name?.trim() || email.trim(),
+          organizationName: organizationName?.trim() || null,
+          email: email.trim().toLowerCase(),
+          phone: referrerPhone?.trim() || phone?.trim() || null,
+          userId: newUser.id,
+          invitedByUserId: adminAuth.userId,
+        }, tx);
+        if (actorResult.mergeRequired) {
+          throw new Error("A referral identity for this contact requires manual merge review");
+        }
+        const activeLink = await tx.referralLink.findFirst({
+          where: { referralActorId: actorResult.actor.id, isActive: true },
+          select: { id: true },
+        });
+        if (!activeLink) {
+          await generateReferralLink({ referralActorId: actorResult.actor.id }, tx);
+        }
+
         return tx.user.findUnique({
           where: { id: newUser.id },
           include: {
@@ -104,7 +129,21 @@ export async function POST(req: NextRequest) {
       return newUser;
     });
 
-    return NextResponse.json({ ok: true, data: user }, { status: 201 });
+    let invitationSent: boolean | null = null;
+    if (initialRole === "REFERRER" && user) {
+      try {
+        invitationSent = (await issuePasswordlessToken({
+          email: user.email,
+          purpose: "REFERRER_INVITE",
+          requireExistingUserId: user.id,
+          callbackUrl: "/referrer/dashboard",
+        })).issued;
+      } catch {
+        invitationSent = false;
+      }
+    }
+
+    return NextResponse.json({ ok: true, data: user, meta: { invitationSent } }, { status: 201 });
   } catch (e: any) {
     const status = e.status || 500;
     return NextResponse.json({ ok: false, error: e.message }, { status });

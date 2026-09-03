@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
             code: "TIX-" + Math.random().toString(36).slice(2, 10).toUpperCase(),
             attendeeName: auth.session.user.name ?? "Guest",
             attendeeEmail: auth.session.user.email ?? "",
+            attendeeEmailNormalized: auth.session.user.email?.trim().toLowerCase() ?? null,
             ticketStatus: "ISSUED",
           },
         });

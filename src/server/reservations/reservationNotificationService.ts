@@ -44,6 +44,7 @@ export async function deliverReservationStateEmail(
   const props: ReservationConfirmationInput = {
     contactName: reservation.contactName,
     contactEmail: reservation.contactEmail,
+    locale: reservation.customerLocale,
     confirmationCode: reservation.confirmationCode,
     reservationDate: reservation.reservationDate,
     partySize: reservation.partySize,

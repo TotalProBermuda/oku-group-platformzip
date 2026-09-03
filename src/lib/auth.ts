@@ -7,6 +7,7 @@ import { resolveAuthSecret } from "@/lib/authSecret";
 import { sameSiteForEnv } from "@/lib/cookieSecurity";
 import type { NextAuthOptions } from "next-auth";
 import { authorizeProductionAccount } from "@/server/auth/productionAccount";
+import { consumePasswordlessToken } from "@/server/auth/passwordless";
 
 const useSecureCookies = !!process.env.REPLIT_DEV_DOMAIN || process.env.NODE_ENV === "production";
 
@@ -39,6 +40,30 @@ const demoCredentialsProvider = CredentialsProvider({
   },
 });
 
+const passwordlessCredentialsProvider = CredentialsProvider({
+  id: "passwordless",
+  name: "Email magic link",
+  credentials: {
+    token: { label: "Token", type: "text" },
+    email: { label: "Email", type: "email" },
+  },
+  async authorize(credentials) {
+    const identity = await consumePasswordlessToken({
+      rawToken: credentials?.token ?? "",
+      claimedEmail: credentials?.email ?? "",
+    });
+    if (!identity) return null;
+    return {
+      id: identity.id,
+      email: identity.email,
+      name: identity.name,
+      roles: identity.roles,
+      status: identity.status,
+      passwordlessDestination: identity.destination,
+    } as any;
+  },
+});
+
 export const authOptions: NextAuthOptions = {
   secret: resolveAuthSecret(),
   logger: {
@@ -50,6 +75,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   providers: [
+    passwordlessCredentialsProvider,
     ...(isDemoModeEnabled() ? [demoCredentialsProvider] : []),
     ...(process.env.GOOGLE_CLIENT_ID
       ? [GoogleProvider({ clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! })]
@@ -105,6 +131,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === "credentials") return isDemoModeEnabled();
+      if (account?.provider === "passwordless") return true;
 
       const authorized = await authorizeProductionAccount({
         email: user.email,
@@ -124,6 +151,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.userId = user.id;
         token.roles = (user as any).roles ?? [];
+        token.passwordlessDestination = (user as any).passwordlessDestination;
       }
       return token;
     },
@@ -131,6 +159,9 @@ export const authOptions: NextAuthOptions = {
       if (token?.userId) {
         session.user.id = token.userId;
         session.user.roles = token.roles ?? [];
+        if (token.passwordlessDestination) {
+          session.user.passwordlessDestination = token.passwordlessDestination;
+        }
       }
       return session;
     },

@@ -1186,5 +1186,8 @@
   "anchorResolved": "Sesión anclada manualmente al contexto de referidor preservado.",
   "anchorNoSessions": "No hay sesiones que requieran atención. Todas las atribuciones de referido están ancladas.",
   "anchorSessionsTotal": "sesiones que requieren revisión",
-  "refresh": "Actualizar"
+  "refresh": "Actualizar",
+  "resendReferrerInvite": "Reenviar invitación segura",
+  "referrerInviteSent": "Invitación segura de referente enviada.",
+  "referrerInviteFailed": "No se pudo enviar la invitación."
 }

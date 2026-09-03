@@ -1186,5 +1186,8 @@
   "anchorResolved": "Session manually anchored to preserved referrer context.",
   "anchorNoSessions": "No sessions require attention. All referral attributions are anchored.",
   "anchorSessionsTotal": "sessions requiring review",
-  "refresh": "Refresh"
+  "refresh": "Refresh",
+  "resendReferrerInvite": "Resend secure invitation",
+  "referrerInviteSent": "Secure referrer invitation sent.",
+  "referrerInviteFailed": "The invitation could not be sent."
 }

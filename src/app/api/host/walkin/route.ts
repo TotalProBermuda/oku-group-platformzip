@@ -71,6 +71,8 @@ export async function POST(req: NextRequest) {
             conceptRequested: concept,
             contactName: name,
             contactEmail: `walkin-${entry.id}@gold-house.local`,
+            contactEmailNormalized: `walkin-${entry.id}@gold-house.local`,
+            customerLocale: "en",
             contactPhone: phone || null,
             confirmationCode: code,
           },

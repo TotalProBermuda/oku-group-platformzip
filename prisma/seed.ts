@@ -677,7 +677,7 @@ async function main() {
     },
   });
   await prisma.payment.create({ data: { orderId: order1.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 28350, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
-  const t1 = await prisma.ticket.create({ data: { orderId: order1.id, userId: att1.id, sessionId: s1s1.id, ticketTypeId: tt1vip.id, code: "TIX-" + randCode(8), attendeeName: "Mia Rodriguez", attendeeEmail: "attendee@oku.local", isPubliclyVisible: true, ticketStatus: "ISSUED" } });
+  const t1 = await prisma.ticket.create({ data: { orderId: order1.id, userId: att1.id, sessionId: s1s1.id, ticketTypeId: tt1vip.id, code: "TIX-" + randCode(8), attendeeName: "Mia Rodriguez", attendeeEmail: "attendee@oku.local", attendeeEmailNormalized: "attendee@oku.local", isPubliclyVisible: true, ticketStatus: "ISSUED" } });
   await prisma.orderEvent.createMany({ data: [
     { orderId: order1.id, eventType: "ORDER_CREATED",      eventLabel: "Order placed",          performedBy: "Mia Rodriguez",   createdAt: daysAgo(12) },
     { orderId: order1.id, eventType: "PAYMENT_SUCCEEDED",  eventLabel: "Payment succeeded",     performedBy: "System",          createdAt: daysAgo(12) },
@@ -700,7 +700,7 @@ async function main() {
     },
   });
   await prisma.payment.create({ data: { orderId: order2.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 20412, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
-  await prisma.ticket.create({ data: { orderId: order2.id, userId: att1.id, sessionId: s4s1.id, ticketTypeId: tt4all.id, code: "TIX-" + randCode(8), attendeeName: "Mia Rodriguez", attendeeEmail: "attendee@oku.local", ticketStatus: "ISSUED" } });
+  await prisma.ticket.create({ data: { orderId: order2.id, userId: att1.id, sessionId: s4s1.id, ticketTypeId: tt4all.id, code: "TIX-" + randCode(8), attendeeName: "Mia Rodriguez", attendeeEmail: "attendee@oku.local", attendeeEmailNormalized: "attendee@oku.local", ticketStatus: "ISSUED" } });
   await prisma.orderEvent.createMany({ data: [
     { orderId: order2.id, eventType: "ORDER_CREATED",     eventLabel: "Order placed",        performedBy: "Mia Rodriguez", createdAt: daysAgo(10) },
     { orderId: order2.id, eventType: "PAYMENT_SUCCEEDED", eventLabel: "Payment succeeded",   performedBy: "System",        createdAt: daysAgo(10) },
@@ -723,8 +723,8 @@ async function main() {
   });
   await prisma.payment.create({ data: { orderId: order3.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 19278, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
   await prisma.ticket.createMany({ data: [
-    { orderId: order3.id, userId: att2.id, sessionId: s2s1.id, ticketTypeId: tt2gen.id, code: "TIX-" + randCode(8), attendeeName: "John Doe", attendeeEmail: "john@doe.local", isPubliclyVisible: true, ticketStatus: "ISSUED" },
-    { orderId: order3.id, userId: att2.id, sessionId: s2s1.id, ticketTypeId: tt2gen.id, code: "TIX-" + randCode(8), attendeeName: "Guest", attendeeEmail: "john@doe.local", ticketStatus: "ISSUED" },
+    { orderId: order3.id, userId: att2.id, sessionId: s2s1.id, ticketTypeId: tt2gen.id, code: "TIX-" + randCode(8), attendeeName: "John Doe", attendeeEmail: "john@doe.local", attendeeEmailNormalized: "john@doe.local", isPubliclyVisible: true, ticketStatus: "ISSUED" },
+    { orderId: order3.id, userId: att2.id, sessionId: s2s1.id, ticketTypeId: tt2gen.id, code: "TIX-" + randCode(8), attendeeName: "Guest", attendeeEmail: "john@doe.local", attendeeEmailNormalized: "john@doe.local", ticketStatus: "ISSUED" },
   ]});
   await prisma.orderEvent.createMany({ data: [
     { orderId: order3.id, eventType: "ORDER_CREATED",     eventLabel: "Order placed",        performedBy: "John Doe",  createdAt: daysAgo(8) },
@@ -749,8 +749,8 @@ async function main() {
   });
   await prisma.payment.create({ data: { orderId: order4.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 49896, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
   await prisma.ticket.createMany({ data: [
-    { orderId: order4.id, userId: att3.id, sessionId: s3s1.id, ticketTypeId: tt3gen.id, code: "TIX-" + randCode(8), attendeeName: "Jane Smith", attendeeEmail: "jane@smith.local", isPubliclyVisible: true, ticketStatus: "ISSUED" },
-    { orderId: order4.id, userId: att3.id, sessionId: s3s1.id, ticketTypeId: tt3gen.id, code: "TIX-" + randCode(8), attendeeName: "Guest", attendeeEmail: "jane@smith.local", ticketStatus: "ISSUED" },
+    { orderId: order4.id, userId: att3.id, sessionId: s3s1.id, ticketTypeId: tt3gen.id, code: "TIX-" + randCode(8), attendeeName: "Jane Smith", attendeeEmail: "jane@smith.local", attendeeEmailNormalized: "jane@smith.local", isPubliclyVisible: true, ticketStatus: "ISSUED" },
+    { orderId: order4.id, userId: att3.id, sessionId: s3s1.id, ticketTypeId: tt3gen.id, code: "TIX-" + randCode(8), attendeeName: "Guest", attendeeEmail: "jane@smith.local", attendeeEmailNormalized: "jane@smith.local", ticketStatus: "ISSUED" },
   ]});
   await prisma.orderEvent.createMany({ data: [
     { orderId: order4.id, eventType: "ORDER_CREATED",     eventLabel: "Order placed",        performedBy: "Jane Smith", createdAt: daysAgo(6) },
@@ -1945,6 +1945,7 @@ async function main() {
         occasion: g.occasion ?? undefined,
         contactName: g.name,
         contactEmail: g.email,
+        contactEmailNormalized: g.email.trim().toLowerCase(),
         contactPhone: g.phone,
         confirmationCode: code,
         estimatedRevenueCents: g.party * 4500,
@@ -2130,7 +2131,7 @@ async function main() {
     },
   });
   await prisma.payment.create({ data: { orderId: order7.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 15309, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
-  const t7 = await prisma.ticket.create({ data: { orderId: order7.id, userId: att4.id, sessionId: s1s2.id, ticketTypeId: tt1mem.id, code: "TIX-" + randCode(8), attendeeName: "Isabella Chen", attendeeEmail: "isabella@chen.local", ticketStatus: "ISSUED" } });
+  const t7 = await prisma.ticket.create({ data: { orderId: order7.id, userId: att4.id, sessionId: s1s2.id, ticketTypeId: tt1mem.id, code: "TIX-" + randCode(8), attendeeName: "Isabella Chen", attendeeEmail: "isabella@chen.local", attendeeEmailNormalized: "isabella@chen.local", ticketStatus: "ISSUED" } });
 
   // att5 (Oliver Nakamura) buys Cocktail Experience GA
   const order8 = await prisma.order.create({
@@ -2142,7 +2143,7 @@ async function main() {
     },
   });
   await prisma.payment.create({ data: { orderId: order8.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 9639, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
-  const t8 = await prisma.ticket.create({ data: { orderId: order8.id, userId: att5.id, sessionId: s2s2.id, ticketTypeId: tt2gen.id, code: "TIX-" + randCode(8), attendeeName: "Oliver Nakamura", attendeeEmail: "oliver@nakamura.local", ticketStatus: "ISSUED" } });
+  const t8 = await prisma.ticket.create({ data: { orderId: order8.id, userId: att5.id, sessionId: s2s2.id, ticketTypeId: tt2gen.id, code: "TIX-" + randCode(8), attendeeName: "Oliver Nakamura", attendeeEmail: "oliver@nakamura.local", attendeeEmailNormalized: "oliver@nakamura.local", ticketStatus: "ISSUED" } });
 
   // att6 (Camille Dubois — FOUNDER) buys Wellness Full Series Pass
   const order9 = await prisma.order.create({
@@ -2154,7 +2155,7 @@ async function main() {
     },
   });
   await prisma.payment.create({ data: { orderId: order9.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 20412, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
-  const t9 = await prisma.ticket.create({ data: { orderId: order9.id, userId: att6.id, sessionId: s4s2.id, ticketTypeId: tt4all.id, code: "TIX-" + randCode(8), attendeeName: "Camille Dubois", attendeeEmail: "camille@dubois.local", ticketStatus: "ISSUED" } });
+  const t9 = await prisma.ticket.create({ data: { orderId: order9.id, userId: att6.id, sessionId: s4s2.id, ticketTypeId: tt4all.id, code: "TIX-" + randCode(8), attendeeName: "Camille Dubois", attendeeEmail: "camille@dubois.local", attendeeEmailNormalized: "camille@dubois.local", ticketStatus: "ISSUED" } });
 
   // att7 (Rafael Costa) buys Wine Dinner GA
   const order10 = await prisma.order.create({
@@ -2166,7 +2167,7 @@ async function main() {
     },
   });
   await prisma.payment.create({ data: { orderId: order10.id, provider: "DEMO", status: "SUCCEEDED", amountCents: 24948, currency: "USD", authNetTransId: "DEMO-" + randCode(10) } });
-  const t10 = await prisma.ticket.create({ data: { orderId: order10.id, userId: att7.id, sessionId: s3s2.id, ticketTypeId: tt3gen.id, code: "TIX-" + randCode(8), attendeeName: "Rafael Costa", attendeeEmail: "rafael@costa.local", ticketStatus: "ISSUED" } });
+  const t10 = await prisma.ticket.create({ data: { orderId: order10.id, userId: att7.id, sessionId: s3s2.id, ticketTypeId: tt3gen.id, code: "TIX-" + randCode(8), attendeeName: "Rafael Costa", attendeeEmail: "rafael@costa.local", attendeeEmailNormalized: "rafael@costa.local", ticketStatus: "ISSUED" } });
 
   // ── Check-In Logs (raw scanner audit trail) ───────────────────────────────
   // Valid scans
@@ -2326,6 +2327,7 @@ async function main() {
         occasion: g.occasion ?? undefined,
         contactName: g.name,
         contactEmail: g.email,
+        contactEmailNormalized: g.email.trim().toLowerCase(),
         contactPhone: g.phone,
         confirmationCode: code,
         assignedRestaurantHostId: g.zone === "catch" ? host2Profile.id : host1Profile.id,
@@ -2373,6 +2375,7 @@ async function main() {
       occasion: "None",
       contactName: "Walk-in Group",
       contactEmail: "walkin@oku.local",
+      contactEmailNormalized: "walkin@oku.local",
       contactPhone: "+507-6000-0099",
       confirmationCode: sideCode,
       estimatedRevenueCents: 3 * 4500,

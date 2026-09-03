@@ -96,6 +96,22 @@ function UsersPageContent() {
       onClick: () => setSelectedId(u.id),
     },
     {
+      key: "referrer-invite",
+      label: t("admin", "resendReferrerInvite"),
+      hidden: u.status !== "ACTIVE" || !u.roles?.some((role: any) => role.roleKey === "REFERRER"),
+      onClick: async () => {
+        const response = await fetch(`/api/v1/admin/users/${u.id}/referrer-invite`, {
+          method: "POST",
+        });
+        const data = await response.json();
+        window.alert(
+          data.ok
+            ? t("admin", "referrerInviteSent")
+            : data.error || t("admin", "referrerInviteFailed"),
+        );
+      },
+    },
+    {
       key: "activate",
       label: t("admin", "activate"),
       hidden: u.status === "ACTIVE",

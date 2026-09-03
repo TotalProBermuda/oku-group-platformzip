@@ -5,6 +5,11 @@ import { requireSession } from "@/server/auth/session";
 export async function GET() {
   try {
     const { userId } = await requireSession();
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { email: true },
+    });
+    const normalizedEmail = user.email.trim().toLowerCase();
 
     const orders = await prisma.order.findMany({
       where: { userId },
@@ -14,7 +19,10 @@ export async function GET() {
         lineItems: {
           include: { ticketType: { select: { name: true, priceCents: true } } },
         },
-        tickets: { select: { id: true, code: true, checkedInAt: true } },
+        tickets: {
+          where: { attendeeEmailNormalized: normalizedEmail },
+          select: { id: true, code: true, checkedInAt: true },
+        },
         payment: { select: { status: true, provider: true } },
       },
       orderBy: { createdAt: "desc" },

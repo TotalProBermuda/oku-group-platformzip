@@ -392,5 +392,10 @@
   "calendarGetTickets": "Obter Ingressos",
   "calendarViewEvent": "Ver Evento",
   "calendarPrev": "Mês anterior",
-  "calendarNext": "Próximo mês"
+  "calendarNext": "Próximo mês",
+  "myReservations": "Minhas Reservas",
+  "myTickets": "Meus Ingressos",
+  "noReservations": "Não há reservas nesta seção.",
+  "bookingReference": "Referência da reserva",
+  "guests": "pessoas"
 }
