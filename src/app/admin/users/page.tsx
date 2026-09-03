@@ -122,15 +122,6 @@ function UsersPageContent() {
         fetchUsers();
       },
     },
-    {
-      key: "reset",
-      label: t("admin", "resetPassword"),
-      danger: true,
-      onClick: async () => {
-        await fetch(`/api/v1/admin/users/${u.id}/reset-password`, { method: "POST" });
-        fetchUsers();
-      },
-    },
   ];
 
   const ALL_ROLES = [

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
+import { assertMayManageUser } from "@/server/auth/productionAccount";
 
 export async function DELETE(
   req: NextRequest,
@@ -10,6 +11,10 @@ export async function DELETE(
   try {
     const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id, roleKey } = await params;
+    const { targetIsPrimaryOwner } = await assertMayManageUser(userId, id);
+    if (targetIsPrimaryOwner && roleKey === "SUPERADMIN") {
+      throw Object.assign(new Error("The primary owner must retain the SUPERADMIN role"), { status: 403 });
+    }
 
     await prisma.userRole.deleteMany({
       where: { userId: id, roleKey: roleKey as any },

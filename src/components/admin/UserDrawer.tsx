@@ -218,12 +218,6 @@ export default function UserDrawer({
     else flash(d.error, true);
   };
 
-  const resetPassword = async () => {
-    const d = await api(`/api/v1/admin/users/${userId}/reset-password`);
-    if (d.ok) { flash(d.message); fetchUser(); fetchAudit(); onUserUpdated(); }
-    else flash(d.error, true);
-  };
-
   const forceLogout = async () => {
     const d = await api(`/api/v1/admin/users/${userId}/force-logout`);
     if (d.ok) { flash(d.message); fetchAudit(); }
@@ -629,7 +623,9 @@ export default function UserDrawer({
                   <div>
                     <SectionTitle>Session & Credentials</SectionTitle>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      <ActionRow title="Force Password Reset" desc="User must reset password on next login" btnLabel="Reset" btnColor="#d97706" onClick={resetPassword} disabled={saving} />
+                      <div style={{ padding: "12px 14px", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12, color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                        Sign-in credentials are managed by Google Workspace. OKÜ does not store or email account passwords.
+                      </div>
                       <ActionRow title="Force Logout All Sessions" desc="Invalidates all active sessions immediately" btnLabel="Logout" btnColor="#dc2626" onClick={forceLogout} disabled={saving} />
                     </div>
                   </div>

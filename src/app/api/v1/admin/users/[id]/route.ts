@@ -6,6 +6,7 @@ import {
   commissionWhereForEarner,
   resolveEarnerScopeForReferrer,
 } from "@/server/commissions/earnerScope";
+import { assertMayManageUser, isPrimaryOwnerEmail } from "@/server/auth/productionAccount";
 
 // NOTE: nested `_count.commissions` intentionally REMOVED from the include
 // below. Prisma `_count` follows the relation FK directly (here `referrerId`)
@@ -95,12 +96,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
     const { id } = await params;
     const body = await req.json();
+    const { targetIsPrimaryOwner } = await assertMayManageUser(userId, id);
 
     const prev = await prisma.user.findUniqueOrThrow({ where: { id } });
 
     const update: Record<string, unknown> = {};
     if (body.name         !== undefined) update.name          = body.name;
-    if (body.email        !== undefined) update.email         = body.email;
+    if (body.email !== undefined) {
+      if (targetIsPrimaryOwner && !isPrimaryOwnerEmail(body.email)) {
+        throw Object.assign(new Error("The primary owner email cannot be changed"), { status: 403 });
+      }
+      update.email = body.email.trim().toLowerCase();
+    }
     if (body.phone        !== undefined) update.phone         = body.phone;
     if (body.internalNotes !== undefined) update.internalNotes = body.internalNotes;
     if (body.tags         !== undefined) update.tags          = body.tags;
