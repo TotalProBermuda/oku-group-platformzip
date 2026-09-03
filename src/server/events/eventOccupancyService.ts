@@ -35,7 +35,7 @@ function localisedMessage(
   locale = "en",
 ) {
   const translated = locale === "es" ? occupancy.guestMessageEs : locale === "pt" ? occupancy.guestMessagePt : occupancy.guestMessageEn;
-  return translated || "This dining area is unavailable at the selected time. Please choose another available area.";
+  return translated || "A special event is happening in this dining area at the selected time. You may still request it and our host team will review the best available seating with you.";
 }
 
 export function buildGuestEventCard(
@@ -48,7 +48,7 @@ export function buildGuestEventCard(
     ticketTypes: Array<{ id: string }>;
   },
   message: string,
-  privateMessage = "This space is reserved for a private event at the selected time. Please choose another available area.",
+  privateMessage = "A private event is happening in this dining area at the selected time. You may still request a reservation and our host team will review other seating or times with you.",
 ): PublicEventCard {
   const isPublic = series.status === "PUBLISHED" && series.seriesVisibilityMode === "PUBLIC";
   const canJoin = isPublic && series.ticketTypes.length > 0;
@@ -64,9 +64,9 @@ export function buildGuestEventCard(
 }
 
 function privateEventMessage(locale = "en") {
-  if (locale === "es") return "Este espacio está reservado para un evento privado a la hora seleccionada. Elige otra área disponible.";
-  if (locale === "pt") return "Este espaço está reservado para um evento privado no horário selecionado. Escolha outra área disponível.";
-  return "This space is reserved for a private event at the selected time. Please choose another available area.";
+  if (locale === "es") return "Hay un evento privado en esta área a la hora seleccionada. Aún puedes solicitar una reserva y nuestro equipo revisará otros espacios u horarios contigo.";
+  if (locale === "pt") return "Há um evento privado nesta área no horário selecionado. Você ainda pode solicitar uma reserva e nossa equipe avaliará outros espaços ou horários com você.";
+  return "A private event is happening in this dining area at the selected time. You may still request a reservation and our host team will review other seating or times with you.";
 }
 
 /** Half-open interval overlap: an arrival exactly at an event's end is valid. */

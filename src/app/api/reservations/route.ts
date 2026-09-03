@@ -6,7 +6,7 @@ import { deliverReservationStateEmail } from "@/server/reservations/reservationN
 import { gatePublicPostAsync } from "@/server/rateLimit";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
-import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
+import { findBlockingOccupancy } from "@/server/events/eventOccupancyService";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     // "No preference — host will assign" is also an approval workflow. It
     // cannot be CONFIRMED without a space/hold and then depend on a host fixing
     // it later. The host must choose the final space, time and table plan first.
-    const pendingApproval = requestedSpace ? requestedSpace.requiresApproval : true;
+    let pendingApproval = requestedSpace ? requestedSpace.requiresApproval : true;
 
     // Every request has a window. No-preference requests may wait for host
     // assignment, but must still honour a venue-wide exclusive event block.
@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
     //     the hold when the booking is accepted/assigned.
     //   No requestedSpaceId → no hold; host assignment creates the hold later.
     let reservation: Awaited<ReturnType<typeof prisma.reservation.create>>;
+    let requestEventConflict: Awaited<ReturnType<typeof findBlockingOccupancy>> = null;
     // Payments P215 — set inside the transaction if a deposit intent is created.
     let reservationPaymentIntentId: string | null = null;
     let reservationDepositAmountCents: number | null = null;
@@ -131,16 +132,18 @@ export async function POST(req: NextRequest) {
         if (requestedSpaceId) {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${requestedSpaceId}))`;
 
-          // Event/buyout occupancy is a hard availability boundary. This is
-          // intentionally inside the same space lock/transaction as capacity
-          // creation so a calendar UI or forged request cannot bypass it.
-          await assertNoBlockingOccupancy(tx, {
+          // Event occupancy is advisory at the guest-request stage. Persist the
+          // request for human review, but never auto-confirm or charge/hold the
+          // blocked section. The host confirmation flow remains the hard
+          // operational boundary and must assign an available space.
+          requestEventConflict = await findBlockingOccupancy(tx, {
             venueId: venue.id,
             spaceId: requestedSpaceId,
             startAt: reservationStartAt,
             endAt: reservationEndAt,
             locale: typeof locale === "string" ? locale : "en",
           });
+          if (requestEventConflict) pendingApproval = true;
 
           // Re-read capacity under the lock. We sum ACTIVE holds that overlap our
           // window — identical overlap logic to getHeldCovers() in capacityService.
@@ -169,18 +172,21 @@ export async function POST(req: NextRequest) {
           }
           // requiresApproval + full → fall through; booking becomes PENDING_APPROVAL.
         } else {
-          await assertNoBlockingOccupancy(tx, {
+          requestEventConflict = await findBlockingOccupancy(tx, {
             venueId: venue.id,
             startAt: reservationStartAt,
             endAt: reservationEndAt,
             locale: typeof locale === "string" ? locale : "en",
           });
+          if (requestEventConflict) pendingApproval = true;
         }
 
         // Payments P215 — when the space requires a deposit, the reservation
         // starts in PENDING_PAYMENT. It advances to CONFIRMED (or PENDING_APPROVAL
         // for requiresApproval spaces) only after the payment is authorized.
-        const depositRequired = depositCents > 0;
+        // Never collect a deposit for a section already known to require event
+        // conflict review. Payment can follow after staff offers a viable plan.
+        const depositRequired = depositCents > 0 && !requestEventConflict;
 
         // ── Step 2: create reservation ────────────────────────────────────────
         const res = await tx.reservation.create({
@@ -215,6 +221,16 @@ export async function POST(req: NextRequest) {
               : undefined,
           },
         });
+
+        if (requestEventConflict) {
+          await tx.eventReservationConflict.create({
+            data: {
+              occupancyId: requestEventConflict.occupancy.id,
+              reservationId: res.id,
+              note: "Guest submitted the request after viewing the event notice; host follow-up required.",
+            },
+          });
+        }
 
         // ── Step 3: ledger outbox rows ────────────────────────────────────────
         // RESERVATION_REQUESTED — always, for every new reservation.
@@ -308,12 +324,6 @@ export async function POST(req: NextRequest) {
         return res;
       }, { timeout: 10_000 });
     } catch (txErr: unknown) {
-      if (txErr instanceof EventOccupancyConflictError) {
-        return NextResponse.json(
-          { error: txErr.card.message, code: "EVENT_UNAVAILABLE", eventConflict: txErr.card },
-          { status: 409 }
-        );
-      }
       if (txErr instanceof Error && txErr.message === "__SPACE_FULL__") {
         return NextResponse.json(
           { error: "This space is at full capacity for the selected time.", code: "SPACE_FULL" },
@@ -609,6 +619,7 @@ export async function POST(req: NextRequest) {
       confirmationCode,
       reservationId: reservation.id,
       pendingApproval,
+      eventNotice: requestEventConflict?.card ?? null,
       // Payments P215 — included when the space requires a deposit before confirmation
       ...(reservationPaymentIntentId != null
         ? {

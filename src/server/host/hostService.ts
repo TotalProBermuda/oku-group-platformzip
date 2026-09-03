@@ -193,16 +193,19 @@ export async function createStreetsideBooking(data: {
   // Open the deterministic AttributionSession for this streetside walk-in.
   // Without this, the host who took the walk-in has no path to verification
   // and cannot earn a commission no matter how the matcher resolves later.
-  // Source = HOST_WALKIN, status starts at SEATED because the host is
-  // putting them at a table immediately. hostUserId is stamped so commission
-  // allocations resolve back to the streetside host. Best-effort: a failure
+  // The Streetside Host Form creates a pending floor request without asking
+  // for a table, so its attribution session must remain CAPTURED until the
+  // floor team explicitly seats the guest. Starting this at SEATED exposes
+  // INVU binding before an operational table/check exists. hostUserId is
+  // stamped so commission allocations resolve back to the streetside host.
+  // Best-effort: a failure
   // here must NOT block the booking — the diner already has a confirmation
   // code, and an admin can heal manually via the backfill script.
   try {
     await createAttributionSession({
       kind: "RESERVATION",
       source: "HOST_WALKIN",
-      initialStatus: "SEATED",
+      initialStatus: "CAPTURED",
       venueId: data.venueId,
       reservationId: reservation.id,
       hostUserId: data.sourceUserId,
