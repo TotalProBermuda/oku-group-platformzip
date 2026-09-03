@@ -430,6 +430,11 @@ async function main() {
     for (const userId of createdAttendees.slice(0, 15)) {
       const existingOrders = await prisma.order.count({ where: { userId } });
       if (existingOrders > 0) continue;
+      const attendee = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+      if (!attendee?.email) continue;
 
       const sessionsToBook = sessions.slice(0, rand([1, 1, 2, 2, 3]));
 
@@ -490,6 +495,9 @@ async function main() {
               sessionId:    session.id,
               ticketTypeId: ticketType?.id ?? null,
               code:         `TKT-${order.id.slice(-6).toUpperCase()}-${i + 1}`,
+              attendeeName:  attendee.name,
+              attendeeEmail: attendee.email,
+              attendeeEmailNormalized: attendee.email.trim().toLowerCase(),
               ticketStatus: orderStatus === "CANCELLED" ? "CANCELLED" : "ISSUED",
             },
           });

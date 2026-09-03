@@ -392,5 +392,10 @@
   "calendarGetTickets": "Get Tickets",
   "calendarViewEvent": "View Event",
   "calendarPrev": "Previous month",
-  "calendarNext": "Next month"
+  "calendarNext": "Next month",
+  "myReservations": "My Reservations",
+  "myTickets": "My Tickets",
+  "noReservations": "No reservations in this section.",
+  "bookingReference": "Booking reference",
+  "guests": "guests"
 }

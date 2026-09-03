@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
+import type { Prisma } from "@prisma/client";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://okuhospitality.com";
 
@@ -31,8 +32,9 @@ function buildUrl(code: string, pathHint?: string): string {
  * QR code data URL generation is async-ready; for now stores null — 
  * a BullMQ job can fill it in (Phase 3+ architecture).
  */
-export async function generateReferralLink(input: GenerateLinkInput) {
-  const actor = await prisma.referralActor.findUnique({
+export async function generateReferralLink(input: GenerateLinkInput, tx?: Prisma.TransactionClient) {
+  const client = tx ?? prisma;
+  const actor = await client.referralActor.findUnique({
     where: { id: input.referralActorId },
   });
   if (!actor) throw new Error("ReferralActor not found");
@@ -40,7 +42,7 @@ export async function generateReferralLink(input: GenerateLinkInput) {
   const code = buildCode();
   const url = buildUrl(code, input.pathHint);
 
-  return prisma.referralLink.create({
+  return client.referralLink.create({
     data: {
       referralActorId: input.referralActorId,
       referralAssignmentId: input.referralAssignmentId ?? null,

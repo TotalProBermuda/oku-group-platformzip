@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronRight, ExternalLink } from "lucide-react";
-import { useTranslation } from "@/components/i18n/LocaleProvider";
+import { useLocale, useTranslation } from "@/components/i18n/LocaleProvider";
 import { useEffect, useState } from "react";
-import type { MouseEvent } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
@@ -40,10 +40,15 @@ const EXTERNAL_PERSONAS = [
 
 export function LoginContent({ demoEnabled = false, googleEnabled = false }: { demoEnabled?: boolean; googleEnabled?: boolean }) {
   const t = useTranslation();
+  const locale = useLocale();
   const [isInIframe, setIsInIframe] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const authError = searchParams.get("error");
+  const [passwordlessEmail, setPasswordlessEmail] = useState("");
+  const [passwordlessSent, setPasswordlessSent] = useState(false);
+  const [passwordlessError, setPasswordlessError] = useState("");
+  const [passwordlessLoading, setPasswordlessLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -68,6 +73,25 @@ export function LoginContent({ demoEnabled = false, googleEnabled = false }: { d
       window.location.href = url;
     }
   };
+
+  async function requestMagicLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordlessLoading(true);
+    setPasswordlessError("");
+    try {
+      const response = await fetch("/api/auth/passwordless/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: passwordlessEmail, callbackUrl, locale, _company: "" }),
+      });
+      if (!response.ok && response.status !== 429) throw new Error("request failed");
+      setPasswordlessSent(true);
+    } catch {
+      setPasswordlessError(t("auth", "magicLinkRequestError"));
+    } finally {
+      setPasswordlessLoading(false);
+    }
+  }
 
   const PersonaCard = ({ p }: { p: Persona }) => {
     const href = buildLoginUrl(p.email, p.destination);
@@ -127,7 +151,7 @@ export function LoginContent({ demoEnabled = false, googleEnabled = false }: { d
   if (!demoEnabled) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#1a1614", justifyContent: "center", alignItems: "center", padding: "24px" }}>
-        <div style={{ maxWidth: 480, textAlign: "center" }}>
+        <div style={{ width: "100%", maxWidth: 480, textAlign: "center" }}>
           <h1 style={{
             fontFamily: "var(--font-heading)",
             fontSize: "clamp(28px, 7vw, 36px)",
@@ -135,15 +159,49 @@ export function LoginContent({ demoEnabled = false, googleEnabled = false }: { d
             letterSpacing: "-0.02em",
             margin: "0 0 16px 0", lineHeight: 1.1,
           }}>
-            Sign in
+            {t("auth", "signIn")}
           </h1>
           {authError && (
             <p role="alert" style={{ fontSize: 14, color: "#ff8a9f", lineHeight: 1.6, margin: "0 0 20px 0" }}>
-              This Google account is not approved for OKÜ access. Contact your administrator if you believe this is an error.
+              {t("auth", "accessDenied")}
             </p>
           )}
+          <form onSubmit={requestMagicLink} style={{ textAlign: "left" }}>
+            <label htmlFor="passwordless-email" style={{ display: "block", color: "#d1d5db", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+              {t("auth", "email")}
+            </label>
+            <input
+              id="passwordless-email"
+              type="email"
+              autoComplete="email"
+              required
+              value={passwordlessEmail}
+              onChange={(event) => {
+                setPasswordlessEmail(event.target.value);
+                setPasswordlessSent(false);
+              }}
+              placeholder={t("auth", "magicLinkEmailPlaceholder")}
+              style={{ width: "100%", boxSizing: "border-box", padding: "13px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "#fff", color: "#1a1614", fontSize: 16 }}
+            />
+            <button
+              type="submit"
+              disabled={passwordlessLoading}
+              style={{ width: "100%", marginTop: 12, padding: "13px 18px", borderRadius: 10, border: 0, background: "#c41e3a", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: passwordlessLoading ? .7 : 1 }}
+            >
+              {passwordlessLoading ? t("auth", "magicLinkSending") : t("auth", "magicLinkSend")}
+            </button>
+            {passwordlessSent ? (
+              <p role="status" style={{ color: "#9ae6b4", fontSize: 14, lineHeight: 1.6 }}>
+                {t("auth", "magicLinkGenericSuccess")}
+              </p>
+            ) : null}
+            {passwordlessError ? (
+              <p role="alert" style={{ color: "#ff8a9f", fontSize: 14 }}>{passwordlessError}</p>
+            ) : null}
+          </form>
           {googleEnabled ? (
             <>
+              <div style={{ margin: "22px 0", color: "#6b7280", fontSize: 13 }}>{t("auth", "or")}</div>
               <button
                 type="button"
                 onClick={() => void signIn("google", { callbackUrl })}
@@ -153,22 +211,13 @@ export function LoginContent({ demoEnabled = false, googleEnabled = false }: { d
                   color: "#1a1614", fontSize: 15, fontWeight: 700, cursor: "pointer",
                 }}
               >
-                Continue with Google
+                {t("auth", "continueWith")} Google
               </button>
               <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6, margin: "18px 0 0" }}>
-                Use your approved Google Workspace account. No separate OKÜ password is required.
+                {t("auth", "googleApprovedAccount")}
               </p>
             </>
-          ) : (
-            <>
-              <p style={{ fontSize: 15, color: "#9ca3af", lineHeight: 1.6, margin: "0 0 24px 0" }}>
-                Account sign-in is not yet configured in this environment.
-              </p>
-              <p style={{ fontSize: 13, color: "#5a5a5a", lineHeight: 1.6, margin: 0 }}>
-                If you are an OKÜ team member or partner, please contact your administrator for access.
-              </p>
-            </>
-          )}
+          ) : null}
         </div>
       </div>
     );

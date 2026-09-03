@@ -65,7 +65,7 @@ export const ROLE_ROUTES: { prefix: string; allowed: string[] }[] = [
   { prefix: "/host/streetside",    allowed: ["SUPERADMIN", "STREETSIDE_HOST"] },
   { prefix: "/host/dashboard",     allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"] },
   { prefix: "/host",               allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"] },
-  { prefix: "/account",            allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "INFLUENCER", "PARTNER", "INVESTOR", "STAFF_OKU", "STAFF_CATCH", "ATTENDEE"] },
+  { prefix: "/account",            allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "INFLUENCER", "PARTNER", "INVESTOR", "REFERRER", "STAFF_OKU", "STAFF_CATCH", "ATTENDEE"] },
   { prefix: "/my",                 allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "INFLUENCER", "PARTNER", "INVESTOR", "STAFF_OKU", "STAFF_CATCH", "ATTENDEE"] },
 ];
 

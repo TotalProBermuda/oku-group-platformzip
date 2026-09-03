@@ -197,6 +197,7 @@ async function backcastReservation(params: {
           Math.floor(Math.random() * 5)
         ];
 
+  const contactEmail = `demo+${randCode().toLowerCase()}@goldhouse.bm`;
   const reservation = await prisma.reservation.create({
     data: {
       venueId,
@@ -205,7 +206,8 @@ async function backcastReservation(params: {
       reservationDate,
       partySize,
       contactName,
-      contactEmail: `demo+${randCode().toLowerCase()}@goldhouse.bm`,
+      contactEmail,
+      contactEmailNormalized: contactEmail,
       confirmationCode: randCode(),
       assignedTableLabel: matchKind === "STRONG" ? tableLabel : null,
       assignedRestaurantHostId: attribution.hostId ?? null,

@@ -145,6 +145,8 @@ export async function createStreetsideBooking(data: {
         notes: notesWithMeta || null,
         contactName: data.guestName,
         contactEmail: data.guestEmail,
+        contactEmailNormalized: data.guestEmail.trim().toLowerCase(),
+        customerLocale: "en",
         contactWhatsapp: data.guestWhatsapp ?? null,
         confirmationCode,
         sourceContext: data.sourceUserId,

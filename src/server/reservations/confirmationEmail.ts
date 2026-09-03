@@ -3,6 +3,7 @@ import { getResendClient, isResendConfigured } from "@/server/invitation/resend"
 export interface ReservationConfirmationInput {
   contactName: string;
   contactEmail: string;
+  locale?: string;
   confirmationCode: string;
   reservationDate: Date;
   partySize: number;
@@ -27,6 +28,25 @@ export interface ReservationConfirmationResult {
 export type ReservationEmailKind = "REQUEST_RECEIVED" | "CONFIRMATION" | "RESERVATION_UPDATED";
 
 const PANAMA_TZ = "America/Panama";
+
+function accountUrl(): string {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_BASE_URL ||
+    process.env.NEXTAUTH_URL ||
+    "https://www.okuhospitalitygroup.com";
+  return `${base.replace(/\/$/, "")}/login?callbackUrl=%2Faccount`;
+}
+
+function accountLabel(locale?: string): string {
+  if (locale?.toLowerCase().startsWith("es")) return "Ver tu reserva";
+  if (locale?.toLowerCase().startsWith("pt")) return "Ver sua reserva";
+  return "View Your Booking";
+}
+
+function accountButton(locale?: string): string {
+  return `<p style="margin:24px 0"><a href="${accountUrl()}" style="display:inline-block;background:#c41e3a;color:#fff;text-decoration:none;padding:13px 22px;border-radius:6px;font-weight:700">${accountLabel(locale)}</a></p>`;
+}
 
 function formatReservationDateTime(date: Date): { dateLine: string; timeLine: string } {
   const dateLine = new Intl.DateTimeFormat("en-US", {
@@ -112,6 +132,7 @@ function buildHtml(props: ReservationConfirmationInput): string {
     <table style="width:100%;border-collapse:collapse;margin:0 0 8px">${detailsHtml}</table>
 
     ${notesBlock}
+    ${accountButton(props.locale)}
 
     <p style="font-size:13px;color:#6b5e54;line-height:1.55;margin:32px 0 0">
       Need to change or cancel your reservation? Simply reply to this email and our team will help — please include your confirmation code.
@@ -151,6 +172,7 @@ function buildText(props: ReservationConfirmationInput): string {
   lines.push(
     "",
     "Need to change or cancel? Just reply to this email with your confirmation code.",
+    `${accountLabel(props.locale)}: ${accountUrl()}`,
     "",
     "— OKÜ Hospitality Group · Casco Viejo, Panama City"
   );
@@ -175,6 +197,7 @@ function buildUpdatedHtml(props: ReservationConfirmationInput): string {
       <div style="font-size:14px;color:#4a423b;margin-top:8px">Dining section: <strong>${seating}</strong></div>
       <div style="font-size:13px;color:#6b5e54;margin-top:8px">${props.partySize} ${props.partySize === 1 ? "guest" : "guests"} · Confirmation ${escapeHtml(props.confirmationCode)}</div>
     </div>
+    ${accountButton(props.locale)}
     <p style="font-size:13px;color:#6b5e54;line-height:1.55">Questions? Reply to this email and include your confirmation code.</p>
   </div>
 </body></html>`;
@@ -193,6 +216,7 @@ export function buildReservationUpdatedText(props: ReservationConfirmationInput)
     `Dining section: ${props.zoneName || "Confirmed dining section"}`,
     `Party size: ${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}`,
     `Confirmation code: ${props.confirmationCode}`,
+    `${accountLabel(props.locale)}: ${accountUrl()}`,
     "",
     "Questions? Reply to this email and include your confirmation code.",
   ].join("\n");
@@ -218,6 +242,7 @@ function buildRequestHtml(props: ReservationConfirmationInput): string {
       <div style="font-size:22px;font-weight:700;letter-spacing:0.1em;font-family:'SF Mono','Menlo',monospace">${escapeHtml(props.confirmationCode)}</div>
       <div style="font-size:13px;color:#6b5e54;margin-top:12px">${dateLine} · ${timeLine} · ${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}</div>
     </div>
+    ${accountButton(props.locale)}
     <p style="font-size:13px;color:#6b5e54;line-height:1.55;margin:0">Plans can change while the request is reviewed, especially for large groups or joined tables. Please rely on the confirmation email for the final time and table arrangements.</p>
   </div>
 </body></html>`;
@@ -237,6 +262,7 @@ export function buildReservationRequestText(props: ReservationConfirmationInput)
     `Party size: ${props.partySize} ${props.partySize === 1 ? "guest" : "guests"}`,
     "",
     "For large groups or joined tables, the final table assignment may change. Please rely on the confirmation email for final arrangements.",
+    `${accountLabel(props.locale)}: ${accountUrl()}`,
   ].join("\n");
 }
 

@@ -84,7 +84,7 @@ const worker = new Worker(
         const order = await prisma.order.findUnique({
           where: { id: orderId },
           include: {
-            user: { select: { name: true, email: true } },
+            user: { select: { name: true, email: true, profile: { select: { language: true } } } },
             series: { select: { title: true, startsAt: true } },
             tickets: { select: { code: true } },
           },
@@ -103,6 +103,8 @@ const worker = new Worker(
         }
 
         const ticketCodes = order.tickets.map((t) => t.code).join(", ");
+        const language = order.user.profile?.language?.toLowerCase().split("-")[0];
+        const bookingLabel = language === "es" ? "Ver tu reserva" : language === "pt" ? "Ver sua reserva" : "View Your Booking";
         const html = `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
             <div style="background:#1a1614;padding:24px;text-align:center">
@@ -122,6 +124,9 @@ const worker = new Worker(
                 <p style="margin:16px 0 8px;color:#7c7168;font-size:12px;text-transform:uppercase;letter-spacing:0.1em">Total Paid</p>
                 <p style="margin:0;color:#1a1614;font-weight:600">$${(order.totalCents / 100).toFixed(2)}</p>
               </div>
+              <p style="margin:24px 0">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || process.env.NEXTAUTH_URL || "https://www.okuhospitalitygroup.com"}/login?callbackUrl=%2Faccount" style="display:inline-block;background:#c41e3a;color:#fff;text-decoration:none;padding:13px 22px;border-radius:6px;font-weight:700">${bookingLabel}</a>
+              </p>
               <p style="color:#9ca3af;font-size:12px">Present your ticket code at the door. See you soon.</p>
             </div>
           </div>`;

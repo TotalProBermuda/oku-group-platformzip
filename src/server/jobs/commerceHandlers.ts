@@ -23,7 +23,7 @@ export async function handleSendOrderEmail(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      user: { select: { name: true, email: true } },
+      user: { select: { name: true, email: true, profile: { select: { language: true } } } },
       series: { select: { title: true, startsAt: true, venue: true } },
       tickets: { select: { code: true } },
       lineItems: { select: { nameSnapshot: true, qty: true, unitPriceCents: true, totalCents: true } },
@@ -44,6 +44,8 @@ export async function handleSendOrderEmail(orderId: string) {
   }
 
   const ticketCodes = order.tickets.map((t) => t.code);
+  const locale = order.user.profile?.language?.toLowerCase().split("-")[0];
+  const bookingLabel = locale === "es" ? "Ver tu reserva" : locale === "pt" ? "Ver sua reserva" : "View Your Booking";
   const totalFormatted = `$${(order.totalCents / 100).toFixed(2)}`;
   const eventDate = order.series?.startsAt
     ? new Date(order.series.startsAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
@@ -57,7 +59,7 @@ export async function handleSendOrderEmail(orderId: string) {
           <div style="background:#1a1614;border-radius:6px;padding:8px 12px">
             <span style="font-family:monospace;font-size:13px;color:white;font-weight:600;letter-spacing:0.06em">${code}</span>
           </div>
-          <a href="${BASE_URL}/my/tickets" style="font-size:12px;color:#c41e3a;text-decoration:none">View ticket →</a>
+          <a href="${BASE_URL}/login?callbackUrl=%2Faccount" style="font-size:12px;color:#c41e3a;text-decoration:none">${bookingLabel} →</a>
         </div>`
         )
         .join("")
@@ -98,7 +100,7 @@ export async function handleSendOrderEmail(orderId: string) {
 
         <div style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e0d8">
           <p style="margin:0 0 8px;font-size:12px;color:#9ca3af">Order reference: <span style="font-family:monospace;color:#4b4540">${order.id.slice(-8).toUpperCase()}</span></p>
-          <a href="${BASE_URL}/my/tickets" style="display:inline-block;margin-top:12px;background:#c41e3a;color:white;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.02em">View My Tickets</a>
+          <a href="${BASE_URL}/login?callbackUrl=%2Faccount" style="display:inline-block;margin-top:12px;background:#c41e3a;color:white;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.02em">${bookingLabel}</a>
         </div>
       </div>
       ${emailFooter()}

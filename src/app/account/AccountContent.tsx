@@ -29,6 +29,34 @@ interface OrderData {
   payment: { status: string } | null;
 }
 
+interface ReservationBooking {
+  id: string;
+  confirmationCode: string;
+  reservationDate: string;
+  partySize: number;
+  status: string;
+  conceptRequested: string | null;
+  venue: { name: string; city: string | null };
+}
+
+interface AccountTicket {
+  id: string;
+  code: string;
+  ticketStatus: string;
+  checkedInAt: string | null;
+  session: {
+    startsAt: string;
+    title: string | null;
+    series: { title: string; slug: string; venue: string | null };
+  };
+  ticketType: { name: string } | null;
+}
+
+interface BookingData {
+  reservations: ReservationBooking[];
+  tickets: AccountTicket[];
+}
+
 const statusBadgeClass: Record<string, string> = {
   PAID: "badge-success",
   PENDING: "badge-warning",
@@ -57,6 +85,7 @@ export function AccountContent() {
   const locale = useLocale();
   const [user, setUser] = useState<UserData | null>(null);
   const [orders, setOrders] = useState<OrderData[]>([]);
+  const [bookings, setBookings] = useState<BookingData>({ reservations: [], tickets: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recentScans, setRecentScans] = useState<string[]>([]);
@@ -73,11 +102,13 @@ export function AccountContent() {
     Promise.all([
       fetch("/api/v1/me").then((r) => r.json()),
       fetch("/api/v1/me/orders").then((r) => r.json()),
+      fetch("/api/v1/me/bookings").then((r) => r.json()),
     ])
-      .then(([meJson, ordersJson]) => {
+      .then(([meJson, ordersJson, bookingsJson]) => {
         if (meJson.ok) setUser(meJson.data);
         else setError(t("common", "failedToLoadProfile"));
         if (ordersJson.ok) setOrders(ordersJson.data || []);
+        if (bookingsJson.ok) setBookings(bookingsJson.data);
         setLoading(false);
 
         // Open SSE stream once we know the userId
@@ -131,6 +162,58 @@ export function AccountContent() {
   const initials = user?.user.name
     ? user.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : user?.user.email?.charAt(0).toUpperCase() || "?";
+  const now = Date.now();
+  const upcomingReservations = bookings.reservations.filter((item) => new Date(item.reservationDate).getTime() >= now);
+  const pastReservations = bookings.reservations.filter((item) => new Date(item.reservationDate).getTime() < now);
+  const upcomingTickets = bookings.tickets.filter((item) => new Date(item.session.startsAt).getTime() >= now);
+  const pastTickets = bookings.tickets.filter((item) => new Date(item.session.startsAt).getTime() < now);
+
+  const renderReservations = (items: ReservationBooking[]) => items.length === 0 ? (
+    <p className="text-secondary">{t("common", "noReservations")}</p>
+  ) : (
+    <div style={{ display: "grid", gap: 12 }}>
+      {items.map((reservation) => (
+        <article key={reservation.id} className="card" style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <strong>{reservation.venue.name}</strong>
+              <div className="text-sm text-secondary" style={{ marginTop: 5 }}>
+                {dateFmt.format(new Date(reservation.reservationDate))} · {reservation.partySize} {t("common", "guests")}
+              </div>
+            </div>
+            <span className="badge badge-neutral">{reservation.status}</span>
+          </div>
+          <div className="text-xs text-muted" style={{ marginTop: 12 }}>
+            {t("common", "bookingReference")}: {reservation.confirmationCode}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+
+  const renderTickets = (items: AccountTicket[]) => items.length === 0 ? (
+    <p className="text-secondary">{t("common", "noTicketsYet")}</p>
+  ) : (
+    <div style={{ display: "grid", gap: 12 }}>
+      {items.map((ticket) => (
+        <article key={ticket.id} className="card" style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <Link href={`/${locale}/experiences/${ticket.session.series.slug}`} style={{ fontWeight: 700, color: "var(--color-text)" }}>
+                {ticket.session.series.title}
+              </Link>
+              <div className="text-sm text-secondary" style={{ marginTop: 5 }}>
+                {dateFmt.format(new Date(ticket.session.startsAt))}
+                {ticket.ticketType?.name ? ` · ${ticket.ticketType.name}` : ""}
+              </div>
+            </div>
+            <span className="badge badge-neutral">{ticket.ticketStatus}</span>
+          </div>
+          <div className="font-mono text-xs" style={{ marginTop: 12 }}>{ticket.code}</div>
+        </article>
+      ))}
+    </div>
+  );
 
   return (
     <div>
@@ -163,6 +246,18 @@ export function AccountContent() {
       </div>
 
       <div className="page-container">
+        <h2 className="section-title">{t("common", "myReservations")}</h2>
+        <h3 style={{ marginTop: 20 }}>{t("common", "upcoming")}</h3>
+        {renderReservations(upcomingReservations)}
+        <h3 style={{ marginTop: 28 }}>{t("common", "past")}</h3>
+        {renderReservations(pastReservations)}
+
+        <h2 className="section-title" style={{ marginTop: 44 }}>{t("common", "myTickets")}</h2>
+        <h3 style={{ marginTop: 20 }}>{t("common", "upcoming")}</h3>
+        {renderTickets(upcomingTickets)}
+        <h3 style={{ marginTop: 28 }}>{t("common", "past")}</h3>
+        {renderTickets(pastTickets)}
+
         <h2 className="section-title">{t("common", "orderHistory")}</h2>
         {orders.length === 0 ? (
           <div className="empty-state" style={{ padding: "48px 24px" }}>

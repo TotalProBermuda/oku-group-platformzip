@@ -134,6 +134,9 @@ export async function POST(req: Request) {
             userId,
             sessionId,
             code: genCode(),
+            attendeeName: auth.session.user.name ?? null,
+            attendeeEmail: auth.session.user.email?.trim().toLowerCase() ?? null,
+            attendeeEmailNormalized: auth.session.user.email?.trim().toLowerCase() ?? null,
           });
         }
       }

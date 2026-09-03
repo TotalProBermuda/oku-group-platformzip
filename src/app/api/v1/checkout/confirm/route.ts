@@ -178,6 +178,9 @@ export async function POST(req: Request) {
         userId: order.userId,
         sessionId: order.sessionId,
         code,
+        attendeeName: order.user.name,
+        attendeeEmail: order.user.email.trim().toLowerCase(),
+        attendeeEmailNormalized: order.user.email.trim().toLowerCase(),
       })),
     });
   });

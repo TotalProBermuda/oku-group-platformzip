@@ -424,6 +424,11 @@ enum InfluencerInviteStatus {
   REVOKED
 }
 
+enum PasswordlessTokenPurpose {
+  SIGN_IN
+  REFERRER_INVITE
+}
+
 enum HostPaymentMethod {
   CASH
   TRANSFER
@@ -634,10 +639,30 @@ model User {
   delegateSeatsAccepted PartnerDelegateSeat[] @relation("DelegateSeatAcceptor")
   eventAccessGrants     UserEventAccess[]
 
-  beneficiaryProfile          BeneficiaryProfile?
-  beneficiaryOkuApprovals     BeneficiaryProfile[]  @relation("BeneficiaryOkuApprover")
-  beneficiaryBankConfirms     BeneficiaryProfile[]  @relation("BeneficiaryBankConfirmer")
-  beneficiaryDocumentUploads  BeneficiaryDocument[] @relation("BeneficiaryDocumentUploader")
+  beneficiaryProfile         BeneficiaryProfile?
+  beneficiaryOkuApprovals    BeneficiaryProfile[]  @relation("BeneficiaryOkuApprover")
+  beneficiaryBankConfirms    BeneficiaryProfile[]  @relation("BeneficiaryBankConfirmer")
+  beneficiaryDocumentUploads BeneficiaryDocument[] @relation("BeneficiaryDocumentUploader")
+  passwordlessTokens         PasswordlessToken[]
+}
+
+model PasswordlessToken {
+  id          String                   @id @default(cuid())
+  tokenHash   String                   @unique
+  purpose     PasswordlessTokenPurpose @default(SIGN_IN)
+  email       String
+  userId      String
+  callbackUrl String?
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime                 @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose, createdAt])
+  @@index([userId, purpose, createdAt])
+  @@index([expiresAt])
 }
 
 model Role {
@@ -967,7 +992,7 @@ model BeneficiaryProfile {
   /// Beneficiary preference: when true, suppress informational status-change
   /// emails (READY_FOR_REVIEW, OKU_APPROVED, BANK_READY). Action-required
   /// transitions (ON_HOLD, REJECTED) IGNORE this flag and always send.
-  statusEmailOptOut      Boolean @default(false)
+  statusEmailOptOut Boolean @default(false)
 
   // ── Audit trail (lightweight; full history goes to AuditLog) ──
   okuApprovedAt   DateTime?
@@ -1160,11 +1185,11 @@ model Series {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  influencer      InfluencerProfile? @relation("SeriesHost", fields: [influencerId], references: [id])
-  partner         PartnerProfile?    @relation(fields: [partnerId], references: [id])
-  commercialOwner InfluencerProfile? @relation("SeriesCommercialOwner", fields: [commercialOwnerInfluencerId], references: [id])
-  operationalVenue Venue? @relation("SeriesOperationalVenue", fields: [venueId], references: [id], onDelete: SetNull)
-  eventSpace       RestaurantSpace? @relation("SeriesEventSpace", fields: [spaceId], references: [id], onDelete: SetNull)
+  influencer       InfluencerProfile? @relation("SeriesHost", fields: [influencerId], references: [id])
+  partner          PartnerProfile?    @relation(fields: [partnerId], references: [id])
+  commercialOwner  InfluencerProfile? @relation("SeriesCommercialOwner", fields: [commercialOwnerInfluencerId], references: [id])
+  operationalVenue Venue?             @relation("SeriesOperationalVenue", fields: [venueId], references: [id], onDelete: SetNull)
+  eventSpace       RestaurantSpace?   @relation("SeriesEventSpace", fields: [spaceId], references: [id], onDelete: SetNull)
 
   sessions               Session[]
   ticketTypes            TicketType[]
@@ -1182,14 +1207,14 @@ model Series {
   profileAssignments     SeriesProfileAssignment[]
   reservationBlocks      ReservationBlock[]
   occupancies            EventSpaceOccupancy[]
-
-  @@index([venueId])
-  @@index([spaceId])
   influencerInvites      InfluencerInvite[]
   hostInfluencerContacts HostInfluencerContact[]
   eventMenuLinks         EventMenuLink[]
   delegateSeats          PartnerDelegateSeat[]
   eventAccessGrants      UserEventAccess[]
+
+  @@index([venueId])
+  @@index([spaceId])
 }
 
 // Join table for assigning influencers to experiences
@@ -1427,19 +1452,20 @@ model OrderNote {
 }
 
 model Ticket {
-  id                String       @id @default(cuid())
-  orderId           String
-  userId            String
-  sessionId         String
-  ticketTypeId      String?
-  code              String       @unique
-  attendeeName      String?
-  attendeeEmail     String?
-  isPubliclyVisible Boolean      @default(false)
-  ticketStatus      TicketStatus @default(ISSUED)
-  checkedInAt       DateTime?
-  checkedInById     String?
-  createdAt         DateTime     @default(now())
+  id                      String       @id @default(cuid())
+  orderId                 String
+  userId                  String
+  sessionId               String
+  ticketTypeId            String?
+  code                    String       @unique
+  attendeeName            String?
+  attendeeEmail           String?
+  attendeeEmailNormalized String?
+  isPubliclyVisible       Boolean      @default(false)
+  ticketStatus            TicketStatus @default(ISSUED)
+  checkedInAt             DateTime?
+  checkedInById           String?
+  createdAt               DateTime     @default(now())
 
   order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1455,6 +1481,7 @@ model Ticket {
 
   @@index([userId])
   @@index([sessionId])
+  @@index([attendeeEmailNormalized, createdAt])
 }
 
 model ExperienceCheckin {
@@ -1596,23 +1623,23 @@ model AttributionEvent {
 }
 
 model LedgerEntry {
-  id            String          @id @default(cuid())
-  influencerId  String
-  orderId       String?
-  type          LedgerEntryType
-  amountCents   Int
-  currency      String          @default("USD")
-  note          String?
-  payoutBatchId String?
+  id                     String          @id @default(cuid())
+  influencerId           String
+  orderId                String?
+  type                   LedgerEntryType
+  amountCents            Int
+  currency               String          @default("USD")
+  note                   String?
+  payoutBatchId          String?
   /// Idempotency anchor: when set, a duplicate bridge call for the same
   /// allocation will find this row and skip — exactly one LedgerEntry per
   /// CommissionAllocation is enforced by the unique index below.
   commissionAllocationId String?
-  createdAt     DateTime        @default(now())
+  createdAt              DateTime        @default(now())
 
-  influencer           InfluencerProfile    @relation(fields: [influencerId], references: [id], onDelete: Cascade)
-  order                Order?               @relation(fields: [orderId], references: [id])
-  payoutBatch          PayoutBatch?         @relation(fields: [payoutBatchId], references: [id])
+  influencer           InfluencerProfile     @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  order                Order?                @relation(fields: [orderId], references: [id])
+  payoutBatch          PayoutBatch?          @relation(fields: [payoutBatchId], references: [id])
   commissionAllocation CommissionAllocation? @relation("LedgerEntryCommissionAllocation", fields: [commissionAllocationId], references: [id], onDelete: SetNull)
 
   @@unique([commissionAllocationId])
@@ -1803,7 +1830,7 @@ model AuditLog {
 // Rows older than 90 days are pruned best-effort on each persist call.
 model LaunchReadinessSnapshot {
   id        String   @id @default(cuid())
-  overall   String   // "GO" | "NO_GO"
+  overall   String // "GO" | "NO_GO"
   // Compact per-gate state: [{ name, status, severity }]. Stored as Json
   // to keep the schema stable as gates evolve in getLaunchReadiness().
   gates     Json
@@ -2534,7 +2561,7 @@ model Venue {
   invuCredential         InvuIntegrationCredential?
   branchMappings         IntegrationBranchMapping[]
   attributionSessions    AttributionSession[]
-  series                 Series[]                 @relation("SeriesOperationalVenue")
+  series                 Series[]                   @relation("SeriesOperationalVenue")
   eventOccupancies       EventSpaceOccupancy[]
 
   createdAt DateTime @default(now())
@@ -2545,27 +2572,27 @@ model Venue {
 // Capacity is enforced using overlapping-window holds (CapacityHold) so concurrent reservations
 // that share time slots are counted correctly — not just exact-match windows.
 model RestaurantSpace {
-  id                 String   @id @default(cuid())
-  venueId            String
-  name               String
-  conceptKey         String
-  capacity           Int      // maximum simultaneous covers
-  reservable         Boolean  @default(true)
-  requiresApproval   Boolean  @default(false)
-  weatherSensitive   Boolean  @default(false)
-  sortOrder          Int      @default(0)
-  isActive           Boolean  @default(true)
+  id               String  @id @default(cuid())
+  venueId          String
+  name             String
+  conceptKey       String
+  capacity         Int // maximum simultaneous covers
+  reservable       Boolean @default(true)
+  requiresApproval Boolean @default(false)
+  weatherSensitive Boolean @default(false)
+  sortOrder        Int     @default(0)
+  isActive         Boolean @default(true)
 
   // Payments P215 — when non-null, a reservation that requests this space
   // MUST collect this deposit before the booking is confirmed. Null (default)
   // means no deposit is required and the existing flow is unchanged.
   depositRequiredCents Int?
 
-  venue            Venue            @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  capacityHolds    CapacityHold[]
-  requestedByReservations Reservation[] @relation("ReservationRequestedSpace")
-  assignedToReservations  Reservation[] @relation("ReservationAssignedSpace")
-  series                  Series[]      @relation("SeriesEventSpace")
+  venue                   Venue                 @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  capacityHolds           CapacityHold[]
+  requestedByReservations Reservation[]         @relation("ReservationRequestedSpace")
+  assignedToReservations  Reservation[]         @relation("ReservationAssignedSpace")
+  series                  Series[]              @relation("SeriesEventSpace")
   eventOccupancies        EventSpaceOccupancy[]
 
   createdAt DateTime @default(now())
@@ -2580,19 +2607,19 @@ model RestaurantSpace {
 // Overlap-aware: the capacity check counts all ACTIVE holds whose window
 // overlaps the new reservation's window (NOT just exact-match windows).
 model CapacityHold {
-  id            String              @id @default(cuid())
+  id            String             @id @default(cuid())
   spaceId       String
   reservationId String
   startAt       DateTime
   endAt         DateTime
   partySize     Int
-  status        CapacityHoldStatus  @default(ACTIVE)
-  expiresAt     DateTime?           // set to endAt+buffer; EXPIRED sweep uses this
+  status        CapacityHoldStatus @default(ACTIVE)
+  expiresAt     DateTime? // set to endAt+buffer; EXPIRED sweep uses this
 
-  space       RestaurantSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  reservation Reservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  ledgerEvents         LedgerEvent[]          @relation("LedgerEventCapacityHold")
-  ledgerEventOutboxRows LedgerEventOutbox[]   @relation("LedgerEventOutboxCapacityHold")
+  space                 RestaurantSpace     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  reservation           Reservation         @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ledgerEvents          LedgerEvent[]       @relation("LedgerEventCapacityHold")
+  ledgerEventOutboxRows LedgerEventOutbox[] @relation("LedgerEventOutboxCapacityHold")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2607,36 +2634,36 @@ model CapacityHold {
 // may include setup/reset time, and must retain a conflict/audit trail rather
 // than pretending to be a very large table reservation.
 model EventSpaceOccupancy {
-  id        String          @id @default(cuid())
+  id        String  @id @default(cuid())
   seriesId  String
   sessionId String?
   venueId   String
   spaceId   String?
 
-  scope     EventOccupancyScope
-  policy    EventOccupancyPolicy @default(EXCLUSIVE)
-  status    EventOccupancyStatus @default(DRAFT)
+  scope  EventOccupancyScope
+  policy EventOccupancyPolicy @default(EXCLUSIVE)
+  status EventOccupancyStatus @default(DRAFT)
 
   eventStartsAt DateTime
   eventEndsAt   DateTime
   blockStartsAt DateTime
   blockEndsAt   DateTime
-  setupMinutes  Int @default(0)
-  resetMinutes  Int @default(0)
+  setupMinutes  Int      @default(0)
+  resetMinutes  Int      @default(0)
 
   // Optional, editor-owned guest copy. Server-side validation keeps these
   // concise; presentation is responsive and never relies on pixel limits.
-  guestMessageEn String? @db.VarChar(160)
-  guestMessageEs String? @db.VarChar(160)
-  guestMessagePt String? @db.VarChar(160)
+  guestMessageEn  String?  @db.VarChar(160)
+  guestMessageEs  String?  @db.VarChar(160)
+  guestMessagePt  String?  @db.VarChar(160)
   createdByUserId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
-  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  space RestaurantSpace? @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  series               Series                     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  session              Session?                   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  venue                Venue                      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  space                RestaurantSpace?           @relation(fields: [spaceId], references: [id], onDelete: SetNull)
   reservationConflicts EventReservationConflict[]
 
   @@index([venueId, status, blockStartsAt, blockEndsAt])
@@ -2646,17 +2673,17 @@ model EventSpaceOccupancy {
 }
 
 model EventReservationConflict {
-  id          String   @id @default(cuid())
-  occupancyId String
+  id            String                         @id @default(cuid())
+  occupancyId   String
   reservationId String
-  status      EventReservationConflictStatus @default(OPEN)
+  status        EventReservationConflictStatus @default(OPEN)
   notedByUserId String?
-  note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  note          String?
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
 
-  occupancy EventSpaceOccupancy @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
-  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  occupancy   EventSpaceOccupancy @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
+  reservation Reservation         @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
   @@unique([occupancyId, reservationId])
   @@index([reservationId, status])
@@ -2815,12 +2842,14 @@ model Reservation {
   celebrationDessert Boolean @default(false)
   celebrationMessage String?
 
-  contactName      String
-  contactEmail     String
-  contactPhone     String?
-  contactWhatsapp  String?
-  confirmationCode String  @unique
-  sourceContext    String?
+  contactName            String
+  contactEmail           String
+  contactEmailNormalized String?
+  customerLocale         String  @default("en")
+  contactPhone           String?
+  contactWhatsapp        String?
+  confirmationCode       String  @unique
+  sourceContext          String?
 
   estimatedRevenueCents Int?
   actualRevenueCents    Int?
@@ -2873,6 +2902,7 @@ model Reservation {
   updatedAt DateTime @updatedAt
 
   @@index([venueId, reservationDate])
+  @@index([contactEmailNormalized, reservationDate])
   @@index([zoneId, reservationDate])
   @@index([status])
   @@index([contactEmail])
@@ -3475,15 +3505,15 @@ model ReferralAssignment {
   /// MEMBERSHIP/PRIVATE_DINING/PACKAGE). Drives intent-bucketing on the
   /// referrer mobile share surface (Today/This week/Restaurants/Events).
   /// Nullable during the migration window for legacy assignments.
-  offerType OfferType?
+  offerType    OfferType?
   /// Optional FK target tied to offerType (e.g. Series.id when
   /// offerType=EVENT|SERIES, Venue.id when RESTAURANT, MembershipPlan.id
   /// when MEMBERSHIP). Validated at the service layer — no Prisma FK so
   /// a single column can address multiple parent tables.
-  offerId   String?
+  offerId      String?
   /// Optional human label cached at write-time (e.g. "OKÜ Friday Sept 12 –
   /// Sunset Set"). Lets the share surface render fast without N+1 lookups.
-  offerLabel String?
+  offerLabel   String?
   /// Optional time window the offer is valid for, used to bucket into
   /// Today/This week/Past on the share surface.
   offerStartAt DateTime?
@@ -3532,8 +3562,8 @@ model ReferralAssignment {
   /// lets `/r/[code]` shortcuts and admin lists render without a join.
   canonicalCode String? @unique
 
-  links ReferralLink[]
-  attributedOrders Order[] @relation("OrderReferralAssignment")
+  links            ReferralLink[]
+  attributedOrders Order[]        @relation("OrderReferralAssignment")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4448,8 +4478,8 @@ enum CommissionAllocationStatus {
   DISPUTED
   REVERSED
   // Rule-engine additions
-  PROCESSING            // bridged to ledger — awaiting payout batch pickup
-  HELD_FOR_REVIEW       // serviceChargePolicy=INCLUDED_UNKNOWN → human must set eligible amount
+  PROCESSING // bridged to ledger — awaiting payout batch pickup
+  HELD_FOR_REVIEW // serviceChargePolicy=INCLUDED_UNKNOWN → human must set eligible amount
   HELD_FOR_BENEFICIARY_MAPPING // earner has no payout-ready InfluencerProfile
 }
 
@@ -4459,11 +4489,11 @@ enum CommissionAllocationStatus {
 /// INVU default: COMMISSIONABLE_CENTS (gross − tax). Gross is already
 /// post-discount; tips are absent. Do NOT subtract discount/tip again.
 enum CommissionRevenueBasis {
-  COMMISSIONABLE_CENTS                       // TableSession.commissionableCents (INVU default)
-  GROSS_MINUS_TAX                            // explicit alias — same result as above
-  GROSS_MINUS_TAX_MINUS_TIP                  // for processors where tips are inside gross
-  GROSS_MINUS_TAX_MINUS_DISCOUNT_REFUND_TIP  // for processors where gross is pre-discount
-  MANUAL_REVIEW                              // trigger HELD_FOR_REVIEW; human sets eligible amount
+  COMMISSIONABLE_CENTS // TableSession.commissionableCents (INVU default)
+  GROSS_MINUS_TAX // explicit alias — same result as above
+  GROSS_MINUS_TAX_MINUS_TIP // for processors where tips are inside gross
+  GROSS_MINUS_TAX_MINUS_DISCOUNT_REFUND_TIP // for processors where gross is pre-discount
+  MANUAL_REVIEW // trigger HELD_FOR_REVIEW; human sets eligible amount
 }
 
 /// Tier assigned to a ReferralActor, used in rule resolution levels 4 and 6.
@@ -4658,26 +4688,26 @@ model CommissionAllocation {
 
   // ── Rule-engine calculation trace ───────────────────────────────────────
   // All five raw financial snapshots at mint time (for audit / dispute).
-  grossCentsSnapshot       Int?
-  taxCentsSnapshot         Int?
-  tipCentsSnapshot         Int?
-  discountCentsSnapshot    Int?
-  refundCentsSnapshot      Int?
+  grossCentsSnapshot        Int?
+  taxCentsSnapshot          Int?
+  tipCentsSnapshot          Int?
+  discountCentsSnapshot     Int?
+  refundCentsSnapshot       Int?
   // The resolved eligible net after applying revenueBasis.
-  eligibleNetRevenueCents  Int?
-  guestCount               Int?
+  eligibleNetRevenueCents   Int?
+  guestCount                Int?
   // Per-component breakdown of the formula result.
-  percentageComponentCents Int?
+  percentageComponentCents  Int?
   percentageCapAppliedCents Int?
-  perPersonComponentCents  Int?
-  maxTakeRateCapCents      Int?
-  finalCommissionCents     Int?
+  perPersonComponentCents   Int?
+  maxTakeRateCapCents       Int?
+  finalCommissionCents      Int?
   // Which formula was applied.
-  revenueBasis             CommissionRevenueBasis?
-  ruleVersionId            String?          // FK → CommissionRule
+  revenueBasis              CommissionRevenueBasis?
+  ruleVersionId             String? // FK → CommissionRule
   // Source check record for full trace (InvuOrderNormalized.id).
-  sourceCheckId            String?
-  confidenceClass          String?
+  sourceCheckId             String?
+  confidenceClass           String?
 
   tableSession          TableSession        @relation(fields: [tableSessionId], references: [id])
   ledgerEvents          LedgerEvent[]       @relation("LedgerEventCommissionAllocation")
@@ -4691,6 +4721,7 @@ model CommissionAllocation {
   // atomically, defeating concurrent-reversal races without application-layer
   // locking. Null on original/held allocations.
   parentAllocationId String? // FK enforced by application; no Prisma relation to avoid cascade complexity
+
   // No @@unique covering all rows — reversal rows intentionally share the
   // (tableSessionId, earnerType, earnerRefId) tuple with the original so that
   // financial history is immutable.
@@ -4721,12 +4752,12 @@ model CommissionRule {
   id                 String                 @id @default(cuid())
   tier               CommissionTierType     @default(STANDARD)
   scopeType          CommissionScopeType    @default(GLOBAL)
-  scopeId            String?                // null = all within scope level
+  scopeId            String? // null = all within scope level
   revenueBasis       CommissionRevenueBasis @default(COMMISSIONABLE_CENTS)
-  percentageBps      Int                    @default(0)  // e.g. 500 = 5.00%
-  percentageCapCents Int?                   // max amount from percentage component
-  perPersonCents     Int?                   // fixed amount per cover
-  maxTakeRateBps     Int?                   // overall take-rate cap
+  percentageBps      Int                    @default(0) // e.g. 500 = 5.00%
+  percentageCapCents Int? // max amount from percentage component
+  perPersonCents     Int? // fixed amount per cover
+  maxTakeRateBps     Int? // overall take-rate cap
   version            Int                    @default(1)
   active             Boolean                @default(true)
   label              String?
@@ -5052,8 +5083,8 @@ model AttributionSession {
   // optional because a HOST_CHECKIN session has neither, and a QR_RESERVATION
   // session may carry only one of the two depending on whether the actor
   // came in through the new ReferralActor chain or the legacy Referrer table.
-  referralActor  ReferralActor? @relation("AttributionSessionActor", fields: [referralActorId], references: [id])
-  legacyReferrer Referrer?      @relation("AttributionSessionLegacy", fields: [legacyReferrerId], references: [id])
+  referralActor         ReferralActor?      @relation("AttributionSessionActor", fields: [referralActorId], references: [id])
+  legacyReferrer        Referrer?           @relation("AttributionSessionLegacy", fields: [legacyReferrerId], references: [id])
   ledgerEvents          LedgerEvent[]       @relation("LedgerEventAttributionSession")
   ledgerEventOutboxRows LedgerEventOutbox[] @relation("LedgerEventOutboxAttributionSession")
   // Payments P215 — attribution anchor carried through deposit lifecycle
@@ -5277,21 +5308,21 @@ enum ConfidenceClass {
 }
 
 model LedgerEvent {
-  id              String           @id @default(cuid())
+  id              String          @id @default(cuid())
   eventType       LedgerEventType
-  sourceSystem    String           // e.g. "invu", "reservations_api", "host_ops"
-  sourceConnector String?          // e.g. "invu_v2", "resend", null for internal
-  sourceRecordId  String?          // external ID from the originating system (nullable for internal events)
-  idempotencyKey  String           // deterministic key; callers must mint this before calling emitLedgerEvent
+  sourceSystem    String // e.g. "invu", "reservations_api", "host_ops"
+  sourceConnector String? // e.g. "invu_v2", "resend", null for internal
+  sourceRecordId  String? // external ID from the originating system (nullable for internal events)
+  idempotencyKey  String // deterministic key; callers must mint this before calling emitLedgerEvent
   occurredAt      DateTime
-  receivedAt      DateTime         @default(now())
+  receivedAt      DateTime        @default(now())
   confidenceClass ConfidenceClass
-  rawPayloadRef   String?          // reference to blob storage or a JSON snapshot
-  auditTraceId    String?          // cross-system correlation ID (e.g. X-Request-ID)
+  rawPayloadRef   String? // reference to blob storage or a JSON snapshot
+  auditTraceId    String? // cross-system correlation ID (e.g. X-Request-ID)
 
   // Deduplication counters — updated in-place when the same event arrives again
-  duplicateCount    Int       @default(0)
-  lastDuplicateAt   DateTime?
+  duplicateCount  Int       @default(0)
+  lastDuplicateAt DateTime?
 
   // Nullable FKs to domain entities — set whichever apply to this event
   attributionSessionId   String?
@@ -5347,7 +5378,7 @@ enum LedgerEventOutboxStatus {
 }
 
 model LedgerEventOutbox {
-  id              String                   @id @default(cuid())
+  id              String          @id @default(cuid())
   eventType       LedgerEventType
   sourceSystem    String
   sourceConnector String?
@@ -5396,17 +5427,17 @@ model LedgerEventOutbox {
 // flow is not disturbed.
 
 model PaymentIntent {
-  id              String              @id @default(cuid())
+  id             String              @id @default(cuid())
   // FK to Reservation — null until the reservation is created (in the same
   // transaction). @unique enforces one active intent per reservation.
-  reservationId   String?             @unique
-  orderType       OrderType           @default(RESERVATION_DEPOSIT)
-  amountCents     Int
-  currency        String              @default("USD")
-  status          PaymentIntentStatus @default(CREATED)
+  reservationId  String?             @unique
+  orderType      OrderType           @default(RESERVATION_DEPOSIT)
+  amountCents    Int
+  currency       String              @default("USD")
+  status         PaymentIntentStatus @default(CREATED)
   // Caller-supplied idempotency key — must be unique per business operation.
-  idempotencyKey  String              @unique
-  provider        PaymentProvider     @default(CYBERSOURCE)
+  idempotencyKey String              @unique
+  provider       PaymentProvider     @default(CYBERSOURCE)
 
   // Attribution anchor carried through payment lifecycle so attribution is
   // never lost on failure, retry, void, or refund.
@@ -5423,9 +5454,9 @@ model PaymentIntent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  reservation        Reservation?        @relation("ReservationPaymentIntent", fields: [reservationId], references: [id], onDelete: SetNull)
-  attributionSession AttributionSession? @relation("PaymentIntentAttributionSession", fields: [attributionSessionId], references: [id], onDelete: SetNull)
-  attempts           PaymentAttempt[]
+  reservation           Reservation?        @relation("ReservationPaymentIntent", fields: [reservationId], references: [id], onDelete: SetNull)
+  attributionSession    AttributionSession? @relation("PaymentIntentAttributionSession", fields: [attributionSessionId], references: [id], onDelete: SetNull)
+  attempts              PaymentAttempt[]
   ledgerEvents          LedgerEvent[]       @relation("LedgerEventPaymentIntent")
   ledgerEventOutboxRows LedgerEventOutbox[] @relation("LedgerEventOutboxPaymentIntent")
 

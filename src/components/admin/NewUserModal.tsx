@@ -153,7 +153,7 @@ export default function NewUserModal({ onClose, onCreated }: Props) {
             </div>
 
             <div style={{ marginTop: 12, padding: "8px 12px", background: "#fff", borderRadius: 8, border: "1px solid #e8e2dd", fontSize: 12, color: "#7d7269" }}>
-              A unique referral code will be generated automatically. You can assign a compensation plan from the user's profile after creation.
+              A unique referral code will be generated automatically and a secure invitation will be emailed. You can assign a compensation plan from the user's profile after creation.
             </div>
           </div>
         )}

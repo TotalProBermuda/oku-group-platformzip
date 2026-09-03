@@ -12,7 +12,6 @@ function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
-
 export async function POST(req: NextRequest) {
   try {
     // .catch keeps malformed JSON from bypassing the gate via the outer try/catch.
@@ -207,6 +206,8 @@ export async function POST(req: NextRequest) {
             notes: notes || null,
             contactName,
             contactEmail,
+            contactEmailNormalized: contactEmail.trim().toLowerCase(),
+            customerLocale: ["en", "es", "pt"].includes(locale) ? locale : "en",
             contactPhone: contactPhone || null,
             confirmationCode,
             requestedSpaceId: requestedSpaceId || null,
@@ -633,31 +634,4 @@ export async function POST(req: NextRequest) {
     console.error("[POST /api/reservations]", err);
     return NextResponse.json({ error: "Failed to create reservation." }, { status: 500 });
   }
-}
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const code = searchParams.get("code");
-  const email = searchParams.get("email");
-
-  if (code) {
-    const res = await prisma.reservation.findUnique({
-      where: { confirmationCode: code },
-      include: { zone: true, addons: true },
-    });
-    if (!res) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(res);
-  }
-
-  if (email) {
-    const reservations = await prisma.reservation.findMany({
-      where: { contactEmail: email },
-      include: { zone: true, addons: true },
-      orderBy: { reservationDate: "desc" },
-      take: 10,
-    });
-    return NextResponse.json(reservations);
-  }
-
-  return NextResponse.json({ error: "Provide code or email param" }, { status: 400 });
 }

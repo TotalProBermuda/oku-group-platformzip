@@ -1186,5 +1186,8 @@
   "anchorResolved": "Sessão ancorada manualmente ao contexto de indicador preservado.",
   "anchorNoSessions": "Nenhuma sessão requer atenção. Todas as atribuições de indicação estão ancoradas.",
   "anchorSessionsTotal": "sessões que requerem revisão",
-  "refresh": "Atualizar"
+  "refresh": "Atualizar",
+  "resendReferrerInvite": "Reenviar convite seguro",
+  "referrerInviteSent": "Convite seguro de indicador enviado.",
+  "referrerInviteFailed": "Não foi possível enviar o convite."
 }
