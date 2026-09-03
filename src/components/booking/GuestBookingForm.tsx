@@ -167,7 +167,9 @@ export function GuestBookingForm({
   const [spaces, setSpaces] = useState<SpaceOption[]>([]);
   const [spacesLoading, setSpacesLoading] = useState(false);
   const [spacesError, setSpacesError] = useState("");
-  const [eventDetails, setEventDetails] = useState<SpaceOption["eventConflict"]>(null);
+  const [eventDetails, setEventDetails] = useState<(
+    NonNullable<SpaceOption["eventConflict"]> & { spaceId: string; conceptKey: string }
+  ) | null>(null);
 
   // Today's ISO date string for the date picker min attribute
   const minDate = typeof window !== "undefined"
@@ -494,7 +496,7 @@ export function GuestBookingForm({
                         type="button"
                         onClick={() => {
                           if (space.eventConflict) {
-                            setEventDetails(space.eventConflict);
+                            setEventDetails({ ...space.eventConflict, spaceId: space.id, conceptKey: space.conceptKey });
                             return;
                           }
                           if (!space.isAvailable) return;
@@ -705,9 +707,13 @@ export function GuestBookingForm({
           >
             {eventDetails.kind === "PUBLIC_EVENT" && eventDetails.imageUrl ? (
               <img src={eventDetails.imageUrl} alt="" style={{ width: "100%", height: 190, objectFit: "cover", display: "block" }} />
+            ) : eventDetails.kind === "PRIVATE_BLOCK" ? (
+              <div aria-hidden="true" style={{ height: 190, display: "grid", placeItems: "center", background: "linear-gradient(145deg,#2d271d,#11100e)" }}>
+                <img src="/images/oku-logo-white.svg" alt="" style={{ width: 150, maxHeight: 76, objectFit: "contain", opacity: 0.92 }} />
+              </div>
             ) : (
               <div aria-hidden="true" style={{ height: 190, display: "grid", placeItems: "center", background: "linear-gradient(145deg,#2d271d,#11100e)", color: "#c8a96e", fontSize: 54 }}>
-                {eventDetails.kind === "PRIVATE_BLOCK" ? "🔒" : "✦"}
+                ✦
               </div>
             )}
             <div style={{ padding: 22 }}>
@@ -726,6 +732,22 @@ export function GuestBookingForm({
                     : "This event is not currently open for public ticket booking."}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setForm((f) => ({
+                    ...f,
+                    requestedSpaceId: eventDetails.spaceId,
+                    conceptRequested: conceptIsLocked
+                      ? (lockedConcept as ConceptKey)
+                      : ((eventDetails.conceptKey as ConceptKey) || f.conceptRequested),
+                  }));
+                  setEventDetails(null);
+                }}
+                style={{ width: "100%", marginTop: 12, padding: "13px 16px", borderRadius: 10, border: "1px solid rgba(200,169,110,0.5)", background: "rgba(200,169,110,0.12)", color: "#c8a96e", fontSize: 14, fontWeight: 800, cursor: "pointer" }}
+              >
+                Request this space anyway
+              </button>
               <button type="button" onClick={() => setEventDetails(null)} style={{ width: "100%", marginTop: 10, padding: "11px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 Choose another space
               </button>

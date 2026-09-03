@@ -78,7 +78,7 @@ describe("event-block disclosure", () => {
     );
     expect(card).toEqual({
       kind: "PRIVATE_BLOCK",
-      message: "This space is reserved for a private event at the selected time. Please choose another available area.",
+      message: "A private event is happening in this dining area at the selected time. You may still request a reservation and our host team will review other seating or times with you.",
     });
     expect(card.message).not.toContain("celebrity");
     expect(card).not.toHaveProperty("href");
