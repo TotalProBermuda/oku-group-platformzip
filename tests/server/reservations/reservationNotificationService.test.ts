@@ -84,4 +84,20 @@ describe("reservation confirmation delivery", () => {
     expect(sendConfirmation).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ skipped: false, sent: true, communicationId: "comm-resend" });
   });
+
+  it("records a provider rejection as FAILED instead of a false SENT", async () => {
+    findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "comm-pending", status: "PENDING" });
+    sendConfirmation.mockResolvedValueOnce({
+      sent: false,
+      reason: "The sender domain is not verified",
+      bodySnapshot: "email body",
+    });
+    const { deliverReservationStateEmail } = await import("@/server/reservations/reservationNotificationService");
+    const result = await deliverReservationStateEmail("res-1", "CONFIRMATION");
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "comm-pending" },
+      data: expect.objectContaining({ status: "FAILED", sentAt: null }),
+    }));
+    expect(result).toMatchObject({ sent: false, reason: "The sender domain is not verified" });
+  });
 });

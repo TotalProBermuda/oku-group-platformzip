@@ -239,6 +239,8 @@
     "fieldZone": "Zona",
     "fieldOccasion": "Ocasião",
     "fieldReferredBy": "Indicado por",
+    "fieldGuestEmail": "E-mail do convidado",
+    "fieldGuestWhatsapp": "WhatsApp / telefone do convidado",
     "fieldTable": "Mesa",
     "fieldCommission": "Comissão",
     "validated": "Validado",
