@@ -34,6 +34,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   try {
     const result = await deliverReservationStateEmail(id, "CONFIRMATION", { force: true });
+    if (!result.sent) {
+      return NextResponse.json(
+        { ok: false, error: result.reason ?? "Confirmation email was rejected by the email provider" },
+        { status: 502 },
+      );
+    }
     return NextResponse.json({ ok: true, data: result });
   } catch (error) {
     return NextResponse.json(

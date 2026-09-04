@@ -40,6 +40,8 @@ type EventConflictCard = {
 type Reservation = {
   id: string;
   contactName: string;
+  contactEmail: string;
+  contactWhatsapp?: string | null;
   partySize: number;
   conceptRequested?: string | null;
   status: string;
@@ -436,6 +438,18 @@ function GuestDrawer({
 
       {/* Guest info */}
       <div style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>{t("host", "operations.fieldGuestEmail")}</div>
+          <a href={`mailto:${res.contactEmail}`} style={{ display: "block", overflowWrap: "anywhere", fontSize: 12, fontWeight: 600, color: "#1d4ed8", marginTop: 1 }}>{res.contactEmail}</a>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>{t("host", "operations.fieldGuestWhatsapp")}</div>
+          {res.contactWhatsapp ? (
+            <a href={`tel:${res.contactWhatsapp}`} style={{ display: "block", overflowWrap: "anywhere", fontSize: 12, fontWeight: 600, color: "#1d4ed8", marginTop: 1 }}>{res.contactWhatsapp}</a>
+          ) : (
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", marginTop: 1 }}>—</div>
+          )}
+        </div>
         {[
           { labelKey: "operations.fieldTime",          val: fmtTime(res.reservationDate) },
           { labelKey: "operations.fieldZone",           val: res.zone?.name ?? res.conceptRequested ?? "—" },

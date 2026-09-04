@@ -29,6 +29,46 @@ export type ReservationEmailKind = "REQUEST_RECEIVED" | "CONFIRMATION" | "RESERV
 
 const PANAMA_TZ = "America/Panama";
 
+type ResendSendResult = { error?: { message?: string } | null };
+
+async function sendWithResend(
+  props: ReservationConfirmationInput,
+  subject: string,
+  html: string,
+  text: string,
+): Promise<ReservationConfirmationResult> {
+  if (!isResendConfigured()) {
+    return { sent: false, reason: "RESEND_NOT_CONFIGURED", bodySnapshot: text, subject };
+  }
+
+  try {
+    const { client, fromEmail } = await getResendClient();
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: props.contactEmail,
+      subject,
+      html,
+      text,
+    }) as ResendSendResult;
+    if (result.error) {
+      return {
+        sent: false,
+        reason: result.error.message || "RESEND_REJECTED",
+        bodySnapshot: text,
+        subject,
+      };
+    }
+    return { sent: true, bodySnapshot: text, subject };
+  } catch (error) {
+    return {
+      sent: false,
+      reason: error instanceof Error ? error.message : "send_failed",
+      bodySnapshot: text,
+      subject,
+    };
+  }
+}
+
 function accountUrl(): string {
   const base =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -284,18 +324,7 @@ export async function sendReservationRequestReceivedEmail(
   const subject = buildReservationRequestSubject(props);
   const html = buildRequestHtml(props);
   const text = buildReservationRequestText(props);
-
-  if (!isResendConfigured()) {
-    return { sent: false, reason: "RESEND_NOT_CONFIGURED", bodySnapshot: text, subject };
-  }
-
-  try {
-    const { client, fromEmail } = await getResendClient();
-    await client.emails.send({ from: fromEmail, to: props.contactEmail, subject, html, text });
-    return { sent: true, bodySnapshot: text, subject };
-  } catch (e) {
-    return { sent: false, reason: e instanceof Error ? e.message : "send_failed", bodySnapshot: text, subject };
-  }
+  return sendWithResend(props, subject, html, text);
 }
 
 export async function sendReservationConfirmationEmail(
@@ -305,28 +334,7 @@ export async function sendReservationConfirmationEmail(
   const html = buildHtml(props);
   const text = buildText(props);
 
-  if (!isResendConfigured()) {
-    return { sent: false, reason: "RESEND_NOT_CONFIGURED", bodySnapshot: text, subject };
-  }
-
-  try {
-    const { client, fromEmail } = await getResendClient();
-    await client.emails.send({
-      from: fromEmail,
-      to: props.contactEmail,
-      subject,
-      html,
-      text,
-    });
-    return { sent: true, bodySnapshot: text, subject };
-  } catch (e) {
-    return {
-      sent: false,
-      reason: e instanceof Error ? e.message : "send_failed",
-      bodySnapshot: text,
-      subject,
-    };
-  }
+  return sendWithResend(props, subject, html, text);
 }
 
 export async function sendReservationUpdatedEmail(
@@ -336,15 +344,5 @@ export async function sendReservationUpdatedEmail(
   const html = buildUpdatedHtml(props);
   const text = buildReservationUpdatedText(props);
 
-  if (!isResendConfigured()) {
-    return { sent: false, reason: "RESEND_NOT_CONFIGURED", bodySnapshot: text, subject };
-  }
-
-  try {
-    const { client, fromEmail } = await getResendClient();
-    await client.emails.send({ from: fromEmail, to: props.contactEmail, subject, html, text });
-    return { sent: true, bodySnapshot: text, subject };
-  } catch (e) {
-    return { sent: false, reason: e instanceof Error ? e.message : "send_failed", bodySnapshot: text, subject };
-  }
+  return sendWithResend(props, subject, html, text);
 }
