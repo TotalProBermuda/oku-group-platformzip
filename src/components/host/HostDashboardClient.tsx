@@ -183,11 +183,13 @@ function ReservationCard({ res, onAction }: {
   const t = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [showLoss, setShowLoss] = useState(false);
-  const [showInvu, setShowInvu] = useState(false);
-  const [invuTotal, setInvuTotal] = useState("");
-  const [invuCommPct, setInvuCommPct] = useState("5");
-  const [invuSaving, setInvuSaving] = useState(false);
-  const [invuSaved, setInvuSaved] = useState<{ total: number; commission: number } | null>(null);
+  const [invuSyncing, setInvuSyncing] = useState(false);
+  const [invuSyncResult, setInvuSyncResult] = useState<{
+    grossCents: number;
+    taxCents: number;
+    commissionableCents: number;
+    commissionAllocations: Array<{ earnerType: string; amountCents: number }>;
+  } | null>(null);
   const [updating, setUpdating] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   // comp drink
@@ -270,25 +272,19 @@ function ReservationCard({ res, onAction }: {
     setPartySaving(false);
   }
 
-  async function handleInvuClose() {
-    const totalUsd = parseFloat(invuTotal);
-    const pct = parseFloat(invuCommPct);
-    if (!totalUsd || isNaN(totalUsd) || totalUsd <= 0) return;
-    setInvuSaving(true);
+  async function syncInvuClose() {
+    setInvuSyncing(true);
     try {
-      const r = await fetch(`/api/v1/host/bookings/${res.id}/close`, {
+      const r = await fetch(`/api/v1/host/bookings/${res.id}/sync-invu-close`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tableTotalCents: Math.round(totalUsd * 100), commissionPercent: pct }),
       });
       const d = await r.json();
       if (!d.ok) throw new Error(d.error);
-      setInvuSaved({ total: totalUsd, commission: Math.round((totalUsd * pct) / 100 * 100) / 100 });
-      setShowInvu(false);
+      setInvuSyncResult(d.tableSession);
     } catch (e: any) {
       alert(e.message);
     }
-    setInvuSaving(false);
+    setInvuSyncing(false);
   }
 
   async function act(status: string, extra?: Record<string, string>) {
@@ -600,7 +596,7 @@ function ReservationCard({ res, onAction }: {
               every waiting stage — they shouldn't have to hunt for it on
               the floor-control board or step through Acknowledge/Arrived
               first when the guest is already standing in front of them. */}
-          {!isFinal && !isLost && !showLoss && !showInvu && (
+          {!isFinal && !isLost && !showLoss && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {res.status === "PENDING_APPROVAL" && (
                 <Link
@@ -633,11 +629,23 @@ function ReservationCard({ res, onAction }: {
                 </button>
               )}
 
-              {/* "Complete" + Record INVU once seated */}
+              {/* The closed INVU order is authoritative: never ask a host to
+                  enter a total or override a commission rate. */}
               {res.status === "SEATED" && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <QuickBtn label={t("host", "actions.complete")} color="#6b7280" disabled={updating} onClick={() => act("COMPLETED")} />
-                  <QuickBtn label={t("host", "actions.recordInvu")} color="#c8a96e" disabled={updating} onClick={() => setShowInvu(true)} />
+                  <QuickBtn label={invuSyncing ? "Syncing INVU close…" : "Sync closed INVU check"} color="#c8a96e" disabled={invuSyncing || !boundInvuOrderId} onClick={syncInvuClose} />
+                </div>
+              )}
+
+              {invuSyncResult && (
+                <div style={{ padding: "10px 14px", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 10, fontSize: 12, color: "#d1fae5" }}>
+                  <strong>✓ Closed total verified from INVU:</strong> ${(invuSyncResult.grossCents / 100).toFixed(2)}
+                  {invuSyncResult.taxCents > 0 && <> · tax ${(invuSyncResult.taxCents / 100).toFixed(2)}</>}
+                  <> · commissionable ${(invuSyncResult.commissionableCents / 100).toFixed(2)}</>
+                  {invuSyncResult.commissionAllocations.map((allocation, index) => (
+                    <span key={index}> · {allocation.earnerType.toLowerCase()} commission ${(allocation.amountCents / 100).toFixed(2)}</span>
+                  ))}
                 </div>
               )}
 
@@ -812,88 +820,6 @@ function ReservationCard({ res, onAction }: {
             </div>
           )}
 
-          {/* INVU table close — commission entry */}
-          {showInvu && (
-            <div style={{ background: "rgba(200,169,110,0.06)", border: "1px solid rgba(200,169,110,0.2)", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ fontSize: 11, color: "#c8a96e", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
-                {t("host", "invu.title")}
-              </div>
-              <div style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-end" }}>
-                <div style={{ flex: 2 }}>
-                  <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>
-                    {t("host", "invu.totalLabel")}
-                  </div>
-                  <div style={{ position: "relative" }}>
-                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#6b7280", fontSize: 13 }}>$</span>
-                    <input
-                      type="number"
-                      value={invuTotal}
-                      onChange={(e) => setInvuTotal(e.target.value)}
-                      placeholder="700.00"
-                      step="0.01"
-                      min="0"
-                      style={{
-                        width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(200,169,110,0.3)",
-                        borderRadius: 8, padding: "9px 10px 9px 22px", color: "white",
-                        fontSize: 14, fontWeight: 700, outline: "none", boxSizing: "border-box",
-                      }}
-                    />
-                  </div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>
-                    {t("host", "invu.commLabel")}
-                  </div>
-                  <input
-                    type="number"
-                    value={invuCommPct}
-                    onChange={(e) => setInvuCommPct(e.target.value)}
-                    step="0.5"
-                    min="0"
-                    max="100"
-                    style={{
-                      width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 8, padding: "9px 10px", color: "white",
-                      fontSize: 14, fontWeight: 700, outline: "none", boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-              </div>
-              {invuTotal && parseFloat(invuTotal) > 0 && (
-                <div style={{ marginBottom: 10, padding: "10px 12px", background: "rgba(200,169,110,0.08)", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "#9ca3af" }}>Host commission ({invuCommPct}% of ${invuTotal})</span>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: "#c8a96e" }}>
-                    ${(parseFloat(invuTotal || "0") * parseFloat(invuCommPct || "0") / 100).toFixed(2)}
-                  </span>
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={handleInvuClose}
-                  disabled={invuSaving || !invuTotal || parseFloat(invuTotal) <= 0}
-                  style={{
-                    flex: 1, padding: "9px 0", borderRadius: 9, border: "none",
-                    background: invuTotal && parseFloat(invuTotal) > 0 ? "linear-gradient(135deg,#c8a96e,#a8894e)" : "rgba(255,255,255,0.05)",
-                    color: invuTotal && parseFloat(invuTotal) > 0 ? "#1a1614" : "#4b5563",
-                    fontWeight: 800, fontSize: 12, cursor: "pointer",
-                  }}
-                >
-                  {invuSaving ? t("host", "invu.saving") : t("host", "invu.submit")}
-                </button>
-                <button onClick={() => setShowInvu(false)} style={{ padding: "9px 14px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
-                  {t("host", "actions.cancel")}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Previously saved INVU commission */}
-          {invuSaved && (
-            <div style={{ marginTop: 8, padding: "10px 14px", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#10b981" }}>✓ Commission recorded from INVU</span>
-              <span style={{ fontSize: 14, fontWeight: 800, color: "#34d399" }}>${invuSaved.commission.toFixed(2)}</span>
-            </div>
-          )}
         </div>
       )}
     </div>
