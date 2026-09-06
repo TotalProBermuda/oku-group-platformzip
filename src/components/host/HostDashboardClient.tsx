@@ -278,7 +278,18 @@ function ReservationCard({ res, onAction }: {
       const r = await fetch(`/api/v1/host/bookings/${res.id}/sync-invu-close`, {
         method: "POST",
       });
-      const d = await r.json();
+      // A proxy/server failure can produce an empty or HTML body. Do not let
+      // that obscure the operational failure behind a JSON parse exception.
+      const raw = await r.text();
+      let d: any;
+      try {
+        d = raw ? JSON.parse(raw) : null;
+      } catch {
+        throw new Error(`INVU sync failed (HTTP ${r.status}). Please try again or check the INVU connection.`);
+      }
+      if (!d) {
+        throw new Error(`INVU sync returned an empty response (HTTP ${r.status}). Please try again or check the INVU connection.`);
+      }
       if (!d.ok) throw new Error(d.error);
       setInvuSyncResult(d.tableSession);
     } catch (e: any) {
