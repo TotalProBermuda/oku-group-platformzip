@@ -1,0 +1,28 @@
+name: INVU bound close watcher
+
+on:
+  schedule:
+    # A modest cadence: no broad report pulls, and at most ten exact bound
+    # invoice reads per run. GitHub Actions schedules run only from main.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: invu-bound-close-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check recent bound tickets for confirmed close
+        env:
+          WATCH_URL: https://www.okuhospitalitygroup.com/api/internal/invu/bound-close-watch
+          WATCH_SECRET: ${{ secrets.INVU_CLOSE_WATCH_SECRET }}
+        run: |
+          test -n "$WATCH_SECRET"
+          curl --fail --silent --show-error --max-time 45 \
+            -X POST "$WATCH_URL" \
+            -H "Authorization: Bearer $WATCH_SECRET" \
+            -H "Accept: application/json"

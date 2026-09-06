@@ -241,6 +241,66 @@ export async function pullBoundClosedOrder(params: {
   }
 }
 
+/**
+ * Read-only close watcher for host-bound checks.
+ *
+ * The range-report endpoint is useful for reconciliation but is not reliable
+ * enough to drive a guest's referral closeout. This watcher deliberately
+ * reads only the exact `num_cita` values that hosts have already bound, and
+ * only for recent, still-open sessions. `pullBoundClosedOrder` is idempotent:
+ * it only reaches aggregation / commission minting after INVU confirms the
+ * invoice is closed.
+ */
+export async function syncRecentBoundCloseouts(params?: {
+  days?: number;
+  limit?: number;
+}): Promise<{
+  examined: number;
+  found: number;
+  closed: number;
+  stillOpen: number;
+  failed: number;
+}> {
+  const days = Math.min(Math.max(params?.days ?? 7, 1), 7);
+  const limit = Math.min(Math.max(params?.limit ?? 10, 1), 25);
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  // A bounded batch is intentional. A stuck or incorrectly bound ticket must
+  // never turn a scheduled run into a broad, expensive POS crawl.
+  const sessions = await prisma.tableSession.findMany({
+    where: {
+      openedInvuOrderId: { not: null },
+      closedAt: null,
+      openedAt: { gte: since },
+    },
+    orderBy: { openedAt: "asc" },
+    take: limit,
+    select: { venueId: true, openedInvuOrderId: true },
+  });
+
+  const result = { examined: sessions.length, found: 0, closed: 0, stillOpen: 0, failed: 0 };
+  for (const session of sessions) {
+    // Prisma's `not: null` filter does not narrow the generated TS type.
+    if (!session.openedInvuOrderId) continue;
+    try {
+      const lookup = await pullBoundClosedOrder({
+        venueId: session.venueId,
+        invuOrderId: session.openedInvuOrderId,
+      });
+      if (lookup.found) result.found++;
+      if (lookup.closed) result.closed++;
+      else result.stillOpen++;
+    } catch (error) {
+      // One provider / credential failure must not block another venue's
+      // bound ticket. The detailed failure is retained in its sync run.
+      result.failed++;
+      console.error("[invu-close-watch] bound ticket lookup failed", error);
+    }
+  }
+
+  return result;
+}
+
 async function completeBoundPull(
   syncRunId: string,
   mappingId: string,
