@@ -66,7 +66,7 @@ export async function POST(
       commissionableCents: true,
       closedAt: true,
       status: true,
-      commissionAllocations: {
+      allocations: {
         select: { earnerType: true, amountCents: true, status: true },
       },
     },
@@ -79,7 +79,14 @@ export async function POST(
     }, { status: 409 });
     }
 
-    return NextResponse.json({ ok: true, invuOrderId, tableSession: synced });
+    return NextResponse.json({
+      ok: true,
+      invuOrderId,
+      tableSession: {
+        ...synced,
+        commissionAllocations: synced.allocations,
+      },
+    });
   } catch (error) {
     console.error("Host INVU close sync failed", error);
     return NextResponse.json(
