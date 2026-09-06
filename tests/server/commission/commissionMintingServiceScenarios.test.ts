@@ -10,8 +10,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Use vi.hoisted so mock objects are available when vi.mock factories run ────
-const { mockFindUnique, mockFindFirst, mockCreate, mockUpdate } = vi.hoisted(() => ({
+const { mockFindUnique, mockActorFindUnique, mockFindFirst, mockCreate, mockUpdate } = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
+  mockActorFindUnique: vi.fn(),
   mockFindFirst: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdate: vi.fn(),
@@ -21,7 +22,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     tableSession: { findUnique: mockFindUnique },
     commissionAllocation: { findFirst: mockFindFirst, create: mockCreate, update: mockUpdate },
-    referralActor: { findUnique: vi.fn().mockResolvedValue(null) },
+    referralActor: { findUnique: mockActorFindUnique },
     referralLink: { findUnique: vi.fn().mockResolvedValue(null) },
     restaurantHostProfile: { findUnique: vi.fn().mockResolvedValue(null) },
     commissionRule: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -95,6 +96,7 @@ function makeValidSession(overrides: Record<string, unknown> = {}) {
 describe("commissionMintingService — service charge policy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockActorFindUnique.mockResolvedValue({ commissionEligible: true, commissionTier: "STANDARD" });
     mockFindFirst.mockResolvedValue(null); // no existing allocation
     mockCreate.mockResolvedValue({ id: "alloc_created", amountCents: 425 });
   });
@@ -138,6 +140,18 @@ describe("commissionMintingService — service charge policy", () => {
     const result = await mintCommissionsForTableSession("ts_1");
     expect(result.minted).toHaveLength(0);
     expect(result.skipped).toHaveLength(0);
+  });
+
+  it("attribution-only actor → never mints a commission", async () => {
+    mockFindUnique.mockResolvedValue(makeValidSession());
+    mockActorFindUnique.mockResolvedValue({ commissionEligible: false, commissionTier: null });
+
+    const result = await mintCommissionsForTableSession("ts_1");
+    expect(result.minted).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      expect.objectContaining({ reason: "referral_actor_not_commission_eligible" }),
+    ]);
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("MANUAL_REVIEW basis → creates HELD_FOR_REVIEW allocation, skipped with held_manual_review_basis reason", async () => {

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, ReferralActor } from "@prisma/client";
 import { logReferrerAssignmentAction } from "./referrerAssignmentAudit";
+import { defaultCommissionProgram } from "./commissionProgram";
 import {
   findOrLinkReferralActor,
   normalizeEmail as _normalizeEmail,
@@ -126,9 +127,20 @@ export async function findOrCreateReferralActor(
 
   const resolvedActorId = isMergeConflict ? result.candidateActorId : result.actorId;
 
-  const actor = await client.referralActor.findUniqueOrThrow({
+  let actor = await client.referralActor.findUniqueOrThrow({
     where: { id: resolvedActorId },
   });
+
+  if (result.status === "created" || result.status === "override_created") {
+    const program = defaultCommissionProgram(input.actorType);
+    actor = await client.referralActor.update({
+      where: { id: actor.id },
+      data: {
+        commissionEligible: program.eligible,
+        commissionTier: program.tier,
+      },
+    });
+  }
 
   const matchField = result.matchField;
   const matchKey =

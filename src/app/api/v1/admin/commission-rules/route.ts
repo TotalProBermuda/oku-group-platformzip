@@ -80,6 +80,19 @@ export async function POST(req: NextRequest) {
         `;
         const nextVersion = (lockRows[0]?.version ?? 0) + 1;
 
+        // A rule family has exactly one active version. Historical versions
+        // remain queryable for allocation audit traces, but never compete in
+        // live resolution.
+        await tx.commissionRule.updateMany({
+          where: {
+            scopeType,
+            scopeId: scopeId ?? null,
+            tier,
+            active: true,
+          },
+          data: { active: false },
+        });
+
         return tx.commissionRule.create({
           data: {
             tier,

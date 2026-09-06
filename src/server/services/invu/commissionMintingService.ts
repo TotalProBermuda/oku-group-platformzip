@@ -246,14 +246,32 @@ export async function mintCommissionsForTableSession(
     // ── Resolve actor tier for rule lookup ───────────────────────────────────
     // Host earners already resolved above; referrer earners need a DB lookup.
     let actorTier: import("@prisma/client").CommissionTierType | null = null;
+    let actorCommissionEligible = true;
     if (earner.earnerType === "HOST") {
       actorTier = hostActorTier;
+      if (earner.referralActorId) {
+        const actor = await prisma.referralActor.findUnique({
+          where: { id: earner.referralActorId },
+          select: { commissionEligible: true },
+        }).catch(() => null);
+        actorCommissionEligible = actor?.commissionEligible ?? false;
+      }
     } else if (earner.referralActorId) {
       const actor = await prisma.referralActor.findUnique({
         where: { id: earner.referralActorId },
-        select: { commissionTier: true },
+        select: { commissionTier: true, commissionEligible: true },
       }).catch(() => null);
       actorTier = actor?.commissionTier ?? null;
+      actorCommissionEligible = actor?.commissionEligible ?? false;
+    }
+
+    if (!actorCommissionEligible) {
+      result.skipped.push({
+        earnerType: earner.earnerType,
+        earnerRefId: earner.earnerRefId,
+        reason: "referral_actor_not_commission_eligible",
+      });
+      continue;
     }
 
     // isPrivateEvent only applies to REFERRER earners (private dining assignment)
