@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
-import { pullLast7DaysClosedOrders } from "@/server/services/invu/invuClosedOrdersService";
-import { diagnoseMissingInvuClose } from "@/server/services/invu/invuCloseDiagnosticService";
+import { pullBoundClosedOrder } from "@/server/services/invu/invuClosedOrdersService";
 
 // Pull the recently closed, already-bound INVU check and let the normal INVU
 // aggregation/minting pipeline be the sole authority for totals and commission.
@@ -48,12 +47,13 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Bind the open INVU order before syncing its close" }, { status: 409 });
     }
 
-  // A tight pull keeps the operational action fast while allowing normal
-  // INVU endpoint delays. The sync service safely de-duplicates records.
-    await pullLast7DaysClosedOrders({
-    venueId: reservation.venueId,
-    triggeredByUserId: userId,
-    windowMinutes: 120,
+    // Directly query the exact bound `num_cita`. A date-range report remains
+    // available to the admin sync, but must never be required to close a host
+    // reservation or create its commission allocation.
+    const lookup = await pullBoundClosedOrder({
+      venueId: reservation.venueId,
+      invuOrderId,
+      triggeredByUserId: userId,
     });
 
     const synced = await prisma.tableSession.findUnique({
@@ -74,15 +74,15 @@ export async function POST(
     });
 
     if (!synced?.closedAt || synced.invuOrderId !== invuOrderId) {
-      const diagnostic = await diagnoseMissingInvuClose({
-        venueId: reservation.venueId,
-        internalOrderId: invuOrderId,
-      });
+      const error = !lookup.found
+        ? `INVU has no invoice for bound check ${invuOrderId}. Confirm the bound internal order number.`
+        : !lookup.closed
+          ? `INVU found check ${invuOrderId}, but it is not closed yet.`
+          : `INVU returned check ${invuOrderId}, but it could not be matched to this reservation.`;
       return NextResponse.json({
-      ok: false,
-      error: `INVU has not returned a closed check for ${invuOrderId} yet. Try again shortly; no manual total is required.`,
-      diagnostic,
-    }, { status: 409 });
+        ok: false,
+        error,
+      }, { status: 409 });
     }
 
     return NextResponse.json({
@@ -95,8 +95,15 @@ export async function POST(
     });
   } catch (error) {
     console.error("Host INVU close sync failed", error);
+    const isInvuAuthorizationIssue =
+      error instanceof Error && error.message.includes("INVU getInvoiceByNumCita authorization or provider error");
     return NextResponse.json(
-      { ok: false, error: "Could not sync the INVU close. Please try again; if it persists, check the INVU connection." },
+      {
+        ok: false,
+        error: isInvuAuthorizationIssue
+          ? "INVU rejected the lookup. Reconnect the INVU integration or confirm this credential has invoice-search permission."
+          : "Could not sync the INVU close. Please try again; if it persists, check the INVU connection.",
+      },
       { status: 502 }
     );
   }

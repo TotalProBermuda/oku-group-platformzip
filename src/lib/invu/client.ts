@@ -15,6 +15,32 @@ function unwrapInvuList(parsed: unknown): Record<string, unknown>[] {
   return [];
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+/**
+ * INVU returns several provider-side failures as HTTP 200 JSON bodies, for
+ * example `{ status: 403, error: "..." }`. Treating those as an empty list
+ * makes an expired/under-scoped token look like a missing sale.
+ *
+ * Do not include the provider's error text: it may contain operational or
+ * account details which must not reach application logs or the browser.
+ */
+function throwIfProviderError(parsed: unknown, method: string): void {
+  const body = asObject(parsed);
+  if (!body) return;
+
+  const status = body.status;
+  const hasError = typeof body.error === "string" && body.error.trim().length > 0;
+  if (status === 401 || status === 403 || hasError) {
+    const suffix = status === 401 || status === 403 ? ` (${status})` : "";
+    throw new Error(`INVU ${method} authorization or provider error${suffix}`);
+  }
+}
+
 function toEpochSeconds(d: Date): number {
   return Math.floor(d.getTime() / 1000);
 }
@@ -36,6 +62,7 @@ async function callInvuList(
   }
   let parsed: unknown = text;
   try { parsed = JSON.parse(text); } catch { /* keep as text */ }
+  throwIfProviderError(parsed, method);
   return unwrapInvuList(parsed);
 }
 
@@ -116,6 +143,40 @@ export async function getClosedOrders(
   const ffin = toEpochSeconds(toDate);
   const url = `${INVU_API_BASE}?r=citas/ordenesAllAdv/fini/${fini}/ffin/${ffin}/tipo/1/grouping/1`;
   return callInvuList(token, url, "getClosedOrders");
+}
+
+/**
+ * Fetch one order by its INVU `num_cita`, which is the identifier stored when
+ * a host binds an open check. This is the deterministic closeout path; unlike
+ * a date-range list it cannot miss a ticket because of a reporting delay or
+ * grouping filter.
+ */
+export async function getInvoiceByNumCita(
+  token: string,
+  numCita: string
+): Promise<Record<string, unknown> | null> {
+  const encodedId = encodeURIComponent(numCita);
+  const url = `${INVU_API_BASE}?r=citas/view/id/${encodedId}/tipo/0`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { accept: "application/json", authorization: token },
+  });
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    throw new Error(`INVU getInvoiceByNumCita failed (${res.status})`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("INVU getInvoiceByNumCita returned a non-JSON response");
+  }
+  throwIfProviderError(parsed, "getInvoiceByNumCita");
+
+  const invoice = asObject(parsed);
+  if (!invoice || invoice.encontro === false) return null;
+  return invoice;
 }
 
 // Satellite endpoint: invoice totals. See top-of-file comment — intentional no-op until the

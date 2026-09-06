@@ -16,6 +16,46 @@ function pickFirst(obj: Record<string, unknown>, keys: string[]): unknown {
   return undefined;
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+/**
+ * `citas/view` returns a detail envelope (`orden_datos`, `pagos`, `status`)
+ * while `ordenesAllAdv` returns a flat row. Normalize both forms into the
+ * existing closed-order shape so aggregation and commission minting retain a
+ * single, audited path.
+ */
+function flattenInvoiceDetail(payload: Record<string, unknown>): Record<string, unknown> {
+  const header = asObject(payload.orden_datos);
+  if (!header) return payload;
+
+  const status = asObject(payload.status);
+  const payments = Array.isArray(payload.pagos) ? payload.pagos : payload.payments;
+  const tips = Array.isArray(payload.propinas) ? payload.propinas : payload.tips;
+
+  return {
+    ...header,
+    // The caller supplies `id` as the already-bound num_cita for deterministic
+    // matching; preserve the provider's own id in the raw record as well.
+    id: payload.id ?? header.id,
+    num_cita: payload.num_cita ?? header.num_cita,
+    mesa: payload.mesa ?? header.mesa,
+    total: payload.total ?? header.total ?? header.total_final ?? header.importe,
+    subtotal: payload.subtotal ?? header.subtotal,
+    impuesto: payload.impuesto ?? header.impuesto ?? header.tax,
+    descuento: payload.descuento ?? header.descuento,
+    pagos: payments,
+    payments,
+    propinas: tips,
+    status: status?.descripcion ?? header.status ?? header.estado,
+    estado: status?.descripcion ?? header.estado,
+    status_id: status?.id ?? header.status_id,
+  };
+}
+
 /**
  * INVU sometimes returns fields like `mesa` and `cliente` as objects
  * (e.g. `{ id: 12, nombre: "T-9" }`) and sometimes as bare strings.
@@ -46,6 +86,14 @@ function toIntCents(val: unknown): number {
 
 function parseDate(val: unknown): Date | null {
   if (!val) return null;
+  const numeric = typeof val === "number" ? val : Number(String(val));
+  // INVU detail responses use Epoch timestamps. Accept seconds and
+  // milliseconds as well as the ISO values returned by list endpoints.
+  if (Number.isFinite(numeric) && numeric > 0) {
+    const ms = numeric < 100_000_000_000 ? numeric * 1000 : numeric;
+    const epochDate = new Date(ms);
+    if (!isNaN(epochDate.getTime())) return epochDate;
+  }
   const d = new Date(String(val));
   return isNaN(d.getTime()) ? null : d;
 }
@@ -77,6 +125,7 @@ export function normalizePayload(
   payload: Record<string, unknown>,
   payloadType: InvuPayloadType
 ): Record<string, unknown> {
+  payload = flattenInvoiceDetail(payload);
   const publicOrderNumber = extractString(
     pickFirst(payload, ["num_cita", "num_factura", "folio", "order_number"])
   );
@@ -101,12 +150,20 @@ export function normalizePayload(
   const openedAt = parseDate(pickFirst(payload, ["fecha_apertura_date", "fecha_apertura", "open_at", "created_at", "openedAt", "fecha_creacion"]));
   const closedAt = parseDate(pickFirst(payload, ["fecha_cierre_date", "fecha_cierre", "closed_at", "end_at", "closedAt", "fecha_fin"]));
 
-  const statusRaw = String(pickFirst(payload, ["status", "estado", "estado_orden", "pagada"]) ?? "") || null;
+  const statusId = pickFirst(payload, ["status_id", "estado_id"]);
+  const statusRaw = String(
+    pickFirst(payload, ["status", "estado", "estado_orden", "pagada"])
+      ?? (String(statusId) === "1" ? "cerrada" : "")
+  ) || null;
   const statusCanonical = normalizeStatus(statusRaw);
 
   // INVU's `total` includes tax; `subtotal` is pre-tax. Use `total` as gross when present
   // so the trust-layer commissionable computation reflects what the guest actually paid.
-  const grossCents = toIntCents(pickFirst(payload, ["total", "subtotal", "gross_total", "importe"]));
+  const paymentLines = (payload["pagos"] ?? payload["payments"] ?? []) as unknown[];
+  const paymentGrossCents = Array.isArray(paymentLines)
+    ? aggregateCents(paymentLines, "amount", "monto", "importe", "valor", "total")
+    : 0;
+  const grossCents = toIntCents(pickFirst(payload, ["total", "subtotal", "gross_total", "importe"])) || paymentGrossCents;
 
   const discountLines = (payload["discounts"] ?? payload["descuentos"]) as unknown[];
   const discountCents = Array.isArray(discountLines)
@@ -115,7 +172,7 @@ export function normalizePayload(
 
   const taxCents = toIntCents(pickFirst(payload, ["impuesto", "tax", "iva", "tax_amount", "total_impuesto"]));
 
-  const tipLines = (payload["payments"] ?? []) as unknown[];
+  const tipLines = (payload["payments"] ?? payload["pagos"] ?? []) as unknown[];
   const tipFromPayments = Array.isArray(tipLines)
     ? aggregateCents(tipLines, "tip", "propina", "gratuity")
     : 0;
