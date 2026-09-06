@@ -28,6 +28,11 @@ export const INCLUDE_FULL = {
     include: {
       referralActor:  { select: { id: true, displayName: true, actorType: true } },
       legacyReferrer: { select: { id: true, fullName: true,    referrerType: true } },
+      // Required by the recovery control: a completed reservation may be
+      // reopened only when no INVU order was ever bound.  A POS order remains
+      // globally unique, so it must never be reused by another booking.
+      tableSession: { select: { openedInvuOrderId: true } },
+      bindings: { select: { invuOrderId: true }, take: 1 },
     },
   },
   addons: true,
@@ -351,8 +356,35 @@ export async function transitionStatus(
 ) {
   const existing = await prisma.reservation.findUniqueOrThrow({
     where: { id: reservationId },
-    include: { venue: true, handoffs: true },
+    include: {
+      venue: true,
+      handoffs: true,
+      attributionSession: {
+        select: {
+          tableSession: { select: { openedInvuOrderId: true } },
+          bindings: { select: { invuOrderId: true }, take: 1 },
+        },
+      },
+    },
   });
+
+  // Recovery path: a host can undo an accidental COMPLETED click and return
+  // to SEATED only before any POS evidence exists.  This deliberately
+  // preserves the table label and records a normal status-log entry, while
+  // preventing a closed/bound INVU check from being attached to a second
+  // reservation or accidentally re-opened after revenue was captured.
+  if (existing.status === "COMPLETED" && toStatus === "SEATED") {
+    const boundOrderId =
+      existing.attributionSession?.tableSession?.openedInvuOrderId ??
+      existing.attributionSession?.bindings[0]?.invuOrderId;
+    if (boundOrderId || existing.actualRevenueCents !== null) {
+      const e = new Error(
+        "This completed reservation has POS evidence and cannot be reopened. Use a supervised correction instead."
+      ) as Error & { status?: number };
+      e.status = 409;
+      throw e;
+    }
+  }
 
   assertTransitionOperationalRequirements(existing, toStatus, opts);
 
