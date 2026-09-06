@@ -10,10 +10,11 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { userId, roles } = await requireSession();
-  const isSuperAdmin = roles.includes("SUPERADMIN");
+  try {
+    const { userId, roles } = await requireSession();
+    const isSuperAdmin = roles.includes("SUPERADMIN");
 
-  const reservation = await prisma.reservation.findUnique({
+    const reservation = await prisma.reservation.findUnique({
     where: { id: params.id },
     select: {
       id: true,
@@ -30,31 +31,31 @@ export async function POST(
     },
   });
 
-  if (!reservation) {
+    if (!reservation) {
     return NextResponse.json({ ok: false, error: "Reservation not found" }, { status: 404 });
-  }
-  if (!isSuperAdmin && reservation.assignedHost?.userId !== userId) {
+    }
+    if (!isSuperAdmin && reservation.assignedHost?.userId !== userId) {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
-  if (reservation.actualRevenueCents != null) {
+    }
+    if (reservation.actualRevenueCents != null) {
     return NextResponse.json({ ok: false, error: "This reservation has already been financially closed" }, { status: 409 });
-  }
+    }
 
-  const tableSession = reservation.attributionSession?.tableSession;
-  const invuOrderId = tableSession?.openedInvuOrderId;
-  if (!tableSession || !invuOrderId) {
+    const tableSession = reservation.attributionSession?.tableSession;
+    const invuOrderId = tableSession?.openedInvuOrderId;
+    if (!tableSession || !invuOrderId) {
     return NextResponse.json({ ok: false, error: "Bind the open INVU order before syncing its close" }, { status: 409 });
-  }
+    }
 
   // A tight pull keeps the operational action fast while allowing normal
   // INVU endpoint delays. The sync service safely de-duplicates records.
-  await pullLast7DaysClosedOrders({
+    await pullLast7DaysClosedOrders({
     venueId: reservation.venueId,
     triggeredByUserId: userId,
     windowMinutes: 120,
-  });
+    });
 
-  const synced = await prisma.tableSession.findUnique({
+    const synced = await prisma.tableSession.findUnique({
     where: { id: tableSession.id },
     select: {
       invuOrderId: true,
@@ -69,14 +70,21 @@ export async function POST(
         select: { earnerType: true, amountCents: true, status: true },
       },
     },
-  });
+    });
 
-  if (!synced?.closedAt || synced.invuOrderId !== invuOrderId) {
+    if (!synced?.closedAt || synced.invuOrderId !== invuOrderId) {
     return NextResponse.json({
       ok: false,
       error: `INVU has not returned a closed check for ${invuOrderId} yet. Try again shortly; no manual total is required.`,
     }, { status: 409 });
-  }
+    }
 
-  return NextResponse.json({ ok: true, invuOrderId, tableSession: synced });
+    return NextResponse.json({ ok: true, invuOrderId, tableSession: synced });
+  } catch (error) {
+    console.error("Host INVU close sync failed", error);
+    return NextResponse.json(
+      { ok: false, error: "Could not sync the INVU close. Please try again; if it persists, check the INVU connection." },
+      { status: 502 }
+    );
+  }
 }
