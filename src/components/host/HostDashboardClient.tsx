@@ -221,6 +221,16 @@ function ReservationCard({ res, onAction }: {
   const conceptColor = CONCEPT_COLOR[res.conceptRequested ?? ""] ?? "#6b7280";
   const isFinal = ["COMPLETED", "CANCELLED"].includes(res.status);
   const isLost = res.status === "NO_SHOW";
+  const boundInvuOrderId =
+    res.attributionSession?.tableSession?.openedInvuOrderId ??
+    res.attributionSession?.bindings?.[0]?.invuOrderId ?? null;
+  // An accidental completion before an INVU bind is recoverable.  Once a POS
+  // order or revenue exists, reopening would make the financial audit trail
+  // ambiguous, so the server and UI both refuse it.
+  const canReopenForInvu =
+    res.status === "COMPLETED" &&
+    !boundInvuOrderId &&
+    res.actualRevenueCents == null;
   const isStreetside = res.source === "STREETSIDE_HOST";
   const isWaiting = ["PENDING", "CONFIRMED", "ACKNOWLEDGED", "ARRIVED"].includes(res.status);
 
@@ -437,6 +447,23 @@ function ReservationCard({ res, onAction }: {
                   </div>
                 )}
               </div>
+              {canReopenForInvu && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(200,169,110,0.18)" }}>
+                  <div style={{ fontSize: 11, color: "#d1d5db", lineHeight: 1.45, marginBottom: 8 }}>
+                    No INVU check is bound. If this table was completed by mistake, reopen it to <strong>Seated</strong> and bind the actual open INVU check before closing it again.
+                  </div>
+                  <QuickBtn
+                    label="Reopen for INVU binding"
+                    color="#c8a96e"
+                    disabled={updating}
+                    onClick={() => {
+                      if (window.confirm("Reopen this completed reservation to Seated for INVU binding? No POS order or revenue is attached.")) {
+                        act("SEATED");
+                      }
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 

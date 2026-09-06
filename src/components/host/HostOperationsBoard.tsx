@@ -50,6 +50,7 @@ type Reservation = {
   reservationDate: string;
   source: string;
   assignedTableLabel?: string | null;
+  actualRevenueCents?: number | null;
   commissionEligible?: boolean;
   arrivalConfirmedAt?: string | null;
   seatedAt?: string | null;
@@ -72,6 +73,8 @@ type Reservation = {
     status: string;
     referralActor:  { id: string; displayName: string; actorType: string } | null;
     legacyReferrer: { id: string; fullName: string;    referrerType: string } | null;
+    tableSession?: { openedInvuOrderId: string | null } | null;
+    bindings?: Array<{ invuOrderId: string }>;
   } | null;
   addons: Addon[];
   statusLogs: StatusLog[];
@@ -418,6 +421,12 @@ function GuestDrawer({
     SEATED:       [{ labelKey: "operations.actComplete",    status: "COMPLETED",    color: "#475569" }],
   };
 
+  const boundInvuOrderId =
+    res.attributionSession?.tableSession?.openedInvuOrderId ??
+    res.attributionSession?.bindings?.[0]?.invuOrderId ?? null;
+  const canReopenForInvu =
+    res.status === "COMPLETED" && !boundInvuOrderId && res.actualRevenueCents == null;
+
   const actions = STATUS_ACTIONS[res.status] ?? [];
   const approvalSpaces = scheduledSpaces.filter((space) => space.isActive && space.reservable);
 
@@ -735,6 +744,22 @@ function GuestDrawer({
                   : ""}
               </button>;
             })}
+            {canReopenForInvu && (
+              <div style={{ marginTop: 6, padding: "10px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde68a" }}>
+                <div style={{ fontSize: 11, color: "#92400e", marginBottom: 8 }}>
+                  No INVU check is bound. Recover an accidental completion before recording any POS close.
+                </div>
+                <ActionButton
+                  label="Reopen to Seated for INVU binding"
+                  color="#b45309"
+                  onClick={() => {
+                    if (window.confirm("Reopen this completed reservation to Seated for INVU binding? No POS order is attached.")) {
+                      onAction(res.id, "SEATED");
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1000,7 +1025,7 @@ export default function HostOperationsBoard({
       {/* Overlay when drawer open */}
       {activeRes && <div onClick={() => setActiveRes(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.18)", zIndex: 100 }} />}
 
-      {/* Sticky top nav — Platform return */}
+      {/* Sticky top nav — explicit return to the operational dashboard */}
       <header style={{
         position: "sticky", top: 0, zIndex: 150,
         background: "rgba(13,13,15,0.96)",
@@ -1016,14 +1041,14 @@ export default function HostOperationsBoard({
               {t("host", "operations.boardTitle")}
             </span>
           </div>
-          <a href="/en" style={{
+          <a href="/host/dashboard" style={{
             display: "flex", alignItems: "center", gap: 6,
             fontSize: 12, fontWeight: 600, color: "#9ca3af",
             textDecoration: "none", padding: "6px 12px",
             border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8,
             background: "rgba(255,255,255,0.04)",
           }}>
-            ← {t("host", "operations.platform")}
+            ← Host dashboard
           </a>
         </div>
       </header>
