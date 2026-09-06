@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { MatchMethod, TableSessionStatus, ReviewQueueStatus } from "@prisma/client";
+import { InvuPayloadType, MatchMethod, SyncRunStatus, TableSessionStatus, ReviewQueueStatus } from "@prisma/client";
 import { runInvuSyncForVenue } from "./invuSyncService";
+import { decrypt } from "./invuEncryptionService";
+import { getInvoiceByNumCita } from "@/lib/invu/client";
+import { storeRawAndNormalize } from "./invuNormalizationService";
+import { aggregateToTableSession } from "./invuAggregationService";
 
 /**
  * INVU Closed Orders — admin demo panel service.
@@ -156,6 +160,108 @@ export async function pullLast7DaysClosedOrders(params: {
   await runInvuSyncForVenue(venueId, mappingId, syncRun.id, windowMinutes);
 
   return { syncRunId: syncRun.id };
+}
+
+/**
+ * Deterministically sync one host-bound INVU ticket. The bound identifier is
+ * INVU's `num_cita`, so this never depends on a time-range report arriving in
+ * time. Only a confirmed closed invoice is sent to aggregation/minting.
+ */
+export async function pullBoundClosedOrder(params: {
+  venueId: string;
+  invuOrderId: string;
+  triggeredByUserId?: string;
+}): Promise<{ found: boolean; closed: boolean }> {
+  const { mappingId, credentialId } = await ensureBranchMapping(params.venueId);
+  const syncRun = await prisma.integrationSyncRun.create({
+    data: {
+      credentialId,
+      venueId: params.venueId,
+      branchMappingId: mappingId,
+      scopeType: "CLOSED_ORDERS",
+      triggeredByUserId: params.triggeredByUserId ?? null,
+      status: "STARTED",
+      checkpointStart: new Date(),
+      checkpointEnd: new Date(),
+    },
+    select: { id: true },
+  });
+
+  try {
+    const mapping = await prisma.integrationBranchMapping.findUniqueOrThrow({
+      where: { id: mappingId },
+      include: { credential: true },
+    });
+    const encrypted = mapping.credential.accessTokenEncrypted ?? mapping.credential.apiPasswordEncrypted;
+    if (!encrypted) throw new Error("INVU credential has no usable access token");
+
+    const invoice = await getInvoiceByNumCita(decrypt(encrypted), params.invuOrderId);
+    if (!invoice) {
+      await completeBoundPull(syncRun.id, mappingId, "SUCCESS", 0);
+      return { found: false, closed: false };
+    }
+
+    // `id` is deliberately the host-bound num_cita. Keep the provider's own
+    // field separately for audit while preserving deterministic matching to
+    // the existing table session.
+    const payload = {
+      ...invoice,
+      invuProviderOrderId: invoice.id ?? null,
+      id: params.invuOrderId,
+    };
+    const stored = await storeRawAndNormalize({
+      syncRunId: syncRun.id,
+      venueId: params.venueId,
+      branchMappingId: mappingId,
+      payloadType: InvuPayloadType.CLOSED_ORDER,
+      payload,
+    });
+    const normalized = stored.skipped
+      ? await prisma.invuOrderNormalized.findFirstOrThrow({
+          where: { rawRecordId: stored.rawId },
+          orderBy: { createdAt: "desc" },
+        })
+      : await prisma.invuOrderNormalized.findUniqueOrThrow({ where: { id: stored.normalizedId } });
+    const isClosed = normalized.statusCanonical === "CLOSED";
+    if (!isClosed) {
+      await completeBoundPull(syncRun.id, mappingId, "SUCCESS", 0);
+      return { found: true, closed: false };
+    }
+
+    await aggregateToTableSession({
+      normalized,
+      venueId: params.venueId,
+      syncRunId: syncRun.id,
+    });
+    await completeBoundPull(syncRun.id, mappingId, "SUCCESS", 1);
+    return { found: true, closed: true };
+  } catch (error) {
+    await completeBoundPull(syncRun.id, mappingId, "FAILED", 0);
+    throw error;
+  }
+}
+
+async function completeBoundPull(
+  syncRunId: string,
+  mappingId: string,
+  status: SyncRunStatus,
+  ordersPulledCount: number
+): Promise<void> {
+  const now = new Date();
+  await prisma.integrationSyncRun.update({
+    where: { id: syncRunId },
+    data: {
+      status,
+      ordersPulledCount,
+      matchedCount: ordersPulledCount,
+      finishedAt: now,
+      syncedAt: now,
+    },
+  });
+  await prisma.integrationBranchMapping.update({
+    where: { id: mappingId },
+    data: status === "SUCCESS" ? { lastSuccessfulSyncAt: now } : { lastFailedSyncAt: now },
+  });
 }
 
 export async function getClosedOrdersOverview(params: {
