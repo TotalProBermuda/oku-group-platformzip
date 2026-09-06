@@ -290,7 +290,17 @@ function ReservationCard({ res, onAction }: {
       if (!d) {
         throw new Error(`INVU sync returned an empty response (HTTP ${r.status}). Please try again or check the INVU connection.`);
       }
-      if (!d.ok) throw new Error(d.error);
+      if (!d.ok) {
+        const diagnostic = Array.isArray(d.diagnostic)
+          ? d.diagnostic.map((probe: any) => {
+              const count = Object.values(probe.arrayCounts ?? {})
+                .reduce((sum: number, value: unknown) => sum + (typeof value === "number" ? value : 0), 0);
+              const match = probe.containsInternalOrderId || probe.containsPublicOrderNumber;
+              return `${probe.probe}: HTTP ${probe.httpStatus}, ${count} records${match ? ", matched" : ""}`;
+            }).join("; ")
+          : "";
+        throw new Error(`${d.error}${diagnostic ? `\n\nRead-only diagnostic: ${diagnostic}` : ""}`);
+      }
       setInvuSyncResult(d.tableSession);
     } catch (e: any) {
       alert(e.message);
