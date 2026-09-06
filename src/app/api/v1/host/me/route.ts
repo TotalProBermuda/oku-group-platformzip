@@ -191,6 +191,39 @@ export async function GET() {
         })
       : [];
 
+    // A table can be seated and bound late in the night, then its POS close
+    // can arrive after the active-queue window rolls over. Keep those
+    // actionable, bound-but-unverified reservations visible for the same
+    // seven-day period as closed reservations. This deliberately limits the
+    // carry-over list to SEATED rows with an open bound table session: old
+    // unconfirmed bookings and already-settled tables must not reappear.
+    const unresolvedBoundReservations = (isRestaurantHost && venue)
+      ? await prisma.reservation.findMany({
+          where: {
+            venueId: venue.id,
+            reservationDate: { gte: closedWindowStart, lt: windowStart },
+            status: "SEATED",
+            attributionSession: {
+              tableSession: {
+                is: {
+                  openedInvuOrderId: { not: null },
+                  closedAt: null,
+                },
+              },
+            },
+          },
+          include: reservationInclude,
+          orderBy: { reservationDate: "desc" as const },
+          take: 100,
+        })
+      : [];
+
+    // Feed carry-over POS work through the existing host-card controls. The
+    // date ranges are intentionally non-overlapping, so a reservation is
+    // never duplicated in the queue. Hosts can use the normal "Sync closed
+    // INVU check" control without reopening or recreating the reservation.
+    const actionableReservations = [...todayReservations, ...unresolvedBoundReservations];
+
     const closedReservations = (isRestaurantHost && venue)
       ? await prisma.reservation.findMany({
           where: {
@@ -209,7 +242,7 @@ export async function GET() {
     // user names in one query so the front-end can render "Walked in by
     // <name>" without N+1 calls or another schema relation.
     const hostUserIdSet = new Set<string>();
-    for (const r of [...todayReservations, ...closedReservations]) {
+    for (const r of [...actionableReservations, ...closedReservations]) {
       const id = (r as { attributionSession?: { hostUserId?: string | null } | null })
         .attributionSession?.hostUserId;
       if (id) hostUserIdSet.add(id);
@@ -408,7 +441,7 @@ export async function GET() {
         // profiled hosts, who use personalReferrerAssignment.referralCode).
         streetsideReferralCode,
         provisionFailed,
-        todayReservations,
+        todayReservations: actionableReservations,
         // Closed within the last 7 days at this venue. Powers the host
         // dashboard's Closed tab + stats chip. Empty for non-restaurant
         // hosts (their Closed view is currently scoped to mySubmissions).
