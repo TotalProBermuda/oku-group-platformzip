@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
 import { pullLast7DaysClosedOrders } from "@/server/services/invu/invuClosedOrdersService";
+import { diagnoseMissingInvuClose } from "@/server/services/invu/invuCloseDiagnosticService";
 
 // Pull the recently closed, already-bound INVU check and let the normal INVU
 // aggregation/minting pipeline be the sole authority for totals and commission.
@@ -73,9 +74,14 @@ export async function POST(
     });
 
     if (!synced?.closedAt || synced.invuOrderId !== invuOrderId) {
-    return NextResponse.json({
+      const diagnostic = await diagnoseMissingInvuClose({
+        venueId: reservation.venueId,
+        internalOrderId: invuOrderId,
+      });
+      return NextResponse.json({
       ok: false,
       error: `INVU has not returned a closed check for ${invuOrderId} yet. Try again shortly; no manual total is required.`,
+      diagnostic,
     }, { status: 409 });
     }
 
