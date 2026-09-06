@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import CompensationPlanPicker from "@/components/admin/CompensationPlanPicker";
+import CommissionProgramEditor from "@/components/admin/CommissionProgramEditor";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 
 const ALL_ROLES = [
@@ -50,17 +50,6 @@ const REFERRER_TYPE_LABELS: Record<string, string> = {
   TOUR_GUIDE:       "Tour Guide",
   HOTEL_CONCIERGE:  "Hotel Concierge",
   PARTNER:          "Partner",
-};
-
-const COMP_MODEL_LABELS: Record<string, string> = {
-  COMMISSION_ONLY:              "Commission Only",
-  COMMISSION_PLUS_HOURLY:       "Commission + Hourly",
-  HOURLY_ONLY:                  "Hourly Only",
-  FIXED_SALARY:                 "Fixed Salary",
-  FIXED_SALARY_PLUS_COMMISSION: "Salary + Commission",
-  FLAT_PER_SEATED_PARTY:        "Flat Per Party",
-  FLAT_PER_SEATED_COVER:        "Flat Per Cover",
-  CUSTOM:                       "Custom",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -335,7 +324,6 @@ export default function UserDrawer({
                     <Stat label="Status"     value={user.status} />
                     <Stat label="Roles"      value={user.roles?.map((r: any) => ROLE_LABELS[r.roleKey] ?? r.roleKey).join(", ") || "None"} />
                     <Stat label="Persona"    value={user.referrer ? (REFERRER_TYPE_LABELS[user.referrer.referrerType] || user.referrer.referrerType) : "None"} />
-                    <Stat label="Plan"       value={user.referrer?.compensationPlan ? COMP_MODEL_LABELS[user.referrer.compensationPlan.modelType] || user.referrer.compensationPlan.modelType : "—"} />
                     {user.suspendedAt && <Stat label="Suspended"  value={fmtDate(user.suspendedAt)} />}
                     {user.suspensionReason && <Stat label="Reason" value={user.suspensionReason} />}
                     {user.lockedAt && <Stat label="Locked"      value={fmtDate(user.lockedAt)} />}
@@ -395,7 +383,7 @@ export default function UserDrawer({
                     <SectionTitle>Commercial Persona</SectionTitle>
                     <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 16 }}>
                       A commercial persona defines how this user participates in revenue generation — as a Streetside Host, Concierge, Taxi Driver, etc.
-                      This is separate from their access role and determines which compensation plan applies.
+                      This is separate from their access role and determines which commission program applies.
                     </p>
 
                     {user.referrer ? (
@@ -431,37 +419,14 @@ export default function UserDrawer({
                         </div>
 
                         <div style={{ marginTop: 16, padding: "12px 16px", background: "#fff", borderRadius: 8, border: "1px solid var(--color-border)" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 8 }}>Compensation Plan</div>
-                          {user.referrer.compensationPlan ? (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontWeight: 600 }}>{user.referrer.compensationPlan.name}</div>
-                              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
-                                {COMP_MODEL_LABELS[user.referrer.compensationPlan.modelType] || user.referrer.compensationPlan.modelType}
-                                {user.referrer.compensationPlan.flatPerCoverCents > 0 && (
-                                  <> · ${(user.referrer.compensationPlan.flatPerCoverCents / 100).toFixed(2)} per cover</>
-                                )}
-                                {user.referrer.compensationPlan.commissionPercent && (
-                                  <> · {Number(user.referrer.compensationPlan.commissionPercent)}% commission</>
-                                )}
-                                {user.referrer.compensationPlan.hourlyRateCents > 0 && (
-                                  <> · ${(user.referrer.compensationPlan.hourlyRateCents / 100).toFixed(2)}/hr</>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 12 }}>No plan assigned</div>
-                          )}
-                          <CompensationPlanPicker
+                          <CommissionProgramEditor
                             userId={userId}
-                            currentPlanId={user.referrer.compensationPlan?.id ?? null}
-                            currentPlanName={user.referrer.compensationPlan?.name ?? null}
-                            plans={compensation?.plans ?? undefined}
                             readOnly={!canEditUsers}
                             onSaved={() => { fetchUser(); fetchCompensation(); fetchAudit(); }}
                           />
                           {!canEditUsers && (
                             <div style={{ fontSize: 11, color: "#9ca3af", marginTop: -8, fontStyle: "italic" }}>
-                              Read-only — your role cannot change compensation plans.
+                              Read-only — your role cannot change commission programs.
                             </div>
                           )}
                         </div>
@@ -480,7 +445,7 @@ export default function UserDrawer({
                       <div style={{ padding: "24px", background: "#f8f5f3", borderRadius: 12, border: "1px dashed var(--color-border)" }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>No Commercial Persona Linked</div>
                         <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16, lineHeight: 1.6 }}>
-                          A commercial persona connects this user to a Referrer profile — which determines their referral code, type (Tour Guide, Taxi Driver, etc.), and compensation plan.
+                          A commercial persona connects this user to a Referrer profile — which determines their referral code, type (Tour Guide, Taxi Driver, etc.), and commission program.
                           Select an existing unlinked Referrer profile below to attach one.
                         </div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

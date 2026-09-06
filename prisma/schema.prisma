@@ -40,6 +40,7 @@ enum UserAdminAction {
   SEAT_REVOKED
   SEAT_REMOVED
   SEAT_COMMISSION_UPDATED
+  REFERRER_COMMISSION_PROGRAM_UPDATED
 }
 
 enum RoleKey {
@@ -3472,6 +3473,9 @@ model ReferralActor {
   /// Commission tier for rule resolution (levels 4 and 6). Null = falls
   /// to venue or global STANDARD default.
   commissionTier   CommissionTierType?
+  /// Explicit payout gate. Attribution remains visible when false, but INVU
+  /// closeout must not mint a commission allocation for this actor.
+  commissionEligible Boolean @default(false)
 
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id])

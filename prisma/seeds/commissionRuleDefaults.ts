@@ -19,35 +19,39 @@ const prisma = new PrismaClient();
 const DEFAULT_RULES = [
   {
     tier: "STANDARD" as const,
-    label: "Global STANDARD default — 5% (starting point; edit via admin panel)",
+    label: "Driver / open network — 5% up to $75",
     percentageBps: 500,   // 5.00%
-    percentageCapCents: null,
+    percentageCapCents: 7500,
     perPersonCents: null,
-    maxTakeRateBps: null,
+    maxTakeRateBps: 500,
+    revenueBasis: "COMMISSIONABLE_CENTS" as const,
   },
   {
     tier: "TRUSTED" as const,
-    label: "Global TRUSTED — 6% (starting point; edit via admin panel)",
-    percentageBps: 600,   // 6.00%
-    percentageCapCents: null,
+    label: "Verified tour guide — 10% up to $250",
+    percentageBps: 1000,  // 10.00%
+    percentageCapCents: 25000,
     perPersonCents: null,
-    maxTakeRateBps: null,
+    maxTakeRateBps: 1000,
+    revenueBasis: "COMMISSIONABLE_CENTS" as const,
   },
   {
     tier: "PREMIUM" as const,
-    label: "Global PREMIUM — 8% (starting point; edit via admin panel)",
-    percentageBps: 800,   // 8.00%
-    percentageCapCents: null,
+    label: "Premium hotel concierge / doorman — 10% up to $350",
+    percentageBps: 1000,  // 10.00%
+    percentageCapCents: 35000,
     perPersonCents: null,
-    maxTakeRateBps: null,
+    maxTakeRateBps: 1000,
+    revenueBasis: "COMMISSIONABLE_CENTS" as const,
   },
   {
     tier: "PRIVATE_EVENT" as const,
-    label: "Global PRIVATE_EVENT — 10% (starting point; edit via admin panel)",
-    percentageBps: 1000,  // 10.00%
+    label: "Strategic events — negotiated rule required",
+    percentageBps: 0,
     percentageCapCents: null,
     perPersonCents: null,
     maxTakeRateBps: null,
+    revenueBasis: "MANUAL_REVIEW" as const,
   },
 ] as const;
 
@@ -70,7 +74,7 @@ export async function seedCommissionRuleDefaults(db = prisma) {
         tier: rule.tier,
         scopeType: "GLOBAL",
         scopeId: null,
-        revenueBasis: "COMMISSIONABLE_CENTS",
+        revenueBasis: rule.revenueBasis,
         percentageBps: rule.percentageBps,
         percentageCapCents: rule.percentageCapCents,
         perPersonCents: rule.perPersonCents,

@@ -2520,10 +2520,10 @@ async function ensureCommissionRuleDefaults() {
   // These are starting points that SUPERADMIN can adjust via the admin panel.
   // Only creates rules if no GLOBAL rule for a given tier already exists.
   const tiers = [
-    { tier: "STANDARD", percentageBps: 500, label: "Global STANDARD default — 5% (starting point; edit via admin panel)" },
-    { tier: "TRUSTED",  percentageBps: 600, label: "Global TRUSTED — 6% (starting point; edit via admin panel)" },
-    { tier: "PREMIUM",  percentageBps: 800, label: "Global PREMIUM — 8% (starting point; edit via admin panel)" },
-    { tier: "PRIVATE_EVENT", percentageBps: 1000, label: "Global PRIVATE_EVENT — 10% (starting point; edit via admin panel)" },
+    { tier: "STANDARD", percentageBps: 500, percentageCapCents: 7500, maxTakeRateBps: 500, revenueBasis: "COMMISSIONABLE_CENTS", label: "Driver / open network — 5% up to $75" },
+    { tier: "TRUSTED", percentageBps: 1000, percentageCapCents: 25000, maxTakeRateBps: 1000, revenueBasis: "COMMISSIONABLE_CENTS", label: "Verified tour guide — 10% up to $250" },
+    { tier: "PREMIUM", percentageBps: 1000, percentageCapCents: 35000, maxTakeRateBps: 1000, revenueBasis: "COMMISSIONABLE_CENTS", label: "Premium hotel concierge / doorman — 10% up to $350" },
+    { tier: "PRIVATE_EVENT", percentageBps: 0, percentageCapCents: null, maxTakeRateBps: null, revenueBasis: "MANUAL_REVIEW", label: "Strategic events — negotiated rule required" },
   ] as const;
 
   for (const r of tiers) {
@@ -2537,8 +2537,10 @@ async function ensureCommissionRuleDefaults() {
         tier: r.tier,
         scopeType: "GLOBAL",
         scopeId: null,
-        revenueBasis: "COMMISSIONABLE_CENTS",
+        revenueBasis: r.revenueBasis,
         percentageBps: r.percentageBps,
+        percentageCapCents: r.percentageCapCents,
+        maxTakeRateBps: r.maxTakeRateBps,
         version: 1,
         active: true,
         label: r.label,
