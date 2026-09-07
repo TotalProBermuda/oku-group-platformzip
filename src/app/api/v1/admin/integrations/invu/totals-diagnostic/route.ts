@@ -31,7 +31,17 @@ async function runDiagnostic(params: { venueId?: string; boundOrderId?: string }
   let venueId = params.venueId?.trim() ?? "";
   if (!venueId) {
     const boundSession = await prisma.tableSession.findFirst({
-      where: { invuOrderId: boundOrderId },
+      // A host bind is persisted as `openedInvuOrderId`. `invuOrderId` is
+      // populated only after a closed INVU order has been normalized, so a
+      // diagnostic for the exact binding must accept either lifecycle field.
+      // This mirrors the host close-sync route, which reads
+      // `openedInvuOrderId` before it attempts the provider lookup.
+      where: {
+        OR: [
+          { openedInvuOrderId: boundOrderId },
+          { invuOrderId: boundOrderId },
+        ],
+      },
       select: { venueId: true },
       orderBy: { updatedAt: "desc" },
     });
