@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
-import { MatchMethod, ReservationStatus, TableSessionStatus } from "@prisma/client";
+import {
+  CommissionAllocationStatus,
+  CommissionEligibilityStatus,
+  DeterministicMatchStatus,
+  InvuSyncStatus,
+  MatchMethod,
+  ReservationStatus,
+  TableSessionStatus,
+} from "@prisma/client";
 
 // POST /api/v1/host/bookings/[id]/close
 // Called when a host records an INVU table close.
@@ -9,6 +17,11 @@ import { MatchMethod, ReservationStatus, TableSessionStatus } from "@prisma/clie
 // the submitted commissionPercent only when no plan is configured.
 // All writes (reservation update, table session, allocations, status log)
 // are executed inside a single Prisma transaction to ensure consistency.
+//
+// This is the explicitly-labelled fallback for a bound table when INVU's
+// read credential cannot retrieve a closed check. It never writes to INVU.
+// A later manual correction replaces only PENDING allocations on the same
+// table session; it cannot duplicate or rewrite a paid commission.
 
 export async function POST(
   req: NextRequest,
@@ -18,11 +31,14 @@ export async function POST(
   const isSuperAdmin = roles.includes("SUPERADMIN");
   const { tableTotalCents, commissionPercent } = await req.json();
 
-  if (!tableTotalCents || tableTotalCents <= 0) {
+  if (!Number.isInteger(tableTotalCents) || tableTotalCents <= 0) {
     return NextResponse.json({ ok: false, error: "tableTotalCents is required and must be > 0" }, { status: 400 });
   }
 
   const fallbackPct = parseFloat(commissionPercent ?? "5");
+  if (!Number.isFinite(fallbackPct) || fallbackPct < 0 || fallbackPct > 100) {
+    return NextResponse.json({ ok: false, error: "commissionPercent must be between 0 and 100" }, { status: 400 });
+  }
 
   const reservation = await prisma.reservation.findUnique({
     where: { id: params.id },
@@ -57,6 +73,14 @@ export async function POST(
         select: {
           referralActorId: true,
           legacyReferrerId: true,
+          tableSession: {
+            select: {
+              id: true,
+              openedInvuOrderId: true,
+              matchMethod: true,
+              allocations: { select: { id: true, status: true } },
+            },
+          },
           referralActor: {
             select: {
               id: true,
@@ -93,14 +117,47 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
-  // Idempotency guard: return 409 if a MANUAL TableSession already exists for this reservation.
+  // Historical versions created a second MANUAL TableSession for a bound
+  // booking. Keep it correctable for backwards compatibility, but new closes
+  // update the attribution's canonical table session in place.
   const existingManualSession = await prisma.tableSession.findFirst({
     where: { reservationId: params.id, matchMethod: MatchMethod.MANUAL },
-    select: { id: true, grossCents: true, closedAt: true },
+    select: {
+      id: true,
+      grossCents: true,
+      closedAt: true,
+      allocations: { select: { id: true, status: true } },
+    },
   });
-  if (existingManualSession) {
+
+  const canonicalSession = reservation.attributionSession?.tableSession ?? null;
+  if (reservation.attributionSession && !canonicalSession?.openedInvuOrderId) {
     return NextResponse.json(
-      { ok: false, error: "A manual table session already exists for this reservation", tableSessionId: existingManualSession.id },
+      { ok: false, error: "Bind the open INVU check before recording a manual fallback close" },
+      { status: 409 }
+    );
+  }
+  const manualSession =
+    canonicalSession?.matchMethod === MatchMethod.MANUAL
+      ? canonicalSession
+      : existingManualSession;
+
+  // Never silently overwrite an INVU-confirmed financial close. Manual
+  // correction is intentionally limited to manual fallback data.
+  if (reservation.actualRevenueCents != null && !manualSession) {
+    return NextResponse.json(
+      { ok: false, error: "This reservation was already closed from INVU and cannot be replaced manually" },
+      { status: 409 }
+    );
+  }
+
+  if (manualSession?.allocations.some((allocation) => allocation.status !== CommissionAllocationStatus.PENDING)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "This manual close already has a non-pending commission. Use the payout correction workflow instead.",
+        tableSessionId: manualSession.id,
+      },
       { status: 409 }
     );
   }
@@ -202,7 +259,8 @@ export async function POST(
   const referrerPlanPct = referrerPlanSource === "compensation_plan" ? referrerPct : null;
 
   const closedAt = new Date();
-  const noteText = `INVU table closed: $${(tableTotalCents / 100).toFixed(2)} · Host commission (${hostPct}%): $${(hostCommissionCents / 100).toFixed(2)}${referrerId ? ` · Referrer commission (${referrerPct}%): $${(referrerCommissionCents / 100).toFixed(2)}` : ""}`;
+  const correction = !!manualSession;
+  const noteText = `Manual fallback close${correction ? " corrected" : ""}: $${(tableTotalCents / 100).toFixed(2)} · Host commission (${hostPct}%): $${(hostCommissionCents / 100).toFixed(2)}${referrerId ? ` · Referrer commission (${referrerPct}%): $${(referrerCommissionCents / 100).toFixed(2)}` : ""}`;
 
   // --- Atomic transaction: reservation update + table session + allocations + status log ---
   const tableSession = await prisma.$transaction(async (tx) => {
@@ -216,25 +274,40 @@ export async function POST(
       },
     });
 
-    // 2. Create a TableSession for this manual host close
-    const session = await tx.tableSession.create({
-      data: {
-        venueId: reservation.venueId,
-        reservationId: params.id,
-        tableLabel: reservation.assignedTableLabel,
-        closedAt,
-        grossCents: tableTotalCents,
-        discountCents: 0,
-        taxCents: 0,
-        tipCents: 0,
-        refundCents: 0,
-        netRevenueCents: tableTotalCents,
-        commissionableCents: tableTotalCents,
-        matchMethod: MatchMethod.MANUAL,
-        trustScore: 1.0,
-        status: TableSessionStatus.MATCHED,
-      },
-    });
+    // 2. Use the bound table session where possible. This retains the INVU
+    // order link so an eventual provider repair can reconcile the record
+    // rather than creating a second, competing table session.
+    const manualCloseData = {
+      reservationId: params.id,
+      tableLabel: reservation.assignedTableLabel,
+      ...(canonicalSession?.openedInvuOrderId ? { invuOrderId: canonicalSession.openedInvuOrderId } : {}),
+      closedAt,
+      grossCents: tableTotalCents,
+      discountCents: 0,
+      taxCents: 0,
+      tipCents: 0,
+      refundCents: 0,
+      netRevenueCents: tableTotalCents,
+      commissionableCents: tableTotalCents,
+      matchMethod: MatchMethod.MANUAL,
+      matchStatus: DeterministicMatchStatus.MANUALLY_OVERRIDDEN,
+      syncStatus: InvuSyncStatus.CLOSED,
+      commissionEligibility: CommissionEligibilityStatus.OVERRIDE_LOCKED,
+      trustScore: 1.0,
+      status: TableSessionStatus.MATCHED,
+    };
+    const session = manualSession
+      ? await tx.tableSession.update({ where: { id: manualSession.id }, data: manualCloseData })
+      : canonicalSession
+        ? await tx.tableSession.update({ where: { id: canonicalSession.id }, data: manualCloseData })
+        : await tx.tableSession.create({ data: { venueId: reservation.venueId, ...manualCloseData } });
+
+    // Correction replaces the pending, manually-calculated allocations. The
+    // guard above ensures neither paid nor otherwise finalized allocations
+    // can be erased by a host correction.
+    if (manualSession) {
+      await tx.commissionAllocation.deleteMany({ where: { tableSessionId: session.id, status: CommissionAllocationStatus.PENDING } });
+    }
 
     // 3. Create CommissionAllocation for host if applicable
     if (reservation.assignedRestaurantHostId) {
@@ -283,7 +356,7 @@ export async function POST(
         fromStatus: reservation.status as ReservationStatus,
         toStatus: reservation.status as ReservationStatus,
         changedByUserId: userId,
-        changedByLabel: "HOST_INVU_CLOSE",
+        changedByLabel: correction ? "HOST_MANUAL_CLOSE_CORRECTED" : "HOST_MANUAL_CLOSE",
         notes: noteText,
       },
     });
@@ -296,6 +369,7 @@ export async function POST(
     data: {
       reservationId: params.id,
       tableSessionId: tableSession.id,
+      corrected: correction,
       tableTotalCents,
       host: {
         commissionPercent: hostPct,
