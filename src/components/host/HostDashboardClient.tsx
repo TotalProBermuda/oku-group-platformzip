@@ -196,7 +196,6 @@ function ReservationCard({ res, onAction }: {
   // only while every affected allocation is still pending.
   const [showManualClose, setShowManualClose] = useState(false);
   const [manualTotal, setManualTotal] = useState("");
-  const [manualCommissionPercent, setManualCommissionPercent] = useState("5");
   const [manualSaving, setManualSaving] = useState(false);
   const [manualResult, setManualResult] = useState<{
     totalCents: number;
@@ -323,12 +322,7 @@ function ReservationCard({ res, onAction }: {
 
   async function saveManualClose() {
     const totalUsd = Number(manualTotal);
-    const fallbackPercent = Number(manualCommissionPercent);
     if (!Number.isFinite(totalUsd) || totalUsd <= 0) return;
-    if (!Number.isFinite(fallbackPercent) || fallbackPercent < 0 || fallbackPercent > 100) {
-      alert("Enter a commission fallback between 0 and 100.");
-      return;
-    }
     const wording = manualResult
       ? "Replace the pending manual commission amounts with this corrected total?"
       : "Record this manual fallback close? Use this only when the bound INVU check cannot be read.";
@@ -341,7 +335,6 @@ function ReservationCard({ res, onAction }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tableTotalCents: Math.round(totalUsd * 100),
-          commissionPercent: fallbackPercent,
         }),
       });
       const d = await r.json();
@@ -666,12 +659,9 @@ function ReservationCard({ res, onAction }: {
             </div>
           )}
 
-          {/* Actions — standard flow.
-              Layout is intentionally tiered so the host's most common
-              real-world action ("seat this guest") is the obvious CTA at
-              every waiting stage — they shouldn't have to hunt for it on
-              the floor-control board or step through Acknowledge/Arrived
-              first when the guest is already standing in front of them. */}
+          {/* Actions follow the customer journey: arrive → assign a physical
+              table & seat → bind the open POS check → close. Seating must go
+              through Floor Control because a table assignment is mandatory. */}
           {!isFinal && !isLost && !showLoss && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {res.status === "PENDING_APPROVAL" && (
@@ -686,27 +676,40 @@ function ReservationCard({ res, onAction }: {
                   Review &amp; confirm
                 </Link>
               )}
-              {/* Primary CTA — "Seat" reachable from any waiting state */}
-              {["PENDING", "CONFIRMED", "WAITLISTED", "ACKNOWLEDGED", "ARRIVED"].includes(res.status) && (
+              {["CONFIRMED", "ACKNOWLEDGED"].includes(res.status) && (
                 <button
                   type="button"
                   disabled={updating}
-                  onClick={() => act("SEATED")}
+                  onClick={() => act("ARRIVED")}
                   style={{
                     width: "100%", padding: "14px 18px", borderRadius: 10,
+                    border: "1px solid rgba(52,211,153,0.45)",
+                    background: "rgba(52,211,153,0.12)", color: "#a7f3d0",
+                    fontSize: 15, fontWeight: 800, letterSpacing: "0.02em",
+                    cursor: updating ? "not-allowed" : "pointer", opacity: updating ? 0.6 : 1,
+                  }}
+                >
+                  Mark arrived
+                </button>
+              )}
+              {res.status === "ARRIVED" && (
+                <Link
+                  href={`/host/operations?reservationId=${encodeURIComponent(res.id)}`}
+                  style={{
+                    display: "block", width: "100%", boxSizing: "border-box", padding: "14px 18px", borderRadius: 10,
                     border: "1px solid rgba(16,185,129,0.5)",
                     background: "linear-gradient(180deg, rgba(16,185,129,0.22), rgba(16,185,129,0.12))",
                     color: "#a7f3d0", fontSize: 15, fontWeight: 800, letterSpacing: "0.02em",
-                    cursor: updating ? "not-allowed" : "pointer", opacity: updating ? 0.6 : 1,
-                    boxShadow: "0 1px 0 rgba(16,185,129,0.25) inset",
+                    textDecoration: "none", textAlign: "center", boxShadow: "0 1px 0 rgba(16,185,129,0.25) inset",
                   }}
                 >
-                  {t("host", "actions.seat")}
-                </button>
+                  Assign table &amp; seat guest
+                </Link>
               )}
 
-              {/* The closed INVU order is authoritative: never ask a host to
-                  enter a total or override a commission rate. */}
+              {/* The closed INVU order is authoritative. The manual fallback
+                  accepts the net sale only; configured commission rules are
+                  calculated server-side and cannot be edited by the host. */}
               {res.status === "SEATED" && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <QuickBtn label={t("host", "actions.complete")} color="#6b7280" disabled={updating} onClick={() => act("COMPLETED")} />
@@ -732,7 +735,7 @@ function ReservationCard({ res, onAction }: {
                     Manual fallback close
                   </div>
                   <div style={{ fontSize: 11, color: "#d1d5db", lineHeight: 1.45, marginBottom: 10 }}>
-                    Use only when the bound INVU check cannot be read. The bound order remains attached, INVU is never written to, and pending commissions can be corrected before payout.
+                    Use only when the bound INVU check cannot be read. Enter the pre-tax, pre-tip net sale only. The bound order remains attached, INVU is never written to, and the configured commission rule is applied automatically. Pending commissions can be corrected before payout.
                   </div>
                   {!boundInvuOrderId && (
                     <div style={{ fontSize: 11, color: "#fca5a5", marginBottom: 10 }}>
@@ -741,12 +744,8 @@ function ReservationCard({ res, onAction }: {
                   )}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
                     <label style={{ flex: "2 1 180px", fontSize: 10, color: "#9ca3af", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                      Closed total (USD)
+                      Net sale before tax &amp; tips (USD)
                       <input value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} type="number" min="0.01" step="0.01" placeholder="0.00" style={{ display: "block", boxSizing: "border-box", marginTop: 5, width: "100%", padding: "9px 10px", borderRadius: 8, color: "white", background: "rgba(0,0,0,0.25)", border: "1px solid rgba(245,158,11,0.35)" }} />
-                    </label>
-                    <label style={{ flex: "1 1 100px", fontSize: 10, color: "#9ca3af", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                      Fallback %
-                      <input value={manualCommissionPercent} onChange={(e) => setManualCommissionPercent(e.target.value)} type="number" min="0" max="100" step="0.5" style={{ display: "block", boxSizing: "border-box", marginTop: 5, width: "100%", padding: "9px 10px", borderRadius: 8, color: "white", background: "rgba(0,0,0,0.25)", border: "1px solid rgba(245,158,11,0.35)" }} />
                     </label>
                     <button disabled={manualSaving || !boundInvuOrderId || !manualTotal || Number(manualTotal) <= 0} onClick={saveManualClose} style={{ padding: "10px 14px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#1c1917", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: manualSaving || !boundInvuOrderId || !manualTotal || Number(manualTotal) <= 0 ? 0.5 : 1 }}>
                       {manualSaving ? "Recording…" : manualResult ? "Correct pending close" : "Record fallback close"}
@@ -771,9 +770,6 @@ function ReservationCard({ res, onAction }: {
                 )}
                 {["PENDING", "CONFIRMED", "WAITLISTED"].includes(res.status) && (
                   <QuickBtn label={t("host", "actions.acknowledge")} color="#818cf8" disabled={updating} onClick={() => act("ACKNOWLEDGED")} />
-                )}
-                {["CONFIRMED", "ACKNOWLEDGED"].includes(res.status) && (
-                  <QuickBtn label={t("host", "actions.arrived")} color="#34d399" disabled={updating} onClick={() => act("ARRIVED")} />
                 )}
                 <QuickBtn label={t("host", "actions.lost")} color="#f87171" disabled={updating} onClick={() => setShowLoss(true)} />
               </div>

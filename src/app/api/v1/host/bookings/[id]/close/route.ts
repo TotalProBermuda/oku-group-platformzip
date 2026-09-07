@@ -13,8 +13,9 @@ import {
 
 // POST /api/v1/host/bookings/[id]/close
 // Called when a host records an INVU table close.
-// Derives commission rates from active CompensationPlan records; falls back to
-// the submitted commissionPercent only when no plan is configured.
+// The host supplies only the pre-tax / pre-tip net sale. Commission rates are
+// derived from active CompensationPlan and referral-assignment records; the
+// platform fallback is used only when no configured rate exists.
 // All writes (reservation update, table session, allocations, status log)
 // are executed inside a single Prisma transaction to ensure consistency.
 //
@@ -29,16 +30,16 @@ export async function POST(
 ) {
   const { userId, roles } = await requireSession();
   const isSuperAdmin = roles.includes("SUPERADMIN");
-  const { tableTotalCents, commissionPercent } = await req.json();
+  const { tableTotalCents } = await req.json();
 
   if (!Number.isInteger(tableTotalCents) || tableTotalCents <= 0) {
     return NextResponse.json({ ok: false, error: "tableTotalCents is required and must be > 0" }, { status: 400 });
   }
 
-  const fallbackPct = parseFloat(commissionPercent ?? "5");
-  if (!Number.isFinite(fallbackPct) || fallbackPct < 0 || fallbackPct > 100) {
-    return NextResponse.json({ ok: false, error: "commissionPercent must be between 0 and 100" }, { status: 400 });
-  }
+  // Hosts never choose a commission rate. This last-resort rate matches the
+  // documented platform fallback and is reached only when the relevant plan
+  // or referral assignment has not been configured yet.
+  const fallbackPct = 5;
 
   const reservation = await prisma.reservation.findUnique({
     where: { id: params.id },
