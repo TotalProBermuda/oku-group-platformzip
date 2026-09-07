@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { authenticate, getClosedOrders, getInvoiceByNumCita, getInvoiceTotals } from "@/lib/invu/client";
+import { authenticate, getClosedOrders, getInvoiceByNumCita, getInvoiceTotals, probeInvoiceTotals } from "@/lib/invu/client";
 
 describe("INVU client", () => {
   it("does not copy an authentication response body into an error", async () => {
@@ -83,6 +83,24 @@ describe("INVU client", () => {
       expect.stringContaining("r=citas/OrdenesAllTotales/fini/0/ffin/0/tipo/1"),
       expect.objectContaining({ method: "GET" }),
     );
+    vi.unstubAllGlobals();
+  });
+
+  it("reports totals capability without returning a provider payload", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{"totales":[{"num_cita":"1-18-5017-48942","total":11}]}',
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(probeInvoiceTotals("vendor-token", "1-18-5017-48942", new Date(0), new Date(1))).resolves.toEqual({
+      accepted: true,
+      httpStatus: 200,
+      providerStatus: null,
+      recordCount: 1,
+      matchedBoundOrder: true,
+    });
     vi.unstubAllGlobals();
   });
 });
