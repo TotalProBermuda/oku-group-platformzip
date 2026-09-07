@@ -15,17 +15,30 @@ function isSuperadmin(session: unknown): boolean {
  * `OrdenesAllTotales` endpoint. It verifies capability without exposing a
  * token, raw provider payload, financial amounts, or customer data.
  */
-export async function POST(req: NextRequest) {
+async function runDiagnostic(params: { venueId?: string; boundOrderId?: string }) {
   const session = await getServerSession(authOptions);
   if (!isSuperadmin(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const venueId = typeof body?.venueId === "string" ? body.venueId : "";
-  const boundOrderId = typeof body?.boundOrderId === "string" ? body.boundOrderId.trim() : "";
-  if (!venueId || !boundOrderId) {
-    return NextResponse.json({ error: "venueId and boundOrderId are required" }, { status: 400 });
+  const boundOrderId = params.boundOrderId?.trim() ?? "";
+  if (!boundOrderId) {
+    return NextResponse.json({ error: "boundOrderId is required" }, { status: 400 });
+  }
+
+  // Host users know the order they bound, not the internal venue UUID. Resolve
+  // the scope server-side, after the superadmin gate, without returning it.
+  let venueId = params.venueId?.trim() ?? "";
+  if (!venueId) {
+    const boundSession = await prisma.tableSession.findFirst({
+      where: { invuOrderId: boundOrderId },
+      select: { venueId: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    venueId = boundSession?.venueId ?? "";
+  }
+  if (!venueId) {
+    return NextResponse.json({ error: "No bound table session was found for this order" }, { status: 404 });
   }
 
   const credential = await prisma.invuIntegrationCredential.findFirst({
@@ -50,4 +63,21 @@ export async function POST(req: NextRequest) {
     // Do not disclose unexpected provider, database, or cryptographic details.
     return NextResponse.json({ error: "Invoice totals diagnostic could not be completed" }, { status: 502 });
   }
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  return runDiagnostic({
+    venueId: typeof body?.venueId === "string" ? body.venueId : undefined,
+    boundOrderId: typeof body?.boundOrderId === "string" ? body.boundOrderId : undefined,
+  });
+}
+
+// GET is deliberately read-only and lets a signed-in superadmin run the
+// redacted probe directly from the production host screen. It accepts only
+// the already-known bound order number; the venue remains server-side.
+export async function GET(req: NextRequest) {
+  return runDiagnostic({
+    boundOrderId: req.nextUrl.searchParams.get("boundOrderId") ?? undefined,
+  });
 }
