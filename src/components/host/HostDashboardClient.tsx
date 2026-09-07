@@ -190,6 +190,19 @@ function ReservationCard({ res, onAction }: {
     commissionableCents: number;
     commissionAllocations: Array<{ earnerType: string; amountCents: number }>;
   } | null>(null);
+  // INVU is the preferred source of truth. This controlled fallback is kept
+  // available only while the provider credential lacks closed-order scope.
+  // The server records it as a MANUAL, auditable close and permits corrections
+  // only while every affected allocation is still pending.
+  const [showManualClose, setShowManualClose] = useState(false);
+  const [manualTotal, setManualTotal] = useState("");
+  const [manualCommissionPercent, setManualCommissionPercent] = useState("5");
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualResult, setManualResult] = useState<{
+    totalCents: number;
+    corrected: boolean;
+    allocations: Array<{ earnerType: string; amountCents: number }>;
+  } | null>(null);
   const [updating, setUpdating] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   // comp drink
@@ -306,6 +319,48 @@ function ReservationCard({ res, onAction }: {
       alert(e.message);
     }
     setInvuSyncing(false);
+  }
+
+  async function saveManualClose() {
+    const totalUsd = Number(manualTotal);
+    const fallbackPercent = Number(manualCommissionPercent);
+    if (!Number.isFinite(totalUsd) || totalUsd <= 0) return;
+    if (!Number.isFinite(fallbackPercent) || fallbackPercent < 0 || fallbackPercent > 100) {
+      alert("Enter a commission fallback between 0 and 100.");
+      return;
+    }
+    const wording = manualResult
+      ? "Replace the pending manual commission amounts with this corrected total?"
+      : "Record this manual fallback close? Use this only when the bound INVU check cannot be read.";
+    if (!window.confirm(wording)) return;
+
+    setManualSaving(true);
+    try {
+      const r = await fetch(`/api/v1/host/bookings/${res.id}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tableTotalCents: Math.round(totalUsd * 100),
+          commissionPercent: fallbackPercent,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) throw new Error(d?.error ?? "Manual close could not be recorded");
+      const allocations = [
+        d.data.host ? { earnerType: "HOST", amountCents: d.data.host.commissionCents } : null,
+        d.data.referrer ? { earnerType: "REFERRER", amountCents: d.data.referrer.commissionCents } : null,
+      ].filter(Boolean) as Array<{ earnerType: string; amountCents: number }>;
+      setManualResult({
+        totalCents: d.data.tableTotalCents,
+        corrected: Boolean(d.data.corrected),
+        allocations,
+      });
+      setShowManualClose(false);
+    } catch (e: any) {
+      alert(e?.message ?? "Manual close could not be recorded");
+    } finally {
+      setManualSaving(false);
+    }
   }
 
   async function act(status: string, extra?: Record<string, string>) {
@@ -656,6 +711,7 @@ function ReservationCard({ res, onAction }: {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <QuickBtn label={t("host", "actions.complete")} color="#6b7280" disabled={updating} onClick={() => act("COMPLETED")} />
                   <QuickBtn label={invuSyncing ? "Syncing INVU close…" : "Sync closed INVU check"} color="#c8a96e" disabled={invuSyncing || !boundInvuOrderId} onClick={syncInvuClose} />
+                  <QuickBtn label={showManualClose ? "Hide manual fallback" : "Record manual fallback close"} color="#f59e0b" disabled={manualSaving} onClick={() => setShowManualClose((open) => !open)} />
                 </div>
               )}
 
@@ -665,6 +721,44 @@ function ReservationCard({ res, onAction }: {
                   {invuSyncResult.taxCents > 0 && <> · tax ${(invuSyncResult.taxCents / 100).toFixed(2)}</>}
                   <> · commissionable ${(invuSyncResult.commissionableCents / 100).toFixed(2)}</>
                   {invuSyncResult.commissionAllocations.map((allocation, index) => (
+                    <span key={index}> · {allocation.earnerType.toLowerCase()} commission ${(allocation.amountCents / 100).toFixed(2)}</span>
+                  ))}
+                </div>
+              )}
+
+              {showManualClose && res.status === "SEATED" && (
+                <div style={{ padding: "12px 14px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#fbbf24", marginBottom: 5 }}>
+                    Manual fallback close
+                  </div>
+                  <div style={{ fontSize: 11, color: "#d1d5db", lineHeight: 1.45, marginBottom: 10 }}>
+                    Use only when the bound INVU check cannot be read. The bound order remains attached, INVU is never written to, and pending commissions can be corrected before payout.
+                  </div>
+                  {!boundInvuOrderId && (
+                    <div style={{ fontSize: 11, color: "#fca5a5", marginBottom: 10 }}>
+                      No INVU check is bound. Bind the open check first so this fallback stays auditable.
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
+                    <label style={{ flex: "2 1 180px", fontSize: 10, color: "#9ca3af", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                      Closed total (USD)
+                      <input value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} type="number" min="0.01" step="0.01" placeholder="0.00" style={{ display: "block", boxSizing: "border-box", marginTop: 5, width: "100%", padding: "9px 10px", borderRadius: 8, color: "white", background: "rgba(0,0,0,0.25)", border: "1px solid rgba(245,158,11,0.35)" }} />
+                    </label>
+                    <label style={{ flex: "1 1 100px", fontSize: 10, color: "#9ca3af", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                      Fallback %
+                      <input value={manualCommissionPercent} onChange={(e) => setManualCommissionPercent(e.target.value)} type="number" min="0" max="100" step="0.5" style={{ display: "block", boxSizing: "border-box", marginTop: 5, width: "100%", padding: "9px 10px", borderRadius: 8, color: "white", background: "rgba(0,0,0,0.25)", border: "1px solid rgba(245,158,11,0.35)" }} />
+                    </label>
+                    <button disabled={manualSaving || !boundInvuOrderId || !manualTotal || Number(manualTotal) <= 0} onClick={saveManualClose} style={{ padding: "10px 14px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#1c1917", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: manualSaving || !boundInvuOrderId || !manualTotal || Number(manualTotal) <= 0 ? 0.5 : 1 }}>
+                      {manualSaving ? "Recording…" : manualResult ? "Correct pending close" : "Record fallback close"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {manualResult && (
+                <div style={{ padding: "10px 14px", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 10, fontSize: 12, color: "#d1fae5" }}>
+                  <strong>✓ Manual fallback {manualResult.corrected ? "corrected" : "recorded"}:</strong> ${(manualResult.totalCents / 100).toFixed(2)}
+                  {manualResult.allocations.map((allocation, index) => (
                     <span key={index}> · {allocation.earnerType.toLowerCase()} commission ${(allocation.amountCents / 100).toFixed(2)}</span>
                   ))}
                 </div>
