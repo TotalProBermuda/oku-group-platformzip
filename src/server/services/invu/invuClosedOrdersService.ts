@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { InvuPayloadType, MatchMethod, SyncRunStatus, TableSessionStatus, ReviewQueueStatus } from "@prisma/client";
 import { runInvuSyncForVenue } from "./invuSyncService";
 import { decrypt } from "./invuEncryptionService";
-import { getInvoiceByNumCita } from "@/lib/invu/client";
+import { getInvoiceByNumCita, getInvoiceTotals } from "@/lib/invu/client";
 import { storeRawAndNormalize } from "./invuNormalizationService";
 import { aggregateToTableSession } from "./invuAggregationService";
 
@@ -195,8 +195,42 @@ export async function pullBoundClosedOrder(params: {
     const encrypted = mapping.credential.accessTokenEncrypted ?? mapping.credential.apiPasswordEncrypted;
     if (!encrypted) throw new Error("INVU credential has no usable access token");
 
-    const invoice = await getInvoiceByNumCita(decrypt(encrypted), params.invuOrderId);
+    const token = decrypt(encrypted);
+    let invoice: Record<string, unknown> | null = null;
+    let detailLookupError: unknown = null;
+    try {
+      invoice = await getInvoiceByNumCita(token, params.invuOrderId);
+    } catch (error) {
+      // The documented totals endpoint is intentionally an independent
+      // fallback. Some INVU credentials expose financial reports before the
+      // per-invoice detail view, so do not abandon a bound closeout yet.
+      detailLookupError = error;
+    }
+
+    // INVU documents `OrdenesAllTotales` as a closed-invoice financial report.
+    // A bound num_cita is still the sole match key; the bounded seven-day
+    // request is a fallback for cases where `citas/view` has not exposed the
+    // invoice detail yet. It neither writes to INVU nor scans unrelated dates.
     if (!invoice) {
+      const toDate = new Date();
+      const fromDate = new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      let totals: Record<string, unknown>[];
+      try {
+        totals = await getInvoiceTotals(token, params.venueId, fromDate, toDate);
+      } catch (totalLookupError) {
+        // Keep the more specific detail-lookup error when both endpoints
+        // reject the credential; callers already map it to an actionable UI
+        // message without leaking provider response bodies.
+        throw detailLookupError ?? totalLookupError;
+      }
+      const matchingTotal = totals.find((row) => totalMatchesBoundCheck(row, params.invuOrderId));
+      if (matchingTotal) {
+        invoice = totalRowAsClosedInvoice(matchingTotal, params.invuOrderId);
+      }
+    }
+
+    if (!invoice) {
+      if (detailLookupError) throw detailLookupError;
       await completeBoundPull(syncRun.id, mappingId, "SUCCESS", 0);
       return { found: false, closed: false };
     }
@@ -239,6 +273,55 @@ export async function pullBoundClosedOrder(params: {
     await completeBoundPull(syncRun.id, mappingId, "FAILED", 0);
     throw error;
   }
+}
+
+/**
+ * The totals report's documented rows are financial artifacts, not the full
+ * `citas/view` envelope. Different INVU installations label the same order
+ * reference slightly differently, so match only exact values from known
+ * order-reference fields (including the documented num_cita).
+ */
+function totalMatchesBoundCheck(row: Record<string, unknown>, boundCheck: string): boolean {
+  const candidateObjects = [
+    row,
+    asRecord(row.orden),
+    asRecord(row.orden_datos),
+    asRecord(row.order),
+  ].filter((value): value is Record<string, unknown> => value !== null);
+  const keys = [
+    "num_cita",
+    "numero_orden",
+    "numeroOrden",
+    "order_number",
+    "id_cita",
+    "id_orden",
+    "order_id",
+    "id",
+  ];
+  return candidateObjects.some((obj) => keys.some((key) => String(obj[key] ?? "").trim() === boundCheck));
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+/** Make the documented totals row safe for the existing audited normalizer. */
+function totalRowAsClosedInvoice(row: Record<string, unknown>, boundCheck: string): Record<string, unknown> {
+  const header = asRecord(row.orden) ?? asRecord(row.orden_datos) ?? asRecord(row.order) ?? {};
+  return {
+    ...header,
+    ...row,
+    // Preserve the deterministic binding identity for reconciliation.
+    id: boundCheck,
+    num_cita: boundCheck,
+    status: row.status ?? row.estado ?? header.status ?? header.estado ?? "Cerrada",
+    status_id: row.status_id ?? row.estado_id ?? header.status_id ?? header.estado_id ?? 1,
+    total: row.total ?? row.total_orden ?? row.total_factura ?? row.monto_total ?? row.importe_total,
+    subtotal: row.subtotal ?? row.sub_total ?? row.total_neto ?? row.neto,
+    impuesto: row.impuesto ?? row.total_impuesto ?? row.tax ?? row.iva,
+  };
 }
 
 /**
