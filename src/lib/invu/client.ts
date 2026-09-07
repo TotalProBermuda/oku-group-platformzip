@@ -7,7 +7,7 @@ function unwrapInvuList(parsed: unknown): Record<string, unknown>[] {
   if (Array.isArray(parsed)) return parsed as Record<string, unknown>[];
   if (parsed && typeof parsed === "object") {
     const o = parsed as Record<string, unknown>;
-    for (const k of ["data", "records", "rows", "ordenes", "result"]) {
+    for (const k of ["data", "records", "rows", "ordenes", "totales", "result"]) {
       const v = o[k];
       if (Array.isArray(v)) return v as Record<string, unknown>[];
     }
@@ -78,21 +78,17 @@ export interface InvuAuthResult {
 // (src/server/services/invu/invuAggregationService.ts) transparently falls back to the
 // order-level fields when no satellite records are present.
 //
-// The vendor has four additional endpoints (invoice totals, payment breakdowns, credit
-// notes, order totals) that would let the trust layer reconcile post-hoc voids and split
-// payments. Their URLs are not yet published. Until then, these functions are intentional
-// no-ops that return `[]`. They log once at INFO level so the behaviour is visible in
-// dev without spamming production error streams.
-//
-// When the vendor confirms the URLs, replace the body of each function with a real
-// `callInvuList(...)` call and remove the info log.
+// INVU documents the invoice-totals endpoint, which we use as an independent closed-order
+// fallback. Payment breakdowns, credit notes, and order totals would also support
+// post-hoc void and split-payment reconciliation, but their URLs are not confirmed; those
+// functions remain no-ops and log once at INFO level in development.
 
 let _loggedSatelliteNoOp = false;
 function logSatelliteNoOpOnce(): void {
   if (_loggedSatelliteNoOp) return;
   _loggedSatelliteNoOp = true;
   console.info(
-    "[INVU] Satellite endpoints (invoiceTotals, payments, creditNotes, orderTotals) are intentionally no-ops; " +
+    "[INVU] Satellite endpoints (payments, creditNotes, orderTotals) are intentionally no-ops; " +
       "commissionable revenue is derived from order-level fields on citas/ordenesAllAdv."
   );
 }
@@ -179,16 +175,20 @@ export async function getInvoiceByNumCita(
   return invoice;
 }
 
-// Satellite endpoint: invoice totals. See top-of-file comment — intentional no-op until the
-// vendor URL is confirmed. Order-level totals from getClosedOrders are authoritative today.
+// INVU's documented totals-per-invoice endpoint. It is deliberately separate
+// from `getClosedOrders`: the former returns one financial-total row per
+// invoice and is a useful read-only fallback when an exact invoice-detail
+// lookup is temporarily unavailable.
 export async function getInvoiceTotals(
-  _token: string,
+  token: string,
   _branchId: string,
-  _fromDate: Date,
-  _toDate: Date
-): Promise<any[]> {
-  logSatelliteNoOpOnce();
-  return [];
+  fromDate: Date,
+  toDate: Date
+): Promise<Record<string, unknown>[]> {
+  const fini = toEpochSeconds(fromDate);
+  const ffin = toEpochSeconds(toDate);
+  const url = `${INVU_API_BASE}?r=citas/OrdenesAllTotales/fini/${fini}/ffin/${ffin}/tipo/1`;
+  return callInvuList(token, url, "getInvoiceTotals");
 }
 
 // Satellite endpoint: payment breakdowns. Intentional no-op — see top-of-file comment.
