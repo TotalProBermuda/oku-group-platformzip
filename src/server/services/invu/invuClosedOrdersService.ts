@@ -227,6 +227,15 @@ export async function pullBoundClosedOrder(params: {
       if (matchingTotal) {
         invoice = totalRowAsClosedInvoice(matchingTotal, params.invuOrderId);
       }
+
+      // The financial report completed successfully. If it simply does not
+      // contain this order yet, that is a normal not-found/still-open state —
+      // do not rethrow an earlier per-invoice permission error and mislabel a
+      // successful report read as an INVU credential rejection.
+      if (!invoice) {
+        await completeBoundPull(syncRun.id, mappingId, "SUCCESS", 0);
+        return { found: false, closed: false };
+      }
     }
 
     if (!invoice) {
