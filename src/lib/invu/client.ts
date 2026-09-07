@@ -70,6 +70,17 @@ export interface InvuAuthResult {
   token: string;
 }
 
+export type InvuInvoiceTotalsProbe = {
+  /** True only when INVU accepted the endpoint and returned a parseable response. */
+  accepted: boolean;
+  /** Transport status only; no provider response body is returned. */
+  httpStatus: number;
+  /** INVU sometimes reports authorization failures in a JSON HTTP-200 envelope. */
+  providerStatus: number | null;
+  recordCount: number;
+  matchedBoundOrder: boolean;
+};
+
 // --- INVU satellite endpoints (invoices, payments, credit notes, order totals) ---
 //
 // The real INVU closed-orders endpoint (`citas/ordenesAllAdv`, wired in getClosedOrders
@@ -189,6 +200,50 @@ export async function getInvoiceTotals(
   const ffin = toEpochSeconds(toDate);
   const url = `${INVU_API_BASE}?r=citas/OrdenesAllTotales/fini/${fini}/ffin/${ffin}/tipo/1`;
   return callInvuList(token, url, "getInvoiceTotals");
+}
+
+/**
+ * Read-only, redacted capability check for the documented invoice-totals
+ * endpoint. This intentionally exposes neither the token, financial rows,
+ * customer data, nor INVU's raw error string.
+ */
+export async function probeInvoiceTotals(
+  token: string,
+  boundOrderId: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<InvuInvoiceTotalsProbe> {
+  const fini = toEpochSeconds(fromDate);
+  const ffin = toEpochSeconds(toDate);
+  const url = `${INVU_API_BASE}?r=citas/OrdenesAllTotales/fini/${fini}/ffin/${ffin}/tipo/1`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { accept: "application/json", authorization: token },
+  });
+  const text = await res.text().catch(() => "");
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(text); } catch { /* non-JSON response remains rejected */ }
+
+  const body = asObject(parsed);
+  const providerStatus = typeof body?.status === "number" ? body.status : null;
+  const providerRejected = providerStatus === 401 || providerStatus === 403 ||
+    (typeof body?.error === "string" && body.error.trim().length > 0);
+  const records = !providerRejected && res.ok ? unwrapInvuList(parsed) : [];
+
+  return {
+    accepted: res.ok && !providerRejected,
+    httpStatus: res.status,
+    providerStatus,
+    recordCount: records.length,
+    matchedBoundOrder: records.some((record) => recordReferencesBoundOrder(record, boundOrderId)),
+  };
+}
+
+function recordReferencesBoundOrder(record: Record<string, unknown>, boundOrderId: string): boolean {
+  const nested = [record, asObject(record.orden), asObject(record.orden_datos), asObject(record.order)]
+    .filter((value): value is Record<string, unknown> => value !== null);
+  const keys = ["num_cita", "numero_orden", "numeroOrden", "order_number", "id_cita", "id_orden", "order_id", "id"];
+  return nested.some((candidate) => keys.some((key) => String(candidate[key] ?? "").trim() === boundOrderId));
 }
 
 // Satellite endpoint: payment breakdowns. Intentional no-op — see top-of-file comment.
