@@ -1,5 +1,19 @@
 const INVU_AUTH_URL = "https://api6.invupos.com/invuApiPos/userAuth";
 const INVU_API_BASE = "https://api6.invupos.com/invuApiPos/index.php";
+const INVU_READ_TIMEOUT_MS = 15_000;
+
+/**
+ * INVU read endpoints occasionally keep a connection open without returning
+ * a body. Bound closeouts must fail safely rather than leaving a host request
+ * (and its commission workflow) pending forever.
+ */
+async function fetchInvuRead(url: string, token: string): Promise<Response> {
+  return fetch(url, {
+    method: "GET",
+    headers: { accept: "application/json", authorization: token },
+    signal: AbortSignal.timeout(INVU_READ_TIMEOUT_MS),
+  });
+}
 
 // Unwrap INVU's `{ data: [...], error: null }` envelope. Some endpoints return a
 // bare array; tolerate both shapes.
@@ -50,10 +64,7 @@ async function callInvuList(
   url: string,
   method: string
 ): Promise<Record<string, unknown>[]> {
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { accept: "application/json", authorization: token },
-  });
+  const res = await fetchInvuRead(url, token);
   const text = await res.text().catch(() => "");
   if (!res.ok) {
     // Provider errors can contain credentials, tokens, order details, or raw
@@ -164,10 +175,7 @@ export async function getInvoiceByNumCita(
 ): Promise<Record<string, unknown> | null> {
   const encodedId = encodeURIComponent(numCita);
   const url = `${INVU_API_BASE}?r=citas/view/id/${encodedId}/tipo/0`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { accept: "application/json", authorization: token },
-  });
+  const res = await fetchInvuRead(url, token);
   const text = await res.text().catch(() => "");
   if (!res.ok) {
     throw new Error(`INVU getInvoiceByNumCita failed (${res.status})`);
@@ -216,10 +224,21 @@ export async function probeInvoiceTotals(
   const fini = toEpochSeconds(fromDate);
   const ffin = toEpochSeconds(toDate);
   const url = `${INVU_API_BASE}?r=citas/OrdenesAllTotales/fini/${fini}/ffin/${ffin}/tipo/1`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { accept: "application/json", authorization: token },
-  });
+  let res: Response;
+  try {
+    res = await fetchInvuRead(url, token);
+  } catch {
+    // The diagnostic intentionally returns only its fixed, redacted shape.
+    // A timeout or transport failure therefore appears as rejected with no
+    // invented provider status or raw provider payload.
+    return {
+      accepted: false,
+      httpStatus: 0,
+      providerStatus: null,
+      recordCount: 0,
+      matchedBoundOrder: false,
+    };
+  }
   const text = await res.text().catch(() => "");
   let parsed: unknown = null;
   try { parsed = JSON.parse(text); } catch { /* non-JSON response remains rejected */ }
