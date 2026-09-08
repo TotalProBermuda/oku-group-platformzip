@@ -11,6 +11,8 @@ interface Allocation {
   earnerRefId: string;
   amountCents: number;
   status: string;
+  adjustmentCents: number;
+  effectiveAmountCents: number;
   tableSession: {
     id: string;
     grossCents: number;
@@ -44,8 +46,9 @@ export default function ObligationsPage() {
   const [preset, setPreset] = useState("30d");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [modal, setModal] = useState<{ type: "dispute" | "reverse"; allocationId: string } | null>(null);
+  const [modal, setModal] = useState<{ type: "dispute" | "reverse" | "adjust"; allocationId: string; currentAmountCents?: number } | null>(null);
   const [modalNote, setModalNote] = useState("");
+  const [targetAmount, setTargetAmount] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -82,9 +85,9 @@ export default function ObligationsPage() {
     g.allocations.push(a);
     g.totalGrossCents += a.tableSession.grossCents;
     g.totalCommissionableCents += a.tableSession.commissionableCents;
-    if (a.status === "PENDING") g.pendingCents += a.amountCents;
-    else if (a.status === "APPROVED") g.approvedCents += a.amountCents;
-    else if (a.status === "PAID") g.paidCents += a.amountCents;
+    if (a.status === "PENDING") g.pendingCents += a.effectiveAmountCents;
+    else if (a.status === "APPROVED") g.approvedCents += a.effectiveAmountCents;
+    else if (a.status === "PAID") g.paidCents += a.effectiveAmountCents;
     else if (a.status === "DISPUTED") g.disputedCount++;
     else if (a.status === "REVERSED") g.reversedCount++;
   }
@@ -110,6 +113,29 @@ export default function ObligationsPage() {
       setActionLoading(null);
       setModal(null);
       setModalNote("");
+    }
+  };
+
+  const submitAdjustment = async () => {
+    if (!modal || modal.type !== "adjust") return;
+    const dollars = Number(targetAmount);
+    const targetAmountCents = Math.round(dollars * 100);
+    if (!Number.isFinite(dollars) || targetAmountCents < 0) return;
+    setActionLoading(modal.allocationId);
+    try {
+      const res = await fetch(`/api/v1/admin/revenue/allocations/${modal.allocationId}/adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetAmountCents, reason: modalNote }),
+      });
+      const json = await res.json();
+      if (!json.ok) window.alert(json.error ?? "Adjustment failed");
+      else load();
+    } finally {
+      setActionLoading(null);
+      setModal(null);
+      setModalNote("");
+      setTargetAmount("");
     }
   };
 
@@ -191,7 +217,9 @@ export default function ObligationsPage() {
                             </td>
                             <td style={{ padding: "8px 16px" }}>{fmt(a.tableSession.grossCents)}</td>
                             <td style={{ padding: "8px 16px" }}>{fmt(a.tableSession.commissionableCents)}</td>
-                            <td style={{ padding: "8px 16px" }}>{fmt(a.amountCents)}</td>
+                            <td style={{ padding: "8px 16px" }}>
+                              {a.adjustmentCents !== 0 ? <><span style={{ textDecoration: "line-through", color: "var(--color-text-muted)", marginRight: 6 }}>{fmt(a.amountCents)}</span><strong>{fmt(a.effectiveAmountCents)}</strong></> : fmt(a.effectiveAmountCents)}
+                            </td>
                             <td style={{ padding: "8px 16px" }}><StatusChip status={a.status.toLowerCase()} label={a.status} size="xs" /></td>
                             <td style={{ padding: "8px 16px" }}>
                               <div style={{ display: "flex", gap: 6 }}>
@@ -211,6 +239,13 @@ export default function ObligationsPage() {
                                       style={{ fontSize: 12, padding: "3px 10px", color: "#991b1b" }}
                                     >
                                       {t("admin", "revenue.obligations.dispute") || "Dispute"}
+                                    </button>
+                                    <button
+                                      onClick={() => { setModal({ type: "adjust", allocationId: a.id, currentAmountCents: a.effectiveAmountCents }); setModalNote(""); setTargetAmount((a.effectiveAmountCents / 100).toFixed(2)); }}
+                                      className="btn btn-ghost"
+                                      style={{ fontSize: 12, padding: "3px 10px", color: "#7c3aed" }}
+                                    >
+                                      Adjust
                                     </button>
                                   </>
                                 )}
@@ -251,11 +286,17 @@ export default function ObligationsPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="card" style={{ padding: 28, maxWidth: 420, width: "90%" }}>
             <h3 style={{ margin: "0 0 16px", fontFamily: "var(--font-heading)" }}>
-              {modal.type === "dispute" ? (t("admin", "revenue.obligations.disputeTitle") || "Dispute Allocation") : (t("admin", "revenue.obligations.reverseTitle") || "Reverse Allocation")}
+              {modal.type === "adjust" ? "Adjust Commission" : modal.type === "dispute" ? (t("admin", "revenue.obligations.disputeTitle") || "Dispute Allocation") : (t("admin", "revenue.obligations.reverseTitle") || "Reverse Allocation")}
             </h3>
             <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 12 }}>
-              {t("admin", "revenue.obligations.addNote") || "Add a note explaining this action:"}
+              {modal.type === "adjust" ? "Set the corrected payable amount. The original INVU allocation stays unchanged; an immutable signed offset is recorded." : (t("admin", "revenue.obligations.addNote") || "Add a note explaining this action:")}
             </p>
+            {modal.type === "adjust" && (
+              <label style={{ display: "block", fontSize: 13, marginBottom: 12 }}>
+                Correct payable commission (USD)
+                <input value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} inputMode="decimal" style={{ display: "block", width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: "1px solid var(--color-border)", boxSizing: "border-box" }} />
+              </label>
+            )}
             <textarea
               value={modalNote}
               onChange={(e) => setModalNote(e.target.value)}
@@ -263,9 +304,10 @@ export default function ObligationsPage() {
               style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--color-border)", fontSize: 13, minHeight: 80, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
             />
             <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
-              <button onClick={() => { setModal(null); setModalNote(""); }} className="btn btn-ghost">{t("admin", "cancel") || "Cancel"}</button>
+              <button onClick={() => { setModal(null); setModalNote(""); setTargetAmount(""); }} className="btn btn-ghost">{t("admin", "cancel") || "Cancel"}</button>
               <button
-                onClick={() => doAction(modal.allocationId, modal.type === "dispute" ? "dispute" : "reverse", modalNote)}
+                onClick={() => modal.type === "adjust" ? submitAdjustment() : doAction(modal.allocationId, modal.type === "dispute" ? "dispute" : "reverse", modalNote)}
+                disabled={modal.type === "adjust" && (modalNote.trim().length < 10 || !Number.isFinite(Number(targetAmount)) || Number(targetAmount) < 0)}
                 className="btn btn-primary"
                 style={{ background: modal.type === "dispute" ? "#991b1b" : undefined }}
               >

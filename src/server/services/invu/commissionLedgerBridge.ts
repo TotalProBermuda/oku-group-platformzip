@@ -38,6 +38,7 @@ export async function bridgeAllocationToLedger(
       earnerType: true,
       earnerRefId: true,
       amountCents: true,
+      adjustments: { select: { deltaCents: true } },
       currency: true,
       tableSessionId: true,
       ledgerEntries: { select: { id: true }, take: 1 },
@@ -47,6 +48,13 @@ export async function bridgeAllocationToLedger(
   if (!allocation) {
     return { outcome: "skipped", reason: "allocation_not_found" };
   }
+
+  // `?? []` keeps historical/unit-test mocks compatible; Prisma always returns
+  // an array when the relation is selected in production.
+  const effectiveAmountCents = allocation.amountCents + (allocation.adjustments ?? []).reduce(
+    (sum, adjustment) => sum + adjustment.deltaCents,
+    0
+  );
 
   // ── Idempotency: already bridged ─────────────────────────────────────────
   if (allocation.ledgerEntries.length > 0) {
@@ -103,10 +111,10 @@ export async function bridgeAllocationToLedger(
         data: {
           influencerId: influencerProfileId,
           type: "COMMISSION_EARNED",
-          amountCents: allocation.amountCents,
+          amountCents: effectiveAmountCents,
           currency: allocation.currency,
           commissionAllocationId: allocationId,
-          note: `Commission allocation ${allocationId}`,
+          note: `Commission allocation ${allocationId}${effectiveAmountCents !== allocation.amountCents ? ` (adjusted from ${allocation.amountCents} cents)` : ""}`,
         },
         select: { id: true },
       });

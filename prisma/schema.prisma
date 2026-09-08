@@ -4718,6 +4718,7 @@ model CommissionAllocation {
   ledgerEvents          LedgerEvent[]       @relation("LedgerEventCommissionAllocation")
   ledgerEventOutboxRows LedgerEventOutbox[] @relation("LedgerEventOutboxCommissionAllocation")
   ledgerEntries         LedgerEntry[]       @relation("LedgerEntryCommissionAllocation")
+  adjustments           CommissionAllocationAdjustment[]
   commissionRule        CommissionRule?     @relation(fields: [ruleVersionId], references: [id])
 
   // parentAllocationId: populated on reversal rows to point at the original
@@ -4739,6 +4740,22 @@ model CommissionAllocation {
   @@index([earnerType, earnerRefId])
   @@index([status])
   @@index([ruleVersionId])
+}
+
+/// Immutable finance adjustment to a commission allocation.  The source INVU
+/// allocation is never edited; the effective payable amount is the allocation
+/// amount plus the sum of these signed offsets.
+model CommissionAllocationAdjustment {
+  id             String               @id @default(cuid())
+  allocationId   String
+  deltaCents     Int
+  reason         String
+  actorId        String
+  createdAt      DateTime             @default(now())
+
+  allocation     CommissionAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+
+  @@index([allocationId, createdAt])
 }
 
 // ─── Commission Rule Engine ───────────────────────────────────────────────────

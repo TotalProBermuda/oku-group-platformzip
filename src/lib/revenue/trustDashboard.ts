@@ -234,6 +234,10 @@ export async function getObligations(opts: {
   const allocations = await prisma.commissionAllocation.findMany({
     where: { tableSession: sessionWhere },
     include: {
+      adjustments: {
+        select: { id: true, deltaCents: true, reason: true, actorId: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      },
       tableSession: {
         select: {
           id: true,
@@ -248,7 +252,14 @@ export async function getObligations(opts: {
     orderBy: { createdAt: "desc" },
   });
 
-  return allocations;
+  return allocations.map((allocation) => {
+    const adjustmentCents = allocation.adjustments.reduce((sum, adjustment) => sum + adjustment.deltaCents, 0);
+    return {
+      ...allocation,
+      adjustmentCents,
+      effectiveAmountCents: allocation.amountCents + adjustmentCents,
+    };
+  });
 }
 
 export async function getReviewItems(opts: {
