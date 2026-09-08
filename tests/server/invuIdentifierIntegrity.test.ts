@@ -45,4 +45,14 @@ describe("INVU identifier integrity", () => {
     expect(result?.proof?.sourceField).toBe("num_cita");
     expect(findFirst).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps totals when citas/view wraps them around orden_datos", () => {
+    const normalized = normalizePayload({
+      orden_datos: { id: "5038", num_cita: "1-18-5063-68087", estado: "Cerrada" },
+      totales: { subtotal: "10.00", tax: "1.00", total: "11.00" },
+    }, InvuPayloadType.CLOSED_ORDER);
+
+    expect(normalized.grossCents).toBe(1100);
+    expect(normalized.taxCents).toBe(100);
+  });
 });

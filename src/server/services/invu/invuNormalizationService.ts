@@ -41,6 +41,7 @@ function flattenInvoiceDetail(payload: Record<string, unknown>): Record<string, 
   if (!header) return payload;
 
   const status = asObject(payload.status);
+  const totals = asObject(payload.totales) ?? asObject(header.totales);
   const payments = Array.isArray(payload.pagos) ? payload.pagos : payload.payments;
   const tips = Array.isArray(payload.propinas) ? payload.propinas : payload.tips;
 
@@ -51,10 +52,15 @@ function flattenInvoiceDetail(payload: Record<string, unknown>): Record<string, 
     id: payload.id ?? header.id,
     num_cita: payload.num_cita ?? header.num_cita,
     mesa: payload.mesa ?? header.mesa,
-    total: payload.total ?? header.total ?? header.total_final ?? header.importe,
-    subtotal: payload.subtotal ?? header.subtotal,
-    impuesto: payload.impuesto ?? header.impuesto ?? header.tax,
-    descuento: payload.descuento ?? header.descuento,
+    // Keep the detail response's financial block. The host close watcher
+    // sends this envelope through the same normalizer as list rows; dropping
+    // it would silently turn a $1 tax into $0 and overstate commissionable
+    // revenue by the tax amount.
+    totales: totals,
+    total: payload.total ?? totals?.total ?? header.total ?? header.total_final ?? header.importe,
+    subtotal: payload.subtotal ?? totals?.subtotal ?? header.subtotal,
+    impuesto: payload.impuesto ?? totals?.impuesto ?? totals?.tax ?? header.impuesto ?? header.tax,
+    descuento: payload.descuento ?? totals?.descuento ?? header.descuento,
     pagos: payments,
     payments,
     propinas: tips,
