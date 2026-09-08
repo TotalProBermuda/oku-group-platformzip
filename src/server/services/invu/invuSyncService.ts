@@ -247,13 +247,20 @@ export async function runInvuSyncForVenue(
     }
   }
 
-  // Execute enabled scope methods with 401-retry logic
+  // INVU encodes an expired/invalid token as a JSON body `status: 403` while
+  // returning HTTP 200. The client turns that response into an error, so both
+  // conventional 401 and INVU's 403 must refresh the saved token once.
   const execute = async <T>(fn: () => Promise<T>): Promise<T> => {
     try {
       return await fn();
     } catch (err: unknown) {
       const e = err as { message?: string; status?: number };
-      if (e?.message?.includes("401") || e?.status === 401) {
+      if (
+        e?.message?.includes("401") ||
+        e?.message?.includes("403") ||
+        e?.status === 401 ||
+        e?.status === 403
+      ) {
         try {
           await reauthenticateInvu(credential.id);
           const refreshed = await prisma.invuIntegrationCredential.findUnique({

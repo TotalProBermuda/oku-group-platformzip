@@ -10,7 +10,12 @@ const INVU_READ_TIMEOUT_MS = 15_000;
 async function fetchInvuRead(url: string, token: string): Promise<Response> {
   return fetch(url, {
     method: "GET",
-    headers: { accept: "application/json", authorization: token },
+    // INVU expects the token verbatim: no HTTP Basic scheme, Bearer prefix,
+    // or a separate TOKEN header. Use its documented field spelling exactly.
+    headers: {
+      "Content-Type": "application/json",
+      AUTHORIZATION: token,
+    },
     signal: AbortSignal.timeout(INVU_READ_TIMEOUT_MS),
   });
 }
@@ -159,7 +164,9 @@ export async function getClosedOrders(
 ): Promise<Record<string, unknown>[]> {
   const fini = toEpochSeconds(fromDate);
   const ffin = toEpochSeconds(toDate);
-  const url = `${INVU_API_BASE}?r=citas/ordenesAllAdv/fini/${fini}/ffin/${ffin}/tipo/1/grouping/1`;
+  // `grouping` only adds item recipe detail; omitting it keeps the response
+  // small and preserves the ticket-level `num_cita` and totals needed here.
+  const url = `${INVU_API_BASE}?r=citas/ordenesAllAdv/fini/${fini}/ffin/${ffin}/tipo/1`;
   return callInvuList(token, url, "getClosedOrders");
 }
 
