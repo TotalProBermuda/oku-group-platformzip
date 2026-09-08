@@ -17,6 +17,7 @@ const STATIC_DATA: Record<SlugType, {
   heroPhoto?: string;
   gallery?: { src: string; alt: string; pos: string }[];
   sushiBarPhotos?: { src: string; alt: string }[];
+  featurePhotos?: { src: string; alt: string; pos?: string }[];
   accent: string; accentLight: string; accentMid: string;
   phone: string; email: string; address: string;
   hours: { day: string; time: string }[];
@@ -77,6 +78,19 @@ const STATIC_DATA: Record<SlugType, {
     logoLight: "/images/logo-catch.webp",
     logoDark: "/images/logo-catch.webp",
     logoNeedsWhiteBox: false,
+    heroPhoto: "/images/catch/dining-room.jpg",
+    gallery: [
+      { src: "/images/catch/bartenders.jpg", alt: "CATCH bartenders preparing a signature drink", pos: "center 52%" },
+      { src: "/images/catch/lobster.jpg", alt: "Grilled Caribbean lobster at CATCH", pos: "center" },
+      { src: "/images/catch/sushi.jpg", alt: "CATCH signature tuna roll", pos: "center" },
+      { src: "/images/catch/mussels.jpg", alt: "Mussels served at CATCH", pos: "center" },
+      { src: "/images/catch/steak.jpg", alt: "Steak served in a CATCH skillet", pos: "center" },
+    ],
+    featurePhotos: [
+      { src: "/images/catch/bar.jpg", alt: "CATCH bar at Gold House", pos: "center" },
+      { src: "/images/catch/ceviche.jpg", alt: "Citrus seafood dish at CATCH", pos: "center" },
+      { src: "/images/catch/bar-motion.jpg", alt: "CATCH bar after dark", pos: "center" },
+    ],
     accent: "#1e3a5f", accentLight: "#f0f4f8", accentMid: "rgba(30,58,95,0.88)",
     phone: "+507 6000 0002", email: "catch@okugroup.com",
     address: "Gold House, Casco Viejo, Panama City",
@@ -344,6 +358,39 @@ export default async function LocaleRestaurantSlugPage({
           </div>
         </div>
       </div>
+
+      {/* ── CATCH AFTER DARK ────────────────────────────────────────────────── */}
+      {safeSlug === "catch" && sd.featurePhotos && (
+        <section style={{ background: "#11100f", padding: "96px 48px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)", marginBottom: 20, display: "block" }}>
+              CATCH · After dark
+            </span>
+            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "48px 64px", alignItems: "start", marginBottom: 40 }}>
+              <div>
+                <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(32px, 4.5vw, 54px)", fontWeight: 400, letterSpacing: "-0.04em", lineHeight: 1.05, color: "#fff", margin: "0 0 20px" }}>
+                  Dinner, drinks<br />and a little theatre.
+                </h2>
+                <p style={{ maxWidth: 440, margin: 0, fontSize: 16, lineHeight: 1.75, color: "rgba(255,255,255,0.58)" }}>
+                  From the bar to the final course, CATCH keeps the room moving long after dinner begins.
+                </p>
+              </div>
+              <div style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", borderRadius: 10 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={sd.featurePhotos[0].src} alt={sd.featurePhotos[0].alt} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: sd.featurePhotos[0].pos ?? "center" }} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {sd.featurePhotos.slice(1).map((photo) => (
+                <div key={photo.src} style={{ position: "relative", aspectRatio: "4/5", overflow: "hidden", borderRadius: 10 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.src} alt={photo.alt} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: photo.pos ?? "center" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── SUSHI BAR FEATURE (OKÜ only) ─────────────────────────────────────── */}
       {safeSlug === "oku" && sd.sushiBarPhotos && (
