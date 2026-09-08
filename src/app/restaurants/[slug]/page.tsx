@@ -271,7 +271,9 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
 
           {/* Logo — top centre */}
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
-            {r.logoNeedsWhiteBox ? (
+            {/* CATCH's hero photograph already contains its illuminated venue
+                logo, so the page intentionally avoids a duplicate overlay. */}
+            {slug !== "catch" && (r.logoNeedsWhiteBox ? (
               <div style={{ background: "#fff", borderRadius: 16, padding: "20px 32px", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 40px rgba(0,0,0,0.3)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={r.logoHero} alt={r.name} style={{ height: 80, width: "auto", objectFit: "contain" }} />
@@ -279,7 +281,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ slu
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={r.logoHero} alt={r.name} style={{ height: 120, width: "auto", objectFit: "contain", filter: "drop-shadow(0 4px 24px rgba(0,0,0,0.5))" }} />
-            )}
+            ))}
           </div>
 
           {/* Emotive headline — bottom left */}

@@ -234,7 +234,9 @@ export default async function LocaleRestaurantSlugPage({
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px 48px 72px", position: "relative", zIndex: 10 }}>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
-            {sd.logoNeedsWhiteBox ? (
+            {/* CATCH's dining-room hero already contains the real illuminated
+                venue logo. Do not duplicate it with a synthetic overlay. */}
+            {safeSlug !== "catch" && (sd.logoNeedsWhiteBox ? (
               <div style={{ background: "#fff", borderRadius: 16, padding: "20px 32px", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 40px rgba(0,0,0,0.3)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={sd.logoHero} alt={safeSlug} style={{ height: 80, width: "auto", objectFit: "contain" }} />
@@ -242,7 +244,7 @@ export default async function LocaleRestaurantSlugPage({
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={sd.logoHero} alt={safeSlug} style={{ height: 120, width: "auto", objectFit: "contain", filter: "drop-shadow(0 4px 24px rgba(0,0,0,0.5))" }} />
-            )}
+            ))}
           </div>
           <div>
             <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 20 }}>{tagline}</div>
