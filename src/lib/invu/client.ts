@@ -43,7 +43,13 @@ async function callInvuList(
 ): Promise<Record<string, unknown>[]> {
   const res = await fetch(url, {
     method: "GET",
-    headers: { accept: "application/json", authorization: token },
+    // INVU expects its auth value literally: no HTTP Basic scheme, Bearer
+    // prefix, or secondary TOKEN header. Header field names are normally
+    // case-insensitive, but use the vendor's documented spelling verbatim.
+    headers: {
+      "Content-Type": "application/json",
+      AUTHORIZATION: token,
+    },
   });
   const text = await res.text().catch(() => "");
   if (!res.ok) {

@@ -49,4 +49,26 @@ describe("INVU client", () => {
     expect(fetchMock.mock.calls[0][0]).not.toContain("grouping");
     vi.unstubAllGlobals();
   });
+
+  it("sends the documented raw INVU authorization header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "[]",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getClosedOrders("raw-invu-token", "branch", new Date(0), new Date(1));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("citas/ordenesAllAdv"),
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/json",
+          AUTHORIZATION: "raw-invu-token",
+        },
+      }),
+    );
+    vi.unstubAllGlobals();
+  });
 });
