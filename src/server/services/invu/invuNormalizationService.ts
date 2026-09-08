@@ -22,6 +22,14 @@ function asObject(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function pickOrderValue(
+  payload: Record<string, unknown>,
+  totals: Record<string, unknown> | null,
+  keys: string[]
+): unknown {
+  return pickFirst(payload, keys) ?? (totals ? pickFirst(totals, keys) : undefined);
+}
+
 /**
  * `citas/view` returns a detail envelope (`orden_datos`, `pagos`, `status`)
  * while `ordenesAllAdv` returns a flat row. Normalize both forms into the
@@ -126,6 +134,7 @@ export function normalizePayload(
   payloadType: InvuPayloadType
 ): Record<string, unknown> {
   payload = flattenInvoiceDetail(payload);
+  const totals = asObject(payload.totales);
   const publicOrderNumber = extractString(
     pickFirst(payload, ["num_cita", "num_factura", "folio", "order_number"])
   );
@@ -163,14 +172,14 @@ export function normalizePayload(
   const paymentGrossCents = Array.isArray(paymentLines)
     ? aggregateCents(paymentLines, "amount", "monto", "importe", "valor", "total")
     : 0;
-  const grossCents = toIntCents(pickFirst(payload, ["total", "subtotal", "gross_total", "importe"])) || paymentGrossCents;
+  const grossCents = toIntCents(pickOrderValue(payload, totals, ["total", "gross_total", "importe", "subtotal"])) || paymentGrossCents;
 
   const discountLines = (payload["discounts"] ?? payload["descuentos"]) as unknown[];
   const discountCents = Array.isArray(discountLines)
     ? aggregateCents(discountLines, "amount", "monto", "importe", "discount_amount")
-    : toIntCents(pickFirst(payload, ["discount_total", "total_descuento", "descuento"]));
+    : toIntCents(pickOrderValue(payload, totals, ["discount_total", "total_descuento", "descuento"]));
 
-  const taxCents = toIntCents(pickFirst(payload, ["impuesto", "tax", "iva", "tax_amount", "total_impuesto"]));
+  const taxCents = toIntCents(pickOrderValue(payload, totals, ["impuesto", "tax", "iva", "tax_amount", "total_impuesto"]));
 
   const tipLines = (payload["payments"] ?? payload["pagos"] ?? []) as unknown[];
   const tipFromPayments = Array.isArray(tipLines)
@@ -184,7 +193,7 @@ export function normalizePayload(
     : toIntCents(pickFirst(payload, ["credit_total", "total_credito", "refund_total"]));
 
   const netRevenueCents = toIntCents(
-    pickFirst(payload, ["total_neto", "net_total", "net_amount", "total_net"])
+    pickOrderValue(payload, totals, ["total_neto", "net_total", "net_amount", "total_net"])
   ) || Math.max(0, grossCents - discountCents - refundCents);
 
   const invuOrderId = String(pickFirst(payload, ["id", "order_id", "id_orden", "folio_id"]) ?? "") || null;

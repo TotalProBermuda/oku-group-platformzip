@@ -54,6 +54,17 @@ export type HeuristicCandidate = {
 
 const BOOKING_CODE_RE = /OKU-\d{4}-[A-Z0-9]{8}/;
 
+/** Public receipt number first; numeric POS id only as a fallback. */
+export function operationalBindingIdentifiers(
+  normalized: Pick<InvuOrderNormalized, "publicOrderNumber" | "invuOrderId">
+): string[] {
+  return [...new Set(
+    [normalized.publicOrderNumber, normalized.invuOrderId]
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value))
+  )];
+}
+
 function unmatchedResult(reason: string): ThreeTierMatchResult {
   const trustInput: TrustScoreInput = {
     matchMethod: "UNMATCHED",
@@ -372,17 +383,31 @@ export async function resolveTier2OperationalBinding(
   normalized: InvuOrderNormalized,
   db: DbLike = prisma
 ): Promise<ThreeTierMatchResult | null> {
-  if (!normalized.invuOrderId) return null;
-  const binding = await db.operationalBinding.findFirst({
-    where: { invuOrderId: normalized.invuOrderId },
-    orderBy: { createdAt: "asc" },
-    include: {
-      attributionSession: {
-        select: { id: true, reservationId: true, venueId: true, bookingCode: true },
+  const identifiers = operationalBindingIdentifiers(normalized);
+  if (identifiers.length === 0) return null;
+  let binding: {
+    id: string;
+    invuOrderId: string;
+    bindingType: string;
+    attributionSession: { id: string; reservationId: string | null; venueId: string; bookingCode: string | null };
+  } | null = null;
+  for (const identifier of identifiers) {
+    binding = await db.operationalBinding.findFirst({
+      where: { invuOrderId: identifier },
+      orderBy: { createdAt: "asc" },
+      include: {
+        attributionSession: {
+          select: { id: true, reservationId: true, venueId: true, bookingCode: true },
+        },
       },
-    },
-  });
+    });
+    if (binding) break;
+  }
   if (!binding) return null;
+  if (binding.attributionSession.venueId !== normalized.venueId) return null;
+  const matchedIdentifierKind = binding.invuOrderId === normalized.publicOrderNumber
+    ? "num_cita"
+    : "internal_order_id";
 
   const trustInput: TrustScoreInput = {
     matchMethod: "AUTO",
@@ -402,12 +427,14 @@ export async function resolveTier2OperationalBinding(
     attributionSessionId: binding.attributionSession.id,
     proof: {
       matchProofType: "OPERATIONAL_BINDING",
-      sourceField: "operational_binding",
-      sourceValue: binding.id,
+      sourceField: matchedIdentifierKind,
+      sourceValue: binding.invuOrderId,
       bookingCode: binding.attributionSession.bookingCode,
       detailJson: {
         bindingId: binding.id,
         bindingType: binding.bindingType,
+        matchedIdentifierKind,
+        matchedIdentifier: binding.invuOrderId,
         bookingCode: binding.attributionSession.bookingCode,
       },
     },

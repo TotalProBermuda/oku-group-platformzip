@@ -12,9 +12,11 @@ import {
 import {
   matchNormalizedToReservation,
   MatchSignals,
+  operationalBindingIdentifiers,
   resolveMatch,
   persistMatchResult,
   type HeuristicCandidate,
+  type ThreeTierMatchResult,
 } from "./invuMatchService";
 import { needsReviewQueue } from "./invuTrustScoreService";
 import { mintCommissionsForTableSession } from "./commissionMintingService";
@@ -183,10 +185,17 @@ export async function aggregateToTableSession(params: {
   // canonical link) and stamp its `invuOrderId` so the existing de-dup
   // query path picks it up uniformly. Idempotent: the updateMany guards
   // against overwriting a different invuOrderId already stamped.
-  if (normalized.invuOrderId) {
-    const binding = await prisma.operationalBinding.findUnique({
-      where: { invuOrderId: normalized.invuOrderId },
+  const bindingIdentifiers = operationalBindingIdentifiers(normalized);
+  if (bindingIdentifiers.length > 0) {
+    let binding: {
+      invuOrderId: string;
+      attributionSession: { venueId: string; tableSession: { id: string; invuOrderId: string | null } | null };
+    } | null = null;
+    for (const identifier of bindingIdentifiers) {
+      binding = await prisma.operationalBinding.findFirst({
+        where: { invuOrderId: identifier },
       select: {
+        invuOrderId: true,
         attributionSession: {
           select: {
             venueId: true,
@@ -194,20 +203,24 @@ export async function aggregateToTableSession(params: {
           },
         },
       },
-    });
+      });
+      if (binding) break;
+    }
     const hostTableSession = binding?.attributionSession?.tableSession;
     const bindingVenueId = binding?.attributionSession?.venueId;
+    const sessionOrderId = normalized.invuOrderId ?? binding?.invuOrderId;
     if (
       hostTableSession &&
       bindingVenueId === venueId &&
-      hostTableSession.invuOrderId !== normalized.invuOrderId
+      sessionOrderId &&
+      hostTableSession.invuOrderId !== sessionOrderId
     ) {
       await prisma.tableSession.updateMany({
         where: {
           id: hostTableSession.id,
-          OR: [{ invuOrderId: null }, { invuOrderId: normalized.invuOrderId }],
+          OR: [{ invuOrderId: null }, { invuOrderId: sessionOrderId }],
         },
-        data: { invuOrderId: normalized.invuOrderId },
+        data: { invuOrderId: sessionOrderId },
       });
     }
   }
@@ -271,9 +284,36 @@ export async function aggregateToTableSession(params: {
   }
 
   const matchSignals: MatchSignals = { paymentTotalConsistent, noDuplicateConflict };
+  const heuristicCandidates: HeuristicCandidate[] = candidates.map((c) => ({
+    reservationId: c.id,
+    reservationDate: c.reservationDate,
+    partySize: c.partySize,
+    contactName: c.contactName,
+    assignedTableLabel: c.assignedTableLabel,
+  }));
 
-  // Pass priorReservationId for Priority #1 exact-match path, plus computed signals
-  const matchResult = matchNormalizedToReservation(primary, candidates, priorReservationId, matchSignals);
+  // An explicit host binding is deterministic evidence. Resolve it before
+  // TableSession creation so it governs the initial status, review decision,
+  // and eligibility rather than repairing an unmatched row afterward.
+  let deterministicResult: ThreeTierMatchResult | null = null;
+  try {
+    deterministicResult = await resolveMatch(primary, heuristicCandidates);
+  } catch {
+    // Preserve sale ingestion if the resolver is transiently unavailable.
+  }
+
+  const matchResult = deterministicResult
+    ? {
+        reservationId: deterministicResult.reservationId,
+        matchMethod: deterministicResult.status === "MANUALLY_OVERRIDDEN" ? "MANUAL" as const
+          : deterministicResult.status === "AUTO_MATCHED" ? "AUTO" as const
+          : "UNMATCHED" as const,
+        trustScore: deterministicResult.trustScore,
+        trustScoreInput: deterministicResult.trustScoreInput,
+        issueType: deterministicResult.issueType,
+        multipleMatches: deterministicResult.issueType === "MULTIPLE_MATCHES",
+      }
+    : matchNormalizedToReservation(primary, candidates, priorReservationId, matchSignals);
 
   let sessionStatus: TableSessionStatus = TableSessionStatus.PENDING_REVIEW;
   if (matchResult.reservationId && matchResult.trustScore >= 0.75) {
@@ -444,12 +484,16 @@ export async function aggregateToTableSession(params: {
 
   // --- Create review queue items as needed ---
   let reviewQueueCreated = false;
+  const hasExactDeterministicBinding =
+    deterministicResult?.status === "AUTO_MATCHED" &&
+    (deterministicResult.tier === "TIER1_DETERMINISTIC" || deterministicResult.tier === "TIER2_OPERATIONAL");
   const needsReview =
-    needsReviewQueue(matchResult.trustScore) ||
-    !!matchResult.multipleMatches ||
-    isFullDiscount ||
-    !primary.tableLabel ||
-    !sessionTime;
+    !hasExactDeterministicBinding &&
+    (needsReviewQueue(matchResult.trustScore) ||
+      !!matchResult.multipleMatches ||
+      isFullDiscount ||
+      !primary.tableLabel ||
+      !sessionTime);
 
   if (needsReview && tableSession) {
     let issueType: ReviewIssueType = ReviewIssueType.NO_MATCH;
@@ -574,14 +618,7 @@ export async function aggregateToTableSession(params: {
   // Tier-3 fallback inside resolveMatch; Tier-1 and Tier-2 use the
   // booking_code / OperationalBinding tables directly.
   try {
-    const heuristicCandidates: HeuristicCandidate[] = candidates.map((c) => ({
-      reservationId: c.id,
-      reservationDate: c.reservationDate,
-      partySize: c.partySize,
-      contactName: c.contactName,
-      assignedTableLabel: c.assignedTableLabel,
-    }));
-    const tierResult = await resolveMatch(primary, heuristicCandidates);
+    const tierResult = deterministicResult ?? await resolveMatch(primary, heuristicCandidates);
     await persistMatchResult({
       invuOrderNormalizedId: primary.id,
       invuOrderId: primary.invuOrderId,
