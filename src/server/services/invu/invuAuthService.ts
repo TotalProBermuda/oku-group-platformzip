@@ -10,6 +10,9 @@ interface InvuAuthResponse {
   token?: string;
   authorization?: string;
   expires_in?: number;
+  status?: number | string;
+  statusCode?: number | string;
+  code?: number | string;
   error?: string;
   message?: string;
 }
@@ -20,6 +23,19 @@ function extractInvuToken(body: InvuAuthResponse): string | null {
 
 function extractInvuError(body: InvuAuthResponse): string {
   return body.error ?? body.message ?? "No token returned";
+}
+
+// INVU may encode an authorization failure in the response body while the
+// HTTP transport itself returns 200. Keep the numeric status for control flow
+// but never persist the full body, which can include sensitive provider data.
+function bodyFailureStatus(body: InvuAuthResponse): number | null {
+  const candidate = body.status ?? body.statusCode ?? body.code;
+  const status = typeof candidate === "number"
+    ? candidate
+    : typeof candidate === "string" && /^\d+$/.test(candidate)
+      ? Number(candidate)
+      : null;
+  return status !== null && status >= 400 ? status : null;
 }
 
 export async function authenticateInvu(
@@ -48,7 +64,11 @@ export async function authenticateInvu(
     const body = (await res.json()) as InvuAuthResponse;
     authResponse = body;
     token = extractInvuToken(body);
-    if (!token) {
+    const providerStatus = bodyFailureStatus(body);
+    if (providerStatus !== null) {
+      token = null;
+      authError = `INVU body status ${providerStatus} (HTTP ${res.status})`;
+    } else if (!token) {
       authError = `${extractInvuError(body)} (HTTP ${res.status})`;
     } else {
       authSucceeded = true;
@@ -156,7 +176,11 @@ export async function reauthenticateInvu(
     });
     const body = (await res.json()) as InvuAuthResponse;
     token = extractInvuToken(body);
-    if (!token) {
+    const providerStatus = bodyFailureStatus(body);
+    if (providerStatus !== null) {
+      token = null;
+      authError = `INVU body status ${providerStatus} (HTTP ${res.status})`;
+    } else if (!token) {
       authError = `${extractInvuError(body)} (HTTP ${res.status})`;
     } else {
       authSucceeded = true;

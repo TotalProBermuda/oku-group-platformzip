@@ -19,6 +19,23 @@ function toEpochSeconds(d: Date): number {
   return Math.floor(d.getTime() / 1000);
 }
 
+// INVU can return a transport-successful response while carrying the actual
+// failure in the JSON envelope (for example `{ status: 403, ... }`). Treat
+// that as a provider failure instead of quietly normalising it to an empty
+// order list. Do not return the raw body: it can contain order and payment
+// data and must never be copied into application errors or logs.
+function invuBodyFailureStatus(parsed: unknown): number | null {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const body = parsed as Record<string, unknown>;
+  const candidate = body.status ?? body.statusCode ?? body.code;
+  const status = typeof candidate === "number"
+    ? candidate
+    : typeof candidate === "string" && /^\d+$/.test(candidate)
+      ? Number(candidate)
+      : null;
+  return status !== null && status >= 400 ? status : null;
+}
+
 async function callInvuList(
   token: string,
   url: string,
@@ -36,6 +53,10 @@ async function callInvuList(
   }
   let parsed: unknown = text;
   try { parsed = JSON.parse(text); } catch { /* keep as text */ }
+  const bodyFailureStatus = invuBodyFailureStatus(parsed);
+  if (bodyFailureStatus !== null) {
+    throw new Error(`INVU ${method} failed (body status ${bodyFailureStatus})`);
+  }
   return unwrapInvuList(parsed);
 }
 
@@ -89,6 +110,10 @@ export async function authenticate(
   }
 
   const data = await res.json();
+  const bodyFailureStatus = invuBodyFailureStatus(data);
+  if (bodyFailureStatus !== null) {
+    throw new Error(`INVU auth failed (body status ${bodyFailureStatus})`);
+  }
   const token =
     data?.token ??
     data?.access_token ??
@@ -114,7 +139,10 @@ export async function getClosedOrders(
 ): Promise<Record<string, unknown>[]> {
   const fini = toEpochSeconds(fromDate);
   const ffin = toEpochSeconds(toDate);
-  const url = `${INVU_API_BASE}?r=citas/ordenesAllAdv/fini/${fini}/ffin/${ffin}/tipo/1/grouping/1`;
+  // Per INVU support, grouping is optional recipe/ingredient detail and does
+  // not affect ticket matching or totals. Omitting it keeps the response
+  // smaller and leaves `num_cita` and ticket-level totals intact.
+  const url = `${INVU_API_BASE}?r=citas/ordenesAllAdv/fini/${fini}/ffin/${ffin}/tipo/1`;
   return callInvuList(token, url, "getClosedOrders");
 }
 

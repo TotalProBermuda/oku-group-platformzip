@@ -4,7 +4,7 @@ import { decrypt } from "../src/server/services/invu/invuEncryptionService";
 const BASE = "https://api6.invupos.com/invuApiPos/index.php";
 
 async function callClosed(token: string, finiSec: number, ffinSec: number) {
-  const url = `${BASE}?r=citas/ordenesAllAdv/fini/${finiSec}/ffin/${ffinSec}/tipo/1/grouping/1`;
+  const url = `${BASE}?r=citas/ordenesAllAdv/fini/${finiSec}/ffin/${ffinSec}/tipo/1`;
   const res = await fetch(url, {
     headers: { accept: "application/json", authorization: token },
   });

@@ -31,4 +31,22 @@ describe("INVU client", () => {
     );
     vi.unstubAllGlobals();
   });
+
+  it("rejects an INVU JSON-body authorization error even when HTTP is 200", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{"status":403,"message":"expired token"}',
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getClosedOrders("vendor-token", "branch", new Date(0), new Date(1))).rejects.toThrow(
+      "INVU getClosedOrders failed (body status 403)",
+    );
+    await expect(getClosedOrders("vendor-token", "branch", new Date(0), new Date(1))).rejects.not.toThrow(
+      "expired token",
+    );
+    expect(fetchMock.mock.calls[0][0]).not.toContain("grouping");
+    vi.unstubAllGlobals();
+  });
 });

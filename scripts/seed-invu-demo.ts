@@ -60,7 +60,7 @@ function extractString(v: unknown): string | null {
 async function pullLast7Days(token: string): Promise<InvuClosedOrder[]> {
   const now = Math.floor(Date.now() / 1000);
   const sevenDaysAgo = now - 7 * 24 * 60 * 60;
-  const url = `${INVU_BASE}?r=citas/ordenesAllAdv/fini/${sevenDaysAgo}/ffin/${now}/tipo/1/grouping/1`;
+  const url = `${INVU_BASE}?r=citas/ordenesAllAdv/fini/${sevenDaysAgo}/ffin/${now}/tipo/1`;
   const res = await fetch(url, {
     headers: { accept: "application/json", authorization: token },
   });
