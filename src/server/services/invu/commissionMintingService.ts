@@ -56,8 +56,17 @@ export type MintResult = {
   skipped: Array<{ earnerType: "HOST" | "REFERRER"; earnerRefId: string; reason: string }>;
 };
 
+type MintOptions = {
+  /**
+   * Limits a repair/backfill run to the named payee. Normal close-of-sale
+   * processing intentionally leaves this unset and considers every earner.
+   */
+  earnerTypes?: Array<"HOST" | "REFERRER">;
+};
+
 export async function mintCommissionsForTableSession(
-  tableSessionId: string
+  tableSessionId: string,
+  options: MintOptions = {}
 ): Promise<MintResult> {
   const session = await prisma.tableSession.findUnique({
     where: { id: tableSessionId },
@@ -152,7 +161,7 @@ export async function mintCommissionsForTableSession(
   // the linked User → ReferralActor so the resolver can apply tier-based rules.
   let hostActorId: string | null = null;
   let hostActorTier: import("@prisma/client").CommissionTierType | null = null;
-  if (hostEarnerRefId) {
+  if (hostEarnerRefId && (!options.earnerTypes || options.earnerTypes.includes("HOST"))) {
     // Try direct ReferralActor lookup (if earnerRefId happens to be an actor id)
     const directActor = await prisma.referralActor.findUnique({
       where: { id: hostEarnerRefId },
@@ -215,7 +224,7 @@ export async function mintCommissionsForTableSession(
     });
   }
 
-  if (referrerEarnerRefId) {
+  if (referrerEarnerRefId && (!options.earnerTypes || options.earnerTypes.includes("REFERRER"))) {
     earners.push({
       earnerType: "REFERRER",
       earnerRefId: referrerEarnerRefId,
@@ -559,5 +568,48 @@ export async function mintCommissionsForTableSession(
     });
   }
 
+  return result;
+}
+
+/**
+ * Backfills only missing referrer allocations when an administrator enables
+ * (or changes) that actor's commission programme after a sale has closed.
+ *
+ * This deliberately reuses the same trust/status gates and idempotency rules
+ * as the normal INVU close path. It cannot change an existing allocation and
+ * it cannot mint a host allocation as a side effect of a referrer repair.
+ */
+export async function mintMissingReferrerCommissionsForActor(
+  referralActorId: string
+): Promise<MintResult> {
+  const sessions = await prisma.tableSession.findMany({
+    where: {
+      matchStatus: "AUTO_MATCHED",
+      commissionEligibility: "ELIGIBLE_AUTO",
+      attributionSession: {
+        is: {
+          referralActorId,
+          status: "VERIFIED_POS_SALE",
+        },
+      },
+      allocations: {
+        none: {
+          earnerType: "REFERRER",
+          earnerRefId: referralActorId,
+          status: { not: "REVERSED" },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  const result: MintResult = { minted: [], skipped: [] };
+  for (const session of sessions) {
+    const minted = await mintCommissionsForTableSession(session.id, {
+      earnerTypes: ["REFERRER"],
+    });
+    result.minted.push(...minted.minted);
+    result.skipped.push(...minted.skipped);
+  }
   return result;
 }

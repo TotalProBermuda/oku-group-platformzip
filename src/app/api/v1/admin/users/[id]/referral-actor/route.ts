@@ -3,6 +3,7 @@ import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { prisma } from "@/lib/prisma";
 import { logAdminAction } from "@/lib/adminAudit";
 import { CommissionTierType } from "@prisma/client";
+import { mintMissingReferrerCommissionsForActor } from "@/server/services/invu/commissionMintingService";
 
 async function findActorForUser(id: string) {
   let actor = await prisma.referralActor.findFirst({
@@ -114,7 +115,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       },
     });
 
-    return NextResponse.json({ ok: true, actor: updated, effectiveRule: await effectiveRuleFor(updated) });
+    // A sale may have closed while this actor was attribution-only. Re-run
+    // only that actor's missing, already-verified referrer allocations after
+    // enabling (or updating) their program. This is idempotent and never
+    // rewrites a prior allocation or mints another earner's commission.
+    const backfill = updated.commissionEligible
+      ? await mintMissingReferrerCommissionsForActor(updated.id)
+      : { minted: [], skipped: [] };
+
+    return NextResponse.json({
+      ok: true,
+      actor: updated,
+      effectiveRule: await effectiveRuleFor(updated),
+      backfill: { mintedCount: backfill.minted.length, skippedCount: backfill.skipped.length },
+    });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
   }
