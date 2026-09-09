@@ -170,3 +170,53 @@ export async function testCybersourceConnection(override?: {
     };
   }
 }
+
+/**
+ * Creates a one-time Digital Accept Flex capture context.  The merchant
+ * credentials remain on the server; the browser receives only Cybersource's
+ * short-lived public JWT and uses it to tokenize card data inside the hosted
+ * Microform iframe.
+ */
+export async function createCybersourceCaptureContext(input: {
+  amount: string;
+  currency: string;
+}): Promise<{ captureContext: string; clientLibrary: string; clientLibraryIntegrity?: string }> {
+  const cfg = await getResolvedCybersourceConfig();
+  const host = cybersourceHost(cfg.env);
+  const path = "/microform/v2/sessions";
+  const body = JSON.stringify({
+    targetOrigins: ["https://www.okuhospitalitygroup.com", "https://okuhospitalitygroup.com"],
+    allowedCardNetworks: ["VISA", "MASTERCARD", "AMEX", "DISCOVER"],
+    clientVersion: "0.22",
+    paymentInformation: {
+      card: {
+        number: {},
+        securityCode: { required: true },
+        expirationMonth: { required: true },
+        expirationYear: { required: true },
+        type: { required: false },
+      },
+    },
+    orderInformation: {
+      amountDetails: { totalAmount: input.amount, currency: input.currency || "USD" },
+    },
+  });
+  const headers = buildCybersourceHttpSignatureHeaders({
+    method: "POST", path, body, merchantId: cfg.merchantId, keyId: cfg.keyId,
+    sharedSecret: cfg.sharedSecret, host,
+  });
+  const response = await fetch(`https://${host}${path}`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+    body,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.captureContext || !data.clientLibrary) {
+    throw new Error(data?.errorInformation?.message || data?.message || `Cybersource capture context failed (${response.status})`);
+  }
+  return {
+    captureContext: data.captureContext,
+    clientLibrary: data.clientLibrary,
+    clientLibraryIntegrity: data.clientLibraryIntegrity,
+  };
+}

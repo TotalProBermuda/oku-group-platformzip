@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
@@ -20,6 +20,13 @@ export default function CheckoutPage() {
   const [paying, setPaying]       = useState(false);
   const [done, setDone]           = useState(false);
   const [error, setError]         = useState("");
+  const [checkoutItems, setCheckoutItems] = useState<any[]>([]);
+  const [intentId, setIntentId] = useState<string | null>(null);
+  const [secureReady, setSecureReady] = useState(false);
+  const [flexConfig, setFlexConfig] = useState<{ captureContext: string; clientLibrary: string; clientLibraryIntegrity?: string } | null>(null);
+  const [expiryMonth, setExpiryMonth] = useState("");
+  const [expiryYear, setExpiryYear] = useState("");
+  const microformRef = useRef<any>(null);
 
   useEffect(() => {
     fetch(`/api/v1/experiences?slug=${slug}`)
@@ -31,6 +38,36 @@ export default function CheckoutPage() {
       })
       .finally(() => setLoading(false));
   }, [slug]);
+
+  useEffect(() => {
+    if (!flexConfig) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const existing = document.querySelector(`script[src="${flexConfig.clientLibrary}"]`) as HTMLScriptElement | null;
+          if (existing && (window as any).Flex) return resolve();
+          const script = document.createElement("script");
+          script.src = flexConfig.clientLibrary;
+          script.crossOrigin = "anonymous";
+          if (flexConfig.clientLibraryIntegrity) script.integrity = flexConfig.clientLibraryIntegrity;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Cybersource secure card library could not load."));
+          document.head.appendChild(script);
+        });
+        if (cancelled) return;
+        const flex = new (window as any).Flex(flexConfig.captureContext);
+        const microform = flex.microform({ styles: { input: { "font-size": "16px", color: "#1a1614" } } });
+        microform.createField("number", { placeholder: "Card number" }).load("#cybersource-card-number");
+        microform.createField("securityCode", { placeholder: "CVV" }).load("#cybersource-security-code");
+        microformRef.current = microform;
+        setSecureReady(true);
+      } catch {
+        if (!cancelled) setError("Unable to load secure card entry. No card information was submitted.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [flexConfig]);
 
   async function getQuote() {
     if (!selectedSession) { setError("Please select a session"); return; }
@@ -53,28 +90,59 @@ export default function CheckoutPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Quote failed"); setQuoting(false); return; }
       setQuote(data);
+      setCheckoutItems(items);
     } catch {
       setError("Unable to get a quote. Please try again.");
     }
     setQuoting(false);
   }
 
-  async function completePurchase() {
-    if (!quote) return;
+  async function initializeSecurePayment() {
+    if (!quote || !checkoutItems.length) return;
     setPaying(true);
     setError("");
     try {
-      // Demo payment — creates order directly
-      const res = await fetch("/api/v1/orders", {
+      const intentResponse = await fetch("/api/v1/checkout/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...quote, paymentMethod: "DEMO" }),
+        body: JSON.stringify({ sessionId: quote.sessionId, items: checkoutItems }),
+      });
+      const intentData = await intentResponse.json();
+      if (!intentResponse.ok) throw new Error(intentData.message ?? intentData.error ?? "Unable to create payment order.");
+      const nextIntentId = intentData.data.intentId as string;
+      const contextResponse = await fetch("/api/v1/checkout/cybersource/capture-context", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId: nextIntentId }),
+      });
+      const contextData = await contextResponse.json();
+      if (!contextResponse.ok) throw new Error(contextData.error ?? "Unable to initialize secure card entry.");
+      setFlexConfig(contextData.data);
+      setIntentId(nextIntentId);
+    } catch {
+      setError("Unable to initialize secure payment. No card information was submitted.");
+    }
+    setPaying(false);
+  }
+
+  async function completePurchase() {
+    if (!intentId || !microformRef.current || !expiryMonth || !expiryYear) {
+      setError("Enter your card expiry month and year."); return;
+    }
+    setPaying(true); setError("");
+    try {
+      const transientToken = await new Promise<string>((resolve, reject) => {
+        microformRef.current.createToken({ expirationMonth: expiryMonth, expirationYear: expiryYear }, (err: any, token: string) => err ? reject(err) : resolve(token));
+      });
+      const res = await fetch("/api/v1/checkout/confirm", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId, cybersourceTransientToken: transientToken }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Payment failed"); setPaying(false); return; }
+      if (!res.ok) throw new Error(data.error ?? "Payment failed");
       setDone(true);
     } catch {
-      setError("Payment failed. Please try again.");
+      setError("Payment was not approved. Your card information was not stored by OKÜ.");
     }
     setPaying(false);
   }
@@ -254,15 +322,24 @@ export default function CheckoutPage() {
                   {quote.memberDiscount && <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>Member discount applied</div>}
                 </div>
 
-                {/* Demo payment form */}
                 <div style={{ marginTop: 28, background: "#fafaf9", border: "1px solid #e5e0d8", borderRadius: 12, padding: "20px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 16 }}>Demo Payment</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <input readOnly value="4242 4242 4242 4242" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "#f9fafb", color: "#6b7280", gridColumn: "1/-1" }} />
-                    <input readOnly value="12/28" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "#f9fafb", color: "#6b7280" }} />
-                    <input readOnly value="123" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "#f9fafb", color: "#6b7280" }} />
-                  </div>
-                  <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>This is a demo environment — no real payment is processed.</p>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b625c", marginBottom: 12 }}>Secure card payment</div>
+                  {!intentId ? (
+                    <>
+                      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 16px" }}>Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
+                      <button onClick={initializeSecurePayment} disabled={paying} className="btn btn-primary" style={{ width: "100%" }}>
+                        {paying ? "Preparing secure card entry…" : "Continue to secure card entry"}
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      {!secureReady && <div style={{ gridColumn: "1 / -1", fontSize: 13, color: "#6b7280" }}>Loading Cybersource secure card fields…</div>}
+                      <div id="cybersource-card-number" style={{ gridColumn: "1 / -1", minHeight: 42, padding: "11px 12px", background: "white", border: "1px solid #d8d2ca", borderRadius: 8 }} />
+                      <input aria-label="Expiry month" inputMode="numeric" maxLength={2} placeholder="MM" value={expiryMonth} onChange={(e) => setExpiryMonth(e.target.value.replace(/\D/g, "").slice(0, 2))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                      <input aria-label="Expiry year" inputMode="numeric" maxLength={4} placeholder="YYYY" value={expiryYear} onChange={(e) => setExpiryYear(e.target.value.replace(/\D/g, "").slice(0, 4))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                      <div id="cybersource-security-code" style={{ gridColumn: "1 / -1", minHeight: 42, padding: "11px 12px", background: "white", border: "1px solid #d8d2ca", borderRadius: 8 }} />
+                    </div>
+                  )}
                 </div>
 
                 {error && <div style={{ color: "#dc2626", fontSize: 14, marginTop: 16, padding: "12px 16px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>{error}</div>}
@@ -270,7 +347,7 @@ export default function CheckoutPage() {
 
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
                 <button onClick={() => setQuote(null)} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
-                <button onClick={completePurchase} disabled={paying} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
+                <button onClick={completePurchase} disabled={paying || !secureReady} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
                   {paying ? "Processing…" : `Confirm & Pay ${fmt(quote.totalCents)}`}
                 </button>
               </div>

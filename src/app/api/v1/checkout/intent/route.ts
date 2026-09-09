@@ -110,6 +110,13 @@ export async function POST(req: Request) {
     resolvedAttributionSource = "INFLUENCER_HOST";
   }
 
+    // Keep the payment intent authoritative and aligned with the quote shown
+    // to the guest.  Amounts are calculated server-side; the browser never
+    // supplies a payable total.
+    const feesCents = Math.round(subtotalCents * 0.05);
+    const taxCents = Math.round(subtotalCents * 0.084);
+    const totalCents = subtotalCents + feesCents + taxCents;
+
     const order = await prisma.order.create({
     data: {
       userId,
@@ -117,7 +124,9 @@ export async function POST(req: Request) {
       sessionId: session.id,
       status: "PENDING",
       subtotalCents,
-      totalCents: subtotalCents,
+      feesCents,
+      taxCents,
+      totalCents,
       currency: "USD",
       couponCode: body.couponCode,
       attributionId: body.attributionId,
