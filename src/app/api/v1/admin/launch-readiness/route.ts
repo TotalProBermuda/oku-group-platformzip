@@ -6,6 +6,7 @@ import { getResendClient } from "@/server/invitation/resend";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, isEncryptionAvailable } from "@/server/security/encryption";
 import { getLaunchReadiness } from "@/server/launchReadiness/getLaunchReadiness";
+import { hasRedisConfig } from "@/server/redis/config";
 
 function requireSuperadmin(roles: string[]) {
   if (!roles.includes("SUPERADMIN")) {
@@ -272,9 +273,9 @@ async function buildStatus(snapshot: Awaited<ReturnType<typeof getLaunchReadines
       publicAppUrlConfigured: gatePass("auth.public_app_url"),
     },
     runtime: {
-      redisConfigured: envPresent("REDIS_URL"),
+      redisConfigured: hasRedisConfig(),
       databaseUrlConfigured: gatePass("environment.database_url"),
-      rateLimitProvider: envPresent("REDIS_URL") ? "redis" : "database",
+      rateLimitProvider: hasRedisConfig() ? "redis" : "database",
       nodeEnv: process.env.NODE_ENV ?? "development",
     },
     flags: {

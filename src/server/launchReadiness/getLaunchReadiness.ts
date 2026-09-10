@@ -23,6 +23,7 @@ import {
 } from "@/server/payments/activeGateway";
 import { isEncryptionAvailable } from "@/server/security/encryption";
 import { getResendClient } from "@/server/invitation/resend";
+import { hasRedisConfig } from "@/server/redis/config";
 
 export type GateStatus = "pass" | "warn" | "fail";
 export type GateSeverity = "blocking" | "informational";
@@ -307,7 +308,7 @@ function checkDemoModeOff(): ReadinessGate {
 }
 
 function checkRedisForRateLimiting(): ReadinessGate {
-  if (envPresent("REDIS_URL")) {
+  if (hasRedisConfig()) {
     return gate({
       name: "environment.redis_rate_limit",
       category: "environment",

@@ -6,6 +6,7 @@
 
 import { createHmac, randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { getRedisUrl } from "@/server/redis/config";
 import type { Redis as IORedis } from "ioredis";
 
 type Bucket = { count: number; resetAt: number };
@@ -22,14 +23,15 @@ let redisUnavailableUntil = 0;
 const REDIS_RETRY_DELAY_MS = 30_000;
 
 function getRedis(): IORedis | null {
-  if (!process.env.REDIS_URL || Date.now() < redisUnavailableUntil) return null;
+  const redisUrl = getRedisUrl();
+  if (!redisUrl || Date.now() < redisUnavailableUntil) return null;
   if (redis) return redis;
   try {
     // ioredis is already a production dependency through BullMQ. Require it
     // lazily so local tooling does not make a network connection on import.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const IORedisCtor = require("ioredis").default ?? require("ioredis");
-    redis = new IORedisCtor(process.env.REDIS_URL, {
+    redis = new IORedisCtor(redisUrl, {
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
       lazyConnect: false,
