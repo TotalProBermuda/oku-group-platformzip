@@ -1826,6 +1826,23 @@ model AuditLog {
   createdAt DateTime @default(now())
 }
 
+// Shared, fixed-window request limiter. The key is an HMAC digest of the
+// route and client fingerprint, so neither raw IP addresses nor request data
+// are retained. This is intentionally a small operational table: it supports
+// public abuse protection without adding a separate Redis dependency.
+model RateLimitBucket {
+  id          String   @id
+  keyHash     String
+  windowStart DateTime
+  count       Int      @default(0)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([keyHash, windowStart])
+  @@index([expiresAt])
+}
+
 // Persisted point-in-time snapshot of getLaunchReadiness() (Task #131).
 // Used by /admin/launch-readiness to show a "Recent history" trend so
 // operators can spot gates that flip between pass/fail across deploys.

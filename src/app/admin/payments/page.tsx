@@ -47,6 +47,7 @@ interface ReadinessData {
   runtime: {
     redisConfigured: boolean;
     databaseUrlConfigured: boolean;
+    rateLimitProvider?: "database" | "redis";
     nodeEnv: string;
   };
   flags: { demoModeEnabled: boolean };
@@ -954,12 +955,14 @@ export default function PaymentsPage() {
             <Row label="DATABASE_URL">
               <StatusPill ok={data.runtime.databaseUrlConfigured} />
             </Row>
-            <Row label="REDIS_URL">
-              {data.runtime.redisConfigured ? (
-                <StatusPill ok />
-              ) : (
-                <WarnPill>Not configured (using inline fallback — non-blocking)</WarnPill>
-              )}
+            <Row label="Public rate limiting">
+              <StatusPill
+                ok={data.runtime.rateLimitProvider === "database"}
+                label={data.runtime.rateLimitProvider === "database" ? "Production database" : "Check configuration"}
+              />
+            </Row>
+            <Row label="Redis worker (optional)">
+              {data.runtime.redisConfigured ? <StatusPill ok /> : <WarnPill>Not configured — background jobs run inline</WarnPill>}
             </Row>
             <Row label="NODE_ENV">
               <code style={{ color: "#475569", fontSize: 12 }}>{data.runtime.nodeEnv}</code>
