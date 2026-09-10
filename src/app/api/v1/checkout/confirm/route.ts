@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { createCommissionIfAttributed } from "@/server/commerce/commissions";
@@ -69,6 +70,9 @@ export async function POST(req: Request) {
     customerName: order.user?.name ?? null,
     instrument,
   });
+  const gatewayRawSafeJson = result.rawSafeResponse === undefined
+    ? null
+    : (result.rawSafeResponse as Prisma.InputJsonValue);
 
   if (!result.ok) {
     await prisma.order.update({ where: { id: order.id }, data: { status: "FAILED" } });
@@ -78,7 +82,7 @@ export async function POST(req: Request) {
         status: "FAILED",
         provider,
         gatewayResponseCode: result.responseCode,
-        gatewayRawSafeJson: (result.rawSafeResponse ?? null) as any,
+        gatewayRawSafeJson,
       },
       create: {
         orderId: order.id,
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
         amountCents: order.totalCents,
         currency: order.currency,
         gatewayResponseCode: result.responseCode,
-        gatewayRawSafeJson: (result.rawSafeResponse ?? null) as any,
+        gatewayRawSafeJson,
       },
     });
     await releaseCatalogCapacity({
@@ -138,7 +142,7 @@ export async function POST(req: Request) {
         gatewayReferenceId: result.referenceId,
         gatewayAuthCode: result.authCode,
         gatewayResponseCode: result.responseCode,
-        gatewayRawSafeJson: (result.rawSafeResponse ?? null) as any,
+        gatewayRawSafeJson,
         ...(isAuthNet
           ? {
               authNetTransId: result.transactionId,
@@ -156,7 +160,7 @@ export async function POST(req: Request) {
         gatewayReferenceId: result.referenceId,
         gatewayAuthCode: result.authCode,
         gatewayResponseCode: result.responseCode,
-        gatewayRawSafeJson: (result.rawSafeResponse ?? null) as any,
+        gatewayRawSafeJson,
         ...(isAuthNet
           ? {
               authNetTransId: result.transactionId,
