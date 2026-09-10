@@ -25,41 +25,13 @@
  * The endpoint will return 503 until the secret is configured.
  */
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
+import { verifyCybersourceWebhookSignature } from "@/server/cybersource/webhookSignature";
 
 export const dynamic = "force-dynamic";
 
 const WEBHOOK_SECRET = process.env.CYBERSOURCE_WEBHOOK_SECRET;
-
-/**
- * Verify the Cybersource HMAC-SHA256 signature.
- * Returns false if the secret is not configured (fail-closed in all envs).
- */
-function verifySignature(rawBody: Buffer, signatureHeader: string | null): boolean {
-  if (!WEBHOOK_SECRET) {
-    // Fail closed — never accept unsigned requests regardless of environment.
-    return false;
-  }
-  if (!signatureHeader) return false;
-
-  // Cybersource may send: "sha256=<hex>" or just "<hex>"
-  const hex = signatureHeader.startsWith("sha256=")
-    ? signatureHeader.slice("sha256=".length)
-    : signatureHeader;
-
-  const expected = crypto
-    .createHmac("sha256", WEBHOOK_SECRET)
-    .update(rawBody)
-    .digest("hex");
-
-  try {
-    return crypto.timingSafeEqual(Buffer.from(hex, "hex"), Buffer.from(expected, "hex"));
-  } catch {
-    return false;
-  }
-}
 
 /** Map Cybersource webhook eventType strings to our ledger types */
 function mapLedgerEventType(csEventType: string): string | null {
@@ -117,7 +89,11 @@ export async function POST(req: NextRequest) {
     req.headers.get("signature") ??
     null;
 
-  if (!verifySignature(rawBody, sigHeader)) {
+  if (!verifyCybersourceWebhookSignature({
+    rawBody,
+    signatureHeader: sigHeader,
+    digitalSignatureKey: WEBHOOK_SECRET,
+  })) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
