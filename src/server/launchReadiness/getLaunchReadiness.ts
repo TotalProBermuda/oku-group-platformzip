@@ -306,25 +306,25 @@ function checkDemoModeOff(): ReadinessGate {
   });
 }
 
-function checkDatabaseForRateLimiting(): ReadinessGate {
-  if (envPresent("DATABASE_URL")) {
+function checkRedisForRateLimiting(): ReadinessGate {
+  if (envPresent("REDIS_URL")) {
     return gate({
-      name: "environment.database_rate_limit",
+      name: "environment.redis_rate_limit",
       category: "environment",
-      label: "Production database available for shared rate limiting",
+      label: "Redis configured as the primary distributed rate limiter",
       status: "pass",
-      severity: "blocking",
+      severity: "informational",
       remediation: "OK",
     });
   }
   return gate({
-    name: "environment.database_rate_limit",
+    name: "environment.redis_rate_limit",
     category: "environment",
-    label: "Production database available for shared rate limiting",
-    status: "fail",
-    severity: "blocking",
+    label: "Redis is not configured; database rate-limit fallback is active",
+    status: "warn",
+    severity: "informational",
     remediation:
-      "Set DATABASE_URL to the production Postgres connection. Authentication, public chat, and checkout writes fail closed without shared rate limiting.",
+      "Set REDIS_URL to make Redis the primary rate limiter. The existing production database remains the shared fail-closed fallback.",
   });
 }
 
@@ -486,7 +486,7 @@ export async function getLaunchReadiness(): Promise<LaunchReadinessSnapshot> {
   const gates: ReadinessGate[] = [
     checkNodeEnv(),
     checkDemoModeOff(),
-    checkDatabaseForRateLimiting(),
+    checkRedisForRateLimiting(),
     checkEnvVar({
       name: "environment.database_url",
       varName: "DATABASE_URL",

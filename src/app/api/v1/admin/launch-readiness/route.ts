@@ -274,7 +274,7 @@ async function buildStatus(snapshot: Awaited<ReturnType<typeof getLaunchReadines
     runtime: {
       redisConfigured: envPresent("REDIS_URL"),
       databaseUrlConfigured: gatePass("environment.database_url"),
-      rateLimitProvider: "database",
+      rateLimitProvider: envPresent("REDIS_URL") ? "redis" : "database",
       nodeEnv: process.env.NODE_ENV ?? "development",
     },
     flags: {

@@ -1,10 +1,12 @@
 // Per-key fixed-window rate limiter + honeypot helpers for public POST
-// endpoints. Production uses the shared Postgres database already operated by
-// the app. Redis remains optional for BullMQ, but public checkout and auth do
-// not depend on a second managed service merely for request protection.
+// endpoints. Production prefers Redis because the counter increment and TTL
+// are handled in one small, atomic operation across every app instance. The
+// existing Postgres limiter remains a safe, shared fallback if Redis has a
+// short outage; public routes never silently become per-instance limited.
 
 import { createHmac, randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
+import type { Redis as IORedis } from "ioredis";
 
 type Bucket = { count: number; resetAt: number };
 
@@ -14,6 +16,36 @@ let lastSweep = Date.now();
 
 const PRUNE_INTERVAL_MS = 10 * 60_000;
 let nextPruneAt = 0;
+
+let redis: IORedis | null = null;
+let redisUnavailableUntil = 0;
+const REDIS_RETRY_DELAY_MS = 30_000;
+
+function getRedis(): IORedis | null {
+  if (!process.env.REDIS_URL || Date.now() < redisUnavailableUntil) return null;
+  if (redis) return redis;
+  try {
+    // ioredis is already a production dependency through BullMQ. Require it
+    // lazily so local tooling does not make a network connection on import.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const IORedisCtor = require("ioredis").default ?? require("ioredis");
+    redis = new IORedisCtor(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      lazyConnect: false,
+    });
+    redis.on("error", () => {
+      // The database fallback below remains authoritative during a temporary
+      // Redis failure. Do not log a request key, IP address, or connection URL.
+      redis = null;
+      redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
+    });
+    return redis;
+  } catch {
+    redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
+    return null;
+  }
+}
 
 export interface RateLimitOptions {
   key: string;
@@ -79,6 +111,32 @@ function hashRateLimitKey(key: string): string | null {
   return secret ? createHmac("sha256", secret).update(key).digest("hex") : null;
 }
 
+async function checkRateLimitRedis(client: IORedis, opts: RateLimitOptions): Promise<RateLimitResult> {
+  const keyHash = hashRateLimitKey(opts.key);
+  if (!keyHash) throw new Error("No stable secret available for Redis rate-limit key hashing");
+
+  // A Lua script prevents the INCR/EXPIRE split that can leave a counter
+  // without an expiry if a process stops between two separate commands.
+  const reply = (await client.eval(
+    `local count = redis.call("INCR", KEYS[1])\n` +
+      `if count == 1 then redis.call("PEXPIRE", KEYS[1], ARGV[1]) end\n` +
+      `return { count, redis.call("PTTL", KEYS[1]) }`,
+    1,
+    `oku:rate-limit:${keyHash}`,
+    String(Math.max(1, opts.windowMs)),
+  )) as [number, number];
+  const [count, ttlMs] = reply;
+  if (!Number.isInteger(count)) throw new Error("Redis rate-limit counter did not return a count");
+  if (count > opts.limit) {
+    return {
+      ok: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((ttlMs > 0 ? ttlMs : opts.windowMs) / 1000)),
+      remaining: 0,
+    };
+  }
+  return { ok: true, remaining: Math.max(0, opts.limit - count) };
+}
+
 function pruneExpiredBuckets(now: Date) {
   if (now.getTime() < nextPruneAt) return;
   nextPruneAt = now.getTime() + PRUNE_INTERVAL_MS;
@@ -125,6 +183,16 @@ async function checkRateLimitDatabase(opts: RateLimitOptions): Promise<RateLimit
 
 export async function checkRateLimitAsync(opts: RateLimitOptions): Promise<RateLimitResult> {
   const mustBeDistributed = opts.requireDistributed && process.env.NODE_ENV === "production";
+
+  const redisClient = getRedis();
+  if (redisClient) {
+    try {
+      return await checkRateLimitRedis(redisClient, opts);
+    } catch {
+      redis = null;
+      redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
+    }
+  }
   try {
     const databaseResult = await checkRateLimitDatabase(opts);
     if (databaseResult) return databaseResult;
