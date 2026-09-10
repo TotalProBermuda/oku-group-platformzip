@@ -12,7 +12,6 @@ type TeamMember = {
   badgeColor: string | null;
   venue: { id: string; name: string } | null;
   userId: string;
-  userEmail: string;
   lastSeen: string;
   isSelf: boolean;
 };

@@ -14,12 +14,26 @@ export async function GET() {
   const allowed = roles.some((r) => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "STREETSIDE_HOST", "SUPERADMIN"].includes(r));
   if (!allowed) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
+  // Staff directories are venue-scoped for operational roles. Only a superadmin
+  // may view the cross-venue directory.
+  const isSuperadmin = roles.includes("SUPERADMIN");
+  let venueId: string | null = null;
+  if (!isSuperadmin) {
+    const profile = await prisma.restaurantHostProfile.findUnique({
+      where: { userId },
+      select: { venueId: true },
+    });
+    venueId = profile?.venueId ?? null;
+    if (!venueId) return NextResponse.json({ ok: false, error: "Host venue is not configured" }, { status: 403 });
+  }
+
   const profiles = await prisma.restaurantHostProfile.findMany({
     where: {
+      ...(venueId ? { venueId } : {}),
       user: { roles: { some: { roleKey: "STREETSIDE_HOST" } } },
     },
     include: {
-      user: { select: { id: true, name: true, email: true, updatedAt: true } },
+      user: { select: { id: true, name: true, updatedAt: true } },
       venue: { select: { id: true, name: true, slug: true } },
     },
     orderBy: [{ isActive: "desc" }, { displayName: "asc" }],
@@ -34,7 +48,6 @@ export async function GET() {
       badgeColor: p.badgeColor,
       venue: p.venue ? { id: p.venue.id, name: p.venue.name } : null,
       userId: p.userId,
-      userEmail: p.user.email,
       lastSeen: p.user.updatedAt,
       isSelf: p.userId === userId,
     })),
