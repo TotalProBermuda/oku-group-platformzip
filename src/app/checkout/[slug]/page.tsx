@@ -168,9 +168,12 @@ export default function CheckoutPage() {
     <div className="page-container" style={{ padding: "80px 24px", maxWidth: 560, textAlign: "center" }}>
       <div style={{ fontSize: 48, marginBottom: 24 }}>✓</div>
       <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 36, color: "#1a1614", marginBottom: 12 }}>You're booked!</h2>
-      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 32 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. A confirmation is being sent to {guest.email}.</p>
+      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 12 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. A confirmation is being sent to {guest.email}.</p>
+      <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.55, margin: "0 0 32px" }}>
+        Your booking is linked to this email. Use a one-time secure email link whenever you want to view your tickets—no password or Google account is required.
+      </p>
       <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <Link href="/my/tickets" className="btn btn-primary">View My Tickets</Link>
+        <Link href="/login?callbackUrl=/my/tickets" className="btn btn-primary">Access My Tickets</Link>
         <Link href="/experiences" className="btn btn-ghost">More Experiences</Link>
       </div>
     </div>
@@ -336,7 +339,7 @@ export default function CheckoutPage() {
                         <input aria-label="Phone number" type="tel" value={guest.phone} onChange={(event) => setGuest((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone (optional)" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                         <label style={{ display: "flex", gap: 8, fontSize: 12, color: "#4b5563" }}><input type="checkbox" checked={guest.marketingEmailConsent} onChange={(event) => setGuest((current) => ({ ...current, marketingEmailConsent: event.target.checked }))} />Send me occasional OKÜ news and experiences. Optional.</label>
                       </div>
-                      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 16px" }}>No password is required. Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
+                      <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5, margin: "0 0 16px" }}>No password is required. Your booking will be linked to this email, and secure one-time email access is available afterwards. Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
                       <button onClick={initializeSecurePayment} disabled={paying} className="btn btn-primary" style={{ width: "100%" }}>
                         {paying ? "Preparing secure card entry…" : "Continue to secure card entry"}
                       </button>

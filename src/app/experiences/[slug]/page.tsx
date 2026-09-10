@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
@@ -33,10 +31,9 @@ const venueGrad: Record<string, string> = {
 
 export default async function ExperienceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [series, availability, session] = await Promise.all([
+  const [series, availability] = await Promise.all([
     getSeries(slug),
     getAvailability(slug),
-    getServerSession(authOptions),
   ]);
 
   if (!series) notFound();
@@ -200,18 +197,14 @@ export default async function ExperienceDetailPage({ params }: { params: Promise
               </div>
             )}
 
-            {session ? (
-              <Link href={`/checkout/${slug}`} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>
+            <div>
+              <Link href={`/checkout/${slug}`} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px", marginBottom: 8 }}>
                 Select Tickets
               </Link>
-            ) : (
-              <div>
-                <Link href={`/login?callbackUrl=/checkout/${slug}`} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px", marginBottom: 8 }}>
-                  Sign In to Book
-                </Link>
-                <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center" }}>You'll need an account to complete your purchase.</p>
-              </div>
-            )}
+              <p style={{ fontSize: 12, color: "#6b7280", textAlign: "center", lineHeight: 1.5, margin: 0 }}>
+                Book as a guest with your email. You can securely access your tickets afterwards—no password required.
+              </p>
+            </div>
           </div>
 
           {/* Location */}
