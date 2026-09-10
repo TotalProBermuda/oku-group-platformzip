@@ -19,6 +19,7 @@ const PRUNE_INTERVAL_MS = 10 * 60_000;
 let nextPruneAt = 0;
 
 let redis: IORedis | null = null;
+let redisConnectPromise: Promise<void> | null = null;
 let redisUnavailableUntil = 0;
 const REDIS_RETRY_DELAY_MS = 30_000;
 
@@ -34,12 +35,13 @@ function getRedis(): IORedis | null {
     redis = new IORedisCtor(redisUrl, {
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
-      lazyConnect: false,
+      lazyConnect: true,
     });
     redis.on("error", () => {
       // The database fallback below remains authoritative during a temporary
       // Redis failure. Do not log a request key, IP address, or connection URL.
       redis = null;
+      redisConnectPromise = null;
       redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
     });
     return redis;
@@ -47,6 +49,16 @@ function getRedis(): IORedis | null {
     redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
     return null;
   }
+}
+
+async function ensureRedisConnected(client: IORedis): Promise<void> {
+  if (client.status === "ready") return;
+  if (!redisConnectPromise) {
+    redisConnectPromise = client.connect().then(() => undefined).finally(() => {
+      redisConnectPromise = null;
+    });
+  }
+  await redisConnectPromise;
 }
 
 export interface RateLimitOptions {
@@ -114,6 +126,7 @@ function hashRateLimitKey(key: string): string | null {
 }
 
 async function checkRateLimitRedis(client: IORedis, opts: RateLimitOptions): Promise<RateLimitResult> {
+  await ensureRedisConnected(client);
   const keyHash = hashRateLimitKey(opts.key);
   if (!keyHash) throw new Error("No stable secret available for Redis rate-limit key hashing");
 
@@ -192,6 +205,7 @@ export async function checkRateLimitAsync(opts: RateLimitOptions): Promise<RateL
       return await checkRateLimitRedis(redisClient, opts);
     } catch {
       redis = null;
+      redisConnectPromise = null;
       redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
     }
   }
