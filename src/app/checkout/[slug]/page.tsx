@@ -23,6 +23,7 @@ export default function CheckoutPage() {
   const [checkoutItems, setCheckoutItems] = useState<any[]>([]);
   const [intentId, setIntentId] = useState<string | null>(null);
   const [secureReady, setSecureReady] = useState(false);
+  const [paymentDeclined, setPaymentDeclined] = useState(false);
   const [flexConfig, setFlexConfig] = useState<{ captureContext: string; clientLibrary: string; clientLibraryIntegrity?: string } | null>(null);
   const [expiryMonth, setExpiryMonth] = useState("");
   const [expiryYear, setExpiryYear] = useState("");
@@ -129,6 +130,25 @@ export default function CheckoutPage() {
     setPaying(false);
   }
 
+  /**
+   * A declined payment leaves its server-side order immutable so the same
+   * gateway request can never be charged twice.  Start again from the quote
+   * instead of giving the impression that pressing "pay" a second time is a
+   * valid retry against that old order.
+   */
+  function startFreshPaymentAttempt() {
+    microformRef.current = null;
+    setFlexConfig(null);
+    setSecureReady(false);
+    setIntentId(null);
+    setGuestCheckoutToken(undefined);
+    setExpiryMonth("");
+    setExpiryYear("");
+    setPaymentDeclined(false);
+    setError("");
+    setQuote(null);
+  }
+
   async function completePurchase() {
     if (!intentId || !microformRef.current || !expiryMonth || !expiryYear) {
       setError("Enter your card expiry month and year."); return;
@@ -146,7 +166,11 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error(data.error ?? "Payment failed");
       setDone(true);
     } catch {
-      setError("Payment was not approved. Your card information was not stored by OKÜ.");
+      // Keep the public message intentionally generic: provider responses can
+      // reveal issuer and fraud-decision detail.  The server stores a safe,
+      // auditable response code for authorised finance/support staff.
+      setPaymentDeclined(true);
+      setError("Payment was not approved. Your card information was not stored by OKÜ. Please start a fresh payment attempt or use another card.");
     }
     setPaying(false);
   }
@@ -194,7 +218,7 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <div className="page-container" style={{ padding: "40px 24px", display: "grid", gridTemplateColumns: "1fr 360px", gap: 48, alignItems: "start" }}>
+      <div className="page-container checkout-layout" style={{ padding: "40px 24px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 48, alignItems: "start" }}>
         {!quote ? (
           <>
             {/* Step 1: Selection */}
@@ -345,22 +369,27 @@ export default function CheckoutPage() {
                       </button>
                     </>
                   ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div className="cybersource-payment-fields" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                       {!secureReady && <div style={{ gridColumn: "1 / -1", fontSize: 13, color: "#6b7280" }}>Loading Cybersource secure card fields…</div>}
-                      <div id="cybersource-card-number" style={{ gridColumn: "1 / -1", minHeight: 42, padding: "11px 12px", background: "white", border: "1px solid #d8d2ca", borderRadius: 8 }} />
+                      <div id="cybersource-card-number" className="cybersource-field" style={{ gridColumn: "1 / -1" }} />
                       <input aria-label="Expiry month" inputMode="numeric" maxLength={2} placeholder="MM" value={expiryMonth} onChange={(e) => setExpiryMonth(e.target.value.replace(/\D/g, "").slice(0, 2))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                       <input aria-label="Expiry year" inputMode="numeric" maxLength={4} placeholder="YYYY" value={expiryYear} onChange={(e) => setExpiryYear(e.target.value.replace(/\D/g, "").slice(0, 4))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
-                      <div id="cybersource-security-code" style={{ gridColumn: "1 / -1", minHeight: 42, padding: "11px 12px", background: "white", border: "1px solid #d8d2ca", borderRadius: 8 }} />
+                      <div id="cybersource-security-code" className="cybersource-field" style={{ gridColumn: "1 / -1" }} />
                     </div>
                   )}
                 </div>
 
                 {error && <div style={{ color: "#dc2626", fontSize: 14, marginTop: 16, padding: "12px 16px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>{error}</div>}
+                {paymentDeclined && (
+                  <button type="button" onClick={startFreshPaymentAttempt} className="btn btn-ghost" style={{ marginTop: 14, width: "100%" }}>
+                    Start a fresh payment attempt
+                  </button>
+                )}
               </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={() => setQuote(null)} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
-                <button onClick={completePurchase} disabled={paying || !secureReady} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
+                <button onClick={startFreshPaymentAttempt} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
+                <button onClick={completePurchase} disabled={paying || !secureReady || paymentDeclined} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
                   {paying ? "Processing…" : `Confirm & Pay ${fmt(quote.totalCents)}`}
                 </button>
               </div>
@@ -376,6 +405,29 @@ export default function CheckoutPage() {
           </>
         )}
       </div>
+      <style jsx>{`
+        .cybersource-field {
+          display: flex;
+          align-items: center;
+          height: 48px;
+          min-height: 48px;
+          overflow: hidden;
+          padding: 0 12px;
+          background: #fff;
+          border: 1px solid #d8d2ca;
+          border-radius: 8px;
+        }
+        .cybersource-field :global(iframe) {
+          display: block;
+          width: 100% !important;
+          height: 28px !important;
+          min-height: 28px !important;
+          border: 0;
+        }
+        @media (max-width: 820px) {
+          .checkout-layout { grid-template-columns: 1fr !important; gap: 24px !important; }
+        }
+      `}</style>
     </div>
   );
 }
