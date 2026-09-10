@@ -87,6 +87,50 @@ export async function reserveCatalogCapacityOrThrow(input: {
 }
 
 /**
+ * Release every inventory counter reserved for a pending checkout. Keeping
+ * this paired with `reserveCatalogCapacityOrThrow` matters: releasing only a
+ * session seat after a declined payment leaves a capped ticket or add-on
+ * falsely sold out.
+ */
+export async function releaseCatalogCapacity(input: {
+  sessionId: string;
+  ticketItems: Array<{ id: string; qty: number }>;
+  addonItems: Array<{ id: string; qty: number }>;
+}) {
+  const ticketQty = input.ticketItems.reduce((sum, item) => sum + item.qty, 0);
+  return prisma.$transaction(async (tx) => {
+    const session = await tx.session.findUnique({ where: { id: input.sessionId } });
+    if (!session) return;
+
+    // Each release is performed only when the corresponding reservation could
+    // have existed. This prevents a retry from taking a counter below zero.
+    if (ticketQty > 0) {
+      await tx.session.updateMany({
+        where: { id: session.id, soldCount: { gte: ticketQty } },
+        data: { soldCount: { decrement: ticketQty } },
+      });
+    }
+    for (const item of input.ticketItems) {
+      await tx.ticketType.updateMany({
+        where: { id: item.id, soldCount: { gte: item.qty } },
+        data: { soldCount: { decrement: item.qty } },
+      });
+    }
+    for (const item of input.addonItems) {
+      await tx.experienceAddon.updateMany({
+        where: { id: item.id, soldCount: { gte: item.qty } },
+        data: { soldCount: { decrement: item.qty } },
+      });
+    }
+
+    const refreshed = await tx.session.findUnique({ where: { id: session.id } });
+    if (refreshed?.status === "SOLD_OUT" && refreshed.soldCount < refreshed.capacity) {
+      await tx.session.update({ where: { id: session.id }, data: { status: "SCHEDULED" } });
+    }
+  });
+}
+
+/**
  * Revert capacity on refund/cancel.
  */
 export async function releaseCapacity(sessionId: string, qty: number) {

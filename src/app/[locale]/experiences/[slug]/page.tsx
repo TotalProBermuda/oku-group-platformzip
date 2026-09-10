@@ -328,20 +328,10 @@ export default async function ExperienceDetailPage({ params }: Props) {
                 ))}
               </div>
             )}
-            {session ? (
-              <Link href={localePath(safeLocale, `/checkout/${slug}`)} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>
-                {c.selectTickets}
-              </Link>
-            ) : (
-              <div>
-                <Link href={localePath(safeLocale, `/login?callbackUrl=/checkout/${slug}`)} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px", marginBottom: 8 }}>
-                  {c.signInToBook}
-                </Link>
-                <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center" }}>
-                  {c.signInToBookDesc}
-                </p>
-              </div>
-            )}
+            <div>
+              <Link href={localePath(safeLocale, `/checkout/${slug}`)} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+              <p style={{ fontSize: 12, color: "#6b7280", textAlign: "center", marginTop: 8 }}>Continue as a guest, or sign in later to manage your bookings.</p>
+            </div>
           </div>
 
           {series.venueAddress && (
