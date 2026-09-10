@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
+import { getOptionalSession } from "@/server/auth/session";
 import { reserveCatalogCapacityOrThrow } from "@/server/commerce/capacity";
 import { getEventReferrerByCode } from "@/server/events/eventReferrerService";
 import { resolveActorFromCode } from "@/server/referrals/referralActorService";
 import { assertCheckoutCatalogPolicy, CatalogPolicyError } from "@/server/commerce/catalogPolicy";
+import { createGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
+import { createCheckoutHold, expireCheckoutHoldsForSession } from "@/server/commerce/checkoutHold";
+import { gatePublicPostAsync } from "@/server/rateLimit";
 
 const Body = z.object({
   sessionId: z.string(),
@@ -26,12 +29,30 @@ const Body = z.object({
   referralCode: z.string().optional(),
   // Source hint so analytics know how the user arrived
   attributionSource: z.enum(["EVENT_REFERRER_QR", "EVENT_REFERRER_LINK", "DIRECT"]).optional(),
+  guest: z.object({
+    name: z.string().trim().min(1).max(120),
+    email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
+    phone: z.string().trim().min(5).max(32).optional(),
+    locale: z.enum(["en", "es", "pt"]).optional(),
+    marketingEmailConsent: z.boolean().optional().default(false),
+  }).optional(),
 });
 
 export async function POST(req: Request) {
   try {
-    const { userId } = await requireSession();
-    const body = Body.parse(await req.json());
+    const rawBody = await req.json();
+    const gate = await gatePublicPostAsync(req, rawBody, "checkout-intent", { limit: 8, windowMs: 10 * 60_000, requireDistributed: true });
+    if (!gate.ok) return gate.response;
+    const body = Body.parse(rawBody);
+    const auth = await getOptionalSession();
+    if (!auth && !body.guest) return NextResponse.json({ ok: false, error: "Guest contact details are required." }, { status: 400 });
+    const guestUser = auth ? null : await prisma.user.upsert({
+      where: { email: body.guest!.email }, update: {},
+      create: { email: body.guest!.email, name: body.guest!.name, phone: body.guest!.phone }, select: { id: true },
+    });
+    const userId = auth?.userId ?? guestUser!.id;
+
+    await expireCheckoutHoldsForSession(body.sessionId);
 
     // Validate identity, product scope, visibility, access, sale windows, and
     // per-product inventory before any capacity is reserved or order is made.
@@ -141,6 +162,13 @@ export async function POST(req: Request) {
     },
   });
 
+    const checkoutHoldExpiresAt = await createCheckoutHold(order.id);
+    const guestCredential = auth ? null : await createGuestCheckoutCredential(order.id);
+    if (body.guest) await prisma.orderEvent.create({ data: {
+      orderId: order.id, eventType: "ORDER_CREATED", eventLabel: "guest-checkout-contact",
+      eventPayload: { email: body.guest.email, name: body.guest.name, phone: body.guest.phone ?? null, locale: body.guest.locale ?? "en", marketingEmailConsent: body.guest.marketingEmailConsent },
+    }});
+
     await prisma.orderLineItem.createMany({
     data: body.items.map(i => {
       const tt = i.ticketTypeId ? ticketTypes.find(t => t.id === i.ticketTypeId) : undefined;
@@ -159,7 +187,11 @@ export async function POST(req: Request) {
     })
   });
 
-    return NextResponse.json({ ok: true, data: { intentId: order.id, orderId: order.id, totalCents: order.totalCents, currency: order.currency } });
+    return NextResponse.json({ ok: true, data: {
+      intentId: order.id, orderId: order.id, totalCents: order.totalCents, currency: order.currency,
+      checkoutHoldExpiresAt: checkoutHoldExpiresAt.toISOString(),
+      ...(guestCredential ? { guestCheckoutToken: guestCredential.token } : {}),
+    } });
   } catch (error) {
     if (error instanceof CatalogPolicyError) {
       return NextResponse.json({ ok: false, error: error.code, message: error.message }, { status: error.status });

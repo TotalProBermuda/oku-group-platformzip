@@ -27,6 +27,8 @@ export default function CheckoutPage() {
   const [expiryMonth, setExpiryMonth] = useState("");
   const [expiryYear, setExpiryYear] = useState("");
   const microformRef = useRef<any>(null);
+  const [guest, setGuest] = useState({ name: "", email: "", phone: "", marketingEmailConsent: false });
+  const [guestCheckoutToken, setGuestCheckoutToken] = useState<string | undefined>();
 
   useEffect(() => {
     fetch(`/api/v1/experiences?slug=${slug}`)
@@ -99,13 +101,14 @@ export default function CheckoutPage() {
 
   async function initializeSecurePayment() {
     if (!quote || !checkoutItems.length) return;
+    if (!guest.name.trim() || !guest.email.trim()) { setError("Enter your name and email to continue as a guest."); return; }
     setPaying(true);
     setError("");
     try {
       const intentResponse = await fetch("/api/v1/checkout/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: quote.sessionId, items: checkoutItems }),
+        body: JSON.stringify({ sessionId: quote.sessionId, items: checkoutItems, guest: { ...guest, phone: guest.phone.trim() || undefined, locale: "en" } }),
       });
       const intentData = await intentResponse.json();
       if (!intentResponse.ok) throw new Error(intentData.message ?? intentData.error ?? "Unable to create payment order.");
@@ -113,12 +116,13 @@ export default function CheckoutPage() {
       const contextResponse = await fetch("/api/v1/checkout/cybersource/capture-context", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intentId: nextIntentId }),
+        body: JSON.stringify({ intentId: nextIntentId, guestCheckoutToken: intentData.data.guestCheckoutToken }),
       });
       const contextData = await contextResponse.json();
       if (!contextResponse.ok) throw new Error(contextData.error ?? "Unable to initialize secure card entry.");
       setFlexConfig(contextData.data);
       setIntentId(nextIntentId);
+      setGuestCheckoutToken(intentData.data.guestCheckoutToken);
     } catch {
       setError("Unable to initialize secure payment. No card information was submitted.");
     }
@@ -136,7 +140,7 @@ export default function CheckoutPage() {
       });
       const res = await fetch("/api/v1/checkout/confirm", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intentId, cybersourceTransientToken: transientToken }),
+        body: JSON.stringify({ intentId, guestCheckoutToken, cybersourceTransientToken: transientToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Payment failed");
@@ -164,7 +168,7 @@ export default function CheckoutPage() {
     <div className="page-container" style={{ padding: "80px 24px", maxWidth: 560, textAlign: "center" }}>
       <div style={{ fontSize: 48, marginBottom: 24 }}>✓</div>
       <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 36, color: "#1a1614", marginBottom: 12 }}>You're booked!</h2>
-      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 32 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. Check your ticket wallet for the QR code.</p>
+      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 32 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. A confirmation is being sent to {guest.email}.</p>
       <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
         <Link href="/my/tickets" className="btn btn-primary">View My Tickets</Link>
         <Link href="/experiences" className="btn btn-ghost">More Experiences</Link>
@@ -326,7 +330,13 @@ export default function CheckoutPage() {
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b625c", marginBottom: 12 }}>Secure card payment</div>
                   {!intentId ? (
                     <>
-                      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 16px" }}>Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
+                      <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+                        <input aria-label="Full name" value={guest.name} onChange={(event) => setGuest((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                        <input aria-label="Email" type="email" value={guest.email} onChange={(event) => setGuest((current) => ({ ...current, email: event.target.value }))} placeholder="Email for confirmation" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                        <input aria-label="Phone number" type="tel" value={guest.phone} onChange={(event) => setGuest((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone (optional)" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                        <label style={{ display: "flex", gap: 8, fontSize: 12, color: "#4b5563" }}><input type="checkbox" checked={guest.marketingEmailConsent} onChange={(event) => setGuest((current) => ({ ...current, marketingEmailConsent: event.target.checked }))} />Send me occasional OKÜ news and experiences. Optional.</label>
+                      </div>
+                      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 16px" }}>No password is required. Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
                       <button onClick={initializeSecurePayment} disabled={paying} className="btn btn-primary" style={{ width: "100%" }}>
                         {paying ? "Preparing secure card entry…" : "Continue to secure card entry"}
                       </button>
