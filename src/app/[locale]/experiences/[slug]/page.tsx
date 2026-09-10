@@ -330,7 +330,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
             )}
             <div>
               <Link href={localePath(safeLocale, `/checkout/${slug}`)} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
-              <p style={{ fontSize: 12, color: "#6b7280", textAlign: "center", marginTop: 8 }}>Continue as a guest, or sign in later to manage your bookings.</p>
+              <p style={{ fontSize: 12, color: "#6b7280", textAlign: "center", marginTop: 8 }}>Continue as a guest. We’ll email your booking confirmation after payment.</p>
             </div>
           </div>
 
