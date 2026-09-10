@@ -161,12 +161,12 @@ export async function testCybersourceConnection(override?: {
       status,
       message: `Cybersource returned HTTP ${res.status}. ${detail || "Verify credentials, environment, and system clock."}`,
     };
-  } catch (e: any) {
+  } catch (error: unknown) {
     return {
       ok: false,
       env,
       status,
-      message: `Network error contacting ${host}: ${e?.message || "unknown"}`,
+      message: `Network error contacting ${host}: ${error instanceof Error ? error.message : "unknown"}`,
     };
   }
 }
@@ -181,25 +181,20 @@ export async function createCybersourceCaptureContext(input: {
   amount: string;
   currency: string;
 }): Promise<{ captureContext: string; clientLibrary: string; clientLibraryIntegrity?: string }> {
+  // Retain the amount/currency contract at the call boundary. Microform v2
+  // does not accept order details in its capture-context request; the signed
+  // authorization request carries those values later.
+  void input;
   const cfg = await getResolvedCybersourceConfig();
   const host = cybersourceHost(cfg.env);
   const path = "/microform/v2/sessions";
   const body = JSON.stringify({
     targetOrigins: ["https://www.okuhospitalitygroup.com", "https://okuhospitalitygroup.com"],
     allowedCardNetworks: ["VISA", "MASTERCARD", "AMEX", "DISCOVER"],
-    clientVersion: "0.22",
-    paymentInformation: {
-      card: {
-        number: {},
-        securityCode: { required: true },
-        expirationMonth: { required: true },
-        expirationYear: { required: true },
-        type: { required: false },
-      },
-    },
-    orderInformation: {
-      amountDetails: { totalAmount: input.amount, currency: input.currency || "USD" },
-    },
+    // Microform v2 requires the literal v2 API version.  "0.22" was a
+    // client-library release number, not a valid capture-context version.
+    clientVersion: "v2",
+    allowedPaymentTypes: ["CARD"],
   });
   const headers = buildCybersourceHttpSignatureHeaders({
     method: "POST", path, body, merchantId: cfg.merchantId, keyId: cfg.keyId,
@@ -207,16 +202,58 @@ export async function createCybersourceCaptureContext(input: {
   });
   const response = await fetch(`https://${host}${path}`, {
     method: "POST",
-    headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+    // The v2 endpoint returns the capture context as application/jwt, not a
+    // JSON object. Request both formats so older/test environments remain
+    // compatible while production receives the documented JWT response.
+    headers: { ...headers, "Content-Type": "application/json", Accept: "application/jwt, application/json" },
     body,
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.captureContext || !data.clientLibrary) {
+  const raw = await response.text();
+  let data: {
+    captureContext?: string;
+    clientLibrary?: string;
+    clientLibraryIntegrity?: string;
+    errorInformation?: { message?: string };
+    message?: string;
+  } = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    // Expected for a v2 application/jwt response.
+  }
+  const captureContext = data.captureContext ?? (raw.split(".").length === 3 ? raw : null);
+  let clientLibrary = data.clientLibrary;
+  let clientLibraryIntegrity = data.clientLibraryIntegrity;
+
+  // CyberSource places the Microform script URL and integrity value inside
+  // the signed capture-context JWT. Decode only its public payload; the JWT
+  // itself remains opaque and is passed unchanged to the browser.
+  if (captureContext && (!clientLibrary || !clientLibraryIntegrity)) {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(captureContext.split(".")[1], "base64url").toString("utf8"),
+      ) as {
+        ctx?: Array<{
+          data?: {
+            clientLibrary?: string;
+            clientLibraryIntegrity?: string;
+          };
+        }>;
+      };
+      const contextData = payload.ctx?.find((entry) => entry.data)?.data;
+      clientLibrary ??= contextData?.clientLibrary;
+      clientLibraryIntegrity ??= contextData?.clientLibraryIntegrity;
+    } catch {
+      // The validation below returns a safe, actionable error to the caller.
+    }
+  }
+
+  if (!response.ok || !captureContext || !clientLibrary) {
     throw new Error(data?.errorInformation?.message || data?.message || `Cybersource capture context failed (${response.status})`);
   }
   return {
-    captureContext: data.captureContext,
-    clientLibrary: data.clientLibrary,
-    clientLibraryIntegrity: data.clientLibraryIntegrity,
+    captureContext,
+    clientLibrary,
+    clientLibraryIntegrity,
   };
 }
