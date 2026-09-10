@@ -957,12 +957,12 @@ export default function PaymentsPage() {
             </Row>
             <Row label="Public rate limiting">
               <StatusPill
-                ok={data.runtime.rateLimitProvider === "database"}
-                label={data.runtime.rateLimitProvider === "database" ? "Production database" : "Check configuration"}
+                ok={data.runtime.rateLimitProvider === "redis"}
+                label={data.runtime.rateLimitProvider === "redis" ? "Redis primary" : "Database fallback"}
               />
             </Row>
-            <Row label="Redis worker (optional)">
-              {data.runtime.redisConfigured ? <StatusPill ok /> : <WarnPill>Not configured — background jobs run inline</WarnPill>}
+            <Row label="Redis connection">
+              {data.runtime.redisConfigured ? <StatusPill ok /> : <WarnPill>Not configured — database fallback active</WarnPill>}
             </Row>
             <Row label="NODE_ENV">
               <code style={{ color: "#475569", fontSize: 12 }}>{data.runtime.nodeEnv}</code>

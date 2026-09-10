@@ -754,12 +754,12 @@ export default function CommerceSettingsPanel() {
               <div className="commerce-settings__integration-row">
                 <span className="commerce-settings__integration-name">Request protection</span>
                 <span className="commerce-settings__integration-purpose">
-                  Shared rate limiting via the production database
+                  Redis-backed shared rate limiting with a production-database fallback
                 </span>
-                {readiness?.runtime.rateLimitProvider === "database" ? (
+                {readiness?.runtime.rateLimitProvider === "redis" ? (
                   <Badge variant="ok">Configured</Badge>
                 ) : (
-                  <Badge variant="warning">Check database</Badge>
+                  <Badge variant="warning">Database fallback</Badge>
                 )}
                 <span className="commerce-settings__integration-action">
                   <a href="/admin/payments">Status →</a>
