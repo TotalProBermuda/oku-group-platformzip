@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/server/auth/session";
+import { getOptionalSession } from "@/server/auth/session";
 import { createCommissionIfAttributed } from "@/server/commerce/commissions";
 import { releaseCapacity } from "@/server/commerce/capacity";
 import { safeEnqueue } from "@/server/queue/queue";
@@ -9,6 +9,7 @@ import { writeTicketAttributionSession } from "@/server/events/eventReferrerServ
 import { assertActiveGatewayReady } from "@/server/payments/activeGateway";
 import { getActiveCheckoutAdapter } from "@/server/payments/providers";
 import type { PaymentInstrument } from "@/server/payments/providers/types";
+import { hasValidGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 
 // Payments P5 — accept either Authorize.net Accept.js opaqueData or a
 // Cybersource Flex transient token (or sandbox raw card). The active
@@ -27,11 +28,12 @@ const Body = z.object({
       securityCode: z.string().optional(),
     })
     .optional(),
+  guestCheckoutToken: z.string().min(32).optional(),
 });
 
 export async function POST(req: Request) {
-  const { userId } = await requireSession();
   const body = Body.parse(await req.json());
+  const auth = await getOptionalSession();
 
   // Payments P4 — block checkout when the active gateway isn't ready.
   const guard = await assertActiveGatewayReady();
@@ -46,7 +48,8 @@ export async function POST(req: Request) {
     where: { id: body.intentId },
     include: { session: true, series: true, lineItems: true, user: true },
   });
-  if (!order || order.userId !== userId) {
+  const authorizedGuest = !auth && await hasValidGuestCheckoutCredential(body.intentId, body.guestCheckoutToken);
+  if (!order || (auth ? order.userId !== auth.userId : !authorizedGuest)) {
     return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
   }
   if (order.status !== "PENDING") {
@@ -97,7 +100,7 @@ export async function POST(req: Request) {
     await prisma.auditLog
       .create({
         data: {
-          actorId: userId,
+          actorId: auth?.userId ?? order.userId,
           action: "checkout.charge.failed",
           metadata: {
             orderId: order.id,
