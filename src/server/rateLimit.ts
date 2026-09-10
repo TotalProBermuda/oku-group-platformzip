@@ -1,9 +1,10 @@
 // Per-key fixed-window rate limiter + honeypot helpers for public POST
-// endpoints. Uses Redis (INCR + EXPIRE) when REDIS_URL is set so limits
-// are shared across instances; falls back to an in-process Map for
-// single-instance dev/preview environments.
+// endpoints. Production uses the shared Postgres database already operated by
+// the app. Redis remains optional for BullMQ, but public checkout and auth do
+// not depend on a second managed service merely for request protection.
 
-import type { Redis as IORedis } from "ioredis";
+import { createHmac, randomUUID } from "crypto";
+import { prisma } from "@/lib/prisma";
 
 type Bucket = { count: number; resetAt: number };
 
@@ -11,31 +12,8 @@ const buckets = new Map<string, Bucket>();
 const SWEEP_MS = 60_000;
 let lastSweep = Date.now();
 
-let redis: IORedis | null = null;
-let redisInitTried = false;
-
-function getRedis(): IORedis | null {
-  if (redisInitTried) return redis;
-  redisInitTried = true;
-  if (!process.env.REDIS_URL) return null;
-  try {
-    // ioredis is already pulled in via bullmq; safe to require lazily.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const IORedisCtor = require("ioredis").default ?? require("ioredis");
-    redis = new IORedisCtor(process.env.REDIS_URL, {
-      maxRetriesPerRequest: 2,
-      enableOfflineQueue: false,
-      lazyConnect: false,
-    });
-    redis!.on("error", (err: Error) => {
-      // Don't crash the process; the next call will fall back to memory.
-      console.error(JSON.stringify({ type: "rate_limit_redis_error", message: err.message }));
-    });
-    return redis;
-  } catch {
-    return null;
-  }
-}
+const PRUNE_INTERVAL_MS = 10 * 60_000;
+let nextPruneAt = 0;
 
 export interface RateLimitOptions {
   key: string;
@@ -90,17 +68,55 @@ function checkRateLimitInMemory(opts: RateLimitOptions): RateLimitResult {
   return { ok: true, remaining: Math.max(0, opts.limit - b.count) };
 }
 
-async function checkRateLimitRedis(client: IORedis, opts: RateLimitOptions): Promise<RateLimitResult> {
-  const windowSec = Math.max(1, Math.ceil(opts.windowMs / 1000));
-  const k = `rl:${opts.key}`;
-  // INCR returns the new count; on first hit we set the TTL.
-  const count = await client.incr(k);
-  if (count === 1) await client.expire(k, windowSec);
+function stableRateLimitSecret(): string | null {
+  // APP_ENCRYPTION_KEY is already mandatory for encrypted production data.
+  // Auth secrets are a safe compatibility fallback for older environments.
+  return process.env.APP_ENCRYPTION_KEY ?? process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? null;
+}
+
+function hashRateLimitKey(key: string): string | null {
+  const secret = stableRateLimitSecret();
+  return secret ? createHmac("sha256", secret).update(key).digest("hex") : null;
+}
+
+function pruneExpiredBuckets(now: Date) {
+  if (now.getTime() < nextPruneAt) return;
+  nextPruneAt = now.getTime() + PRUNE_INTERVAL_MS;
+  // Best effort only. Expired buckets never affect a new window because the
+  // uniqueness key includes windowStart; this keeps cleanup off the hot path.
+  void prisma.rateLimitBucket.deleteMany({ where: { expiresAt: { lt: now } } }).catch(() => {});
+}
+
+async function checkRateLimitDatabase(opts: RateLimitOptions): Promise<RateLimitResult | null> {
+  const keyHash = hashRateLimitKey(opts.key);
+  if (!keyHash) return null;
+
+  const now = new Date();
+  const windowStartMs = Math.floor(now.getTime() / opts.windowMs) * opts.windowMs;
+  const windowStart = new Date(windowStartMs);
+  const expiresAt = new Date(windowStartMs + opts.windowMs);
+  pruneExpiredBuckets(now);
+
+  // PostgreSQL performs this upsert atomically, including under simultaneous
+  // requests from separate Replit instances. The raw request key is HMACed
+  // before it reaches the database, so this table never holds an IP address.
+  const rows = await prisma.$queryRaw<Array<{ count: number }>>`
+    INSERT INTO "RateLimitBucket"
+      ("id", "keyHash", "windowStart", "count", "expiresAt", "createdAt", "updatedAt")
+    VALUES
+      (${randomUUID()}, ${keyHash}, ${windowStart}, 1, ${expiresAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT ("keyHash", "windowStart")
+    DO UPDATE SET
+      "count" = "RateLimitBucket"."count" + 1,
+      "updatedAt" = CURRENT_TIMESTAMP
+    RETURNING "count";
+  `;
+  const count = rows[0]?.count;
+  if (!Number.isInteger(count)) throw new Error("Rate limit counter did not return a count");
   if (count > opts.limit) {
-    const ttl = await client.ttl(k);
     return {
       ok: false,
-      retryAfterSeconds: Math.max(1, ttl > 0 ? ttl : windowSec),
+      retryAfterSeconds: Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / 1000)),
       remaining: 0,
     };
   }
@@ -108,23 +124,18 @@ async function checkRateLimitRedis(client: IORedis, opts: RateLimitOptions): Pro
 }
 
 export async function checkRateLimitAsync(opts: RateLimitOptions): Promise<RateLimitResult> {
-  const client = getRedis();
   const mustBeDistributed = opts.requireDistributed && process.env.NODE_ENV === "production";
-  if (!client) {
-    return mustBeDistributed
-      ? { ok: false, retryAfterSeconds: 60, remaining: 0, unavailable: true }
-      : checkRateLimitInMemory(opts);
-  }
   try {
-    return await checkRateLimitRedis(client, opts);
+    const databaseResult = await checkRateLimitDatabase(opts);
+    if (databaseResult) return databaseResult;
   } catch {
-    // Authentication and public-chat limits must not become per-instance in a
-    // production fleet when Redis is unavailable. Local/dev still has the
-    // in-memory fallback for a usable developer experience.
-    return mustBeDistributed
-      ? { ok: false, retryAfterSeconds: 60, remaining: 0, unavailable: true }
-      : checkRateLimitInMemory(opts);
+    // The caller below decides whether a local fallback is acceptable.
   }
+  // Authentication, public chat, and payment routes must not become
+  // per-instance limited in production if the shared database is unavailable.
+  return mustBeDistributed
+    ? { ok: false, retryAfterSeconds: 60, remaining: 0, unavailable: true }
+    : checkRateLimitInMemory(opts);
 }
 
 // Sync version retained for callers that can't await (none today).
@@ -199,8 +210,8 @@ export function gatePublicPost(
   return { ok: true };
 }
 
-// Async variant — uses Redis when REDIS_URL is set so limits are
-// shared across instances. Identical contract to gatePublicPost().
+// Async variant — uses the production database so limits are shared across
+// instances. Identical contract to gatePublicPost().
 export async function gatePublicPostAsync(
   req: Request,
   body: unknown,
@@ -209,7 +220,7 @@ export async function gatePublicPostAsync(
     limit?: number;
     windowMs?: number;
     botSuccessBody?: unknown;
-    /** Fail closed in production when the shared Redis limiter is unavailable. */
+    /** Fail closed in production when the shared database limiter is unavailable. */
     requireDistributed?: boolean;
   } = {},
 ): Promise<{ ok: true } | { ok: false; response: Response }> {

@@ -48,7 +48,7 @@ interface ReadinessSnapshot {
   };
   activeGateway?: { active?: string | null } | null;
   email: { resendApiKeyConfigured: boolean; fromEmailConfigured: boolean };
-  runtime: { redisConfigured: boolean };
+  runtime: { redisConfigured: boolean; rateLimitProvider?: "database" | "redis" };
   flags: { demoModeEnabled: boolean };
 }
 
@@ -752,14 +752,14 @@ export default function CommerceSettingsPanel() {
                 </span>
               </div>
               <div className="commerce-settings__integration-row">
-                <span className="commerce-settings__integration-name">Redis / Worker</span>
+                <span className="commerce-settings__integration-name">Request protection</span>
                 <span className="commerce-settings__integration-purpose">
-                  Background jobs and shared rate limiting
+                  Shared rate limiting via the production database
                 </span>
-                {readiness?.runtime.redisConfigured ? (
+                {readiness?.runtime.rateLimitProvider === "database" ? (
                   <Badge variant="ok">Configured</Badge>
                 ) : (
-                  <Badge variant="warning">Inline fallback</Badge>
+                  <Badge variant="warning">Check database</Badge>
                 )}
                 <span className="commerce-settings__integration-action">
                   <a href="/admin/payments">Status →</a>
