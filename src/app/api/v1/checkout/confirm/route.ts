@@ -22,10 +22,23 @@ const Body = z.object({
     .optional(),
   cybersourceTransientToken: z.string().optional(),
   guestCheckoutToken: z.string().min(32).optional(),
+  // Billing data is validated at the boundary and forwarded to Cybersource.
+  // It is intentionally not written to Order or Payment records.
+  billing: z.object({
+    address1: z.string().trim().min(3).max(120),
+    locality: z.string().trim().min(2).max(80),
+    administrativeArea: z.string().trim().min(2).max(80),
+    postalCode: z.string().trim().min(2).max(20),
+    country: z.string().trim().regex(/^[A-Za-z]{2}$/),
+  }),
 });
 
 export async function POST(req: Request) {
-  const body = Body.parse(await req.json());
+  const parsed = Body.safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "Enter a complete billing address before paying." }, { status: 400 });
+  }
+  const body = parsed.data;
   const auth = await getOptionalSession();
 
   // Payments P4 — block checkout when the active gateway isn't ready.
@@ -104,6 +117,13 @@ export async function POST(req: Request) {
     authNetOpaqueData: body.opaqueData,
     cybersourceTransientToken: body.cybersourceTransientToken,
   };
+  const nameParts = (order.user?.name ?? "Guest").trim().split(/\s+/).filter(Boolean);
+  const billing = {
+    ...body.billing,
+    country: body.billing.country.toUpperCase(),
+    firstName: nameParts[0] || "Guest",
+    lastName: nameParts.slice(1).join(" ") || nameParts[0] || "Customer",
+  };
 
   const result = await adapter.charge({
     amountCents: order.totalCents,
@@ -112,6 +132,7 @@ export async function POST(req: Request) {
     orderId: order.id,
     customerEmail: order.user?.email ?? null,
     customerName: order.user?.name ?? null,
+    billing,
     instrument,
   });
   const gatewayRawSafeJson = result.rawSafeResponse === undefined

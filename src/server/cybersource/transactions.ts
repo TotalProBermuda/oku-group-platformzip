@@ -120,16 +120,19 @@ export async function cybersourceCharge(
     },
   };
 
-  if (input.billing || input.customerEmail) {
+  // Never invent billing data. Placeholder addresses trigger AVS/fraud
+  // failures and make reconciliation unreliable. Checkout validates and
+  // supplies this data before a charge is attempted.
+  if (input.billing && input.customerEmail) {
     body.orderInformation.billTo = {
-      firstName: input.billing?.firstName ?? "Guest",
-      lastName: input.billing?.lastName ?? "Customer",
-      address1: input.billing?.address1 ?? "1 Main St",
-      locality: input.billing?.locality ?? "Panama",
-      administrativeArea: input.billing?.administrativeArea ?? "PA",
-      postalCode: input.billing?.postalCode ?? "00000",
-      country: input.billing?.country ?? "PA",
-      email: input.customerEmail ?? "guest@example.com",
+      firstName: input.billing.firstName,
+      lastName: input.billing.lastName,
+      address1: input.billing.address1,
+      locality: input.billing.locality,
+      administrativeArea: input.billing.administrativeArea,
+      postalCode: input.billing.postalCode,
+      country: input.billing.country,
+      email: input.customerEmail,
     };
   }
 

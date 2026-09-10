@@ -27,6 +27,16 @@ export default function CheckoutPage() {
   const [flexConfig, setFlexConfig] = useState<{ captureContext: string; clientLibrary: string; clientLibraryIntegrity?: string } | null>(null);
   const [expiryMonth, setExpiryMonth] = useState("");
   const [expiryYear, setExpiryYear] = useState("");
+  // Billing details are deliberately held only in browser memory. They are
+  // sent to the payment provider for authorization and are not persisted in
+  // the OKÜ order record.
+  const [billing, setBilling] = useState({
+    address1: "",
+    locality: "",
+    administrativeArea: "",
+    postalCode: "",
+    country: "PA",
+  });
   const microformRef = useRef<any>(null);
   const [guest, setGuest] = useState({ name: "", email: "", phone: "", marketingEmailConsent: false });
   const [guestCheckoutToken, setGuestCheckoutToken] = useState<string | undefined>();
@@ -103,6 +113,9 @@ export default function CheckoutPage() {
   async function initializeSecurePayment() {
     if (!quote || !checkoutItems.length) return;
     if (!guest.name.trim() || !guest.email.trim()) { setError("Enter your name and email to continue as a guest."); return; }
+    if (!billing.address1.trim() || !billing.locality.trim() || !billing.administrativeArea.trim() || !billing.postalCode.trim() || !billing.country.trim()) {
+      setError("Enter your complete billing address to continue."); return;
+    }
     setPaying(true);
     setError("");
     try {
@@ -160,7 +173,18 @@ export default function CheckoutPage() {
       });
       const res = await fetch("/api/v1/checkout/confirm", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intentId, guestCheckoutToken, cybersourceTransientToken: transientToken }),
+        body: JSON.stringify({
+          intentId,
+          guestCheckoutToken,
+          cybersourceTransientToken: transientToken,
+          billing: {
+            address1: billing.address1.trim(),
+            locality: billing.locality.trim(),
+            administrativeArea: billing.administrativeArea.trim(),
+            postalCode: billing.postalCode.trim(),
+            country: billing.country.trim().toUpperCase(),
+          },
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Payment failed");
@@ -361,9 +385,35 @@ export default function CheckoutPage() {
                         <input aria-label="Full name" value={guest.name} onChange={(event) => setGuest((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                         <input aria-label="Email" type="email" value={guest.email} onChange={(event) => setGuest((current) => ({ ...current, email: event.target.value }))} placeholder="Email for confirmation" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                         <input aria-label="Phone number" type="tel" value={guest.phone} onChange={(event) => setGuest((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone (optional)" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#4b5563", marginBottom: 8 }}>Billing address</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <input aria-label="Billing street address" value={billing.address1} onChange={(event) => setBilling((current) => ({ ...current, address1: event.target.value }))} placeholder="Street address" style={{ gridColumn: "1 / -1", padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                            <input aria-label="Billing city" value={billing.locality} onChange={(event) => setBilling((current) => ({ ...current, locality: event.target.value }))} placeholder="City" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                            <input aria-label="Billing state or province" value={billing.administrativeArea} onChange={(event) => setBilling((current) => ({ ...current, administrativeArea: event.target.value }))} placeholder="State / province" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                            <input aria-label="Billing postal code" value={billing.postalCode} onChange={(event) => setBilling((current) => ({ ...current, postalCode: event.target.value }))} placeholder="Postal / ZIP code" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                            <select aria-label="Billing country" value={billing.country} onChange={(event) => setBilling((current) => ({ ...current, country: event.target.value }))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14, background: "white" }}>
+                              <option value="PA">Panama</option>
+                              <option value="US">United States</option>
+                              <option value="CA">Canada</option>
+                              <option value="GB">United Kingdom</option>
+                              <option value="MX">Mexico</option>
+                              <option value="CO">Colombia</option>
+                              <option value="BR">Brazil</option>
+                              <option value="AR">Argentina</option>
+                              <option value="ES">Spain</option>
+                              <option value="FR">France</option>
+                              <option value="DE">Germany</option>
+                              <option value="IT">Italy</option>
+                              <option value="NL">Netherlands</option>
+                              <option value="AU">Australia</option>
+                              <option value="NZ">New Zealand</option>
+                            </select>
+                          </div>
+                        </div>
                         <label style={{ display: "flex", gap: 8, fontSize: 12, color: "#4b5563" }}><input type="checkbox" checked={guest.marketingEmailConsent} onChange={(event) => setGuest((current) => ({ ...current, marketingEmailConsent: event.target.checked }))} />Send me occasional OKÜ news and experiences. Optional.</label>
                       </div>
-                      <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5, margin: "0 0 16px" }}>No password is required. Your booking will be linked to this email, and secure one-time email access is available afterwards. Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
+                      <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5, margin: "0 0 16px" }}>No password is required. Your booking will be linked to this email, and secure one-time email access is available afterwards. Your billing address is sent securely to Cybersource for payment authorization and is not stored with this order. Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
                       <button onClick={initializeSecurePayment} disabled={paying} className="btn btn-primary" style={{ width: "100%" }}>
                         {paying ? "Preparing secure card entry…" : "Continue to secure card entry"}
                       </button>

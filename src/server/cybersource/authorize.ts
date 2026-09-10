@@ -114,16 +114,19 @@ export async function cybersourceAuthorize(
     },
   };
 
-  if (input.billing || input.customerEmail) {
+  // Do not substitute a fictional billing identity for deposit payments.
+  // A caller without complete billing details sends no billTo block rather
+  // than misrepresenting the customer to the payment gateway.
+  if (input.billing && input.customerEmail) {
     body.orderInformation.billTo = {
-      firstName: input.billing?.firstName ?? "Guest",
-      lastName: input.billing?.lastName ?? "Customer",
-      address1: input.billing?.address1 ?? "1 Main St",
-      locality: input.billing?.locality ?? "Panama",
-      administrativeArea: input.billing?.administrativeArea ?? "PA",
-      postalCode: input.billing?.postalCode ?? "00000",
-      country: input.billing?.country ?? "PA",
-      email: input.customerEmail ?? "guest@example.com",
+      firstName: input.billing.firstName,
+      lastName: input.billing.lastName,
+      address1: input.billing.address1,
+      locality: input.billing.locality,
+      administrativeArea: input.billing.administrativeArea,
+      postalCode: input.billing.postalCode,
+      country: input.billing.country,
+      email: input.customerEmail,
     };
   }
 
