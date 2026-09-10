@@ -39,11 +39,25 @@ export async function POST(req: Request) {
 
   const order = await prisma.order.findUnique({
     where: { id: body.intentId },
-    include: { session: true, series: true, lineItems: true, user: true },
+    include: { session: true, series: true, lineItems: true, user: true, payment: true },
   });
   const authorizedGuest = !auth && await hasValidGuestCheckoutCredential(body.intentId, body.guestCheckoutToken);
   if (!order || (auth ? order.userId !== auth.userId : !authorizedGuest)) {
     return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
+  }
+  // A browser can retry after a successful charge when the response is lost.
+  // Return the already-completed result instead of treating that as an error or
+  // attempting a second payment.
+  if (order.status === "PAID" && order.payment?.status === "SUCCEEDED") {
+    return NextResponse.json({
+      ok: true,
+      data: {
+        orderId: order.id,
+        provider: order.payment.provider,
+        transId: order.payment.gatewayTransactionId,
+        idempotent: true,
+      },
+    });
   }
   if (order.status !== "PENDING") {
     return NextResponse.json({ ok: false, error: "Order not pending" }, { status: 400 });
@@ -56,6 +70,36 @@ export async function POST(req: Request) {
   const qtyTotal = order.lineItems.reduce((s, li) => s + li.qty, 0);
 
   const { adapter, provider } = await getActiveCheckoutAdapter();
+
+  // Claim this order before calling the provider. `Payment.orderId` is unique,
+  // so this is the durable idempotency boundary for an external charge: only
+  // one request can obtain the claim, including requests arriving on separate
+  // server instances. A duplicate must never be retried automatically because
+  // its first attempt may already be in flight at Cybersource.
+  try {
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider,
+        status: "INITIATED",
+        amountCents: order.totalCents,
+        currency: order.currency,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Payment is already being processed. Please wait before trying again.",
+          data: { orderId: order.id },
+        },
+        { status: 409 },
+      );
+    }
+    throw error;
+  }
+
   const instrument: PaymentInstrument = {
     authNetOpaqueData: body.opaqueData,
     cybersourceTransientToken: body.cybersourceTransientToken,
