@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import CybersourceMicroform from "@/components/checkout/CybersourceMicroform";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
@@ -20,6 +21,8 @@ export default function CheckoutPage() {
   const [paying, setPaying]       = useState(false);
   const [done, setDone]           = useState(false);
   const [error, setError]         = useState("");
+  const [guest, setGuest]         = useState({ name: "", email: "", phone: "", marketingEmailConsent: false });
+  const [checkoutIntent, setCheckoutIntent] = useState<{ id: string; token?: string } | null>(null);
 
   useEffect(() => {
     fetch(`/api/v1/experiences?slug=${slug}`)
@@ -61,18 +64,29 @@ export default function CheckoutPage() {
 
   async function completePurchase() {
     if (!quote) return;
+    if (!guest.name.trim() || !guest.email.trim()) {
+      setError("Enter your name and email to continue as a guest.");
+      return;
+    }
     setPaying(true);
     setError("");
     try {
-      // Demo payment — creates order directly
-      const res = await fetch("/api/v1/orders", {
+      const items: Array<{ ticketTypeId?: string; addonId?: string; qty: number }> = [];
+      for (const [id, qty] of Object.entries(quantities)) if (qty > 0) items.push({ ticketTypeId: id, qty });
+      for (const [id, qty] of Object.entries(addonQty)) if (qty > 0) items.push({ addonId: id, qty });
+      const res = await fetch("/api/v1/checkout/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...quote, paymentMethod: "DEMO" }),
+        body: JSON.stringify({
+          sessionId: selectedSession,
+          items,
+          guest: { ...guest, phone: guest.phone.trim() || undefined, locale: "en" },
+        }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Payment failed"); setPaying(false); return; }
-      setDone(true);
+      if (!res.ok) { setError(data.message ?? data.error ?? "Unable to begin secure checkout."); setPaying(false); return; }
+      setCheckoutIntent({ id: data.data.intentId, token: data.data.guestCheckoutToken });
+      setQuote((current: any) => current ? { ...current, ...data.data } : current);
     } catch {
       setError("Payment failed. Please try again.");
     }
@@ -96,7 +110,7 @@ export default function CheckoutPage() {
     <div className="page-container" style={{ padding: "80px 24px", maxWidth: 560, textAlign: "center" }}>
       <div style={{ fontSize: 48, marginBottom: 24 }}>✓</div>
       <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 36, color: "#1a1614", marginBottom: 12 }}>You're booked!</h2>
-      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 32 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. Check your ticket wallet for the QR code.</p>
+      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 32 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. Your confirmation is being sent to {guest.email}.</p>
       <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
         <Link href="/my/tickets" className="btn btn-primary">View My Tickets</Link>
         <Link href="/experiences" className="btn btn-ghost">More Experiences</Link>
@@ -254,25 +268,38 @@ export default function CheckoutPage() {
                   {quote.memberDiscount && <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>Member discount applied</div>}
                 </div>
 
-                {/* Demo payment form */}
-                <div style={{ marginTop: 28, background: "#fafaf9", border: "1px solid #e5e0d8", borderRadius: 12, padding: "20px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 16 }}>Demo Payment</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <input readOnly value="4242 4242 4242 4242" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "#f9fafb", color: "#6b7280", gridColumn: "1/-1" }} />
-                    <input readOnly value="12/28" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "#f9fafb", color: "#6b7280" }} />
-                    <input readOnly value="123" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "#f9fafb", color: "#6b7280" }} />
+                {!checkoutIntent ? (
+                  <div style={{ marginTop: 28, background: "#fafaf9", border: "1px solid #e5e0d8", borderRadius: 12, padding: 20 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b7280", marginBottom: 16 }}>Guest details</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <input aria-label="Full name" value={guest.name} onChange={(event) => setGuest((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, gridColumn: "1/-1" }} />
+                      <input aria-label="Email" type="email" value={guest.email} onChange={(event) => setGuest((current) => ({ ...current, email: event.target.value }))} placeholder="Email for confirmation" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, gridColumn: "1/-1" }} />
+                      <input aria-label="Phone number" type="tel" value={guest.phone} onChange={(event) => setGuest((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone (optional)" style={{ padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, gridColumn: "1/-1" }} />
+                    </div>
+                    <label style={{ display: "flex", gap: 8, marginTop: 14, fontSize: 12, color: "#4b5563" }}>
+                      <input type="checkbox" checked={guest.marketingEmailConsent} onChange={(event) => setGuest((current) => ({ ...current, marketingEmailConsent: event.target.checked }))} />
+                      Send me occasional OKÜ news and experiences. Optional.
+                    </label>
+                    <p style={{ fontSize: 12, color: "#6b7280", margin: "12px 0 0" }}>No password is required. You can create or claim an account later from your confirmation email.</p>
                   </div>
-                  <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>This is a demo environment — no real payment is processed.</p>
-                </div>
+                ) : (
+                  <CybersourceMicroform
+                    intentId={checkoutIntent.id}
+                    guestCheckoutToken={checkoutIntent.token}
+                    totalLabel={fmt(quote.totalCents)}
+                    onSuccess={() => setDone(true)}
+                    onError={setError}
+                  />
+                )}
 
                 {error && <div style={{ color: "#dc2626", fontSize: 14, marginTop: 16, padding: "12px 16px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>{error}</div>}
               </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={() => setQuote(null)} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
-                <button onClick={completePurchase} disabled={paying} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
-                  {paying ? "Processing…" : `Confirm & Pay ${fmt(quote.totalCents)}`}
-                </button>
+                <button onClick={() => { setQuote(null); setCheckoutIntent(null); }} className="btn btn-ghost" style={{ flex: 1 }} disabled={!!checkoutIntent}>← Back</button>
+                {!checkoutIntent && <button onClick={completePurchase} disabled={paying} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
+                  {paying ? "Preparing…" : "Continue to secure payment"}
+                </button>}
               </div>
             </div>
 

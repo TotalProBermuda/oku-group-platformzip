@@ -1,8 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { CHECKOUT_HOLD_MS } from "@/server/commerce/checkoutHold";
 
 const GUEST_CHECKOUT_EVENT = "guest-checkout-credential";
-const TTL_MS = 30 * 60 * 1000;
+const TTL_MS = CHECKOUT_HOLD_MS;
 
 function digest(value: string) {
   return createHash("sha256").update(value).digest("hex");

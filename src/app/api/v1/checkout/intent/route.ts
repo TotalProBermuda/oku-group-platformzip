@@ -7,6 +7,7 @@ import { getEventReferrerByCode } from "@/server/events/eventReferrerService";
 import { resolveActorFromCode } from "@/server/referrals/referralActorService";
 import { assertCheckoutCatalogPolicy, CatalogPolicyError } from "@/server/commerce/catalogPolicy";
 import { createGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
+import { createCheckoutHold, expireCheckoutHoldsForSession } from "@/server/commerce/checkoutHold";
 import { gatePublicPostAsync } from "@/server/rateLimit";
 
 const Body = z.object({
@@ -66,6 +67,11 @@ export async function POST(req: Request) {
     });
     const userId = auth?.userId ?? guestUser!.id;
 
+    // Reclaim stale, uncompleted payment holds before validating the current
+    // inventory snapshot. Otherwise a stale full session would be rejected as
+    // sold out before its seats could be returned.
+    await expireCheckoutHoldsForSession(body.sessionId);
+
     // Validate identity, product scope, visibility, access, sale windows, and
     // per-product inventory before any capacity is reserved or order is made.
     const catalog = await assertCheckoutCatalogPolicy({ userId, sessionId: body.sessionId, items: body.items });
@@ -80,6 +86,12 @@ export async function POST(req: Request) {
       : addons.find(a => a.id === item.addonId);
     return sum + (product?.priceCents ?? 0) * item.qty;
     }, 0);
+    // This public-flow phase uses the same disclosed pricing calculation as
+    // the quote endpoint. A later pricing service can replace both callers;
+    // no card is charged until this persisted total is returned to the buyer.
+    const feesCents = Math.round(subtotalCents * 0.05);
+    const taxCents = Math.round(subtotalCents * 0.084);
+    const totalCents = subtotalCents + feesCents + taxCents;
 
     // Reserve capacity atomically only after policy has passed.
     await reserveCatalogCapacityOrThrow({
@@ -150,7 +162,9 @@ export async function POST(req: Request) {
       sessionId: session.id,
       status: "PENDING",
       subtotalCents,
-      totalCents: subtotalCents,
+      feesCents,
+      taxCents,
+      totalCents,
       currency: "USD",
       couponCode: body.couponCode,
       attributionId: body.attributionId,
@@ -165,6 +179,7 @@ export async function POST(req: Request) {
     },
   });
 
+    const checkoutHoldExpiresAt = await createCheckoutHold(order.id);
     const guestCredential = auth ? null : await createGuestCheckoutCredential(order.id);
     if (body.guest) {
       await prisma.orderEvent.create({
@@ -206,7 +221,11 @@ export async function POST(req: Request) {
       intentId: order.id,
       orderId: order.id,
       totalCents: order.totalCents,
+      subtotalCents: order.subtotalCents,
+      feesCents: order.feesCents,
+      taxCents: order.taxCents,
       currency: order.currency,
+      checkoutHoldExpiresAt: checkoutHoldExpiresAt.toISOString(),
       ...(guestCredential ? { guestCheckoutToken: guestCredential.token, guestCheckoutExpiresAt: guestCredential.expiresAt.toISOString() } : {}),
     } });
   } catch (error) {

@@ -3,31 +3,24 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { createCommissionIfAttributed } from "@/server/commerce/commissions";
-import { releaseCapacity } from "@/server/commerce/capacity";
+import { releaseCatalogCapacity } from "@/server/commerce/capacity";
 import { safeEnqueue } from "@/server/queue/queue";
 import { writeTicketAttributionSession } from "@/server/events/eventReferrerService";
 import { assertActiveGatewayReady } from "@/server/payments/activeGateway";
 import { getActiveCheckoutAdapter } from "@/server/payments/providers";
 import type { PaymentInstrument } from "@/server/payments/providers/types";
 import { hasValidGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
+import { hasActiveCheckoutHold } from "@/server/commerce/checkoutHold";
 
-// Payments P5 — accept either Authorize.net Accept.js opaqueData or a
-// Cybersource Flex transient token (or sandbox raw card). The active
-// checkout gateway decides which one is consumed.
+// Payments accept either Authorize.net Accept.js opaqueData or a Cybersource
+// Flex transient token. Raw card data is deliberately not accepted by this
+// public route, including in sandbox, so it cannot silently create PCI scope.
 const Body = z.object({
   intentId: z.string(), // orderId
   opaqueData: z
     .object({ dataDescriptor: z.string(), dataValue: z.string() })
     .optional(),
   cybersourceTransientToken: z.string().optional(),
-  cybersourceCard: z
-    .object({
-      number: z.string(),
-      expirationMonth: z.string(),
-      expirationYear: z.string(),
-      securityCode: z.string().optional(),
-    })
-    .optional(),
   guestCheckoutToken: z.string().min(32).optional(),
 });
 
@@ -55,6 +48,11 @@ export async function POST(req: Request) {
   if (order.status !== "PENDING") {
     return NextResponse.json({ ok: false, error: "Order not pending" }, { status: 400 });
   }
+  if (!(await hasActiveCheckoutHold(order.id))) {
+    // Never charge against a reservation that is no longer valid. It must be
+    // rebuilt from the current inventory snapshot instead.
+    return NextResponse.json({ ok: false, error: "Checkout session expired. Please start again." }, { status: 410 });
+  }
 
   const invoiceNumber = order.id.slice(-12);
   const qtyTotal = order.lineItems.reduce((s, li) => s + li.qty, 0);
@@ -63,7 +61,6 @@ export async function POST(req: Request) {
   const instrument: PaymentInstrument = {
     authNetOpaqueData: body.opaqueData,
     cybersourceTransientToken: body.cybersourceTransientToken,
-    cybersourceCard: body.cybersourceCard,
   };
 
   const result = await adapter.charge({
@@ -96,7 +93,15 @@ export async function POST(req: Request) {
         gatewayRawSafeJson: (result.rawSafeResponse ?? null) as any,
       },
     });
-    await releaseCapacity(order.sessionId, qtyTotal);
+    await releaseCatalogCapacity({
+      sessionId: order.sessionId,
+      ticketItems: order.lineItems
+        .filter((item) => item.ticketTypeId)
+        .map((item) => ({ id: item.ticketTypeId!, qty: item.qty })),
+      addonItems: order.lineItems
+        .filter((item) => item.addonId)
+        .map((item) => ({ id: item.addonId!, qty: item.qty })),
+    });
     await prisma.auditLog
       .create({
         data: {
