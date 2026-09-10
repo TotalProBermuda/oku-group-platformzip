@@ -5,9 +5,9 @@
 // short outage; public routes never silently become per-instance limited.
 
 import { createHmac, randomUUID } from "crypto";
+import { Redis } from "@upstash/redis";
 import { prisma } from "@/lib/prisma";
-import { getRedisUrl } from "@/server/redis/config";
-import type { Redis as IORedis } from "ioredis";
+import { getUpstashRedisRestConfig } from "@/server/redis/config";
 
 type Bucket = { count: number; resetAt: number };
 
@@ -18,47 +18,21 @@ let lastSweep = Date.now();
 const PRUNE_INTERVAL_MS = 10 * 60_000;
 let nextPruneAt = 0;
 
-let redis: IORedis | null = null;
-let redisConnectPromise: Promise<void> | null = null;
+let redis: Redis | null = null;
 let redisUnavailableUntil = 0;
 const REDIS_RETRY_DELAY_MS = 30_000;
 
-function getRedis(): IORedis | null {
-  const redisUrl = getRedisUrl();
-  if (!redisUrl || Date.now() < redisUnavailableUntil) return null;
+function getRedis(): Redis | null {
+  const config = getUpstashRedisRestConfig();
+  if (!config || Date.now() < redisUnavailableUntil) return null;
   if (redis) return redis;
   try {
-    // ioredis is already a production dependency through BullMQ. Require it
-    // lazily so local tooling does not make a network connection on import.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const IORedisCtor = require("ioredis").default ?? require("ioredis");
-    redis = new IORedisCtor(redisUrl, {
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-      lazyConnect: true,
-    });
-    redis.on("error", () => {
-      // The database fallback below remains authoritative during a temporary
-      // Redis failure. Do not log a request key, IP address, or connection URL.
-      redis = null;
-      redisConnectPromise = null;
-      redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
-    });
+    redis = new Redis(config);
     return redis;
   } catch {
     redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
     return null;
   }
-}
-
-async function ensureRedisConnected(client: IORedis): Promise<void> {
-  if (client.status === "ready") return;
-  if (!redisConnectPromise) {
-    redisConnectPromise = client.connect().then(() => undefined).finally(() => {
-      redisConnectPromise = null;
-    });
-  }
-  await redisConnectPromise;
 }
 
 export interface RateLimitOptions {
@@ -125,8 +99,7 @@ function hashRateLimitKey(key: string): string | null {
   return secret ? createHmac("sha256", secret).update(key).digest("hex") : null;
 }
 
-async function checkRateLimitRedis(client: IORedis, opts: RateLimitOptions): Promise<RateLimitResult> {
-  await ensureRedisConnected(client);
+async function checkRateLimitRedis(client: Redis, opts: RateLimitOptions): Promise<RateLimitResult> {
   const keyHash = hashRateLimitKey(opts.key);
   if (!keyHash) throw new Error("No stable secret available for Redis rate-limit key hashing");
 
@@ -136,9 +109,8 @@ async function checkRateLimitRedis(client: IORedis, opts: RateLimitOptions): Pro
     `local count = redis.call("INCR", KEYS[1])\n` +
       `if count == 1 then redis.call("PEXPIRE", KEYS[1], ARGV[1]) end\n` +
       `return { count, redis.call("PTTL", KEYS[1]) }`,
-    1,
-    `oku:rate-limit:${keyHash}`,
-    String(Math.max(1, opts.windowMs)),
+    [`oku:rate-limit:${keyHash}`],
+    [String(Math.max(1, opts.windowMs))],
   )) as [number, number];
   const [count, ttlMs] = reply;
   if (!Number.isInteger(count)) throw new Error("Redis rate-limit counter did not return a count");
@@ -205,7 +177,6 @@ export async function checkRateLimitAsync(opts: RateLimitOptions): Promise<RateL
       return await checkRateLimitRedis(redisClient, opts);
     } catch {
       redis = null;
-      redisConnectPromise = null;
       redisUnavailableUntil = Date.now() + REDIS_RETRY_DELAY_MS;
     }
   }

@@ -7,17 +7,23 @@
  * logged or exposed by this module.
  */
 export function getRedisUrl(): string | null {
-  const directUrl = process.env.REDIS_URL?.trim();
-  if (directUrl) return directUrl;
+  return process.env.REDIS_URL?.trim() || null;
+}
 
-  const host = process.env.UPSTASH_REDIS_HOST?.trim();
-  const token = process.env.UPSTASH_REDIS_TOKEN?.trim();
-  if (!host || !token) return null;
+export interface UpstashRedisRestConfig {
+  url: string;
+  token: string;
+}
 
-  const normalizedHost = host.replace(/^rediss?:\/\//, "").replace(/\/$/, "");
-  return `rediss://default:${encodeURIComponent(token)}@${normalizedHost}:6379`;
+export function getUpstashRedisRestConfig(): UpstashRedisRestConfig | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim() || (() => {
+    const host = process.env.UPSTASH_REDIS_HOST?.trim();
+    return host ? `https://${host.replace(/^https?:\/\//, "").replace(/\/$/, "")}` : null;
+  })();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || process.env.UPSTASH_REDIS_TOKEN?.trim();
+  return url && token ? { url, token } : null;
 }
 
 export function hasRedisConfig(): boolean {
-  return getRedisUrl() !== null;
+  return getUpstashRedisRestConfig() !== null;
 }
