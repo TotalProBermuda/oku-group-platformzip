@@ -3,11 +3,26 @@
  *
  * REDIS_URL is supported for conventional Redis deployments. Upstash can be
  * configured without ever copying a combined password-bearing URL: save its
- * endpoint and token as separate Replit secrets instead. Neither value is
- * logged or exposed by this module.
+ * endpoint and token as separate Replit secrets instead. When those TCP
+ * secrets are present we construct an in-memory rediss:// URL for BullMQ.
+ * Neither value is logged or exposed by this module.
  */
 export function getRedisUrl(): string | null {
-  return process.env.REDIS_URL?.trim() || null;
+  const explicitUrl = process.env.REDIS_URL?.trim();
+  if (explicitUrl) return explicitUrl;
+
+  const host = process.env.UPSTASH_REDIS_HOST?.trim();
+  const token = process.env.UPSTASH_REDIS_TOKEN?.trim();
+  if (!host || !token) return null;
+
+  // Upstash's TCP endpoint requires TLS. The username for its Redis endpoint
+  // is always `default`; encode the token because it may contain URL-reserved
+  // characters. This value exists only in process memory.
+  const normalizedHost = host
+    .replace(/^rediss?:\/\//, "")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+  return `rediss://default:${encodeURIComponent(token)}@${normalizedHost}`;
 }
 
 export interface UpstashRedisRestConfig {

@@ -9,15 +9,16 @@ import { handleLaunchReadinessAlertJob } from "./jobs/launch-readiness-alert";
 import { handleAttributionAnchorRetryJob } from "./jobs/attribution-anchor-retry";
 import { handleCapacityExpirySweepJob } from "./jobs/capacity-expiry-sweep";
 import { handleLedgerOutboxDrainJob } from "./jobs/ledger-outbox-drain";
+import { getRedisUrl } from "../src/server/redis/config";
 
-if (!process.env.REDIS_URL) {
+if (!getRedisUrl()) {
   // Redis unavailable — start a polling-based drain so PENDING outbox rows are
   // still drained to LedgerEvent on every configured interval. All other jobs
   // (INVU sync, attribution anchor, etc.) remain inactive — only the proof
   // trail drain runs, since that is the one path that must never be silently
   // stuck regardless of queue infrastructure.
   console.warn(
-    "[worker] REDIS_URL not set — BullMQ workers inactive. " +
+    "[worker] Redis not configured — BullMQ workers inactive. " +
     "Running ledger outbox drain on a 60-second polling interval.",
   );
   // Minimal shim so handleLedgerOutboxDrainJob can log a job reference.
@@ -40,7 +41,7 @@ if (!process.env.REDIS_URL) {
 
 function startWorkers() {
   // Type-narrow the queue references for the rest of this function. We are
-  // already inside `if (process.env.REDIS_URL)` above, so these are non-null
+  // already inside `if (getRedisUrl())` above, so these are non-null
   // here, but TypeScript doesn't track env-based narrowing across imports.
   if (!invuSyncQueue || !invuTokenRotationQueue || !retentionSweepQueue || !auditAnomalyScanQueue || !launchReadinessAlertQueue || !attributionAnchorQueue || !capacityExpirySweepQueue || !ledgerOutboxQueue) {
     throw new Error("Queue references missing despite REDIS_URL being set");
