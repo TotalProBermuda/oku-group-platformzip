@@ -42,9 +42,12 @@ export async function POST(req: Request) {
       currency: order.currency,
     });
     return NextResponse.json({ ok: true, data: context });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { ok: false, error: error?.message || "Unable to initialize secure card entry." },
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Unable to initialize secure card entry.",
+      },
       { status: 400 },
     );
   }
