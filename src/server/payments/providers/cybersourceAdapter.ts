@@ -32,9 +32,9 @@ function centsToAmount(c: number): string {
 }
 
 /**
- * Cybersource success: 2xx HTTP + body.status in {AUTHORIZED, AUTHORIZED_PENDING_REVIEW,
- * PARTIAL_AUTHORIZED, PENDING, TRANSMITTED, REVERSED, VOIDED}. For payments
- * we treat AUTHORIZED/PARTIAL_AUTHORIZED/PENDING as success-after-capture.
+ * Cybersource success for an immediate-capture checkout is a 2xx response
+ * whose status confirms the authorization or transmission. Reversed and
+ * voided states must never be treated as paid.
  */
 function chargeOk(httpStatus: number | null, body: any): boolean {
   if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
@@ -43,7 +43,8 @@ function chargeOk(httpStatus: number | null, body: any): boolean {
     s === "AUTHORIZED" ||
     s === "AUTHORIZED_PENDING_REVIEW" ||
     s === "PARTIAL_AUTHORIZED" ||
-    s === "PENDING"
+    s === "PENDING" ||
+    s === "TRANSMITTED"
   );
 }
 function refundOk(httpStatus: number | null, body: any): boolean {
