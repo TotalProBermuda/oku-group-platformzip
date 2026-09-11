@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { BILLING_COUNTRIES } from "@/lib/billingCountries";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
@@ -403,21 +404,11 @@ export default function CheckoutPage() {
                             <input aria-label="Billing state or province" value={billing.administrativeArea} onChange={(event) => setBilling((current) => ({ ...current, administrativeArea: event.target.value }))} placeholder="State / province" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                             <input aria-label="Billing postal code" value={billing.postalCode} onChange={(event) => setBilling((current) => ({ ...current, postalCode: event.target.value }))} placeholder="Postal / ZIP code" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                             <select aria-label="Billing country" value={billing.country} onChange={(event) => setBilling((current) => ({ ...current, country: event.target.value }))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14, background: "white" }}>
-                              <option value="PA">Panama</option>
-                              <option value="US">United States</option>
-                              <option value="CA">Canada</option>
-                              <option value="GB">United Kingdom</option>
-                              <option value="MX">Mexico</option>
-                              <option value="CO">Colombia</option>
-                              <option value="BR">Brazil</option>
-                              <option value="AR">Argentina</option>
-                              <option value="ES">Spain</option>
-                              <option value="FR">France</option>
-                              <option value="DE">Germany</option>
-                              <option value="IT">Italy</option>
-                              <option value="NL">Netherlands</option>
-                              <option value="AU">Australia</option>
-                              <option value="NZ">New Zealand</option>
+                              {BILLING_COUNTRIES.map((country) => (
+                                <option key={country.code} value={country.code}>
+                                  {country.name}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         </div>
