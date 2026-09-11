@@ -420,11 +420,22 @@ export default function CheckoutPage() {
                       </button>
                     </>
                   ) : (
-                    <div className="cybersource-payment-fields" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div className="cybersource-payment-fields" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
                       {!secureReady && <div style={{ gridColumn: "1 / -1", fontSize: 13, color: "#6b7280" }}>Loading Cybersource secure card fields…</div>}
                       <div id="cybersource-card-number" className="cybersource-field" style={{ gridColumn: "1 / -1" }} />
-                      <input aria-label="Expiry month" inputMode="numeric" maxLength={2} placeholder="MM" value={expiryMonth} onChange={(e) => setExpiryMonth(e.target.value.replace(/\D/g, "").slice(0, 2))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
-                      <input aria-label="Expiry year" inputMode="numeric" maxLength={4} placeholder="YYYY" value={expiryYear} onChange={(e) => setExpiryYear(e.target.value.replace(/\D/g, "").slice(0, 4))} style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                      <input
+                        aria-label="Card expiry date"
+                        inputMode="numeric"
+                        maxLength={7}
+                        placeholder="MM / YY"
+                        value={expiryMonth ? `${expiryMonth}${expiryYear ? ` / ${expiryYear.slice(-2)}` : ""}` : ""}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                          setExpiryMonth(digits.slice(0, 2));
+                          setExpiryYear(digits.length > 2 ? `20${digits.slice(2)}` : "");
+                        }}
+                        style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }}
+                      />
                       <div id="cybersource-security-code" className="cybersource-field" style={{ gridColumn: "1 / -1" }} />
                     </div>
                   )}
