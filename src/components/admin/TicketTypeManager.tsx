@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ClipboardEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 
 interface TicketType {
@@ -75,10 +75,6 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<TicketType> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // The database deliberately stores whole cents, but people enter prices in
-  // the familiar decimal currency notation. Keep the editor text separate so
-  // values such as "100.00" never appear as the internal value 10000.
-  const [priceInput, setPriceInput] = useState("0.00");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -96,7 +92,6 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
   function openNew() {
     setEditing({ ...BLANK });
     setEditingId(null);
-    setPriceInput(formatPriceInput(BLANK.priceCents));
     setError("");
   }
 
@@ -107,7 +102,6 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
       saleEndsAt: tt.saleEndsAt ? tt.saleEndsAt.slice(0, 16) : "",
     });
     setEditingId(tt.id);
-    setPriceInput(formatPriceInput(tt.priceCents));
     setError("");
   }
 
@@ -115,20 +109,43 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
     setEditing(null);
     setEditingId(null);
     setError("");
-    setPriceInput("0.00");
   }
 
   function set(key: keyof TicketType, value: TicketType[keyof TicketType] | null) {
     setEditing((p) => ({ ...p, [key]: value }));
   }
 
-  function setPrice(value: string) {
-    // Permit an incomplete decimal while typing, but never more than two
-    // fractional digits. The API still receives its integer-cent contract.
-    if (!/^\d*(?:\.\d{0,2})?$/.test(value)) return;
-    setPriceInput(value);
-    const dollars = Number(value || "0");
-    set("priceCents", Number.isFinite(dollars) ? Math.round(dollars * 100) : 0);
+  function setPriceCents(value: number) {
+    // Keep the existing whole-cent persistence contract and prevent an
+    // accidental giant number from being entered into the price editor.
+    set("priceCents", Math.max(0, Math.min(Math.trunc(value), 99_999_999)));
+  }
+
+  function handleCashPriceKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    const currentCents = Number(editing?.priceCents) || 0;
+    if (/^\d$/.test(event.key)) {
+      event.preventDefault();
+      setPriceCents(currentCents * 10 + Number(event.key));
+      return;
+    }
+    if (event.key === "Backspace" || event.key === "Delete") {
+      event.preventDefault();
+      setPriceCents(Math.floor(currentCents / 10));
+      return;
+    }
+    // Keep normal keyboard navigation and accessibility shortcuts, but lock
+    // the decimal separator in place so the input behaves like a till.
+    if (![
+      "Tab", "ArrowLeft", "ArrowRight", "Home", "End",
+    ].includes(event.key) && !(event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+    }
+  }
+
+  function handleCashPricePaste(event: ClipboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+    const digits = event.clipboardData.getData("text").replace(/\D/g, "");
+    if (digits) setPriceCents(Number(digits));
   }
 
   async function save() {
@@ -332,17 +349,17 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
                   {currencyPrefix(editing.currency)}
                 </span>
                 <input
-                  aria-label="Price in whole currency units"
-                  inputMode="decimal"
+                  aria-label="Price in currency format"
+                  inputMode="numeric"
                   style={{ ...inputStyle, paddingLeft: 28 }}
-                  value={priceInput}
-                  onChange={(e) => setPrice(e.target.value)}
-                  onBlur={() => setPriceInput(formatPriceInput(Number(editing.priceCents)))}
-                  placeholder="0.00"
+                  value={formatPriceInput(Number(editing.priceCents))}
+                  onChange={() => {}}
+                  onKeyDown={handleCashPriceKeyDown}
+                  onPaste={handleCashPricePaste}
                 />
               </div>
               <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0" }}>
-                Enter the customer-facing amount, for example {currencyPrefix(editing.currency)}100.00.
+                Type digits like a till: 1 → 0.01, 1234 → 12.34. Backspace removes the last digit.
               </p>
             </div>
 
