@@ -44,6 +44,17 @@ export interface NormalizedChargeInput {
     postalCode?: string;
     country?: string; // ISO-2
   };
+  /** Server-verified 3-D Secure result. Never accepted directly from a browser. */
+  payerAuthentication?: {
+    indicator?: string;
+    eciRaw?: string;
+    cavv?: string;
+    xid?: string;
+    directoryServerTransactionId?: string;
+    threeDSServerTransactionId?: string;
+    specificationVersion?: string;
+    paresStatus?: string;
+  };
   instrument: PaymentInstrument;
   metadata?: Record<string, string | number | null>;
 }

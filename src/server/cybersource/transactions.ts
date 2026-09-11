@@ -21,6 +21,7 @@ import {
   getResolvedCybersourceConfig,
   type ResolvedCybersourceConfig,
 } from "@/server/cybersource/client";
+import type { PayerAuthenticationData } from "@/server/cybersource/payerAuthentication";
 
 export type CybersourceCallResult = {
   httpStatus: number | null;
@@ -99,6 +100,7 @@ export type CybersourceChargeInput = {
     expirationYear: string; // "YYYY"
     securityCode?: string;
   };
+  payerAuthentication?: PayerAuthenticationData;
 };
 
 export async function cybersourceCharge(
@@ -116,7 +118,9 @@ export async function cybersourceCharge(
     },
     processingInformation: {
       capture: true,
-      commerceIndicator: "internet",
+      // CyberSource requires its authenticated commerce indicator (for
+      // example `vbv`) rather than `internet` when 3-D Secure succeeds.
+      commerceIndicator: input.payerAuthentication?.indicator || "internet",
     },
     orderInformation: {
       amountDetails: {
@@ -125,6 +129,18 @@ export async function cybersourceCharge(
       },
     },
   };
+
+  if (input.payerAuthentication?.eciRaw) {
+    body.consumerAuthenticationInformation = {
+      eciRaw: input.payerAuthentication.eciRaw,
+      cavv: input.payerAuthentication.cavv,
+      xid: input.payerAuthentication.xid,
+      directoryServerTransactionId: input.payerAuthentication.directoryServerTransactionId,
+      threeDSServerTransactionId: input.payerAuthentication.threeDSServerTransactionId,
+      specificationVersion: input.payerAuthentication.specificationVersion,
+      paresStatus: input.payerAuthentication.paresStatus,
+    };
+  }
 
   // Never invent billing data. Placeholder addresses trigger AVS/fraud
   // failures and make reconciliation unreliable. Checkout validates and

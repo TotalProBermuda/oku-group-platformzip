@@ -168,6 +168,7 @@ class CybersourceAdapter implements PaymentProviderAdapter {
         transactionId: input.orderId,
         customerEmail: input.customerEmail ?? null,
         billing: input.billing,
+        payerAuthentication: input.payerAuthentication,
         transientToken: inst.cybersourceTransientToken,
         card: inst.cybersourceCard,
       });

@@ -12,6 +12,10 @@ import { getActiveCheckoutAdapter } from "@/server/payments/providers";
 import type { PaymentInstrument } from "@/server/payments/providers/types";
 import { hasValidGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 import { hasActiveCheckoutHold } from "@/server/commerce/checkoutHold";
+import {
+  checkPayerAuthentication,
+  validatePayerAuthentication,
+} from "@/server/cybersource/payerAuthentication";
 
 // Accept provider tokenization only. Raw card data is never accepted by this
 // public route, including in sandbox, so the OKÜ app does not enter PCI scope.
@@ -31,6 +35,17 @@ const Body = z.object({
     postalCode: z.string().trim().min(2).max(20),
     country: z.string().trim().regex(/^[A-Za-z]{2}$/),
   }),
+  payerAuthentication: z.object({
+    referenceId: z.string().min(1).optional(),
+    authenticationTransactionId: z.string().min(1).optional(),
+    cardType: z.string().min(1).optional(),
+    browser: z.object({
+      accept: z.string().max(2000), language: z.string().max(40), colorDepth: z.string().max(4),
+      javaEnabled: z.enum(["Y", "N"]), javascriptEnabled: z.literal("Y"),
+      screenHeight: z.string().max(8), screenWidth: z.string().max(8), timeDifference: z.string().max(8),
+      userAgent: z.string().max(1000),
+    }).optional(),
+  }).optional(),
 });
 
 export async function POST(req: Request) {
@@ -129,6 +144,48 @@ export async function POST(req: Request) {
     lastName: nameParts.slice(1).join(" ") || nameParts[0] || "Customer",
   };
 
+  // A test or production 3-D Secure profile must receive Payer
+  // Authentication data before authorization. The browser provides only
+  // ephemeral device facts and the CyberSource reference; authentication
+  // results are obtained server-to-server and are never trusted from client
+  // input.
+  let payerAuthentication: Awaited<ReturnType<typeof validatePayerAuthentication>> | undefined;
+  if (provider === "CYBERSOURCE") {
+    const pa = body.payerAuthentication;
+    if (!body.cybersourceTransientToken || !pa) {
+      return NextResponse.json({ ok: false, error: "Secure cardholder verification is required before payment." }, { status: 400 });
+    }
+    try {
+      if (pa.authenticationTransactionId) {
+        payerAuthentication = await validatePayerAuthentication({
+          authenticationTransactionId: pa.authenticationTransactionId,
+          cardType: pa.cardType,
+        });
+      } else {
+        if (!pa.referenceId || !pa.browser) {
+          return NextResponse.json({ ok: false, error: "Secure cardholder verification has not started." }, { status: 400 });
+        }
+        const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+        const enrollment = await checkPayerAuthentication({
+          transientToken: body.cybersourceTransientToken,
+          referenceId: pa.referenceId,
+          amount: (order.totalCents / 100).toFixed(2),
+          currency: order.currency,
+          billing: { ...billing, email: order.user?.email ?? "" },
+          browser: { ...pa.browser, ipAddress: forwardedFor || "0.0.0.0" },
+          returnUrl: "https://www.okuhospitalitygroup.com/api/v1/checkout/cybersource/payer-auth/return",
+          customerId: order.userId,
+        });
+        if (enrollment.kind === "challenge") {
+          return NextResponse.json({ ok: false, data: { payerAuthenticationChallenge: enrollment.challenge } }, { status: 202 });
+        }
+        payerAuthentication = enrollment.authentication;
+      }
+    } catch {
+      return NextResponse.json({ ok: false, error: "Your card could not complete secure verification. Please start a fresh payment attempt." }, { status: 402 });
+    }
+  }
+
   const result = await adapter.charge({
     amountCents: order.totalCents,
     currency: order.currency,
@@ -137,6 +194,7 @@ export async function POST(req: Request) {
     customerEmail: order.user?.email ?? null,
     customerName: order.user?.name ?? null,
     billing,
+    payerAuthentication,
     instrument,
   });
   // Prisma JSON fields represent a database JSON null with Prisma.JsonNull,
@@ -246,7 +304,14 @@ export async function POST(req: Request) {
       {
         ok: false,
         error: result.failureMessage ?? "Payment failed",
-        data: { provider, code: result.failureCode },
+        // The checkout only uses this non-sensitive environment flag to give
+        // guests the right next step. It never receives issuer, fraud, AVS,
+        // or raw gateway decision detail.
+        data: {
+          provider,
+          code: result.failureCode,
+          environment: (await adapter.getStatus()).environment,
+        },
       },
       { status: 402 },
     );

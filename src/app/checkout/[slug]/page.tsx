@@ -7,6 +7,19 @@ import { BILLING_COUNTRIES } from "@/lib/billingCountries";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
+function safePaymentFailureMessage(environment: unknown, code: unknown) {
+  // A sandbox never reaches a card issuer. Make that explicit rather than
+  // suggesting the guest's real card is defective. We deliberately do not
+  // surface raw processor, AVS, fraud, or issuer messages here.
+  if (environment === "test") {
+    return "CyberSource is in test mode. Use an official CyberSource sandbox test card; real cards cannot be approved in this environment.";
+  }
+  if (code === "BAD_INSTRUMENT") {
+    return "Secure card details could not be verified. Please start a fresh payment attempt.";
+  }
+  return "Payment was not approved. Confirm your billing details and try a different card or payment method.";
+}
+
 export default function CheckoutPage() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
@@ -42,6 +55,23 @@ export default function CheckoutPage() {
   const microformRef = useRef<any>(null);
   const [guest, setGuest] = useState({ name: "", email: "", phone: "", marketingEmailConsent: false });
   const [guestCheckoutToken, setGuestCheckoutToken] = useState<string | undefined>();
+  const [transientToken, setTransientToken] = useState<string | null>(null);
+  const [payerChallenge, setPayerChallenge] = useState<{ authenticationTransactionId: string; stepUpUrl: string; token: string; cardType?: string } | null>(null);
+  const [payerChallengeComplete, setPayerChallengeComplete] = useState(false);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin === window.location.origin && event.data?.type === "oku-3ds-complete") setPayerChallengeComplete(true);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
+    if (!payerChallenge) return;
+    const form = document.getElementById("oku-3ds-challenge-form") as HTMLFormElement | null;
+    form?.submit();
+  }, [payerChallenge]);
 
   useEffect(() => {
     fetch(`/api/v1/experiences?slug=${slug}`)
@@ -157,6 +187,9 @@ export default function CheckoutPage() {
     setSecureReady(false);
     setIntentId(null);
     setGuestCheckoutToken(undefined);
+    setTransientToken(null);
+    setPayerChallenge(null);
+    setPayerChallengeComplete(false);
     setExpiryMonth("");
     setExpiryYear("");
     setPaymentDeclined(false);
@@ -171,15 +204,35 @@ export default function CheckoutPage() {
     }
     setPaying(true); setError("");
     try {
-      const transientToken = await new Promise<string>((resolve, reject) => {
+      const nextTransientToken = transientToken ?? await new Promise<string>((resolve, reject) => {
         microformRef.current.createToken({ expirationMonth: expiryMonth, expirationYear: expiryYear }, (err: any, token: string) => err ? reject(err) : resolve(token));
       });
+      setTransientToken(nextTransientToken);
+      let payerAuthentication: any;
+      if (payerChallenge) {
+        if (!payerChallengeComplete) {
+          setError("Complete the bank verification in the secure window before continuing.");
+          setPaying(false);
+          return;
+        }
+        payerAuthentication = { authenticationTransactionId: payerChallenge.authenticationTransactionId, cardType: payerChallenge.cardType };
+      } else {
+        const setupResponse = await fetch("/api/v1/checkout/cybersource/payer-auth/setup", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ intentId, guestCheckoutToken, transientToken: nextTransientToken }),
+        });
+        const setup = await setupResponse.json();
+        if (!setupResponse.ok) throw new Error("Unable to initialize secure cardholder verification.");
+        await collectDeviceData(setup.data.deviceDataCollectionUrl, setup.data.accessToken);
+        payerAuthentication = { referenceId: setup.data.referenceId, browser: browserData() };
+      }
       const res = await fetch("/api/v1/checkout/confirm", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           intentId,
           guestCheckoutToken,
-          cybersourceTransientToken: transientToken,
+          cybersourceTransientToken: nextTransientToken,
+          payerAuthentication,
           billing: {
             address1: billing.address1.trim(),
             locality: billing.locality.trim(),
@@ -190,6 +243,12 @@ export default function CheckoutPage() {
         }),
       });
       const data = await res.json();
+      if (res.status === 202 && data?.data?.payerAuthenticationChallenge) {
+        setPayerChallenge(data.data.payerAuthenticationChallenge);
+        setError("");
+        setPaying(false);
+        return;
+      }
       if (!res.ok) {
         if (data?.data?.code === "PAYMENT_OUTCOME_UNKNOWN") {
           setPaymentUnderReview(true);
@@ -197,7 +256,10 @@ export default function CheckoutPage() {
           setPaying(false);
           return;
         }
-        throw new Error(data.error ?? "Payment failed");
+        setPaymentDeclined(true);
+        setError(safePaymentFailureMessage(data?.data?.environment, data?.data?.code));
+        setPaying(false);
+        return;
       }
       setDone(true);
     } catch {
@@ -208,6 +270,39 @@ export default function CheckoutPage() {
       setError("Payment was not approved. Your card information was not stored by OKÜ. Please start a fresh payment attempt or use another card.");
     }
     setPaying(false);
+  }
+
+  function browserData() {
+    return {
+      accept: document.querySelector("meta[http-equiv='Accept']")?.getAttribute("content") || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      language: navigator.language || "en-US",
+      colorDepth: String(window.screen.colorDepth || 24),
+      javaEnabled: "N" as const,
+      javascriptEnabled: "Y" as const,
+      screenHeight: String(window.screen.height),
+      screenWidth: String(window.screen.width),
+      timeDifference: String(new Date().getTimezoneOffset()),
+      userAgent: navigator.userAgent,
+    };
+  }
+
+  function collectDeviceData(url: string, jwt: string): Promise<void> {
+    return new Promise((resolve) => {
+      const iframe = document.createElement("iframe");
+      iframe.name = "oku-cardinal-collection";
+      iframe.style.display = "none";
+      iframe.sandbox.add("allow-forms", "allow-scripts", "allow-same-origin", "allow-popups");
+      const form = document.createElement("form");
+      form.method = "POST"; form.target = iframe.name; form.action = url;
+      const input = document.createElement("input");
+      input.type = "hidden"; input.name = "JWT"; input.value = jwt; form.appendChild(input);
+      const finish = () => { window.removeEventListener("message", listener); setTimeout(() => { form.remove(); iframe.remove(); }, 0); resolve(); };
+      const listener = (event: MessageEvent) => { if (event.origin.includes("cardinalcommerce.com")) finish(); };
+      window.addEventListener("message", listener);
+      document.body.append(iframe, form); form.submit();
+      // CyberSource permits a 10-second timeout if the profile callback is delayed.
+      window.setTimeout(finish, 10_000);
+    });
   }
 
   if (loading) return (
@@ -437,6 +532,19 @@ export default function CheckoutPage() {
                         style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }}
                       />
                       <div id="cybersource-security-code" className="cybersource-field" style={{ gridColumn: "1 / -1" }} />
+                    </div>
+                  )}
+                  {payerChallenge && (
+                    <div style={{ marginTop: 16, padding: 16, background: "#fff", border: "1px solid #d8d2ca", borderRadius: 8 }}>
+                      <strong>Verify this payment with your bank</strong>
+                      <p style={{ fontSize: 13, color: "#6b7280", margin: "8px 0 12px" }}>Complete the secure verification below. Your card details remain with CyberSource and your bank.</p>
+                      <iframe name="oku-3ds-challenge" title="Secure cardholder verification" style={{ width: "100%", minHeight: 420, border: 0 }} />
+                      <form id="oku-3ds-challenge-form" method="POST" target="oku-3ds-challenge" action={payerChallenge.stepUpUrl}>
+                        <input type="hidden" name="JWT" value={payerChallenge.token} />
+                      </form>
+                      <button type="button" onClick={() => setPayerChallengeComplete(true)} className="btn btn-ghost" style={{ marginTop: 8, width: "100%" }}>
+                        I’ve completed verification
+                      </button>
                     </div>
                   )}
                 </div>
