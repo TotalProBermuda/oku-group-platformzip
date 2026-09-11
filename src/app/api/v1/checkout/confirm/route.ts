@@ -39,6 +39,8 @@ const Body = z.object({
     referenceId: z.string().min(1).optional(),
     authenticationTransactionId: z.string().min(1).optional(),
     cardType: z.string().min(1).optional(),
+    expirationMonth: z.string().regex(/^\d{2}$/).optional(),
+    expirationYear: z.string().regex(/^\d{4}$/).optional(),
     browser: z.object({
       accept: z.string().max(2000), language: z.string().max(40), colorDepth: z.string().max(4),
       javaEnabled: z.enum(["Y", "N"]), javascriptEnabled: z.literal("Y"),
@@ -162,7 +164,7 @@ export async function POST(req: Request) {
           cardType: pa.cardType,
         });
       } else {
-        if (!pa.referenceId || !pa.browser) {
+        if (!pa.referenceId || !pa.browser || !pa.expirationMonth || !pa.expirationYear) {
           return NextResponse.json({ ok: false, error: "Secure cardholder verification has not started." }, { status: 400 });
         }
         const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -175,6 +177,8 @@ export async function POST(req: Request) {
           browser: { ...pa.browser, ipAddress: forwardedFor || "0.0.0.0" },
           returnUrl: "https://www.okuhospitalitygroup.com/api/v1/checkout/cybersource/payer-auth/return",
           customerId: order.userId,
+          expirationMonth: pa.expirationMonth,
+          expirationYear: pa.expirationYear,
         });
         if (enrollment.kind === "challenge") {
           return NextResponse.json({ ok: false, data: { payerAuthenticationChallenge: enrollment.challenge } }, { status: 202 });

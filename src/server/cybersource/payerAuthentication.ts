@@ -111,11 +111,16 @@ export async function checkPayerAuthentication(input: {
   browser: BrowserData;
   returnUrl: string;
   customerId: string;
+  expirationMonth: string;
+  expirationYear: string;
 }) {
   const cfg = await getResolvedCybersourceConfig();
   const result = await postSigned(cfg, "/risk/v1/authentications", {
     orderInformation: { amountDetails: { totalAmount: input.amount, currency: input.currency }, billTo: input.billing },
-    paymentInformation: { customer: { customerId: input.customerId } },
+    paymentInformation: {
+      customer: { customerId: input.customerId },
+      card: { expirationMonth: input.expirationMonth, expirationYear: input.expirationYear },
+    },
     deviceInformation: {
       ipAddress: input.browser.ipAddress,
       httpAcceptContent: input.browser.accept,

@@ -224,7 +224,12 @@ export default function CheckoutPage() {
         const setup = await setupResponse.json();
         if (!setupResponse.ok) throw new Error("Unable to initialize secure cardholder verification.");
         await collectDeviceData(setup.data.deviceDataCollectionUrl, setup.data.accessToken);
-        payerAuthentication = { referenceId: setup.data.referenceId, browser: browserData() };
+        payerAuthentication = {
+          referenceId: setup.data.referenceId,
+          browser: browserData(),
+          expirationMonth: expiryMonth,
+          expirationYear: expiryYear,
+        };
       }
       const res = await fetch("/api/v1/checkout/confirm", {
         method: "POST", headers: { "Content-Type": "application/json" },
