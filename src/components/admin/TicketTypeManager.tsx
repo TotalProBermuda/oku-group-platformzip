@@ -44,6 +44,14 @@ const BLANK: Partial<TicketType> = {
 const VISIBILITY_OPTIONS = ["VISIBLE", "HIDDEN", "MEMBERS_ONLY", "NEWSLETTER_ONLY", "INVITE_ONLY"];
 const STATUS_OPTIONS = ["DRAFT", "ACTIVE", "INACTIVE", "SOLD_OUT"];
 
+function formatPriceInput(cents: number | undefined): string {
+  return ((Number(cents) || 0) / 100).toFixed(2);
+}
+
+function currencyPrefix(currency: string | undefined): string {
+  return currency === "EUR" ? "€" : currency === "GBP" ? "£" : "$";
+}
+
 const pill = (color: string) => ({
   display: "inline-block",
   padding: "2px 10px",
@@ -67,6 +75,10 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<TicketType> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The database deliberately stores whole cents, but people enter prices in
+  // the familiar decimal currency notation. Keep the editor text separate so
+  // values such as "100.00" never appear as the internal value 10000.
+  const [priceInput, setPriceInput] = useState("0.00");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -84,6 +96,7 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
   function openNew() {
     setEditing({ ...BLANK });
     setEditingId(null);
+    setPriceInput(formatPriceInput(BLANK.priceCents));
     setError("");
   }
 
@@ -94,6 +107,7 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
       saleEndsAt: tt.saleEndsAt ? tt.saleEndsAt.slice(0, 16) : "",
     });
     setEditingId(tt.id);
+    setPriceInput(formatPriceInput(tt.priceCents));
     setError("");
   }
 
@@ -101,10 +115,20 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
     setEditing(null);
     setEditingId(null);
     setError("");
+    setPriceInput("0.00");
   }
 
-  function set(key: string, value: any) {
+  function set(key: keyof TicketType, value: TicketType[keyof TicketType] | null) {
     setEditing((p) => ({ ...p, [key]: value }));
+  }
+
+  function setPrice(value: string) {
+    // Permit an incomplete decimal while typing, but never more than two
+    // fractional digits. The API still receives its integer-cent contract.
+    if (!/^\d*(?:\.\d{0,2})?$/.test(value)) return;
+    setPriceInput(value);
+    const dollars = Number(value || "0");
+    set("priceCents", Number.isFinite(dollars) ? Math.round(dollars * 100) : 0);
   }
 
   async function save() {
@@ -302,10 +326,23 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
             </div>
 
             <div>
-              <label style={labelStyle}>{t("admin", "price") ?? "Price"} (in cents) *</label>
-              <input type="number" min={0} style={inputStyle} value={editing.priceCents ?? 0} onChange={(e) => set("priceCents", e.target.value)} placeholder="e.g. 2500 = $25.00" />
+              <label style={labelStyle}>{t("admin", "price") ?? "Price"} *</label>
+              <div style={{ position: "relative" }}>
+                <span aria-hidden="true" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#6b7280", fontSize: 14 }}>
+                  {currencyPrefix(editing.currency)}
+                </span>
+                <input
+                  aria-label="Price in whole currency units"
+                  inputMode="decimal"
+                  style={{ ...inputStyle, paddingLeft: 28 }}
+                  value={priceInput}
+                  onChange={(e) => setPrice(e.target.value)}
+                  onBlur={() => setPriceInput(formatPriceInput(Number(editing.priceCents)))}
+                  placeholder="0.00"
+                />
+              </div>
               <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0" }}>
-                ${((Number(editing.priceCents) || 0) / 100).toFixed(2)} {editing.currency ?? "USD"}
+                Enter the customer-facing amount, for example {currencyPrefix(editing.currency)}100.00.
               </p>
             </div>
 
