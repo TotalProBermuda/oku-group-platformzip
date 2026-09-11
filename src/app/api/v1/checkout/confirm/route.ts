@@ -140,6 +140,17 @@ export async function POST(req: Request) {
     : (result.rawSafeResponse as Prisma.InputJsonValue);
 
   if (!result.ok) {
+    // Operations need a precise, non-sensitive signal to distinguish a
+    // sandbox-card decline from a gateway/configuration failure. Do not log
+    // the transient token, billing data, gateway payload, customer identity,
+    // or order id here: Replit production logs are not a payment-audit store.
+    console.warn(JSON.stringify({
+      type: "checkout_charge_failed",
+      provider,
+      responseCode: result.responseCode,
+      failureCode: result.failureCode,
+      hasGatewayTransactionId: Boolean(result.transactionId),
+    }));
     await prisma.order.update({ where: { id: order.id }, data: { status: "FAILED" } });
     await prisma.payment.upsert({
       where: { orderId: order.id },
