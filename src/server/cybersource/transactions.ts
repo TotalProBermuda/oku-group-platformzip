@@ -76,6 +76,11 @@ export type CybersourceChargeInput = {
   amount: string; // "150.00"
   currency: string;
   invoiceNumber: string;
+  /**
+   * Stable merchant identifier for this specific checkout. CyberSource can
+   * use this to identify duplicate requests after a client/network timeout.
+   */
+  transactionId: string;
   customerEmail?: string | null;
   billing?: {
     firstName?: string;
@@ -107,6 +112,7 @@ export async function cybersourceCharge(
   const body: any = {
     clientReferenceInformation: {
       code: input.invoiceNumber,
+      transactionId: input.transactionId,
     },
     processingInformation: {
       capture: true,

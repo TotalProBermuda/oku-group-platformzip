@@ -24,6 +24,7 @@ export default function CheckoutPage() {
   const [intentId, setIntentId] = useState<string | null>(null);
   const [secureReady, setSecureReady] = useState(false);
   const [paymentDeclined, setPaymentDeclined] = useState(false);
+  const [paymentUnderReview, setPaymentUnderReview] = useState(false);
   const [flexConfig, setFlexConfig] = useState<{ captureContext: string; clientLibrary: string; clientLibraryIntegrity?: string } | null>(null);
   const [expiryMonth, setExpiryMonth] = useState("");
   const [expiryYear, setExpiryYear] = useState("");
@@ -158,6 +159,7 @@ export default function CheckoutPage() {
     setExpiryMonth("");
     setExpiryYear("");
     setPaymentDeclined(false);
+    setPaymentUnderReview(false);
     setError("");
     setQuote(null);
   }
@@ -187,7 +189,15 @@ export default function CheckoutPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Payment failed");
+      if (!res.ok) {
+        if (data?.data?.code === "PAYMENT_OUTCOME_UNKNOWN") {
+          setPaymentUnderReview(true);
+          setError(data.error ?? "We are confirming your payment with the bank. Please do not try again.");
+          setPaying(false);
+          return;
+        }
+        throw new Error(data.error ?? "Payment failed");
+      }
       setDone(true);
     } catch {
       // Keep the public message intentionally generic: provider responses can
@@ -438,8 +448,8 @@ export default function CheckoutPage() {
               </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={startFreshPaymentAttempt} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
-                <button onClick={completePurchase} disabled={paying || !secureReady || paymentDeclined} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
+                <button onClick={startFreshPaymentAttempt} disabled={paymentUnderReview} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
+                <button onClick={completePurchase} disabled={paying || !secureReady || paymentDeclined || paymentUnderReview} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
                   {paying ? "Processing…" : `Confirm & Pay ${fmt(quote.totalCents)}`}
                 </button>
               </div>

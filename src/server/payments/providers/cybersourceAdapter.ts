@@ -164,6 +164,7 @@ class CybersourceAdapter implements PaymentProviderAdapter {
         amount: centsToAmount(input.amountCents),
         currency: input.currency || "USD",
         invoiceNumber: input.invoiceNumber,
+        transactionId: input.orderId,
         customerEmail: input.customerEmail ?? null,
         billing: input.billing,
         transientToken: inst.cybersourceTransientToken,

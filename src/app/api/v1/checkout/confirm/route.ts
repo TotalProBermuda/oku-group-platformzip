@@ -97,6 +97,10 @@ export async function POST(req: Request) {
         status: "INITIATED",
         amountCents: order.totalCents,
         currency: order.currency,
+        // Persist the merchant reference before calling the gateway. If the
+        // response is lost, a webhook or finance review can reconcile the
+        // payment without guessing which order it belonged to.
+        gatewayReferenceId: invoiceNumber,
       },
     });
   } catch (error) {
@@ -135,11 +139,59 @@ export async function POST(req: Request) {
     billing,
     instrument,
   });
-  const gatewayRawSafeJson = result.rawSafeResponse === undefined
-    ? null
-    : (result.rawSafeResponse as Prisma.InputJsonValue);
+  // Prisma JSON fields represent a database JSON null with Prisma.JsonNull,
+  // rather than JavaScript null. Keeping that distinction here makes every
+  // known/unknown payment outcome persistable and type-safe.
+  const gatewayRawSafeJson: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+    result.rawSafeResponse === undefined
+      ? Prisma.JsonNull
+      : (result.rawSafeResponse as Prisma.InputJsonValue);
 
   if (!result.ok) {
+    // A transport error, or an upstream 5xx with no transaction identifier,
+    // is not proof that CyberSource did not receive the payment. Do not mark
+    // the order failed, release its capacity, or invite the guest to submit a
+    // second charge. Keep the durable payment claim in INITIATED state until
+    // the gateway reference is reconciled by a webhook or finance.
+    const responseIs5xx = /^5\d\d$/.test(result.responseCode ?? "");
+    const outcomeUnknown =
+      provider === "CYBERSOURCE" &&
+      !result.transactionId &&
+      (result.failureCode === "NETWORK" || responseIs5xx);
+
+    if (outcomeUnknown) {
+      await prisma.payment.update({
+        where: { orderId: order.id },
+        data: {
+          status: "INITIATED",
+          gatewayResponseCode: result.responseCode,
+          gatewayRawSafeJson,
+        },
+      });
+      await prisma.auditLog
+        .create({
+          data: {
+            actorId: auth?.userId ?? order.userId,
+            action: "checkout.charge.outcome_unknown",
+            metadata: {
+              provider,
+              responseCode: result.responseCode,
+              failureCode: result.failureCode,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        })
+        .catch(() => {});
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "We are confirming your payment with the bank. Please do not try again; the payment has been held for review.",
+          data: { provider, code: "PAYMENT_OUTCOME_UNKNOWN" },
+        },
+        { status: 409 },
+      );
+    }
+
     // Operations need a precise, non-sensitive signal to distinguish a
     // sandbox-card decline from a gateway/configuration failure. Do not log
     // the transient token, billing data, gateway payload, customer identity,

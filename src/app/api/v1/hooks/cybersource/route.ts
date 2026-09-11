@@ -116,6 +116,16 @@ export async function POST(req: NextRequest) {
     payload?.payload?.status ??
     payload?.data?.object?.status ??
     "";
+  const merchantReference: string =
+    payload?.payload?.clientReferenceInformation?.code ??
+    payload?.data?.object?.clientReferenceInformation?.code ??
+    payload?.clientReferenceInformation?.code ??
+    "";
+  const merchantTransactionId: string =
+    payload?.payload?.clientReferenceInformation?.transactionId ??
+    payload?.data?.object?.clientReferenceInformation?.transactionId ??
+    payload?.clientReferenceInformation?.transactionId ??
+    "";
 
   if (!csTransactionId) {
     // Not actionable — return 200 so Cybersource stops retrying
@@ -124,13 +134,29 @@ export async function POST(req: NextRequest) {
 
   const mappedLedgerType = mapLedgerEventType(csEventType);
 
-  // 6. Find matching PaymentIntent by Cybersource transaction ID
+  // 6. Find matching reservation intent and/or ticket-order payment. Ticket
+  // checkout persists its merchant reference before the external request, so
+  // an asynchronous event can still be reconciled if the original response
+  // was dropped and no transaction ID was stored locally.
   const intent = await prisma.paymentIntent.findFirst({
     where: { cybersourceTransactionId: csTransactionId },
   });
 
-  if (!intent) {
-    // Could be for a non-deposit payment (ticket checkout) — not actionable here
+  const ticketPayment = await prisma.payment.findFirst({
+    where: {
+      OR: [
+        { gatewayTransactionId: csTransactionId },
+        ...(merchantReference ? [{ gatewayReferenceId: merchantReference }] : []),
+        // New checkout requests send the immutable order ID as CyberSource's
+        // client transaction ID. This is the strongest reconciliation key
+        // when a synchronous gateway response was lost.
+        ...(merchantTransactionId ? [{ orderId: merchantTransactionId }] : []),
+      ],
+    },
+    include: { order: { select: { id: true, status: true } } },
+  });
+
+  if (!intent && !ticketPayment) {
     return NextResponse.json({ ok: true, skipped: "intent_not_found" });
   }
 
@@ -147,8 +173,8 @@ export async function POST(req: NextRequest) {
       },
       confidenceClass: "VERIFIED_POS_EVENT",
       idempotencyKey,
-      paymentIntentId: intent.id,
-      reservationId: intent.reservationId ?? undefined,
+      paymentIntentId: intent?.id,
+      reservationId: intent?.reservationId ?? undefined,
       payload: {
         cybersourceEventType: csEventType,
         cybersourceTransactionId: csTransactionId,
@@ -167,7 +193,7 @@ export async function POST(req: NextRequest) {
   // PaymentIntent row; any failure here is logged and the webhook returns 200 so
   // Cybersource does not retry (re-delivery is deduplicated via the ledger outbox).
   const terminalStatuses = ["CAPTURED", "REFUNDED", "CANCELLED"];
-  if (!terminalStatuses.includes(intent.status)) {
+  if (intent && !terminalStatuses.includes(intent.status)) {
     try {
       if (
         csEventType.includes("captured") ||
@@ -202,5 +228,43 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, intentId: intent.id });
+  // Ticket checkout is an immediate capture flow. Webhooks are therefore a
+  // reconciliation mechanism, not a second fulfilment path: they update the
+  // durable payment record without issuing duplicate tickets. A captured
+  // event for a still-PENDING order is deliberately retained for finance
+  // review rather than auto-fulfilling an order whose synchronous result was
+  // lost.
+  if (ticketPayment) {
+    const paymentStatus =
+      csEventType.includes("refund") ? "REFUNDED" :
+      csEventType.includes("voided") || csEventType.includes("reversed") ? "VOIDED" :
+      csEventType.includes("failed") || csEventType.includes("declined") ? "FAILED" :
+      csEventType.includes("authorized") || csEventType.includes("captured") || csEventType.includes("transmitted") ? "SUCCEEDED" :
+      null;
+    if (paymentStatus) {
+      await prisma.payment.update({
+        where: { id: ticketPayment.id },
+        data: {
+          status: paymentStatus,
+          gatewayTransactionId: csTransactionId,
+        },
+      });
+      if (paymentStatus === "SUCCEEDED" && ticketPayment.order.status === "PENDING") {
+        await prisma.auditLog.create({
+          data: {
+            actorId: "system:cybersource_webhook",
+            action: "checkout.webhook.payment_requires_fulfillment_review",
+            metadata: {
+              paymentId: ticketPayment.id,
+              transactionId: csTransactionId,
+              merchantReference: merchantReference || null,
+              merchantTransactionId: merchantTransactionId || null,
+            },
+          },
+        }).catch(() => {});
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, intentId: intent?.id ?? null, paymentId: ticketPayment?.id ?? null });
 }
