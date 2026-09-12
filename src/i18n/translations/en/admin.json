@@ -96,6 +96,8 @@
   "experiences": "Experiences",
   "payouts": "Payouts",
   "hr": "HR",
+  "hostDashboard": "Host Dashboard",
+  "operationsBoard": "Operations Board",
   "quickAccess": "Quick Access",
   "totalOrders": "Total Orders",
   "revenuePaid": "Revenue (Paid)",
@@ -105,6 +107,8 @@
   "cardExperiencesDesc": "Manage experience series & sessions",
   "cardAnalyticsDesc": "Revenue, attendance & engagement data",
   "cardOrdersDesc": "View, refund & track all orders",
+  "cardHostDashboardDesc": "Live reservations, arrivals & service queue",
+  "cardOperationsBoardDesc": "Assign tables and manage the floor",
   "cardMembershipsDesc": "Patron & Founder members, applications",
   "cardMenusDesc": "Edit restaurant food & drinks menus",
   "cardUsersDesc": "Platform members and their roles",
@@ -1186,8 +1190,5 @@
   "anchorResolved": "Session manually anchored to preserved referrer context.",
   "anchorNoSessions": "No sessions require attention. All referral attributions are anchored.",
   "anchorSessionsTotal": "sessions requiring review",
-  "refresh": "Refresh",
-  "resendReferrerInvite": "Resend secure invitation",
-  "referrerInviteSent": "Secure referrer invitation sent.",
-  "referrerInviteFailed": "The invitation could not be sent."
+  "refresh": "Refresh"
 }
