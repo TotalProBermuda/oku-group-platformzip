@@ -230,6 +230,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
     if (step === "contact") {
       if (!contactName.trim()) e.contactName = t.errorNameRequired;
       if (!contactEmail.trim() || !contactEmail.includes("@")) e.contactEmail = t.errorEmailRequired;
+      if (!contactPhone.trim()) e.contactPhone = t.errorPhoneRequired;
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -431,8 +432,8 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
           <WizardInput label={t.email} required error={errors.contactEmail}>
             <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@email.com" style={inputStyle} />
           </WizardInput>
-          <WizardInput label={t.phoneWhatsApp}>
-            <input type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="+507 6000-0000" style={inputStyle} />
+          <WizardInput label={t.phoneWhatsApp} required error={errors.contactPhone}>
+            <input type="tel" required value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="+507 6000-0000" style={inputStyle} />
           </WizardInput>
           {/* Referrer attribution — auto-captured from ?ref= in the URL.
               No manual code entry: if the diner arrived via a referrer link,

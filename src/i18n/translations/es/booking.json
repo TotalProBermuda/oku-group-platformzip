@@ -81,6 +81,7 @@
   "errorPartySize": "El número de personas debe ser 1–50.",
   "errorNameRequired": "El nombre es obligatorio.",
   "errorEmailRequired": "Se requiere un correo electrónico válido.",
+  "errorPhoneRequired": "Se requiere un número de teléfono.",
   "errorSomethingWrong": "Algo salió mal. Por favor, inténtelo de nuevo.",
   "errorNetwork": "Error de red. Por favor, inténtelo de nuevo.",
   "occasionAnniversary": "Aniversario",
