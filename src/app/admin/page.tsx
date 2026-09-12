@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import Link from "next/link";
 import {
-  LayoutGrid, Package, ChevronRight, TriangleAlert,
+  LayoutGrid, Package, ChevronRight, TriangleAlert, ClipboardList, Map,
 } from "lucide-react";
 import { useAdminRoles } from "@/contexts/AdminContext";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
@@ -29,6 +29,8 @@ type CardEntry = {
 
 const ACTION_CARDS: CardEntry[] = [
   // Operations — FB_DIRECTOR and SUPERADMIN
+  { labelKey: "hostDashboard", descKey: "cardHostDashboardDesc", href: "/host/dashboard",          Icon: ClipboardList,                       roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
+  { labelKey: "operationsBoard", descKey: "cardOperationsBoardDesc", href: "/host/operations",     Icon: Map,                                 roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
   { labelKey: "experiences",  descKey: "cardExperiencesDesc",  href: "/admin/experiences",           iconSrc: "/icons/flaticon/sparkle.png",   roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
   { labelKey: "series",       descKey: "browseSeries",         href: "/admin/series",                Icon: LayoutGrid,                          roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
   { labelKey: "analytics",    descKey: "cardAnalyticsDesc",    href: "/admin/analytics/experiences", iconSrc: "/icons/flaticon/analytics.png",  roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
@@ -133,7 +135,8 @@ export default function AdminPage() {
             <strong>F&amp;B Operations Workspace</strong>
             <div>
               Manage menus, experiences, spaces, tickets, orders, and operational analytics. Owner-only finance,
-              payout, user, and ProofPay governance modules stay hidden.
+              payout, user, and ProofPay governance modules stay hidden. Use Host Dashboard and Operations Board
+              for live reservation service.
             </div>
           </div>
         </div>
