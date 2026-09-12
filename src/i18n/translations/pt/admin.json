@@ -96,6 +96,8 @@
   "experiences": "Experiências",
   "payouts": "Pagamentos",
   "hr": "RH",
+  "hostDashboard": "Painel do Anfitrião",
+  "operationsBoard": "Painel de Operações",
   "quickAccess": "Acesso Rápido",
   "totalOrders": "Total de Pedidos",
   "revenuePaid": "Receita (Paga)",
@@ -105,6 +107,8 @@
   "cardExperiencesDesc": "Gerenciar séries de experiências e sessões",
   "cardAnalyticsDesc": "Dados de receita, participação e engajamento",
   "cardOrdersDesc": "Ver, reembolsar e rastrear todos os pedidos",
+  "cardHostDashboardDesc": "Reservas ao vivo, chegadas e fila de serviço",
+  "cardOperationsBoardDesc": "Atribuir mesas e gerenciar o salão",
   "cardMembershipsDesc": "Membros Patron e Founder, candidaturas",
   "cardMenusDesc": "Editar cardápios de comida e bebidas dos restaurantes",
   "cardUsersDesc": "Membros da plataforma e seus papéis",
@@ -1186,8 +1190,5 @@
   "anchorResolved": "Sessão ancorada manualmente ao contexto de indicador preservado.",
   "anchorNoSessions": "Nenhuma sessão requer atenção. Todas as atribuições de indicação estão ancoradas.",
   "anchorSessionsTotal": "sessões que requerem revisão",
-  "refresh": "Atualizar",
-  "resendReferrerInvite": "Reenviar convite seguro",
-  "referrerInviteSent": "Convite seguro de indicador enviado.",
-  "referrerInviteFailed": "Não foi possível enviar o convite."
+  "refresh": "Atualizar"
 }
