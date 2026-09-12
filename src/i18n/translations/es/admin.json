@@ -96,6 +96,8 @@
   "experiences": "Experiencias",
   "payouts": "Pagos",
   "hr": "RR. HH.",
+  "hostDashboard": "Panel de Anfitrión",
+  "operationsBoard": "Panel de Operaciones",
   "quickAccess": "Acceso Rápido",
   "totalOrders": "Total de Pedidos",
   "revenuePaid": "Ingresos (Pagados)",
@@ -105,6 +107,8 @@
   "cardExperiencesDesc": "Gestionar series de experiencias y sesiones",
   "cardAnalyticsDesc": "Datos de ingresos, asistencia y participación",
   "cardOrdersDesc": "Ver, reembolsar y hacer seguimiento de pedidos",
+  "cardHostDashboardDesc": "Reservas en vivo, llegadas y cola de servicio",
+  "cardOperationsBoardDesc": "Asignar mesas y gestionar el salón",
   "cardMembershipsDesc": "Miembros Patron y Founder, solicitudes",
   "cardMenusDesc": "Editar menús de comida y bebidas de los restaurantes",
   "cardUsersDesc": "Miembros de la plataforma y sus roles",
@@ -1186,8 +1190,5 @@
   "anchorResolved": "Sesión anclada manualmente al contexto de referidor preservado.",
   "anchorNoSessions": "No hay sesiones que requieran atención. Todas las atribuciones de referido están ancladas.",
   "anchorSessionsTotal": "sesiones que requieren revisión",
-  "refresh": "Actualizar",
-  "resendReferrerInvite": "Reenviar invitación segura",
-  "referrerInviteSent": "Invitación segura de referente enviada.",
-  "referrerInviteFailed": "No se pudo enviar la invitación."
+  "refresh": "Actualizar"
 }
