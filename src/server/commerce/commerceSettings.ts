@@ -14,6 +14,10 @@ export const COMMERCE_SETTINGS_DEFAULTS = {
   storeStatus: "OPEN" as "OPEN" | "CLOSED" | "TEST_MODE",
   capacityManagementEnabled: true,
   holdMinutes: 15,
+  // 5:00 PM–11:30 PM. These values are used by every guest reservation
+  // surface and can be changed by a superadmin in Commerce Settings.
+  reservationServiceStartMinutes: 17 * 60,
+  reservationServiceEndMinutes: 23 * 60 + 30,
   lowStockThreshold: 10,
   soldOutThreshold: 0,
   stockNotificationEmails: [] as string[],

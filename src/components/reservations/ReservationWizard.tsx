@@ -109,8 +109,28 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
   const [errors, setErrors]                   = useState<Record<string, string>>({});
   const [submitting, setSubmitting]           = useState(false);
   const [confirmationCode, setConfirmationCode] = useState("");
+  const [times, setTimes] = useState<string[]>([
+    "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+    "21:00", "21:30", "22:00", "22:30", "23:00", "23:30",
+  ]);
 
   const stepIdx = STEPS.indexOf(step);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/reservations/service-window", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.slots) && data.slots.length > 0) {
+          setTimes(data.slots);
+          setTime((current) => data.slots.includes(current) ? current : data.slots[0]);
+        }
+      })
+      .catch(() => {
+        // The fallback above keeps booking usable during a short settings outage.
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Auto-capture referrer from URL query string. Supports both ?ref= and
   // ?referrer= for compatibility with older shared links. We intentionally
@@ -206,14 +226,6 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
     { key: "CELEBRATION_DESSERT", label: t.addonDessert,      sub: t.addonDessertSub,      icon: "🎂" },
     { key: "ROMANTIC_SETUP",      label: t.addonRomantic,     sub: t.addonRomanticSub,     icon: "🌹" },
     { key: "ACCESSIBILITY",       label: t.addonAccessibility, sub: t.addonAccessibilitySub, icon: "♿" },
-  ];
-
-  // Kitchen seats from 11:00 AM to 10:30 PM. Late-night sushi take-out and
-  // bar tables are handled off-form (see helper hint under the time field).
-  const times = [
-    "11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30",
-    "15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30",
-    "19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30",
   ];
 
   function toggleAddon(key: string) {

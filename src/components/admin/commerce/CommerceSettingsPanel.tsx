@@ -17,6 +17,8 @@ interface Settings {
   storeStatus: StoreStatus;
   capacityManagementEnabled: boolean;
   holdMinutes: number;
+  reservationServiceStartMinutes: number;
+  reservationServiceEndMinutes: number;
   lowStockThreshold: number;
   soldOutThreshold: number;
   stockNotificationEmails: string[];
@@ -48,7 +50,7 @@ interface ReadinessSnapshot {
   };
   activeGateway?: { active?: string | null } | null;
   email: { resendApiKeyConfigured: boolean; fromEmailConfigured: boolean };
-  runtime: { redisConfigured: boolean; rateLimitProvider?: "database" | "redis" };
+  runtime: { redisConfigured: boolean };
   flags: { demoModeEnabled: boolean };
 }
 
@@ -68,6 +70,15 @@ const CONTINUE_OPTIONS = [
   { value: "/membership", label: "/membership — Membership" },
   { value: "custom", label: "Custom URL…" },
 ] as const;
+
+function minutesToTime(total: number) {
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : 0;
+}
 
 function Badge({
   variant,
@@ -480,6 +491,26 @@ export default function CommerceSettingsPanel() {
                 />
               </SettingRow>
               <SettingRow
+                label="Reservation service window"
+                helper="Controls the time choices and server validation on every guest reservation surface."
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="time"
+                    aria-label="Reservation service starts"
+                    value={minutesToTime(draft.reservationServiceStartMinutes)}
+                    onChange={(e) => update("reservationServiceStartMinutes", timeToMinutes(e.target.value))}
+                  />
+                  <span>to</span>
+                  <input
+                    type="time"
+                    aria-label="Reservation service ends"
+                    value={minutesToTime(draft.reservationServiceEndMinutes)}
+                    onChange={(e) => update("reservationServiceEndMinutes", timeToMinutes(e.target.value))}
+                  />
+                </div>
+              </SettingRow>
+              <SettingRow
                 label="Low-stock threshold"
                 helper="Notify the team before a session sells out."
               >
@@ -752,14 +783,14 @@ export default function CommerceSettingsPanel() {
                 </span>
               </div>
               <div className="commerce-settings__integration-row">
-                <span className="commerce-settings__integration-name">Request protection</span>
+                <span className="commerce-settings__integration-name">Redis / Worker</span>
                 <span className="commerce-settings__integration-purpose">
-                  Redis-backed shared rate limiting with a production-database fallback
+                  Background jobs and shared rate limiting
                 </span>
-                {readiness?.runtime.rateLimitProvider === "redis" ? (
+                {readiness?.runtime.redisConfigured ? (
                   <Badge variant="ok">Configured</Badge>
                 ) : (
-                  <Badge variant="warning">Database fallback</Badge>
+                  <Badge variant="warning">Inline fallback</Badge>
                 )}
                 <span className="commerce-settings__integration-action">
                   <a href="/admin/payments">Status →</a>
