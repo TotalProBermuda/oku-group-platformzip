@@ -43,7 +43,7 @@
   "partySize": "Número de Personas",
   "occasion": "Ocasión",
   "noSpecialOccasion": "Sin ocasión especial",
-  "timeSlotsHint": "Cocina abierta de 11:00 a 22:30. Después de las 22:30, solo sushi para llevar y mesas de bar según disponibilidad — favor llamar para coordinar.",
+  "timeSlotsHint": "Los horarios de reserva se ajustan a la disponibilidad actual del local. La disponibilidad está sujeta a confirmación.",
   "seatingPreference": "Preferencia de Asiento",
   "noPreference": "Sin preferencia",
   "specialNotes": "Notas Especiales",

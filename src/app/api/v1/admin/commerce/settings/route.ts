@@ -37,6 +37,8 @@ const PatchBody = z
     storeStatus: z.enum(["OPEN", "CLOSED", "TEST_MODE"]).optional(),
     capacityManagementEnabled: z.boolean().optional(),
     holdMinutes: z.number().int().min(0).max(240).optional(),
+    reservationServiceStartMinutes: z.number().int().min(0).max(1439).optional(),
+    reservationServiceEndMinutes: z.number().int().min(1).max(1439).optional(),
     lowStockThreshold: z.number().int().min(0).max(10000).optional(),
     soldOutThreshold: z.number().int().min(0).max(10000).optional(),
     stockNotificationEmails: emailList,
@@ -94,6 +96,14 @@ export async function PATCH(req: Request) {
     }
 
     const before = await getCommerceSettings();
+    const reservationServiceStartMinutes = body.reservationServiceStartMinutes ?? before.reservationServiceStartMinutes;
+    const reservationServiceEndMinutes = body.reservationServiceEndMinutes ?? before.reservationServiceEndMinutes;
+    if (reservationServiceEndMinutes <= reservationServiceStartMinutes) {
+      return NextResponse.json(
+        { ok: false, error: "Reservation service end time must be after the start time." },
+        { status: 400 }
+      );
+    }
     const updated = await prisma.commerceSettings.update({
       where: { id: COMMERCE_SETTINGS_ID },
       data: { ...body, updatedById: userId },

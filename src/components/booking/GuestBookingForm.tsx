@@ -51,11 +51,11 @@ type Props = {
   venueSlug?: string;
 };
 
-/** Dinner service slots — 6 pm to 10 pm, every 30 minutes. */
-const SERVICE_SLOTS = [
-  "18:00", "18:30", "19:00", "19:30",
-  "20:00", "20:30", "21:00", "21:30", "22:00",
-] as const;
+/** Safe fallback while the shared availability configuration is loading. */
+const DEFAULT_SERVICE_SLOTS = [
+  "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+  "21:00", "21:30", "22:00", "22:30", "23:00", "23:30",
+];
 
 /** Convert "HH:MM" to a human-readable 12-hour label like "7:30pm". */
 function fmtSlot(slot: string): string {
@@ -162,14 +162,35 @@ export function GuestBookingForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [serviceSlots, setServiceSlots] = useState<string[]>(DEFAULT_SERVICE_SLOTS);
+
+  // One public settings endpoint keeps referral, restaurant, and future guest
+  // booking forms aligned with the superadmin-controlled service window.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/reservations/service-window", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.slots) && data.slots.length > 0) {
+          setServiceSlots(data.slots);
+          setForm((current) =>
+            current.reservationTime && !data.slots.includes(current.reservationTime)
+              ? { ...current, reservationTime: "", requestedSpaceId: "" }
+              : current
+          );
+        }
+      })
+      .catch(() => {
+        // Keep the known-safe default window available if settings cannot load.
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Space availability — only active when showDateTimePicker=true
   const [spaces, setSpaces] = useState<SpaceOption[]>([]);
   const [spacesLoading, setSpacesLoading] = useState(false);
   const [spacesError, setSpacesError] = useState("");
-  const [eventDetails, setEventDetails] = useState<(
-    NonNullable<SpaceOption["eventConflict"]> & { spaceId: string; conceptKey: string }
-  ) | null>(null);
+  const [eventDetails, setEventDetails] = useState<SpaceOption["eventConflict"]>(null);
 
   // Today's ISO date string for the date picker min attribute
   const minDate = typeof window !== "undefined"
@@ -233,10 +254,10 @@ export function GuestBookingForm({
   // setSubmitting(true) gates re-entrant calls.
   async function submitForm() {
     if (submitting) return; // guard against double-fire (onSubmit + onClick)
-    if (!form.guestName || !form.guestEmail) {
+    if (!form.guestName || !form.guestEmail || !form.guestWhatsapp.trim()) {
       setError(
-        (t("host", "streetForm.errorNameEmailRequired") as string) ||
-        "Guest name and email are required."
+        (t("host", "streetForm.errorNameEmailPhoneRequired") as string) ||
+        "Guest name, email, and phone are required."
       );
       return;
     }
@@ -397,7 +418,7 @@ export function GuestBookingForm({
           {/* Time slot buttons */}
           <div style={subLabel}>{t("host", "streetForm.timeLabel")}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
-            {SERVICE_SLOTS.map((slot) => {
+            {serviceSlots.map((slot) => {
               const active = form.reservationTime === slot;
               return (
                 <button
@@ -496,7 +517,7 @@ export function GuestBookingForm({
                         type="button"
                         onClick={() => {
                           if (space.eventConflict) {
-                            setEventDetails({ ...space.eventConflict, spaceId: space.id, conceptKey: space.conceptKey });
+                            setEventDetails(space.eventConflict);
                             return;
                           }
                           if (!space.isAvailable) return;
@@ -620,16 +641,14 @@ export function GuestBookingForm({
 
         <div style={{ marginTop: 10 }}>
           <div style={subLabel}>
-            {t("host", "streetForm.fieldWhatsapp")}{" "}
-            <span style={{ color: "#4b5563", fontWeight: 400 }}>
-              {t("host", "streetForm.fieldEmailOptional")}
-            </span>
+            {t("host", "streetForm.fieldWhatsapp")} <span style={{ color: "#f87171" }}>*</span>
           </div>
           <input
             value={form.guestWhatsapp}
             onChange={(e) => setForm((f) => ({ ...f, guestWhatsapp: e.target.value }))}
             placeholder={t("host", "streetForm.placeholders.whatsapp") as string}
             type="tel"
+            required
             style={inputStyle}
           />
         </div>
@@ -707,13 +726,9 @@ export function GuestBookingForm({
           >
             {eventDetails.kind === "PUBLIC_EVENT" && eventDetails.imageUrl ? (
               <img src={eventDetails.imageUrl} alt="" style={{ width: "100%", height: 190, objectFit: "cover", display: "block" }} />
-            ) : eventDetails.kind === "PRIVATE_BLOCK" ? (
-              <div aria-hidden="true" style={{ height: 190, display: "grid", placeItems: "center", background: "linear-gradient(145deg,#2d271d,#11100e)" }}>
-                <img src="/images/oku-logo-white.svg" alt="" style={{ width: 150, maxHeight: 76, objectFit: "contain", opacity: 0.92 }} />
-              </div>
             ) : (
               <div aria-hidden="true" style={{ height: 190, display: "grid", placeItems: "center", background: "linear-gradient(145deg,#2d271d,#11100e)", color: "#c8a96e", fontSize: 54 }}>
-                ✦
+                {eventDetails.kind === "PRIVATE_BLOCK" ? "🔒" : "✦"}
               </div>
             )}
             <div style={{ padding: 22 }}>
@@ -732,22 +747,6 @@ export function GuestBookingForm({
                     : "This event is not currently open for public ticket booking."}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setForm((f) => ({
-                    ...f,
-                    requestedSpaceId: eventDetails.spaceId,
-                    conceptRequested: conceptIsLocked
-                      ? (lockedConcept as ConceptKey)
-                      : ((eventDetails.conceptKey as ConceptKey) || f.conceptRequested),
-                  }));
-                  setEventDetails(null);
-                }}
-                style={{ width: "100%", marginTop: 12, padding: "13px 16px", borderRadius: 10, border: "1px solid rgba(200,169,110,0.5)", background: "rgba(200,169,110,0.12)", color: "#c8a96e", fontSize: 14, fontWeight: 800, cursor: "pointer" }}
-              >
-                Request this space anyway
-              </button>
               <button type="button" onClick={() => setEventDetails(null)} style={{ width: "100%", marginTop: 10, padding: "11px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 Choose another space
               </button>
