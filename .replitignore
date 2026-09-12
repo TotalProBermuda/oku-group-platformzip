@@ -1,0 +1,15 @@
+.git/
+.local/
+
+# Local/generated build state. Publishing runs a fresh production build, but
+# the resulting .next runtime output must remain in the image.
+.next/cache/
+.next-dev/
+tsconfig.tsbuildinfo
+
+# This duplicate starter app is not part of the production service.
+catch-starter-kit/node_modules/
+
+# Workspace-only design preview dependencies and generated output.
+artifacts/mockup-sandbox/node_modules/
+artifacts/mockup-sandbox/dist/
