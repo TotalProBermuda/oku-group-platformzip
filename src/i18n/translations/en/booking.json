@@ -81,6 +81,7 @@
   "errorPartySize": "Party size must be 1–50.",
   "errorNameRequired": "Name is required.",
   "errorEmailRequired": "Valid email required.",
+  "errorPhoneRequired": "Phone number is required.",
   "errorSomethingWrong": "Something went wrong. Please try again.",
   "errorNetwork": "Network error. Please try again.",
   "occasionAnniversary": "Anniversary",

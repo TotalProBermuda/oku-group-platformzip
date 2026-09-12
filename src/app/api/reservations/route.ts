@@ -6,12 +6,13 @@ import { deliverReservationStateEmail } from "@/server/reservations/reservationN
 import { gatePublicPostAsync } from "@/server/rateLimit";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
-import { findBlockingOccupancy } from "@/server/events/eventOccupancyService";
+import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
+
 export async function POST(req: NextRequest) {
   try {
     // .catch keeps malformed JSON from bypassing the gate via the outer try/catch.
@@ -26,8 +27,12 @@ export async function POST(req: NextRequest) {
 
     const { conceptKey, reservationDate, partySize, occasion, seatingPreference, notes, addons, contactName, contactEmail, contactPhone, referralCode, requestedSpaceId, source, locale } = body;
 
-    if (!contactName || !contactEmail || !conceptKey || !reservationDate || !partySize) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    if (!contactName || !contactEmail || !contactPhone || !conceptKey || !reservationDate || !partySize) {
+      return NextResponse.json({ error: "Name, email, phone, experience, date, and party size are required." }, { status: 400 });
+    }
+
+    if (typeof contactPhone !== "string" || contactPhone.trim().length < 3) {
+      return NextResponse.json({ error: "A valid phone number is required." }, { status: 400 });
     }
 
     // ── partySize validation ──────────────────────────────────────────────────
@@ -78,7 +83,7 @@ export async function POST(req: NextRequest) {
     // "No preference — host will assign" is also an approval workflow. It
     // cannot be CONFIRMED without a space/hold and then depend on a host fixing
     // it later. The host must choose the final space, time and table plan first.
-    let pendingApproval = requestedSpace ? requestedSpace.requiresApproval : true;
+    const pendingApproval = requestedSpace ? requestedSpace.requiresApproval : true;
 
     // Every request has a window. No-preference requests may wait for host
     // assignment, but must still honour a venue-wide exclusive event block.
@@ -115,7 +120,6 @@ export async function POST(req: NextRequest) {
     //     the hold when the booking is accepted/assigned.
     //   No requestedSpaceId → no hold; host assignment creates the hold later.
     let reservation: Awaited<ReturnType<typeof prisma.reservation.create>>;
-    let requestEventConflict: Awaited<ReturnType<typeof findBlockingOccupancy>> = null;
     // Payments P215 — set inside the transaction if a deposit intent is created.
     let reservationPaymentIntentId: string | null = null;
     let reservationDepositAmountCents: number | null = null;
@@ -131,18 +135,16 @@ export async function POST(req: NextRequest) {
         if (requestedSpaceId) {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${requestedSpaceId}))`;
 
-          // Event occupancy is advisory at the guest-request stage. Persist the
-          // request for human review, but never auto-confirm or charge/hold the
-          // blocked section. The host confirmation flow remains the hard
-          // operational boundary and must assign an available space.
-          requestEventConflict = await findBlockingOccupancy(tx, {
+          // Event/buyout occupancy is a hard availability boundary. This is
+          // intentionally inside the same space lock/transaction as capacity
+          // creation so a calendar UI or forged request cannot bypass it.
+          await assertNoBlockingOccupancy(tx, {
             venueId: venue.id,
             spaceId: requestedSpaceId,
             startAt: reservationStartAt,
             endAt: reservationEndAt,
             locale: typeof locale === "string" ? locale : "en",
           });
-          if (requestEventConflict) pendingApproval = true;
 
           // Re-read capacity under the lock. We sum ACTIVE holds that overlap our
           // window — identical overlap logic to getHeldCovers() in capacityService.
@@ -171,21 +173,18 @@ export async function POST(req: NextRequest) {
           }
           // requiresApproval + full → fall through; booking becomes PENDING_APPROVAL.
         } else {
-          requestEventConflict = await findBlockingOccupancy(tx, {
+          await assertNoBlockingOccupancy(tx, {
             venueId: venue.id,
             startAt: reservationStartAt,
             endAt: reservationEndAt,
             locale: typeof locale === "string" ? locale : "en",
           });
-          if (requestEventConflict) pendingApproval = true;
         }
 
         // Payments P215 — when the space requires a deposit, the reservation
         // starts in PENDING_PAYMENT. It advances to CONFIRMED (or PENDING_APPROVAL
         // for requiresApproval spaces) only after the payment is authorized.
-        // Never collect a deposit for a section already known to require event
-        // conflict review. Payment can follow after staff offers a viable plan.
-        const depositRequired = depositCents > 0 && !requestEventConflict;
+        const depositRequired = depositCents > 0;
 
         // ── Step 2: create reservation ────────────────────────────────────────
         const res = await tx.reservation.create({
@@ -206,9 +205,7 @@ export async function POST(req: NextRequest) {
             notes: notes || null,
             contactName,
             contactEmail,
-            contactEmailNormalized: contactEmail.trim().toLowerCase(),
-            customerLocale: ["en", "es", "pt"].includes(locale) ? locale : "en",
-            contactPhone: contactPhone || null,
+            contactPhone: contactPhone.trim(),
             confirmationCode,
             requestedSpaceId: requestedSpaceId || null,
             estimatedRevenueCents: parsedPartySize * 4500,
@@ -222,16 +219,6 @@ export async function POST(req: NextRequest) {
               : undefined,
           },
         });
-
-        if (requestEventConflict) {
-          await tx.eventReservationConflict.create({
-            data: {
-              occupancyId: requestEventConflict.occupancy.id,
-              reservationId: res.id,
-              note: "Guest submitted the request after viewing the event notice; host follow-up required.",
-            },
-          });
-        }
 
         // ── Step 3: ledger outbox rows ────────────────────────────────────────
         // RESERVATION_REQUESTED — always, for every new reservation.
@@ -325,6 +312,12 @@ export async function POST(req: NextRequest) {
         return res;
       }, { timeout: 10_000 });
     } catch (txErr: unknown) {
+      if (txErr instanceof EventOccupancyConflictError) {
+        return NextResponse.json(
+          { error: txErr.card.message, code: "EVENT_UNAVAILABLE", eventConflict: txErr.card },
+          { status: 409 }
+        );
+      }
       if (txErr instanceof Error && txErr.message === "__SPACE_FULL__") {
         return NextResponse.json(
           { error: "This space is at full capacity for the selected time.", code: "SPACE_FULL" },
@@ -620,7 +613,6 @@ export async function POST(req: NextRequest) {
       confirmationCode,
       reservationId: reservation.id,
       pendingApproval,
-      eventNotice: requestEventConflict?.card ?? null,
       // Payments P215 — included when the space requires a deposit before confirmation
       ...(reservationPaymentIntentId != null
         ? {
@@ -634,4 +626,31 @@ export async function POST(req: NextRequest) {
     console.error("[POST /api/reservations]", err);
     return NextResponse.json({ error: "Failed to create reservation." }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const code = searchParams.get("code");
+  const email = searchParams.get("email");
+
+  if (code) {
+    const res = await prisma.reservation.findUnique({
+      where: { confirmationCode: code },
+      include: { zone: true, addons: true },
+    });
+    if (!res) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(res);
+  }
+
+  if (email) {
+    const reservations = await prisma.reservation.findMany({
+      where: { contactEmail: email },
+      include: { zone: true, addons: true },
+      orderBy: { reservationDate: "desc" },
+      take: 10,
+    });
+    return NextResponse.json(reservations);
+  }
+
+  return NextResponse.json({ error: "Provide code or email param" }, { status: 400 });
 }
