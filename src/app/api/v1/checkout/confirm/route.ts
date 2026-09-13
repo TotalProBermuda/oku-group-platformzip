@@ -415,6 +415,7 @@ export async function POST(req: Request) {
 
   // Background jobs — uses BullMQ when REDIS_URL is set, otherwise inline
   await safeEnqueue("send_order_email", { orderId: order.id });
+  await safeEnqueue("send_ticket_operational_alert", { orderId: order.id });
   await safeEnqueue("post_payment_event", { orderId: order.id });
 
   return NextResponse.json({
