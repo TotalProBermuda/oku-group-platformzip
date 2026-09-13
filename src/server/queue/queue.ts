@@ -183,9 +183,15 @@ export async function safeEnqueue(
         console.error("[inline-job] send_order_email failed:", e)
       );
     } else if (name === "send_ticket_operational_alert") {
-      sendPaidTicketOperationalAlerts((data as { orderId: string }).orderId).catch((e) => console.error("[inline-job] ticket alert failed:", e));
+      // Do not fire-and-forget staff alerts. When Redis is unavailable the
+      // request must remain alive until every recipient has been handed to
+      // the mail provider; otherwise a serverless request can finish after a
+      // partial fan-out.
+      await sendPaidTicketOperationalAlerts((data as { orderId: string }).orderId);
     } else if (name === "send_reservation_operational_alert") {
-      sendNewReservationOperationalAlerts((data as { reservationId: string }).reservationId).catch((e) => console.error("[inline-job] reservation alert failed:", e));
+      // See ticket alerts above. This is the Redis-quota fallback for the
+      // four operational reservation recipients.
+      await sendNewReservationOperationalAlerts((data as { reservationId: string }).reservationId);
     } else if (name === "post_payment_event") {
       console.log("[inline-job] post_payment_event (stub) for order:", (data as any).orderId);
     } else if (name === "sync_monday_lead") {
