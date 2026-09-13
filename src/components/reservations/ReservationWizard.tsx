@@ -109,6 +109,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
   const [errors, setErrors]                   = useState<Record<string, string>>({});
   const [submitting, setSubmitting]           = useState(false);
   const [confirmationCode, setConfirmationCode] = useState("");
+  const [requestPending, setRequestPending] = useState(false);
   const [times, setTimes] = useState<string[]>([
     "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
     "21:00", "21:30", "22:00", "22:30", "23:00", "23:30",
@@ -262,7 +263,14 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
         body: JSON.stringify({ conceptKey: selectedConcept, reservationDate: dateTime.toISOString(), partySize, occasion, seatingPreference: seatingPref, notes, addons, contactName, contactEmail, contactPhone, referralCode, _company: company }),
       });
       const data = await res.json();
-      if (data.confirmationCode) { setConfirmationCode(data.confirmationCode); setStep("confirmed"); }
+      if (data.confirmationCode) {
+        setConfirmationCode(data.confirmationCode);
+        // A reference code is issued for both confirmed reservations and
+        // requests. Never turn an approval/payment request into a promise of
+        // a table on the guest-facing confirmation screen.
+        setRequestPending(Boolean(data.pendingApproval || data.paymentRequired));
+        setStep("confirmed");
+      }
       else setErrors({ submit: data.error || t.errorSomethingWrong });
     } catch { setErrors({ submit: t.errorNetwork }); }
     finally { setSubmitting(false); }
@@ -282,16 +290,22 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
         <div style={{ textAlign: "center", padding: "40px 0" }}>
           <div style={{ fontSize: 64, marginBottom: 24 }}>✓</div>
           <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 28, fontWeight: 300, marginBottom: 12, color: "#fff" }}>
-            {t.onTheBooks}
+            {requestPending ? (t.requestReceived ?? "Your reservation request has been received.") : t.onTheBooks}
           </h2>
           <p style={{ color: "rgba(255,255,255,0.55)", marginBottom: 24 }}>
-            {t.confirmationSent} {contactEmail}.
+            {requestPending
+              ? `${t.requestReceivedSent ?? "We’ve emailed your request reference to"} ${contactEmail}.`
+              : `${t.confirmationSent} ${contactEmail}.`}
           </p>
           <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 12, padding: "20px 28px", display: "inline-block", marginBottom: 32 }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.confirmationCode}</div>
+            <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{requestPending ? (t.requestReference ?? "Request Reference") : t.confirmationCode}</div>
             <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "0.12em" }}>{confirmationCode}</div>
           </div>
-          <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 14 }}>{t.presentOnArrival}</div>
+          <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 14 }}>
+            {requestPending
+              ? (t.requestReviewNotice ?? "Our host team will review your request and send a separate confirmation once it is accepted.")
+              : t.presentOnArrival}
+          </div>
         </div>
       </div>
     );
