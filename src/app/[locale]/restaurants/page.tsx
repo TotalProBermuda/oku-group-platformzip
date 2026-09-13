@@ -131,7 +131,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
                         { label: v.setting as string, value: rd.setting as string },
                         { label: v.hours as string,   value: r.hours },
                       ].map(info => (
-                        <div key={info.label}>
+                        <div key={info.label} className="restaurant-index-fact">
                           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7d7269", marginBottom: 3 }}>{info.label}</div>
                           <div style={{ fontSize: 13, color: "#1f1a17", fontWeight: 500 }}>{info.value}</div>
                         </div>
@@ -139,10 +139,10 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
                     </div>
                   </div>
                   <div className="restaurant-index-actions" style={{ display: "flex", gap: 10 }}>
-                    <Link href={localePath(safeLocale, `/restaurants/${r.slug}`)} style={{ flex: 1, textAlign: "center", padding: "12px", border: "1.5px solid #e8e2dd", borderRadius: 10, fontSize: 13, fontWeight: 600, color: "#1f1a17", textDecoration: "none", background: "#faf8f6" }}>
+                    <Link className="restaurant-index-secondary-action" href={localePath(safeLocale, `/restaurants/${r.slug}`)} style={{ flex: 1, textAlign: "center", padding: "12px", border: "1.5px solid #e8e2dd", borderRadius: 10, fontSize: 13, fontWeight: 600, color: "#1f1a17", textDecoration: "none", background: "#faf8f6" }}>
                       {v.viewProfile as string}
                     </Link>
-                    <Link href={localePath(safeLocale, `/reservations?concept=${r.slug}`)} style={{ flex: 2, textAlign: "center", padding: "12px", background: "#c41e3a", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", textDecoration: "none" }}>
+                    <Link className="restaurant-index-primary-action" href={localePath(safeLocale, `/reservations?concept=${r.slug}`)} style={{ flex: 2, textAlign: "center", padding: "12px", background: "#c41e3a", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", textDecoration: "none" }}>
                       {v.reserveArrow as string}
                     </Link>
                   </div>
