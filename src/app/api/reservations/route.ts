@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createAttributionSession } from "@/server/services/invu/identityService";
 import { resolveActorFromCode } from "@/server/referrals/referralActorService";
 import { deliverReservationStateEmail } from "@/server/reservations/reservationNotificationService";
+import { safeEnqueue } from "@/server/queue/queue";
 import { gatePublicPostAsync } from "@/server/rateLimit";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
@@ -632,6 +633,10 @@ export async function POST(req: NextRequest) {
         { reservationId: reservation.id, err: emailErr }
       );
     }
+
+    // Alert delivery is retried independently; an email problem must never
+    // invalidate an already-created guest reservation.
+    await safeEnqueue("send_reservation_operational_alert", { reservationId: reservation.id });
 
     // RESERVATION_REQUESTED and RESERVATION_CONFIRMED outbox rows were written
     // atomically inside the reservation creation $transaction above.

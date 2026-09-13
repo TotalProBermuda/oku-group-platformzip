@@ -10,6 +10,7 @@ import { handleAttributionAnchorRetryJob } from "./jobs/attribution-anchor-retry
 import { handleCapacityExpirySweepJob } from "./jobs/capacity-expiry-sweep";
 import { handleLedgerOutboxDrainJob } from "./jobs/ledger-outbox-drain";
 import { getRedisUrl } from "../src/server/redis/config";
+import { sendNewReservationOperationalAlerts, sendPaidTicketOperationalAlerts } from "../src/server/notifications/operationalCommerceAlerts";
 
 if (!getRedisUrl()) {
   // Redis unavailable — start a polling-based drain so PENDING outbox rows are
@@ -141,6 +142,16 @@ const worker = new Worker(
 
         await prisma.eventLog.create({ data: { type: "PAYMENT_SUCCEEDED", entityId: orderId } as any });
         console.log("Order confirmation email sent to", order.user.email);
+        return true;
+      }
+
+      case "send_ticket_operational_alert": {
+        await sendPaidTicketOperationalAlerts((job.data as { orderId: string }).orderId);
+        return true;
+      }
+
+      case "send_reservation_operational_alert": {
+        await sendNewReservationOperationalAlerts((job.data as { reservationId: string }).reservationId);
         return true;
       }
 

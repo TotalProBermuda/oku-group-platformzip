@@ -83,6 +83,8 @@ export const ledgerOutboxQueue: Queue | null = hasRedis
 
 export type CommerceJob =
   | { name: "send_order_email"; data: { orderId: string } }
+  | { name: "send_ticket_operational_alert"; data: { orderId: string } }
+  | { name: "send_reservation_operational_alert"; data: { reservationId: string } }
   | { name: "sync_monday_lead"; data: { entity: string; entityId: string } }
   | { name: "post_payment_event"; data: { orderId: string } };
 
@@ -174,11 +176,16 @@ export async function safeEnqueue(
   // Inline execution for commerce jobs — import lazily to avoid circular deps at module load time
   try {
     const { handleSendOrderEmail } = await import("@/server/jobs/commerceHandlers");
+    const { sendNewReservationOperationalAlerts, sendPaidTicketOperationalAlerts } = await import("@/server/notifications/operationalCommerceAlerts");
     if (name === "send_order_email") {
       const { orderId } = data as { orderId: string };
       handleSendOrderEmail(orderId).catch((e) =>
         console.error("[inline-job] send_order_email failed:", e)
       );
+    } else if (name === "send_ticket_operational_alert") {
+      sendPaidTicketOperationalAlerts((data as { orderId: string }).orderId).catch((e) => console.error("[inline-job] ticket alert failed:", e));
+    } else if (name === "send_reservation_operational_alert") {
+      sendNewReservationOperationalAlerts((data as { reservationId: string }).reservationId).catch((e) => console.error("[inline-job] reservation alert failed:", e));
     } else if (name === "post_payment_event") {
       console.log("[inline-job] post_payment_event (stub) for order:", (data as any).orderId);
     } else if (name === "sync_monday_lead") {
