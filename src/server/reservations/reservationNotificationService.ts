@@ -11,6 +11,16 @@ import {
 } from "@/server/reservations/confirmationEmail";
 
 /**
+ * "Gold House" is an internal operating venue name. Guests should see the
+ * hospitality brands they recognise in transactional communications.
+ */
+function getCustomerFacingVenueName(venueName: string) {
+  return venueName.trim().toLowerCase() === "gold house"
+    ? "OKÜ & CATCH by OKÜ Hospitality Group"
+    : venueName;
+}
+
+/**
  * Sends exactly the email implied by the persisted reservation state.
  * A request receipt is deliberately not a confirmation; confirmation is sent
  * only after the row has actually reached CONFIRMED.
@@ -48,7 +58,7 @@ export async function deliverReservationStateEmail(
     confirmationCode: reservation.confirmationCode,
     reservationDate: reservation.reservationDate,
     partySize: reservation.partySize,
-    venueName: reservation.venue.name,
+    venueName: getCustomerFacingVenueName(reservation.venue.name),
     venueCity: reservation.venue.city,
     zoneName: reservation.assignedSpace?.name ?? reservation.zone?.name ?? null,
     tableLabel: reservation.assignedTableLabel,

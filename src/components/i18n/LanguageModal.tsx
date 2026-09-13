@@ -143,6 +143,39 @@ export default function LanguageModal() {
             </button>
           ))}
         </div>
+
+        <div
+          style={{
+            marginTop: 28,
+            paddingTop: 20,
+            borderTop: "1px solid #eee8e3",
+          }}
+        >
+          <div
+            style={{
+              color: "#9b9189",
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+            }}
+          >
+            Dining experiences by OKÜ Hospitality Group
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginTop: 14 }}>
+            <img
+              src="/images/logo-oku-red.png"
+              alt="OKÜ"
+              style={{ display: "block", height: 30, width: "auto", maxWidth: 104, objectFit: "contain" }}
+            />
+            <span aria-hidden="true" style={{ color: "#c7beb7", fontSize: 18 }}>·</span>
+            <img
+              src="/images/logo-catch.webp"
+              alt="CATCH Panama"
+              style={{ display: "block", height: 30, width: "auto", maxWidth: 104, objectFit: "contain" }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
