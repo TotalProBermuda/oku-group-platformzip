@@ -30,12 +30,22 @@ function emailShell({ eyebrow, title, details, ctaLabel, ctaHref }: { eyebrow: s
 async function sendIndividually(args: { kind: RecipientKind; subject: string; html: string; auditAction: string; entityId: string }) {
   if (!isResendConfigured()) return { sent: 0, failed: RECIPIENTS[args.kind].length, skipped: true };
   const { client, fromEmail } = await getResendClient();
-  const outcomes = await Promise.all(RECIPIENTS[args.kind].map(async (email) => {
+  const outcomes = await Promise.allSettled(RECIPIENTS[args.kind].map(async (email) => {
     const result = await client.emails.send({ from: fromEmail, to: email, subject: args.subject, html: args.html });
     return !result.error;
   }));
-  const sent = outcomes.filter(Boolean).length;
+  const sent = outcomes.filter((outcome) => outcome.status === "fulfilled" && outcome.value).length;
   const failed = outcomes.length - sent;
+  if (failed) {
+    // Keep recipient addresses out of application logs. The audit row records
+    // the aggregate delivery result for support without exposing a mailing list.
+    console.error("[operational-alerts] one or more staff notifications were not accepted by the mail provider", {
+      recipientKind: args.kind,
+      sent,
+      failed,
+      entityId: args.entityId,
+    });
+  }
   await prisma.auditLog.create({ data: { actorId: "system:operational-alerts", action: args.auditAction, metadata: { entityId: args.entityId, recipientKind: args.kind, sent, failed } } }).catch(() => null);
   return { sent, failed, skipped: false };
 }
