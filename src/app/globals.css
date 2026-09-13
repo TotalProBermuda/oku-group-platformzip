@@ -1296,6 +1296,70 @@ select.form-input { cursor: pointer; }
   .btn-lg { padding: 12px 24px; }
 }
 
+/* ── Public mobile-first conversion surfaces ────────────────────────────
+   Public pages use deliberately named layout classes rather than brittle
+   selectors against inline style strings. This keeps every venue and future
+   experience within the same phone-first visual contract. */
+@media (max-width: 767px) {
+  .restaurant-index-wrap { padding: 32px 16px !important; }
+  .restaurant-index-list { gap: 24px !important; }
+  .restaurant-index-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+    border-radius: 16px !important;
+  }
+  .restaurant-index-visual,
+  .restaurant-index-copy {
+    order: initial !important;
+  }
+  .restaurant-index-visual {
+    min-height: 250px !important;
+    padding: 28px 24px !important;
+  }
+  .restaurant-index-visual img { max-height: 76px; width: auto; }
+  .restaurant-index-copy { padding: 28px 24px !important; }
+  .restaurant-index-facts { gap: 16px !important; margin-bottom: 24px !important; }
+  .restaurant-index-actions { flex-direction: column; }
+  .restaurant-index-actions a { width: 100%; min-height: 48px; display: inline-flex !important; align-items: center; justify-content: center; }
+
+  .experience-hero { padding: 48px 0 40px !important; min-height: 0 !important; }
+  .experience-hero .page-container { padding-top: 0; padding-bottom: 0; }
+  .experience-hero h1 { font-size: clamp(34px, 10vw, 46px) !important; line-height: 1.02 !important; }
+  .experience-hero p { font-size: 16px !important; line-height: 1.55 !important; }
+  .experience-hero-meta { flex-direction: column; gap: 8px !important; margin-bottom: 16px !important; }
+  .experience-hero .share-buttons, .experience-hero [class*="share"] { max-width: 100%; }
+
+  .experience-layout {
+    display: flex !important;
+    flex-direction: column;
+    gap: 28px !important;
+    padding-top: 32px !important;
+    padding-bottom: 40px !important;
+    overflow-x: clip;
+  }
+  .experience-main { width: 100%; min-width: 0; }
+  .experience-main section { margin-bottom: 32px !important; }
+  .experience-session { padding: 16px !important; }
+  .experience-session-head { flex-direction: column; gap: 12px; }
+  .experience-session-availability { margin-left: 0 !important; text-align: left !important; display: flex; align-items: center; gap: 8px; }
+  .experience-host { padding: 16px !important; gap: 12px !important; align-items: flex-start !important; }
+  .experience-host > a { align-self: center; white-space: nowrap; }
+  .experience-addon { padding: 16px !important; align-items: flex-start !important; gap: 16px; }
+  .experience-waitlist { padding: 24px 20px !important; border-radius: 14px !important; }
+  .experience-waitlist-form { flex-direction: column; }
+  .experience-waitlist-form input, .experience-waitlist-form button { width: 100%; min-height: 48px; }
+
+  .experience-booking-sidebar { position: static !important; width: 100%; order: -1; }
+  .experience-booking-card { padding: 22px 18px !important; border-radius: 14px !important; }
+  .experience-ticket-type { padding: 14px !important; }
+  .experience-location-card { margin-top: 12px !important; }
+}
+
+@media (max-width: 390px) {
+  .restaurant-index-facts { grid-template-columns: minmax(0, 1fr) !important; }
+  .experience-host { flex-wrap: wrap; }
+  .experience-host > a { width: 100%; }
+}
+
 /* Utility: touch-target minimum size */
 .touch-target { min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; }
 
