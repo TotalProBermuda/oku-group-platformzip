@@ -71,7 +71,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
   ];
 
   return (
-    <div style={{ background: "#faf8f6", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
+    <div className="restaurant-index" style={{ background: "#faf8f6", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
       <section className="hero">
         <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
           <div className="hero-eyebrow">{common.goldHouse} · {common.cascoViejo}</div>
@@ -87,13 +87,13 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
         </div>
       </section>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "64px 24px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+      <div className="restaurant-index-wrap" style={{ maxWidth: 1200, margin: "0 auto", padding: "64px 24px" }}>
+        <div className="restaurant-index-list" style={{ display: "flex", flexDirection: "column", gap: 40 }}>
           {RESTAURANTS.map((r, i) => {
             const rd = r.data || {};
             return (
-              <div key={r.slug} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderRadius: 20, overflow: "hidden", border: "1px solid #e8e2dd" }}>
-                <div style={{ background: r.slabBg, minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px", order: i % 2 === 0 ? 0 : 1, position: "relative", overflow: "hidden" }}>
+              <div key={r.slug} className="restaurant-index-card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderRadius: 20, overflow: "hidden", border: "1px solid #e8e2dd" }}>
+                <div className="restaurant-index-visual" style={{ background: r.slabBg, minHeight: 340, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px", order: i % 2 === 0 ? 0 : 1, position: "relative", overflow: "hidden" }}>
                   {r.slabGlow && <div style={{ position: "absolute", inset: 0, background: r.slabGlow, pointerEvents: "none" }} />}
                   <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {r.logoNeedsWhiteBox ? (
@@ -116,7 +116,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
                   </div>
                 </div>
 
-                <div style={{ padding: "40px 44px", display: "flex", flexDirection: "column", justifyContent: "space-between", order: i % 2 === 0 ? 1 : 0, background: "#fff" }}>
+                <div className="restaurant-index-copy" style={{ padding: "40px 44px", display: "flex", flexDirection: "column", justifyContent: "space-between", order: i % 2 === 0 ? 1 : 0, background: "#fff" }}>
                   <div>
                     <div style={{ fontFamily: "var(--font-heading)", fontSize: 24, color: "#1f1a17", letterSpacing: "-0.02em", marginBottom: 12 }}>
                       {rd.headline as string || ""}
@@ -124,7 +124,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
                     <p style={{ fontSize: 14, color: "#7d7269", lineHeight: 1.7, marginBottom: 28, marginTop: 0 }}>
                       {rd.description as string || ""}
                     </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 24px", marginBottom: 32 }}>
+                    <div className="restaurant-index-facts" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 24px", marginBottom: 32 }}>
                       {[
                         { label: v.cuisine as string, value: rd.cuisine as string },
                         { label: v.covers as string,  value: `${r.covers} ${v.seats as string}` },
@@ -138,7 +138,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
                       ))}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 10 }}>
+                  <div className="restaurant-index-actions" style={{ display: "flex", gap: 10 }}>
                     <Link href={localePath(safeLocale, `/restaurants/${r.slug}`)} style={{ flex: 1, textAlign: "center", padding: "12px", border: "1.5px solid #e8e2dd", borderRadius: 10, fontSize: 13, fontWeight: 600, color: "#1f1a17", textDecoration: "none", background: "#faf8f6" }}>
                       {v.viewProfile as string}
                     </Link>

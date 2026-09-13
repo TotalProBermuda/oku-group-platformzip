@@ -112,7 +112,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
   return (
     <div>
       {/* Hero */}
-      <div style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: series.heroImageUrl ? 360 : undefined }}>
+      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: series.heroImageUrl ? 360 : undefined }}>
         {series.heroImageUrl && (
           <img src={series.heroImageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
         )}
@@ -124,7 +124,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
           </div>
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(32px, 5vw, 60px)", fontWeight: 400, color: "white", letterSpacing: "-0.02em", margin: "0 0 12px", lineHeight: 1.1 }}>{title}</h1>
           {series.subtitle && <p style={{ fontSize: 18, color: "rgba(255,255,255,0.7)", margin: "0 0 24px", maxWidth: 560 }}>{content?.subtitle ?? series.subtitle}</p>}
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 20 }}>
+          <div className="experience-hero-meta" style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 20 }}>
             {series.city && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>📍 {series.city}{series.venueAddress ? ` — ${series.venueAddress}` : ""}</span>}
             {firstSession && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>📅 {fmtDate(firstSession.startsAt)}</span>}
           </div>
@@ -153,9 +153,9 @@ export default async function ExperienceDetailPage({ params }: Props) {
         </div>
       )}
 
-      <div className="page-container" style={{ padding: "48px 24px", display: "grid", gridTemplateColumns: "1fr 360px", gap: 48, alignItems: "start" }}>
+      <div className="page-container experience-layout" style={{ padding: "48px 24px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 48, alignItems: "start" }}>
         {/* Left column */}
-        <div>
+        <div className="experience-main">
           {/* Description */}
           <section style={{ marginBottom: 48 }}>
             <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
@@ -172,15 +172,15 @@ export default async function ExperienceDetailPage({ params }: Props) {
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {sessions.map((s: any) => (
-                  <div key={s.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div key={s.id} className="experience-session" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px" }}>
+                    <div className="experience-session-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                       <div>
                         <div style={{ fontWeight: 600, color: "#1a1614", marginBottom: 4 }}>
                           {getSessionTitle(s.title ?? c.sessionLabel, safeLocale)}
                         </div>
                         <div style={{ fontSize: 13, color: "#6b7280" }}>{fmtDate(s.startsAt)} · {fmtTime(s.startsAt)} – {fmtTime(s.endsAt)}</div>
                       </div>
-                      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                      <div className="experience-session-availability" style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
                         <div style={{ fontSize: 12, color: "#9ca3af" }}>{s.capacity - s.soldCount} {c.left}</div>
                         <span className={`badge ${s.status === "SOLD_OUT" ? "badge-error" : s.status === "CANCELLED" ? "badge-neutral" : "badge-success"}`}>
                           {s.status === "SOLD_OUT" ? c.sessionStatusSoldOut
@@ -223,7 +223,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
                 {influencers.map((ei: any) => {
                   const inf = ei.influencer;
                   return (
-                    <div key={ei.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "20px 24px", display: "flex", gap: 20, alignItems: "center" }}>
+                    <div key={ei.id} className="experience-host" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "20px 24px", display: "flex", gap: 20, alignItems: "center" }}>
                       <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg, #c41e3a 0%, #7c0d1f 100%)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 20, fontFamily: "var(--font-heading)" }}>
                         {(inf.displayName ?? "?")[0]}
                       </div>
@@ -252,7 +252,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {addons.map((a: any) => (
-                  <div key={a.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div key={a.id} className="experience-addon" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 600, color: "#1a1614" }}>{a.name}</div>
                       {a.description && <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{a.description}</div>}
@@ -274,14 +274,14 @@ export default async function ExperienceDetailPage({ params }: Props) {
 
           {/* Waitlist form */}
           {(series.newsletterCaptureEnabled || series.waitlistEnabled) && (
-            <section style={{ background: "linear-gradient(135deg, #1a1614 0%, #2d1f1a 100%)", borderRadius: 16, padding: "32px", marginBottom: 48 }}>
+            <section className="experience-waitlist" style={{ background: "linear-gradient(135deg, #1a1614 0%, #2d1f1a 100%)", borderRadius: 16, padding: "32px", marginBottom: 48 }}>
               <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 22, color: "white", fontWeight: 400, marginBottom: 8 }}>
                 {c.stayInTheKnow}
               </h3>
               <p style={{ fontSize: 14, color: "rgba(255,255,255,0.6)", marginBottom: 20 }}>
                 {c.waitlistNotifyDesc}
               </p>
-              <form action={`/api/v1/experiences/${slug}/waitlist`} method="POST" style={{ display: "flex", gap: 12 }}>
+              <form className="experience-waitlist-form" action={`/api/v1/experiences/${slug}/waitlist`} method="POST" style={{ display: "flex", gap: 12 }}>
                 <input type="text" name="_company" tabIndex={-1} autoComplete="off" defaultValue="" aria-hidden="true"
                   style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none" }} />
                 <input type="email" name="email" placeholder="your@email.com" defaultValue={session?.user?.email ?? ""} required
@@ -295,8 +295,8 @@ export default async function ExperienceDetailPage({ params }: Props) {
         </div>
 
         {/* Right column — ticket selector */}
-        <div style={{ position: "sticky", top: 80 }}>
-          <div style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 16, padding: "28px 24px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+        <div className="experience-booking-sidebar" style={{ position: "sticky", top: 80 }}>
+          <div className="experience-booking-card" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 16, padding: "28px 24px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
             <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 4 }}>
               {c.bookYourPlace}
             </h3>
@@ -312,7 +312,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
                 {ticketTypes.map((t: any) => (
-                  <div key={t.id} style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
+                  <div key={t.id} className="experience-ticket-type" style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{getTicketTypeName(t.name, safeLocale)}</div>
                       <div style={{ fontWeight: 700, color: "#c41e3a" }}>{fmt(t.priceCents)}</div>
@@ -335,7 +335,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
           </div>
 
           {series.venueAddress && (
-            <div style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", marginTop: 16 }}>
+            <div className="experience-location-card" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", marginTop: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#c41e3a", textTransform: "uppercase", marginBottom: 6 }}>
                 {c.locationLabel}
               </div>
