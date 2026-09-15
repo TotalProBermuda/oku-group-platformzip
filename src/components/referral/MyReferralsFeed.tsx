@@ -61,7 +61,7 @@ export type MyReferralsData = {
 };
 
 const fmt = (cents: number) =>
-  "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const KNOWN_STATUSES = new Set([
   "PENDING",
