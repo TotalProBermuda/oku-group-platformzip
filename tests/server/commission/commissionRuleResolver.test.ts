@@ -14,6 +14,8 @@ function makeRule(overrides: Partial<CommissionRule> = {}): CommissionRule {
     scopeId: null,
     revenueBasis: "COMMISSIONABLE_CENTS",
     percentageBps: 500,
+    thresholdCents: null,
+    percentageBpsAtOrAboveThreshold: null,
     percentageCapCents: null,
     perPersonCents: null,
     maxTakeRateBps: null,

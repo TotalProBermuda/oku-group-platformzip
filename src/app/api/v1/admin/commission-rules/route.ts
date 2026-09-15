@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
       scopeId,
       revenueBasis,
       percentageBps,
+      thresholdCents,
+      percentageBpsAtOrAboveThreshold,
       percentageCapCents,
       perPersonCents,
       maxTakeRateBps,
@@ -57,6 +59,24 @@ export async function POST(req: NextRequest) {
     if (!tier || !scopeType || percentageBps == null) {
       return NextResponse.json(
         { ok: false, error: "tier, scopeType, and percentageBps are required" },
+        { status: 400 }
+      );
+    }
+
+    const hasThreshold = thresholdCents != null || percentageBpsAtOrAboveThreshold != null;
+    if (hasThreshold && (thresholdCents == null || percentageBpsAtOrAboveThreshold == null)) {
+      return NextResponse.json(
+        { ok: false, error: "thresholdCents and percentageBpsAtOrAboveThreshold must be provided together" },
+        { status: 400 }
+      );
+    }
+    if (
+      thresholdCents != null &&
+      (!Number.isInteger(thresholdCents) || thresholdCents < 0 ||
+        !Number.isInteger(percentageBpsAtOrAboveThreshold) || percentageBpsAtOrAboveThreshold < 0)
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Threshold values must be non-negative integer cents and basis points" },
         { status: 400 }
       );
     }
@@ -100,6 +120,8 @@ export async function POST(req: NextRequest) {
             scopeId: scopeId ?? null,
             revenueBasis: revenueBasis ?? "COMMISSIONABLE_CENTS",
             percentageBps,
+            thresholdCents: thresholdCents ?? null,
+            percentageBpsAtOrAboveThreshold: percentageBpsAtOrAboveThreshold ?? null,
             percentageCapCents: percentageCapCents ?? null,
             perPersonCents: perPersonCents ?? null,
             maxTakeRateBps: maxTakeRateBps ?? null,
