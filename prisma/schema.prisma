@@ -3443,6 +3443,9 @@ model ReferralActor {
   /// Commission tier for rule resolution (levels 4 and 6). Null = falls
   /// to venue or global STANDARD default.
   commissionTier   CommissionTierType?
+  /// Explicit opt-in for payout-eligible referral actors. Attribution remains
+  /// available when false, but no commission is minted.
+  commissionEligible Boolean             @default(false)
 
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id])
