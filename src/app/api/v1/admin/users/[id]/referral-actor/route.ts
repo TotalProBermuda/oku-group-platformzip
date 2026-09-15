@@ -127,7 +127,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       ok: true,
       actor: updated,
       effectiveRule: await effectiveRuleFor(updated),
-      backfill: { mintedCount: backfill.minted.length, skippedCount: backfill.skipped.length },
+      backfill: {
+        mintedCount: backfill.minted.length,
+        skippedCount: backfill.skipped.length,
+        skippedReasons: [...new Set(backfill.skipped.map((entry) => entry.reason))],
+      },
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });

@@ -757,7 +757,7 @@ export default function PersonaProfilePanel({
               <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 12 }}>Loading performance data…</p>
             ) : compensation?.commissionTotals && (
               <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                <Stat label="Total Commissions" value={String(user.referrer._count?.commissions ?? 0)} />
+                <Stat label="Total Commissions" value={String(compensation.commissionTotals.count ?? user.referrer._count?.commissions ?? 0)} />
                 <Stat label="Total Attributions" value={String(user.referrer._count?.attributions ?? 0)} />
                 <Stat label="Pending Payout" value={fmtMoney(compensation.commissionTotals.pending)} />
                 <Stat label="Approved" value={fmtMoney(compensation.commissionTotals.approved)} />

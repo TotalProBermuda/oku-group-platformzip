@@ -74,6 +74,52 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       : null;
 
+    // INVU closeouts mint immutable CommissionAllocation rows first, then
+    // bridge them into the payout ledger. The legacy referrer surface above
+    // reads CommissionEntry rows, so it cannot see an actor-backed allocation
+    // while that bridge is pending. Surface those live allocations separately
+    // rather than pretending that they do not exist or creating a duplicate
+    // legacy commission entry.
+    const actor = referrerBase
+      ? await prisma.referralActor.findUnique({
+          where: { legacyReferrerId: referrerBase.id },
+          select: { id: true },
+        })
+      : null;
+    const allocationOwnerIds = [referrerBase?.id, actor?.id].filter(
+      (value): value is string => Boolean(value)
+    );
+    const liveAllocations = allocationOwnerIds.length > 0
+      ? await prisma.commissionAllocation.findMany({
+          where: {
+            earnerType: "REFERRER",
+            earnerRefId: { in: allocationOwnerIds },
+            status: { not: "REVERSED" },
+          },
+          select: { id: true, amountCents: true, status: true },
+        })
+      : [];
+    const allocationTotals = {
+      count: liveAllocations.length,
+      pending: liveAllocations
+        .filter((allocation) => allocation.status === "PENDING" || allocation.status === "PROCESSING")
+        .reduce((sum, allocation) => sum + allocation.amountCents, 0),
+      approved: liveAllocations
+        .filter((allocation) => allocation.status === "APPROVED")
+        .reduce((sum, allocation) => sum + allocation.amountCents, 0),
+      paid: liveAllocations
+        .filter((allocation) => allocation.status === "PAID")
+        .reduce((sum, allocation) => sum + allocation.amountCents, 0),
+    };
+    const unifiedCommissionTotals = commissionTotals
+      ? {
+          count: (referrer?.commissions.length ?? 0) + allocationTotals.count,
+          pending: commissionTotals.pending + allocationTotals.pending,
+          approved: commissionTotals.approved + allocationTotals.approved,
+          paid: commissionTotals.paid + allocationTotals.paid,
+        }
+      : null;
+
     const ledgerTotals = influencerProfile
       ? {
           earned: influencerProfile.ledgerEntries.filter((l) => l.type === "COMMISSION_EARNED").reduce((s, l) => s + l.amountCents, 0),
@@ -91,7 +137,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ok: true,
       data: {
         referrer,
-        commissionTotals,
+        commissionTotals: unifiedCommissionTotals,
         influencerProfile: influencerProfile
           ? { ...influencerProfile, ledger: influencerProfile.ledgerEntries }
           : null,
