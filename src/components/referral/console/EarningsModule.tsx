@@ -24,7 +24,7 @@ const EMPTY_ROLLUPS: MyReferralsData["rollups"] = {
 };
 
 const fmt = (cents: number) =>
-  "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export interface EarningsModuleProps {
   /** Optional seed rollups to avoid a first-paint flash. */
