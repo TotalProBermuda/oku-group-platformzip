@@ -156,6 +156,23 @@ export async function mintCommissionsForTableSession(
     referrerEarnerRefId = session.reservation.attributions[0].referrerId;
   }
 
+  // Older reservations can carry only the legacy Referrer id even when that
+  // referrer has since been promoted to a ReferralActor. Resolve that bridge
+  // before calculating the commission so the actor's eligibility and its
+  // actor-scoped rule are honoured, and so the allocation appears on the
+  // actor's compensation ledger. Leave genuinely legacy-only referrers on the
+  // legacy path for backwards compatibility.
+  if (!referrerActorId && referrerEarnerRefId) {
+    const actorForLegacyReferrer = await prisma.referralActor.findUnique({
+      where: { legacyReferrerId: referrerEarnerRefId },
+      select: { id: true },
+    }).catch(() => null);
+    if (actorForLegacyReferrer) {
+      referrerActorId = actorForLegacyReferrer.id;
+      referrerEarnerRefId = actorForLegacyReferrer.id;
+    }
+  }
+
   // ── Resolve host ReferralActor for tier context ────────────────────────────
   // The hostEarnerRefId may be a RestaurantHostProfile.id. We try to resolve
   // the linked User → ReferralActor so the resolver can apply tier-based rules.
@@ -589,14 +606,25 @@ export async function mintCommissionsForTableSession(
 export async function mintMissingReferrerCommissionsForActor(
   referralActorId: string
 ): Promise<MintResult> {
+  const actor = await prisma.referralActor.findUnique({
+    where: { id: referralActorId },
+    select: { legacyReferrerId: true },
+  });
+  const attributionOwners: Array<{ referralActorId?: string; legacyReferrerId?: string }> = [
+    { referralActorId },
+  ];
+  if (actor?.legacyReferrerId) {
+    attributionOwners.push({ legacyReferrerId: actor.legacyReferrerId });
+  }
+
   const sessions = await prisma.tableSession.findMany({
     where: {
       matchStatus: "AUTO_MATCHED",
       commissionEligibility: "ELIGIBLE_AUTO",
       attributionSession: {
         is: {
-          referralActorId,
           status: "VERIFIED_POS_SALE",
+          OR: attributionOwners,
         },
       },
       allocations: {

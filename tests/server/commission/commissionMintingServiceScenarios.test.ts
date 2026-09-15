@@ -156,6 +156,37 @@ describe("commissionMintingService — service charge policy", () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it("bridges a legacy referrer attribution to its eligible ReferralActor", async () => {
+    mockFindUnique.mockResolvedValue(
+      makeValidSession({
+        attributionSession: {
+          id: "as_legacy",
+          status: "VERIFIED_POS_SALE",
+          hostProfileId: null,
+          hostUserId: null,
+          referralActorId: null,
+          legacyReferrerId: "legacy_richard",
+          referralLinkId: null,
+        },
+      })
+    );
+    // First lookup resolves the migration bridge; the second enforces the
+    // actor's eligibility and tier for rule resolution.
+    mockActorFindUnique
+      .mockResolvedValueOnce({ id: "actor_richard" })
+      .mockResolvedValueOnce({ commissionEligible: true, commissionTier: "TRUSTED" });
+
+    const result = await mintCommissionsForTableSession("ts_legacy");
+
+    expect(result.minted).toEqual([
+      expect.objectContaining({
+        earnerType: "REFERRER",
+        earnerRefId: "actor_richard",
+        amountCents: 425,
+      }),
+    ]);
+  });
+
   it("MANUAL_REVIEW basis → creates HELD_FOR_REVIEW allocation, skipped with held_manual_review_basis reason", async () => {
     mockFindUnique.mockResolvedValue(makeValidSession());
     // Override the rule resolver to return MANUAL_REVIEW basis
