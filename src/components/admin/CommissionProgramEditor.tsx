@@ -75,7 +75,15 @@ export default function CommissionProgramEditor({
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.error ?? "Could not save commission program");
       setRule(body.effectiveRule ?? null);
-      setMessage({ text: value === "NONE" ? "Saved — attribution only; no commission will be minted." : "Commission program assigned." });
+      const backfill = body.backfill;
+      const backfillSummary = backfill && value !== "NONE"
+        ? backfill.mintedCount > 0
+          ? ` ${backfill.mintedCount} verified close${backfill.mintedCount === 1 ? "" : "s"} added to the pending ledger.`
+          : backfill.skippedCount > 0
+            ? ` Existing closeout state checked: ${backfill.skippedReasons?.join(", ") ?? "no new allocation required"}.`
+            : " No previously closed eligible sale needed a backfill."
+        : "";
+      setMessage({ text: value === "NONE" ? "Saved — attribution only; no commission will be minted." : `Commission program assigned.${backfillSummary}` });
       onSaved?.();
     } catch (error) {
       setMessage({ text: error instanceof Error ? error.message : "Could not save commission program", error: true });
