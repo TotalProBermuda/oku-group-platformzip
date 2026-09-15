@@ -19,6 +19,8 @@ type CommissionRule = {
   scopeId: string | null;
   revenueBasis: CommissionRevenueBasis;
   percentageBps: number;
+  thresholdCents: number | null;
+  percentageBpsAtOrAboveThreshold: number | null;
   percentageCapCents: number | null;
   perPersonCents: number | null;
   maxTakeRateBps: number | null;
@@ -35,6 +37,8 @@ type RuleForm = {
   scopeId: string;
   revenueBasis: CommissionRevenueBasis;
   percentagePct: string;
+  thresholdDollars: string;
+  percentagePctAtOrAboveThreshold: string;
   percentageCapDollars: string;
   perPersonDollars: string;
   maxTakeRatePct: string;
@@ -56,9 +60,11 @@ const EMPTY_FORM: RuleForm = {
   scopeType: "GLOBAL",
   scopeId: "",
   revenueBasis: "COMMISSIONABLE_CENTS",
-  percentagePct: "10",
-  percentageCapDollars: "300",
-  perPersonDollars: "5",
+  percentagePct: "",
+  thresholdDollars: "",
+  percentagePctAtOrAboveThreshold: "",
+  percentageCapDollars: "",
+  perPersonDollars: "",
   maxTakeRatePct: "",
   label: "",
 };
@@ -120,6 +126,9 @@ function formatDate(value: string) {
 
 function ruleFormula(rule: CommissionRule) {
   const parts = [`${bps(rule.percentageBps)} of ${titleCase(rule.revenueBasis)}`];
+  if (rule.thresholdCents != null && rule.percentageBpsAtOrAboveThreshold != null) {
+    parts.push(`${bps(rule.percentageBpsAtOrAboveThreshold)} at or above ${cents(rule.thresholdCents)}`);
+  }
   if (rule.percentageCapCents != null) parts.push(`cap ${cents(rule.percentageCapCents)}`);
   if (rule.perPersonCents != null) parts.push(`${cents(rule.perPersonCents)} per guest floor`);
   if (rule.maxTakeRateBps != null) parts.push(`max take-rate ${bps(rule.maxTakeRateBps)}`);
@@ -178,6 +187,8 @@ export default function CommissionRulesPage() {
     setNotice(null);
     try {
       const percentageBps = pctToBps(form.percentagePct);
+      const thresholdCents = dollarsToCents(form.thresholdDollars);
+      const percentageBpsAtOrAboveThreshold = pctToBps(form.percentagePctAtOrAboveThreshold);
       const percentageCapCents = dollarsToCents(form.percentageCapDollars);
       const perPersonCents = dollarsToCents(form.perPersonDollars);
       const maxTakeRateBps = pctToBps(form.maxTakeRatePct);
@@ -185,8 +196,11 @@ export default function CommissionRulesPage() {
       if (percentageBps == null || Number.isNaN(percentageBps)) {
         throw new Error("Percentage is required and must be a positive number.");
       }
-      if ([percentageCapCents, perPersonCents, maxTakeRateBps].some((v) => Number.isNaN(v))) {
+      if ([thresholdCents, percentageBpsAtOrAboveThreshold, percentageCapCents, perPersonCents, maxTakeRateBps].some((v) => Number.isNaN(v))) {
         throw new Error("Dollar and percentage fields must be positive numbers or blank.");
+      }
+      if ((thresholdCents == null) !== (percentageBpsAtOrAboveThreshold == null)) {
+        throw new Error("Set both the threshold amount and the at-or-above rate, or leave both blank.");
       }
       if (form.scopeType !== "GLOBAL" && !form.scopeId.trim()) {
         throw new Error("Scope ID is required for venue, referrer, offer, and private-event rules.");
@@ -201,6 +215,8 @@ export default function CommissionRulesPage() {
           scopeId: form.scopeType === "GLOBAL" ? null : form.scopeId.trim(),
           revenueBasis: form.revenueBasis,
           percentageBps,
+          thresholdCents,
+          percentageBpsAtOrAboveThreshold,
           percentageCapCents,
           perPersonCents,
           maxTakeRateBps,
@@ -302,6 +318,12 @@ export default function CommissionRulesPage() {
           </Field>
           <Field label="Percentage">
             <input style={inputStyle} value={form.percentagePct} onChange={(e) => setForm((f) => ({ ...f, percentagePct: e.target.value }))} placeholder="10" />
+          </Field>
+          <Field label="Threshold USD (inclusive)">
+            <input style={inputStyle} value={form.thresholdDollars} onChange={(e) => setForm((f) => ({ ...f, thresholdDollars: e.target.value }))} placeholder="e.g. 150" />
+          </Field>
+          <Field label="Rate at/above threshold %">
+            <input style={inputStyle} value={form.percentagePctAtOrAboveThreshold} onChange={(e) => setForm((f) => ({ ...f, percentagePctAtOrAboveThreshold: e.target.value }))} placeholder="e.g. 10" />
           </Field>
           <Field label="Percentage Cap USD">
             <input style={inputStyle} value={form.percentageCapDollars} onChange={(e) => setForm((f) => ({ ...f, percentageCapDollars: e.target.value }))} placeholder="300" />

@@ -35,6 +35,10 @@ export type CalculationTrace = {
   revenueBasis: CommissionRule["revenueBasis"];
   eligibleNetRevenueCents: number;
   guestCount: number;
+  /** The percentage rate selected for this immutable allocation. */
+  effectivePercentageBps: number;
+  thresholdCents: number | null;
+  thresholdApplied: boolean;
   percentageComponentCents: number;
   percentageCapAppliedCents: number | null;   // set when cap actually binds
   perPersonComponentCents: number;
@@ -98,6 +102,9 @@ export function computeCommission(params: {
       revenueBasis: rule.revenueBasis,
       eligibleNetRevenueCents,
       guestCount,
+      effectivePercentageBps: rule.percentageBps,
+      thresholdCents: rule.thresholdCents,
+      thresholdApplied: false,
       percentageComponentCents: 0,
       percentageCapAppliedCents: null,
       perPersonComponentCents: 0,
@@ -108,7 +115,14 @@ export function computeCommission(params: {
   }
 
   // ── Percentage component ──────────────────────────────────────────────────
-  const rawPct = Math.floor((eligibleNetRevenueCents * rule.percentageBps) / 10000);
+  const thresholdApplied =
+    rule.thresholdCents != null &&
+    rule.percentageBpsAtOrAboveThreshold != null &&
+    eligibleNetRevenueCents >= rule.thresholdCents;
+  const effectivePercentageBps = thresholdApplied
+    ? rule.percentageBpsAtOrAboveThreshold!
+    : rule.percentageBps;
+  const rawPct = Math.floor((eligibleNetRevenueCents * effectivePercentageBps) / 10000);
   let percentageComponentCents = rawPct;
   let percentageCapAppliedCents: number | null = null;
 
@@ -142,6 +156,9 @@ export function computeCommission(params: {
     revenueBasis: rule.revenueBasis,
     eligibleNetRevenueCents,
     guestCount,
+    effectivePercentageBps,
+    thresholdCents: rule.thresholdCents,
+    thresholdApplied,
     percentageComponentCents,
     percentageCapAppliedCents,
     perPersonComponentCents,

@@ -10,6 +10,8 @@ function makeRule(overrides: Partial<CommissionRule> = {}): CommissionRule {
     scopeId: null,
     revenueBasis: "COMMISSIONABLE_CENTS",
     percentageBps: 1000, // 10%
+    thresholdCents: null,
+    percentageBpsAtOrAboveThreshold: null,
     percentageCapCents: null,
     perPersonCents: null,
     maxTakeRateBps: null,
@@ -86,6 +88,22 @@ describe("commissionCalculator — INVU basis semantics", () => {
 });
 
 describe("commissionCalculator — formula components", () => {
+  it("uses the base rate below an inclusive commissionable-revenue threshold", () => {
+    const rule = makeRule({ percentageBps: 500, thresholdCents: 15000, percentageBpsAtOrAboveThreshold: 1000 });
+    const trace = computeCommission({ snapshot: makeSnapshot({ commissionableCents: 14999 }), guestCount: null, rule });
+    expect(trace.effectivePercentageBps).toBe(500);
+    expect(trace.thresholdApplied).toBe(false);
+    expect(trace.finalCommissionCents).toBe(749);
+  });
+
+  it("uses the higher rate at the inclusive threshold", () => {
+    const rule = makeRule({ percentageBps: 500, thresholdCents: 15000, percentageBpsAtOrAboveThreshold: 1000 });
+    const trace = computeCommission({ snapshot: makeSnapshot({ commissionableCents: 15000 }), guestCount: null, rule });
+    expect(trace.effectivePercentageBps).toBe(1000);
+    expect(trace.thresholdApplied).toBe(true);
+    expect(trace.finalCommissionCents).toBe(1500);
+  });
+
   it("7 guests, $2000 eligible, 1000 bps pct cap $30 / $5 per person → max($30, $35) = $35", () => {
     const snapshot = makeSnapshot({ commissionableCents: 200000 });
     const rule = makeRule({

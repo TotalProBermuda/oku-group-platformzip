@@ -44,6 +44,8 @@ export const HARDCODED_FALLBACK_RULE: CommissionRule = {
   scopeId: null,
   revenueBasis: "COMMISSIONABLE_CENTS",
   percentageBps: 500,        // 5 % — matches legacy FALLBACK_COMMISSION_PCT
+  thresholdCents: null,
+  percentageBpsAtOrAboveThreshold: null,
   percentageCapCents: null,
   perPersonCents: null,
   maxTakeRateBps: null,

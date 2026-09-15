@@ -4726,6 +4726,11 @@ model CommissionRule {
   scopeId            String?                // null = all within scope level
   revenueBasis       CommissionRevenueBasis @default(COMMISSIONABLE_CENTS)
   percentageBps      Int                    @default(0)  // e.g. 500 = 5.00%
+  // Optional inclusive threshold override. When both fields are set, the
+  // alternate rate applies when the commissionable revenue reaches the
+  // threshold; otherwise percentageBps remains the only percentage rate.
+  thresholdCents                 Int?
+  percentageBpsAtOrAboveThreshold Int?
   percentageCapCents Int?                   // max amount from percentage component
   perPersonCents     Int?                   // fixed amount per cover
   maxTakeRateBps     Int?                   // overall take-rate cap

@@ -7,6 +7,8 @@ type ProgramValue = "NONE" | "STANDARD" | "TRUSTED" | "PREMIUM" | "PRIVATE_EVENT
 type RuleSummary = {
   label: string | null;
   percentageBps: number;
+  thresholdCents: number | null;
+  percentageBpsAtOrAboveThreshold: number | null;
   percentageCapCents: number | null;
   revenueBasis: string;
   source: string;
@@ -14,9 +16,9 @@ type RuleSummary = {
 
 const OPTIONS: Array<{ value: ProgramValue; label: string; detail: string }> = [
   { value: "NONE", label: "Attribution only — no commission", detail: "Streetside hosts and other non-payable introductions" },
-  { value: "STANDARD", label: "Standard", detail: "Drivers and open network · 5% up to $75" },
-  { value: "TRUSTED", label: "Trusted", detail: "Verified tour guides · 10% up to $250" },
-  { value: "PREMIUM", label: "Premium", detail: "Hotel concierge / doorman · 10% up to $350" },
+  { value: "STANDARD", label: "Standard", detail: "Drivers and open network · uses the assigned versioned policy" },
+  { value: "TRUSTED", label: "Trusted", detail: "Verified tour guides · uses the assigned versioned policy" },
+  { value: "PREMIUM", label: "Premium", detail: "Hotel concierge / doorman · uses the assigned versioned policy" },
   { value: "PRIVATE_EVENT", label: "Strategic / private event", detail: "Negotiated rule; held for review unless an event override exists" },
 ];
 
@@ -108,9 +110,18 @@ export default function CommissionProgramEditor({
         )}
       </div>
       <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 7 }}>{option.detail}</div>
+      {value !== "NONE" && (
+        <div style={{ marginTop: 8, fontSize: 12, color: "var(--color-text-muted)" }}>
+          Actor-specific economics are managed as a versioned <strong>Referrer actor</strong> rule in Commission Rules.
+          <span style={{ marginLeft: 6, fontFamily: "monospace" }}>ID: {actorId}</span>
+        </div>
+      )}
       {value !== "NONE" && rule && (
         <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: 12 }}>
-          <strong>Effective rule:</strong> {rule.label ?? rule.source} · {(rule.percentageBps / 100).toFixed(2)}% · {money(rule.percentageCapCents)}
+          <strong>Effective rule:</strong> {rule.label ?? rule.source} · {(rule.percentageBps / 100).toFixed(2)}%
+          {rule.thresholdCents != null && rule.percentageBpsAtOrAboveThreshold != null
+            ? ` below $${(rule.thresholdCents / 100).toFixed(2)}; ${(rule.percentageBpsAtOrAboveThreshold / 100).toFixed(2)}% at or above`
+            : ""} · {money(rule.percentageCapCents)}
           <div style={{ marginTop: 3, opacity: 0.8 }}>{rule.source.replace(/_/g, " ")} · {rule.revenueBasis.replace(/_/g, " ").toLowerCase()}</div>
         </div>
       )}
