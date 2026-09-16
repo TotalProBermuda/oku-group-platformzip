@@ -1,0 +1,21 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+type Seat = { id: string; displayName: string; email: string; commercialRole: string; status: string };
+type Channel = { id: string; label: string; status: string };
+
+export function PartnerCommerceDraftPanel() {
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [seats, setSeats] = useState<Seat[]>([]);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("TEAM_SELLER");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = async () => { const r = await fetch("/api/v1/partner/commerce"); const d = await r.json(); if (d.workspace) { setChannels(d.workspace.commerceChannels ?? []); setSeats(d.workspace.commerceSeats ?? []); } };
+  useEffect(() => { void load(); }, []);
+  const createDirect = async () => { setBusy(true); setMessage(""); const r = await fetch("/api/v1/partner/commerce", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create_direct_channel_draft" }) }); const d = await r.json(); setBusy(false); if (!r.ok) return setMessage(d.error ?? "Unable to create the draft"); setMessage("Partner-direct channel drafted. It is not live or commissionable until OKÜ approves its programme."); await load(); };
+  const createSeller = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setMessage(""); const r = await fetch("/api/v1/partner/commerce", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create_seller_draft", displayName: name, email, commercialRole: role }) }); const d = await r.json(); setBusy(false); if (!r.ok) return setMessage(d.error ?? "Unable to save seller draft"); setName(""); setEmail(""); setMessage("Seller draft saved. No email, login, QR, commission, or bank request has been created."); await load(); };
+  return <section className="panel" style={{ marginBottom: 24, padding: 20 }}><div className="panel-title">Partner commerce setup</div><p className="panel-subtitle" style={{ marginTop: 6 }}>Build the team safely before any invitation, QR activation, commission policy, or payout onboarding.</p><div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "16px 0" }}><button className="btn btn-primary" disabled={busy || channels.length > 0} onClick={() => void createDirect()}>{channels.length ? "Partner direct channel drafted" : "Draft partner direct channel"}</button><span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Room-card QR comes after commercial approval.</span></div><form onSubmit={createSeller} style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) minmax(220px, 1fr) minmax(150px, .7fr) auto", gap: 10, alignItems: "end" }}><label><span className="form-label">Seller name</span><input required value={name} onChange={(e) => setName(e.target.value)} /></label><label><span className="form-label">Seller email</span><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label><label><span className="form-label">Commercial role</span><select value={role} onChange={(e) => setRole(e.target.value)}><option value="TEAM_SELLER">Team seller</option><option value="CONCIERGE">Concierge</option><option value="PROMOTER">Promoter</option><option value="INFLUENCER">Influencer</option><option value="SPEAKER">Speaker</option><option value="SPONSOR">Sponsor</option></select></label><button className="btn btn-secondary" disabled={busy} type="submit">Save draft</button></form>{message && <p style={{ fontSize: 13, marginTop: 14, color: "var(--color-text-secondary)" }}>{message}</p>}{seats.length > 0 && <div style={{ marginTop: 18 }}><div className="form-label">Draft seller seats</div>{seats.map((seat) => <div key={seat.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--color-border)", fontSize: 14 }}><span><strong>{seat.displayName}</strong> · {seat.email}</span><span>{seat.commercialRole.replaceAll("_", " ")} · {seat.status}</span></div>)}</div>}</section>;
+}
