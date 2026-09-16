@@ -632,6 +632,7 @@ model User {
 
   delegateSeatsCreated  PartnerDelegateSeat[] @relation("DelegateSeatCreator")
   delegateSeatsAccepted PartnerDelegateSeat[] @relation("DelegateSeatAcceptor")
+  partnerCommerceSeatsCreated PartnerCommerceSeat[] @relation("PartnerCommerceSeatCreator")
   eventAccessGrants     UserEventAccess[]
 
   beneficiaryProfile          BeneficiaryProfile?
@@ -768,6 +769,88 @@ model PartnerProfile {
   delegateSeats       PartnerDelegateSeat[]
   partnerReferrers    EventReferrerAssignment[]       @relation("PartnerReferrers")
   subCommissionLedger InfluencerSubCommissionLedger[] @relation("PartnerSubCommissionLedger")
+  commerceChannels    PartnerCommerceChannel[]
+  commerceSeats       PartnerCommerceSeat[]
+}
+
+// ── Partner Commerce ─────────────────────────────────────────────────────
+// This is deliberately separate from PartnerDelegateSeat. Commerce seats can
+// attribute sales but never grant event management, guest-list, or host access.
+// Invitations and payment onboarding are separate, explicit workflows.
+
+enum PartnerCommerceChannelStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  RETIRED
+}
+
+enum PartnerCommerceSeatStatus {
+  DRAFT
+  INVITED
+  ACTIVE
+  PAUSED
+  REVOKED
+}
+
+enum PartnerCommerceRole {
+  TEAM_SELLER
+  CONCIERGE
+  PROMOTER
+  INFLUENCER
+  SPEAKER
+  SPONSOR
+}
+
+model PartnerCommerceChannel {
+  id        String                       @id @default(cuid())
+  partnerId String
+  label     String
+  status    PartnerCommerceChannelStatus @default(DRAFT)
+
+  // These are populated only after a superadmin-approved commercial programme
+  // activates the channel. A draft channel is not a live attribution source.
+  referralActorId String? @unique
+  referralLinkId  String? @unique
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  partner PartnerProfile @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, label])
+  @@index([partnerId, status])
+}
+
+model PartnerCommerceSeat {
+  id              String                    @id @default(cuid())
+  partnerId       String
+  createdByUserId String
+  displayName     String
+  email           String
+  commercialRole  PartnerCommerceRole
+  status          PartnerCommerceSeatStatus @default(DRAFT)
+
+  // Requested scope is descriptive until an approved programme binds it.
+  // It is never interpreted as platform permission or payout authority.
+  requestedScopeJson Json?
+  notes              String?
+
+  acceptedByUserId String?
+  invitedAt        DateTime?
+  acceptedAt       DateTime?
+  revokedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partner   PartnerProfile @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdBy User           @relation("PartnerCommerceSeatCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([partnerId, email])
+  @@index([partnerId, status])
+  @@index([email])
 }
 
 // ── Partner Delegate Seats ────────────────────────────────────────────────

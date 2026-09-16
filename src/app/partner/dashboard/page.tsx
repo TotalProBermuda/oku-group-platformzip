@@ -23,6 +23,7 @@ import { useLocale, useTranslation } from "@/components/i18n/LocaleProvider";
 import { KPIStatCard, EmptyStateCard } from "@/components/ui/dashboard";
 import { ShareSurfacePanel } from "@/components/referral/ShareSurfacePanel";
 import { PureReferrerConsole } from "@/components/referral/console/PureReferrerConsole";
+import { PartnerCommerceDraftPanel } from "@/components/partner/PartnerCommerceDraftPanel";
 import { resolveConsoleConfig } from "@/components/referral/console/roleConfig";
 import type { ConsoleConfig, ConsoleIdentity } from "@/components/referral/console/types";
 import type { MyReferralsData } from "@/components/referral/MyReferralsFeed";
@@ -140,6 +141,7 @@ export default function PartnerDashboard() {
           </div>
         ) : (
           <>
+            <PartnerCommerceDraftPanel />
             {/* ── 0. PURE REFERRER CONSOLE — QR-first guest handoff ────────────
                 QR tab is first above the fold — same pattern as streetside.
                 The partner hands their phone to a guest; the QR screen must be
