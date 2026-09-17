@@ -25,6 +25,19 @@ export function getRedisUrl(): string | null {
   return `rediss://default:${encodeURIComponent(token)}@${normalizedHost}`;
 }
 
+/**
+ * BullMQ opens several long-lived Redis connections as soon as its queue
+ * modules are imported. Keep that optional infrastructure explicitly opt-in
+ * in production: a quota-exhausted Redis plan must not prevent the web app
+ * from starting. Commerce callers already have inline/database fallbacks.
+ *
+ * Set ENABLE_REDIS_QUEUE=true only after the Redis service has capacity and
+ * the background worker is intended to run.
+ */
+export function getQueueRedisUrl(): string | null {
+  return process.env.ENABLE_REDIS_QUEUE === "true" ? getRedisUrl() : null;
+}
+
 export interface UpstashRedisRestConfig {
   url: string;
   token: string;
