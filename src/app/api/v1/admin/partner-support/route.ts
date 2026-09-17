@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logAdminAction } from "@/lib/adminAudit";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { PartnerCommerceRole } from "@prisma/client";
+
+const COMMERCE_ROLES = new Set(Object.values(PartnerCommerceRole));
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,5 +34,27 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const status = (error as { status?: number }).status ?? 500;
     return NextResponse.json({ error: status === 500 ? "Unable to load partner support" : "Unauthorized" }, { status });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await requireAdminRoles(request, ["SUPERADMIN"]);
+    const body = await request.json() as Record<string, unknown>;
+    const partnerId = typeof body.partnerId === "string" ? body.partnerId : "";
+    const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const commercialRole = typeof body.commercialRole === "string" ? body.commercialRole : "";
+    if (!partnerId || !displayName || !email.includes("@") || !COMMERCE_ROLES.has(commercialRole as PartnerCommerceRole)) {
+      return NextResponse.json({ error: "Enter a name, valid email, and commercial role" }, { status: 400 });
+    }
+    const seat = await prisma.partnerCommerceSeat.create({
+      data: { partnerId, createdByUserId: auth.userId, displayName, email, commercialRole: commercialRole as PartnerCommerceRole, status: "DRAFT" },
+      select: { id: true, displayName: true, email: true, commercialRole: true, status: true },
+    });
+    return NextResponse.json({ seat }, { status: 201 });
+  } catch (error) {
+    const status = (error as { status?: number }).status ?? 500;
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to save seller draft" }, { status });
   }
 }

@@ -41,6 +41,7 @@ enum UserAdminAction {
   SEAT_REMOVED
   SEAT_COMMISSION_UPDATED
   PARTNER_SUPPORT_VIEWED
+  PARTNER_COMMERCE_INVITED
 }
 
 enum RoleKey {
@@ -634,6 +635,7 @@ model User {
   delegateSeatsCreated  PartnerDelegateSeat[] @relation("DelegateSeatCreator")
   delegateSeatsAccepted PartnerDelegateSeat[] @relation("DelegateSeatAcceptor")
   partnerCommerceSeatsCreated PartnerCommerceSeat[] @relation("PartnerCommerceSeatCreator")
+  partnerCommerceSeatsProvisioned PartnerCommerceSeat[] @relation("PartnerCommerceSeatProvisionedUser")
   eventAccessGrants     UserEventAccess[]
 
   beneficiaryProfile          BeneficiaryProfile?
@@ -839,6 +841,7 @@ model PartnerCommerceSeat {
   notes              String?
 
   acceptedByUserId String?
+  provisionedUserId String?
   invitedAt        DateTime?
   acceptedAt       DateTime?
   revokedAt        DateTime?
@@ -848,10 +851,12 @@ model PartnerCommerceSeat {
 
   partner   PartnerProfile @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   createdBy User           @relation("PartnerCommerceSeatCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  provisionedUser User?    @relation("PartnerCommerceSeatProvisionedUser", fields: [provisionedUserId], references: [id], onDelete: SetNull)
 
   @@unique([partnerId, email])
   @@index([partnerId, status])
   @@index([email])
+  @@index([provisionedUserId])
 }
 
 // ── Partner Delegate Seats ────────────────────────────────────────────────
