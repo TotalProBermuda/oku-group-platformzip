@@ -9,7 +9,10 @@ export async function GET(request: NextRequest) {
     const partnerId = request.nextUrl.searchParams.get("partnerId");
     if (!partnerId) {
       const partners = await prisma.partnerProfile.findMany({
-        select: { id: true, name: true, approved: true, user: { select: { email: true, name: true } }, _count: { select: { commerceChannels: true, commerceSeats: true } } },
+        // The support directory must remain available even when the commerce
+        // migration is pending or a brand-new partner has no commerce rows.
+        // Counts are loaded only after the operator opens a specific profile.
+        select: { id: true, name: true, approved: true, user: { select: { email: true, name: true } } },
         orderBy: { name: "asc" },
       });
       return NextResponse.json({ partners });
