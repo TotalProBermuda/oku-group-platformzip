@@ -9,10 +9,10 @@ import { handleLaunchReadinessAlertJob } from "./jobs/launch-readiness-alert";
 import { handleAttributionAnchorRetryJob } from "./jobs/attribution-anchor-retry";
 import { handleCapacityExpirySweepJob } from "./jobs/capacity-expiry-sweep";
 import { handleLedgerOutboxDrainJob } from "./jobs/ledger-outbox-drain";
-import { getRedisUrl } from "../src/server/redis/config";
+import { getQueueRedisUrl } from "../src/server/redis/config";
 import { sendNewReservationOperationalAlerts, sendPaidTicketOperationalAlerts } from "../src/server/notifications/operationalCommerceAlerts";
 
-if (!getRedisUrl()) {
+if (!getQueueRedisUrl()) {
   // Redis unavailable — start a polling-based drain so PENDING outbox rows are
   // still drained to LedgerEvent on every configured interval. All other jobs
   // (INVU sync, attribution anchor, etc.) remain inactive — only the proof
@@ -42,7 +42,7 @@ if (!getRedisUrl()) {
 
 function startWorkers() {
   // Type-narrow the queue references for the rest of this function. We are
-  // already inside `if (getRedisUrl())` above, so these are non-null
+  // already inside `if (getQueueRedisUrl())` above, so these are non-null
   // here, but TypeScript doesn't track env-based narrowing across imports.
   if (!invuSyncQueue || !invuTokenRotationQueue || !retentionSweepQueue || !auditAnomalyScanQueue || !launchReadinessAlertQueue || !attributionAnchorQueue || !capacityExpirySweepQueue || !ledgerOutboxQueue) {
     throw new Error("Queue references missing despite REDIS_URL being set");

@@ -1,9 +1,9 @@
 import { Queue } from "bullmq";
-import { getRedisUrl } from "@/server/redis/config";
+import { getQueueRedisUrl } from "@/server/redis/config";
 
 // Supports either a conventional REDIS_URL or the separately stored Upstash
 // TCP host/token secrets. getRedisUrl never logs the password-bearing URL.
-const redisUrl = getRedisUrl();
+const redisUrl = getQueueRedisUrl();
 const hasRedis = !!redisUrl;
 
 // Connection shape consumed by both Queue() and Worker() constructors.
@@ -22,7 +22,7 @@ export const redisConnection = hasRedis
   : ({ connection: { url: "" } } as { connection: { url: string } });
 
 if (!hasRedis) {
-  console.warn("Redis not configured. BullMQ will use inline job execution fallback.");
+  console.warn("BullMQ queue is disabled. Commerce paths will use their inline fallback.");
 }
 
 // Queue construction is gated on REDIS_URL. Without this gate, BullMQ's
