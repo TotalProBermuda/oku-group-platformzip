@@ -9,3 +9,4 @@
 - [AuditLog actorId required](auditlog-actorid.md) — AuditLog.actorId is a non-nullable String; system-generated events use a sentinel like "system:ticket-attribution" (pattern from retentionWorker.ts).
 - [Pushing large Replit repo to GitHub](replit-github-push-large-repo.md) — 5+ GiB history blocks HTTPS push; fix via shallow clone + git fast-import orphan root commit, then push ~650 MB pack.
 - [RBAC role split — FB_DIRECTOR / RESTAURANT_SUPERVISOR](rbac-role-split.md) — ADMIN_COMMERCIAL retired to zero-permission legacy; new roles govern access boundaries across middleware, API routes, and UI.
+- [Managed database schema ownership](managed-db-schema-ownership.md) — Replit Publish owns production schema changes; app startup must not run Prisma migrations.
