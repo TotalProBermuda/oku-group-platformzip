@@ -8,7 +8,7 @@ MIGRATION_IDS="20260910010000_database_rate_limit 20260917100000_partner_commerc
 STATUS="$(npx prisma migrate status 2>&1 || true)"
 
 for MIGRATION_ID in $MIGRATION_IDS; do
-  if printf '%s' "$STATUS" | grep -Fq 'P3009' && printf '%s' "$STATUS" | grep -Fq "$MIGRATION_ID"; then
+  if printf '%s' "$STATUS" | grep -Fqi 'failed' && printf '%s' "$STATUS" | grep -Fq "$MIGRATION_ID"; then
     echo "Recovering interrupted infrastructure migration state: $MIGRATION_ID"
     npx prisma migrate resolve --rolled-back "$MIGRATION_ID"
   fi
