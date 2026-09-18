@@ -30,10 +30,16 @@ export async function POST(request: NextRequest) {
 
     const partner = await prisma.$transaction(async (tx) => {
       if (existing?.partner) {
-        return tx.partnerProfile.findUniqueOrThrow({
+        const current = await tx.partnerProfile.findUniqueOrThrow({
           where: { id: existing.partner.id },
           select: { id: true, name: true, approved: true, user: { select: { id: true, email: true, name: true } } },
         });
+        await tx.partnerCommerceChannel.upsert({
+          where: { partnerId_label: { partnerId: current.id, label: "Partner direct" } },
+          create: { partnerId: current.id, label: "Partner direct", createdByUserId: auth.userId, status: "DRAFT" },
+          update: {},
+        });
+        return current;
       }
 
       const user = existing
@@ -56,10 +62,12 @@ export async function POST(request: NextRequest) {
             },
           });
 
-      return tx.partnerProfile.create({
+      const created = await tx.partnerProfile.create({
         data: { userId: user.id, name, approved: true },
         select: { id: true, name: true, approved: true, user: { select: { id: true, email: true, name: true } } },
       });
+      await tx.partnerCommerceChannel.create({ data: { partnerId: created.id, label: "Partner direct", createdByUserId: auth.userId, status: "DRAFT" } });
+      return created;
     });
 
     await logAdminAction({

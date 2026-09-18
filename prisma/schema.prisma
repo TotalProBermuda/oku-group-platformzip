@@ -42,6 +42,10 @@ enum UserAdminAction {
   SEAT_COMMISSION_UPDATED
   PARTNER_SUPPORT_VIEWED
   PARTNER_COMMERCE_INVITED
+  PARTNER_CHANNEL_ACTIVATED
+  PARTNER_CHANNEL_PAUSED
+  PARTNER_CHANNEL_ROTATED
+  PARTNER_SELLER_CHANNEL_ACTIVATED
 }
 
 enum RoleKey {
@@ -814,6 +818,7 @@ model PartnerCommerceChannel {
   // These are populated only after a superadmin-approved commercial programme
   // activates the channel. A draft channel is not a live attribution source.
   referralActorId String? @unique
+  referralAssignmentId String? @unique
   referralLinkId  String? @unique
 
   createdByUserId String
@@ -842,6 +847,9 @@ model PartnerCommerceSeat {
 
   acceptedByUserId String?
   provisionedUserId String?
+  referralActorId    String? @unique
+  referralAssignmentId String? @unique
+  referralLinkId     String? @unique
   invitedAt        DateTime?
   acceptedAt       DateTime?
   revokedAt        DateTime?
