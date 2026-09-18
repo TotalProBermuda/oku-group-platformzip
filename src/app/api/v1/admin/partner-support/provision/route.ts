@@ -23,23 +23,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Enter a partner name and valid email" }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-    if (existing) {
-      return NextResponse.json(
-        { error: "This email already belongs to a user. Review that profile before granting partner access." },
-        { status: 409 },
-      );
-    }
+    const existing = await prisma.user.findUnique({
+      where: { email },
+      include: { roles: { select: { roleKey: true } }, partner: { select: { id: true } } },
+    });
 
     const partner = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email,
-          name,
-          status: "ACTIVE",
-          roles: { create: [{ roleKey: "PARTNER" }] },
-        },
-      });
+      if (existing?.partner) {
+        return tx.partnerProfile.findUniqueOrThrow({
+          where: { id: existing.partner.id },
+          select: { id: true, name: true, approved: true, user: { select: { id: true, email: true, name: true } } },
+        });
+      }
+
+      const user = existing
+        ? await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              name: existing.name ?? name,
+              status: "ACTIVE",
+              roles: existing.roles.some((role) => role.roleKey === "PARTNER")
+                ? undefined
+                : { create: [{ roleKey: "PARTNER" }] },
+            },
+          })
+        : await tx.user.create({
+            data: {
+              email,
+              name,
+              status: "ACTIVE",
+              roles: { create: [{ roleKey: "PARTNER" }] },
+            },
+          });
+
       return tx.partnerProfile.create({
         data: { userId: user.id, name, approved: true },
         select: { id: true, name: true, approved: true, user: { select: { id: true, email: true, name: true } } },
@@ -49,7 +65,7 @@ export async function POST(request: NextRequest) {
     await logAdminAction({
       targetUserId: partner.user.id,
       performedByUserId: auth.userId,
-      action: "USER_CREATED",
+      action: existing ? "USER_UPDATED" : "USER_CREATED",
       summary: `Partner profile provisioned for ${partner.name}`,
       newValue: { partnerId: partner.id, email: partner.user.email, roleKey: "PARTNER" },
       reason: "Superadmin partner provisioning",
