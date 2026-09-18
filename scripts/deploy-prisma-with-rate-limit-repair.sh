@@ -5,12 +5,13 @@
 set -eu
 
 MIGRATION_IDS="20260910010000_database_rate_limit 20260917100000_partner_commerce_signin_invites"
-STATUS="$(npx prisma migrate status 2>&1 || true)"
 
 for MIGRATION_ID in $MIGRATION_IDS; do
-  if printf '%s' "$STATUS" | grep -Fqi 'failed' && printf '%s' "$STATUS" | grep -Fq "$MIGRATION_ID"; then
+  # `migrate resolve --rolled-back` succeeds only when this exact migration is
+  # recorded as failed. Running it conditionally avoids parsing Prisma's
+  # version-dependent status text and leaves applied/pending migrations alone.
+  if npx prisma migrate resolve --rolled-back "$MIGRATION_ID" >/dev/null 2>&1; then
     echo "Recovering interrupted infrastructure migration state: $MIGRATION_ID"
-    npx prisma migrate resolve --rolled-back "$MIGRATION_ID"
   fi
 done
 
