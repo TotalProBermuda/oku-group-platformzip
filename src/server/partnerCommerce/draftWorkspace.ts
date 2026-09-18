@@ -17,13 +17,13 @@ export async function getPartnerCommerceWorkspace(userId: string) {
       approved: true,
       commerceChannels: {
         orderBy: { createdAt: "desc" },
-        select: { id: true, label: true, status: true, createdAt: true },
+        select: { id: true, label: true, status: true, referralLinkId: true, createdAt: true },
       },
       commerceSeats: {
         orderBy: { createdAt: "desc" },
         select: {
           id: true, displayName: true, email: true, commercialRole: true,
-          status: true, requestedScopeJson: true, notes: true, createdAt: true,
+          status: true, requestedScopeJson: true, notes: true, referralLinkId: true, createdAt: true,
         },
       },
     },

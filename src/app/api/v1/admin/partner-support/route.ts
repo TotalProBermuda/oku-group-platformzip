@@ -24,13 +24,20 @@ export async function GET(request: NextRequest) {
       where: { id: partnerId },
       select: {
         id: true, name: true, approved: true, userId: true, user: { select: { name: true, email: true } },
-        commerceChannels: { select: { id: true, label: true, status: true, referralActorId: true, referralLinkId: true, createdAt: true }, orderBy: { createdAt: "desc" } },
-        commerceSeats: { select: { id: true, displayName: true, email: true, commercialRole: true, status: true, requestedScopeJson: true, createdAt: true }, orderBy: { createdAt: "desc" } },
+        commerceChannels: { select: { id: true, label: true, status: true, referralActorId: true, referralAssignmentId: true, referralLinkId: true, createdAt: true }, orderBy: { createdAt: "desc" } },
+        commerceSeats: { select: { id: true, displayName: true, email: true, commercialRole: true, status: true, requestedScopeJson: true, provisionedUserId: true, referralActorId: true, referralAssignmentId: true, referralLinkId: true, createdAt: true }, orderBy: { createdAt: "desc" } },
       },
     });
     if (!partner) return NextResponse.json({ error: "Partner not found" }, { status: 404 });
     await logAdminAction({ targetUserId: partner.userId, performedByUserId: auth.userId, action: "PARTNER_SUPPORT_VIEWED", summary: `Partner support workspace viewed for ${partner.name}`, reason: "Primary support console read-only review" });
-    return NextResponse.json({ partner });
+    const linkIds = [...partner.commerceChannels, ...partner.commerceSeats].map((item) => item.referralLinkId).filter((id): id is string => Boolean(id));
+    const links = linkIds.length ? await prisma.referralLink.findMany({ where: { id: { in: linkIds } }, select: { id: true, code: true, url: true, isActive: true, clickCount: true } }) : [];
+    const linkById = new Map(links.map((link) => [link.id, link]));
+    return NextResponse.json({ partner: {
+      ...partner,
+      commerceChannels: partner.commerceChannels.map((item) => ({ ...item, referralLink: item.referralLinkId ? linkById.get(item.referralLinkId) ?? null : null })),
+      commerceSeats: partner.commerceSeats.map((item) => ({ ...item, referralLink: item.referralLinkId ? linkById.get(item.referralLinkId) ?? null : null })),
+    } });
   } catch (error) {
     const status = (error as { status?: number }).status ?? 500;
     return NextResponse.json({ error: status === 500 ? "Unable to load partner support" : "Unauthorized" }, { status });
@@ -42,6 +49,17 @@ export async function POST(request: NextRequest) {
     const auth = await requireAdminRoles(request, ["SUPERADMIN"]);
     const body = await request.json() as Record<string, unknown>;
     const partnerId = typeof body.partnerId === "string" ? body.partnerId : "";
+    if (body.action === "create_direct_channel" && partnerId) {
+      const partner = await prisma.partnerProfile.findUnique({ where: { id: partnerId }, select: { id: true } });
+      if (!partner) return NextResponse.json({ error: "Partner not found" }, { status: 404 });
+      const channel = await prisma.partnerCommerceChannel.upsert({
+        where: { partnerId_label: { partnerId, label: "Partner direct" } },
+        create: { partnerId, label: "Partner direct", createdByUserId: auth.userId, status: "DRAFT" },
+        update: {},
+        select: { id: true, label: true, status: true },
+      });
+      return NextResponse.json({ channel }, { status: 201 });
+    }
     const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const commercialRole = typeof body.commercialRole === "string" ? body.commercialRole : "";
