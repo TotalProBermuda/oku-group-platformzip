@@ -209,6 +209,10 @@ export async function createCybersourceCaptureContext(input: {
     body,
   });
   const raw = await response.text();
+    const correlationId =
+    response.headers.get("v-c-correlation-id") ??
+    response.headers.get("x-correlation-id") ??
+    response.headers.get("request-id");
   let data: {
     captureContext?: string;
     clientLibrary?: string;
@@ -249,7 +253,18 @@ export async function createCybersourceCaptureContext(input: {
   }
 
   if (!response.ok || !captureContext || !clientLibrary) {
-    throw new Error(data?.errorInformation?.message || data?.message || `Cybersource capture context failed (${response.status})`);
+        const providerMessage =
+      data?.errorInformation?.message || data?.message || raw.slice(0, 500) || "No provider detail returned.";
+    // This occurs before card fields render, so no PAN/CVV is present.
+    console.error("Cybersource capture-context failure", {
+      status: response.status,
+      correlationId,
+      providerMessage,
+      environment: cfg.env,
+      merchantSuffix: cfg.merchantId.slice(-4),
+    });
+    const reference = correlationId ? ` Reference: ${correlationId}.` : "";
+    throw new Error(`Secure card entry is temporarily unavailable (Cybersource HTTP ${response.status}).${reference}`);
   }
   return {
     captureContext,
