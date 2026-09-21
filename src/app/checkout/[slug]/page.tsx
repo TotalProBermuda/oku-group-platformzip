@@ -169,8 +169,9 @@ export default function CheckoutPage() {
       setFlexConfig(contextData.data);
       setIntentId(nextIntentId);
       setGuestCheckoutToken(intentData.data.guestCheckoutToken);
-    } catch {
-      setError("Unable to initialize secure payment. No card information was submitted.");
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : "Unable to initialize secure card entry.";
+      setError(`Unable to initialize secure payment. ${detail} No card information was submitted.`);
     }
     setPaying(false);
   }
