@@ -19,6 +19,7 @@ function getDashboardHref(roles: string[]): string {
   if (roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r))) return "/host/dashboard";
   if (roles.includes("INFLUENCER"))  return "/influencer/dashboard";
   if (roles.includes("PARTNER"))     return "/partner/dashboard";
+  if (roles.includes("PARTNER_SELLER")) return "/partner/seller";
   if (roles.includes("INVESTOR"))    return "/investor";
   if (roles.some((r) => r.startsWith("STAFF_"))) return "/staff";
   return "/my";
@@ -30,6 +31,7 @@ function getDashboardLabel(roles: string[]): string {
   if (roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r))) return "Host Dashboard";
   if (roles.includes("INFLUENCER"))  return "My Dashboard";
   if (roles.includes("PARTNER"))     return "Partner Portal";
+  if (roles.includes("PARTNER_SELLER")) return "Seller Portal";
   if (roles.includes("INVESTOR"))    return "IR Portal";
   if (roles.some((r) => r.startsWith("STAFF_"))) return "SOPs";
   return "My Account";
@@ -46,6 +48,7 @@ function getRoleLabel(roles: string[]): string {
   if (roles.some((r) => r === "STREETSIDE_HOST"))  return "Streetside Host";
   if (roles.includes("INFLUENCER"))        return "Influencer";
   if (roles.includes("PARTNER"))           return "Partner";
+  if (roles.includes("PARTNER_SELLER"))     return "Partner Seller";
   if (roles.includes("INVESTOR"))          return "Investor";
   if (roles.some((r) => r.startsWith("STAFF_"))) return "Staff";
   return "Member";

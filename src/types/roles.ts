@@ -3,6 +3,7 @@ export type RoleKey =
   | "ATTENDEE"
   | "INFLUENCER"
   | "PARTNER"
+  | "PARTNER_SELLER"
   | "INVESTOR"
   | "REFERRER"
   | "STAFF_OKU"

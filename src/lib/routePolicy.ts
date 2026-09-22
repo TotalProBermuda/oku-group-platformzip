@@ -57,6 +57,7 @@ export const ROLE_ROUTES: { prefix: string; allowed: string[] }[] = [
   // Broad admin shell — F&B roles in; RESTAURANT_SUPERVISOR out.
   { prefix: "/admin",              allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"] },
   { prefix: "/influencer",         allowed: ["SUPERADMIN", "INFLUENCER"] },
+  { prefix: "/partner/seller",     allowed: ["SUPERADMIN", "PARTNER_SELLER"] },
   { prefix: "/partner",            allowed: ["SUPERADMIN", "PARTNER"] },
   { prefix: "/investor",           allowed: ["SUPERADMIN", "INVESTOR"] },
   { prefix: "/staff",              allowed: ["SUPERADMIN", "STAFF_OKU", "STAFF_CATCH", "RESTAURANT_HOST"] },
@@ -106,6 +107,7 @@ export function canonicalDestinationForRoles(roles: string[]): string {
   }
   if (roles.includes("INFLUENCER")) return "/influencer/dashboard";
   if (roles.includes("PARTNER")) return "/partner/dashboard";
+  if (roles.includes("PARTNER_SELLER")) return "/partner/seller";
   if (roles.includes("INVESTOR")) return "/investor";
   if (
     roles.some((role) =>

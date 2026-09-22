@@ -11,8 +11,23 @@ export async function invitePartnerCommerceSeat(input: { seatId: string; invited
   const user = await prisma.$transaction(async (tx) => {
     const existing = await tx.user.findUnique({ where: { email }, select: { id: true, status: true } });
     if (existing && existing.status !== "ACTIVE") throw new Error("This account is not active");
-    if (existing) return existing;
-    return tx.user.create({ data: { email, name: seat.displayName, status: "ACTIVE", roles: { create: { roleKey: "ATTENDEE" } } }, select: { id: true, status: true } });
+    if (existing) {
+      await tx.userRole.upsert({
+        where: { userId_roleKey: { userId: existing.id, roleKey: "PARTNER_SELLER" } },
+        create: { userId: existing.id, roleKey: "PARTNER_SELLER" },
+        update: {},
+      });
+      return existing;
+    }
+    return tx.user.create({
+      data: {
+        email,
+        name: seat.displayName,
+        status: "ACTIVE",
+        roles: { create: [{ roleKey: "ATTENDEE" }, { roleKey: "PARTNER_SELLER" }] },
+      },
+      select: { id: true, status: true },
+    });
   });
   const issued = await issuePasswordlessToken({ email, callbackUrl: "/partner/seller", requireExistingUserId: user.id });
   if (!issued.issued) throw new Error("Secure sign-in email could not be issued");
