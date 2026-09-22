@@ -2,8 +2,8 @@
   /* ── Single source of truth for container width ── */
   --site-max-w: 1200px;
   --site-pad-x: 24px;
-  --font-body: var(--inter, 'Inter'), 'Segoe UI', system-ui, sans-serif;
-  --font-heading: var(--cormorant, 'Cormorant Garamond'), Georgia, serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-heading: 'Cormorant Garamond', Georgia, serif;
   --color-primary: #c41e3a;
   --color-primary-dark: #9e1730;
   --color-primary-light: #fdf2f4;
