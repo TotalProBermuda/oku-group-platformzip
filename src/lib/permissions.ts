@@ -31,6 +31,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   ATTENDEE: ["public:read", "account:read", "account:write", "series:read", "series:purchase"],
   INFLUENCER: ["public:read", "account:read", "account:write", "series:read", "influencer:read", "influencer:write"],
   PARTNER: ["public:read", "account:read", "account:write", "series:read", "partner:read", "partner:write", "partner:invite:write", "partner:hosts:write", "partner:earnings:read"],
+  PARTNER_SELLER: ["public:read", "account:read", "account:write", "series:read"],
   INVESTOR: ["public:read", "account:read", "ir:read"],
   STAFF_OKU: ["public:read", "account:read", "staff:sops:read", "staff:sops:ack", "tickets:checkin"],
   STAFF_CATCH: ["public:read", "account:read", "staff:sops:read", "staff:sops:ack", "tickets:checkin"],

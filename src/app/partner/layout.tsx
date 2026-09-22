@@ -13,7 +13,7 @@ export default async function PartnerLayout({ children }: { children: React.Reac
   const session = await getServerSession(authOptions);
   const roles: string[] = (session?.user as any)?.roles ?? [];
 
-  if (!session || (!roles.includes("PARTNER") && !roles.includes("SUPERADMIN"))) {
+  if (!session || (!roles.includes("PARTNER") && !roles.includes("PARTNER_SELLER") && !roles.includes("SUPERADMIN"))) {
     redirect("/login?callbackUrl=/partner/dashboard");
   }
 
