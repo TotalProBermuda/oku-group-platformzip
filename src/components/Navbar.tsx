@@ -5,12 +5,15 @@ import LanguageSwitcher from "./i18n/LanguageSwitcher";
 import Brandmark from "./Brandmark";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
+import { hasReferrerDashboardRole } from "@/lib/referrerDashboardRoles";
+import { hasLinkedReferrerIdentity } from "@/server/referrals/referrerDashboardAccess";
 
 export type NavSession = {
   user: {
     name: string | null;
     email: string | null;
     roles: string[];
+    hasReferrerDashboard?: boolean;
   };
 } | null;
 
@@ -27,7 +30,7 @@ interface Props {
   };
 }
 
-export default function Navbar({ session, locale = "en", navLabels }: Props) {
+export default async function Navbar({ session, locale = "en", navLabels }: Props) {
   const labels = navLabels || {
     restaurants: "Restaurants",
     experiences: "Experiences",
@@ -36,6 +39,30 @@ export default function Navbar({ session, locale = "en", navLabels }: Props) {
     signIn: "Sign In",
     signOut: "Sign Out",
   };
+  const roles = session?.user.roles ?? [];
+  const shouldResolveLinkedIdentity =
+    Boolean(session?.user.email) &&
+    !hasReferrerDashboardRole(roles) &&
+    !roles.some((role) =>
+      [
+        "SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR",
+        "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR",
+        "INFLUENCER", "INVESTOR",
+      ].includes(role) || role.startsWith("STAFF_"),
+    );
+  const hasReferrerDashboard =
+    hasReferrerDashboardRole(roles) ||
+    (shouldResolveLinkedIdentity
+      ? await hasLinkedReferrerIdentity({ email: session!.user.email! })
+      : false);
+  const navSession = session
+    ? {
+        user: {
+          ...session.user,
+          hasReferrerDashboard,
+        },
+      }
+    : null;
 
   return (
     <header style={{ position: "sticky", top: 0, background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)", borderBottom: "1px solid var(--color-border)", zIndex: 100 }}>
@@ -53,13 +80,13 @@ export default function Navbar({ session, locale = "en", navLabels }: Props) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <LanguageSwitcher currentLocale={locale} variant="header" />
-            <NavbarAuth session={session} locale={locale} signInLabel={labels.signIn} signOutLabel={labels.signOut} />
+            <NavbarAuth session={navSession} locale={locale} signInLabel={labels.signIn} signOutLabel={labels.signOut} />
           </div>
         </div>
 
         <div className="nav-mobile-right">
           <LanguageSwitcher currentLocale={locale} variant="header" />
-          <NavbarMobileMenu session={session} locale={locale} labels={labels} />
+          <NavbarMobileMenu session={navSession} locale={locale} labels={labels} />
         </div>
       </nav>
     </header>

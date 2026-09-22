@@ -384,7 +384,28 @@ export async function getShareSurfaceForActor(
  * Used by the /api/v1/referrer/share-surface endpoint.
  */
 export async function getActorForUser(userId: string): Promise<ReferralActor | null> {
-  return prisma.referralActor.findUnique({ where: { userId } });
+  const directActor = await prisma.referralActor.findFirst({
+    where: { userId, status: "ACTIVE" },
+  });
+  if (directActor) return directActor;
+
+  const adminLinks = await prisma.auditLog.findMany({
+    where: {
+      action: "referral.actor.admin_identity_link",
+      metadata: { path: ["linkedUserId"], equals: userId },
+    },
+    select: { actorId: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (adminLinks.length === 0) return null;
+
+  return prisma.referralActor.findFirst({
+    where: {
+      id: { in: adminLinks.map((link) => link.actorId) },
+      status: "ACTIVE",
+    },
+    orderBy: { createdAt: "asc" },
+  });
 }
 
 /**

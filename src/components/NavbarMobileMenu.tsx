@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import type { NavSession } from "./Navbar";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
+import { dashboardNavigationForUser } from "@/lib/dashboardNavigation";
 
 interface Props {
   session: NavSession;
@@ -23,12 +24,10 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
   const [open, setOpen] = useState(false);
 
   const roles: string[] = session?.user?.roles ?? [];
-  const isAdmin      = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r));
   const isInfluencer = roles.includes("INFLUENCER");
-  const isPartner    = roles.includes("PARTNER");
-  const isPartnerSeller = roles.includes("PARTNER_SELLER");
-  const isInvestor   = roles.includes("INVESTOR");
-  const isStaff      = roles.some((r) => ["STAFF_OKU", "STAFF_CATCH"].includes(r));
+  const dashboard = session?.user
+    ? dashboardNavigationForUser(roles, session.user.hasReferrerDashboard ?? false)
+    : null;
 
   const close = () => setOpen(false);
 
@@ -74,15 +73,14 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
             <Link href={localePath(locale, "/membership")}  className="mobile-nav-link" onClick={close}>{labels.membership}</Link>
             <Link href={localePath(locale, "/careers")}     className="mobile-nav-link" onClick={close}>{labels.careers}</Link>
 
-            {(isAdmin || isInfluencer || isPartner || isPartnerSeller || isInvestor || isStaff) && (
+            {dashboard && (
               <div className="mobile-menu-divider" />
             )}
-            {isAdmin      && <Link href="/admin"                className="mobile-nav-link" onClick={close}>Admin Console</Link>}
-            {isInfluencer && <Link href="/influencer/dashboard" className="mobile-nav-link" onClick={close}>Influencer Dashboard</Link>}
-            {isPartner    && <Link href="/partner/dashboard"    className="mobile-nav-link" onClick={close}>Partner Portal</Link>}
-            {isPartnerSeller && <Link href="/partner/seller" className="mobile-nav-link" onClick={close}>Seller Portal</Link>}
-            {isInvestor   && <Link href="/investor"             className="mobile-nav-link" onClick={close}>IR Portal</Link>}
-            {isStaff      && <Link href="/staff"                className="mobile-nav-link" onClick={close}>Staff SOPs</Link>}
+            {dashboard && (
+              <Link href={dashboard.href} className="mobile-nav-link" onClick={close}>
+                {dashboard.label}
+              </Link>
+            )}
 
             <div className="mobile-menu-divider" />
 

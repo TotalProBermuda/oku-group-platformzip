@@ -8,14 +8,21 @@ import { LocaleProvider } from "@/components/i18n/LocaleProvider";
 import Navbar from "@/components/Navbar";
 import PortalNav from "@/components/PortalNav";
 import type { Locale } from "@/types/i18n";
+import { hasReferrerDashboardRole } from "@/lib/referrerDashboardRoles";
+import { hasLinkedReferrerIdentity } from "@/server/referrals/referrerDashboardAccess";
 
 export default async function ReferrerLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   const roles: string[] = (session?.user as any)?.roles ?? [];
+  const userId = (session?.user as { id?: string } | undefined)?.id;
 
-  if (!session || (!roles.includes("REFERRER") && !roles.includes("SUPERADMIN"))) {
+  if (!session || !userId) {
     redirect("/login?callbackUrl=/referrer/dashboard");
   }
+  const canAccess =
+    hasReferrerDashboardRole(roles) ||
+    await hasLinkedReferrerIdentity({ userId });
+  if (!canAccess) redirect("/");
 
   const jar = await cookies();
   const cookieLocale = jar.get("oku_locale")?.value;
@@ -48,7 +55,7 @@ export default async function ReferrerLayout({ children }: { children: React.Rea
           signOut:     nav.signOut     || "Sign Out",
         }}
       />
-      <PortalNav title="Referrer Portal" />
+      <PortalNav title="Referrer Dashboard" />
       <main style={{ minHeight: "70vh", background: "var(--color-bg)" }}>{children}</main>
     </LocaleProvider>
   );
