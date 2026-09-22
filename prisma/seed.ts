@@ -105,6 +105,7 @@ async function main() {
     ATTENDEE: "Attendee",
     INFLUENCER: "Influencer",
     PARTNER: "Partner",
+    PARTNER_SELLER: "Partner Seller",
     INVESTOR: "Investor",
     REFERRER: "Referrer",
     STAFF_OKU: "Staff OKU",
