@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true, name: true, approved: true, userId: true, user: { select: { name: true, email: true } },
         commerceChannels: { select: { id: true, label: true, status: true, referralActorId: true, referralAssignmentId: true, referralLinkId: true, createdAt: true }, orderBy: { createdAt: "desc" } },
-        commerceSeats: { select: { id: true, displayName: true, email: true, commercialRole: true, status: true, requestedScopeJson: true, provisionedUserId: true, referralActorId: true, referralAssignmentId: true, referralLinkId: true, createdAt: true }, orderBy: { createdAt: "desc" } },
+        commerceSeats: { select: { id: true, displayName: true, email: true, commercialRole: true, status: true, requestedScopeJson: true, provisionedUserId: true, referralActorId: true, referralAssignmentId: true, referralLinkId: true, invitedAt: true, createdAt: true }, orderBy: { createdAt: "desc" } },
       },
     });
     if (!partner) return NextResponse.json({ error: "Partner not found" }, { status: 404 });

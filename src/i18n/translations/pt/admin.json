@@ -231,6 +231,8 @@
   "type": "Tipo",
   "amount": "Valor",
   "partnerDashboard": "Painel de Parceiros",
+  "partnerSupport": "Suporte a Parceiros",
+  "cardPartnerSupportDesc": "Reenvie acessos seguros e apoie proprietários e pessoas dos parceiros",
   "totalSeries": "Total de Séries",
   "totalSessions": "Total de Sessões",
   "ticketsSold": "Ingressos Vendidos",

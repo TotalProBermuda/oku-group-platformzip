@@ -231,6 +231,8 @@
   "type": "Tipo",
   "amount": "Monto",
   "partnerDashboard": "Panel de Socios",
+  "partnerSupport": "Soporte a Socios",
+  "cardPartnerSupportDesc": "Reenvía accesos seguros y apoya a propietarios y personas de socios",
   "totalSeries": "Total de Series",
   "totalSessions": "Total de Sesiones",
   "ticketsSold": "Entradas Vendidas",

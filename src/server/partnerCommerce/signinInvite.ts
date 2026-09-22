@@ -6,6 +6,7 @@ export async function invitePartnerCommerceSeat(input: { seatId: string; invited
   const seat = await prisma.partnerCommerceSeat.findUnique({ where: { id: input.seatId }, include: { partner: true } });
   if (!seat) throw new Error("Seller draft not found");
   if (seat.status === "REVOKED") throw new Error("Revoked seller drafts cannot be invited");
+  const isResend = Boolean(seat.invitedAt);
   const email = normalizePasswordlessEmail(seat.email);
   const user = await prisma.$transaction(async (tx) => {
     const existing = await tx.user.findUnique({ where: { email }, select: { id: true, status: true } });
@@ -16,6 +17,6 @@ export async function invitePartnerCommerceSeat(input: { seatId: string; invited
   const issued = await issuePasswordlessToken({ email, callbackUrl: "/partner/seller", requireExistingUserId: user.id });
   if (!issued.issued) throw new Error("Secure sign-in email could not be issued");
   await prisma.partnerCommerceSeat.update({ where: { id: seat.id }, data: { status: "INVITED", invitedAt: new Date(), provisionedUserId: user.id } });
-  await logAdminAction({ targetUserId: user.id, performedByUserId: input.invitedByUserId, action: "PARTNER_COMMERCE_INVITED", summary: `Issued Partner Commerce sign-in invitation for ${seat.partner.name}`, reason: "Superadmin-approved seller onboarding" });
-  return { email, userId: user.id };
+  await logAdminAction({ targetUserId: user.id, performedByUserId: input.invitedByUserId, action: "PARTNER_COMMERCE_INVITED", summary: `${isResend ? "Reissued" : "Issued"} Partner Commerce sign-in invitation for ${seat.displayName} under ${seat.partner.name}`, reason: isResend ? "Superadmin-requested seller sign-in recovery" : "Superadmin-approved seller onboarding" });
+  return { email, userId: user.id, resent: isResend };
 }

@@ -231,6 +231,8 @@
   "type": "Type",
   "amount": "Amount",
   "partnerDashboard": "Partner Dashboard",
+  "partnerSupport": "Partner Support",
+  "cardPartnerSupportDesc": "Resend secure access and support partner owners and their people",
   "totalSeries": "Total Series",
   "totalSessions": "Total Sessions",
   "ticketsSold": "Tickets Sold",
