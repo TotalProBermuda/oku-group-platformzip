@@ -2046,6 +2046,9 @@ model CommerceSettings {
   senderName                   String?
   adminNotificationEmails      String[]              @default([])
   debugMode                    DebugMode             @default(OFF)
+  /// Public restaurant hours and venue copy, editable by Superadmin.
+  /// Never stores secrets; server-side defaults are used until first save.
+  websiteContent               Json?
   activeCheckoutGateway        ActiveCheckoutGateway @default(AUTHORIZE_NET)
   updatedById                  String?
   createdAt                    DateTime              @default(now())

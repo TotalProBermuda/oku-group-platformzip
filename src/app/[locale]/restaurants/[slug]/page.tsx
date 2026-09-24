@@ -8,6 +8,7 @@ import { localePath } from "@/i18n/utils";
 import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
+import { getWebsiteContent, venueCopy } from "@/server/content/websiteContent";
 
 const VALID_SLUGS = ["oku", "catch", "terrace"] as const;
 type SlugType = (typeof VALID_SLUGS)[number];
@@ -44,9 +45,8 @@ const STATIC_DATA: Record<SlugType, {
     phone: "+507 6000 0001", email: "reservations@okugroup.com",
     address: "Gold House, Casco Viejo, Panama City",
     hours: [
-      { day: "Tuesday – Thursday", time: "7:00 pm – 11:00 pm" },
-      { day: "Friday – Saturday", time: "7:00 pm – 11:30 pm" },
-      { day: "Sunday", time: "7:00 pm – 10:30 pm" },
+      { day: "Monday – Thursday", time: "5:00 pm – 12:00 am" },
+      { day: "Friday – Sunday", time: "2:00 pm – 12:00 am" },
     ],
     others: [
       { slug: "catch",   name: "CATCH",   tagKey: "catch.tag" },
@@ -81,8 +81,8 @@ const STATIC_DATA: Record<SlugType, {
     phone: "+507 6000 0002", email: "catch@okugroup.com",
     address: "Gold House, Casco Viejo, Panama City",
     hours: [
-      { day: "Thursday",         time: "8:00 pm – 1:00 am" },
-      { day: "Friday – Saturday",time: "8:00 pm – 2:00 am" },
+      { day: "Monday – Thursday", time: "5:00 pm – 12:00 am" },
+      { day: "Friday – Sunday", time: "2:00 pm – 12:00 am" },
     ],
     others: [
       { slug: "oku",     name: "OKÜ",     tagKey: "oku.tag" },
@@ -117,9 +117,8 @@ const STATIC_DATA: Record<SlugType, {
     phone: "+507 6000 0003", email: "terrace@okugroup.com",
     address: "Gold House (Rooftop), Casco Viejo, Panama City",
     hours: [
-      { day: "Wednesday – Thursday", time: "6:00 pm – midnight" },
-      { day: "Friday – Saturday",    time: "6:00 pm – 1:00 am" },
-      { day: "Sunday",               time: "6:00 pm – 11:00 pm" },
+      { day: "Monday – Thursday", time: "5:00 pm – 12:00 am" },
+      { day: "Friday – Sunday", time: "2:00 pm – 12:00 am" },
     ],
     others: [
       { slug: "oku",   name: "OKÜ",   tagKey: "oku.tag" },
@@ -185,14 +184,15 @@ export default async function LocaleRestaurantSlugPage({
   const safeSlug = slug as SlugType;
   const safeLocale = isValidLocale(locale) ? locale as Locale : "en";
 
-  const [t] = await Promise.all([
+  const [t, websiteContent] = await Promise.all([
     getTranslations(safeLocale, ["venues", "common"]),
+    getWebsiteContent(),
   ]);
 
   const v = t.venues as Record<string, unknown>;
   const common = t.common as Record<string, string>;
-  const vd = (v[safeSlug] as Record<string, unknown>) || {};
-  const sd = STATIC_DATA[safeSlug];
+  const vd = { ...((v[safeSlug] as Record<string, unknown>) || {}), ...venueCopy(websiteContent, safeSlug, safeLocale) };
+  const sd = { ...STATIC_DATA[safeSlug], hours: websiteContent.hours.map((entry) => ({ day: entry.days[safeLocale], time: entry.time })) };
 
   const foodMenu = await getFoodMenuByVenueDb(safeSlug);
   const drinksMenu = await getDrinksMenuByVenueDb(safeSlug);
@@ -210,10 +210,10 @@ export default async function LocaleRestaurantSlugPage({
   const aboutParas = (vd.about as string[]) || [];
 
   return (
-    <div style={{ background: "#faf8f6", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
+    <div className="venue-detail" style={{ background: "#faf8f6", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
 
       {/* ── HERO ─────────────────────────────────────────────────────────────── */}
-      <div style={{ position: "relative", height: "100svh", minHeight: 600, background: sd.accent, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="venue-detail-hero" style={{ position: "relative", height: "100svh", minHeight: 600, background: sd.accent, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {sd.heroPhoto && (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={sd.heroPhoto} alt={vd.name as string || safeSlug} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%", zIndex: 0 }} />
@@ -223,7 +223,7 @@ export default async function LocaleRestaurantSlugPage({
           : `linear-gradient(135deg, ${sd.accent} 0%, ${sd.accent}cc 40%, transparent 100%)`,
           zIndex: 1 }} />
 
-        <div style={{ position: "relative", zIndex: 10, padding: "24px 48px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="venue-detail-hero-nav" style={{ position: "relative", zIndex: 10, padding: "24px 48px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href={localePath(safeLocale, "/restaurants")} style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "rgba(255,255,255,0.5)", fontSize: 12, letterSpacing: "0.1em", fontWeight: 600, textTransform: "uppercase" }}>
             <span style={{ fontSize: 16 }}>←</span> {v.backToGroup as string || "OKÜ Hospitality Group"}
           </Link>
@@ -232,7 +232,7 @@ export default async function LocaleRestaurantSlugPage({
           </Link>
         </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px 48px 72px", position: "relative", zIndex: 10 }}>
+        <div className="venue-detail-hero-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px 48px 72px", position: "relative", zIndex: 10 }}>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
             {/* CATCH's dining-room hero already contains the real illuminated
                 venue logo. Do not duplicate it with a synthetic overlay. */}
@@ -264,8 +264,8 @@ export default async function LocaleRestaurantSlugPage({
       </div>
 
       {/* ── ABOUT ────────────────────────────────────────────────────────────── */}
-      <div style={{ background: "#fff", padding: "96px 48px" }}>
-        <div style={{ maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "200px 1fr", gap: "0 80px", alignItems: "start" }}>
+      <div className="venue-detail-section" style={{ background: "#fff", padding: "96px 48px" }}>
+        <div className="venue-detail-about" style={{ maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "200px 1fr", gap: "0 80px", alignItems: "start" }}>
           <div>
             <span style={sectionLabel}>{v.about as string}</span>
             <div style={{ background: sd.accent, borderRadius: 12, padding: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
@@ -276,7 +276,7 @@ export default async function LocaleRestaurantSlugPage({
               {[
                 { label: v.cuisine as string,  value: vd.cuisine as string },
                 { label: v.covers as string,   value: `${safeSlug === "oku" ? 27 : safeSlug === "catch" ? 24 : 42} ${v.seats as string}` },
-                { label: v.hours as string,    value: sd.hours[0].time },
+                { label: v.hours as string,    value: sd.hours.map((row) => `${row.day}: ${row.time}`).join(" · ") },
                 { label: v.dress as string,    value: vd.dresscode as string },
               ].map(item => (
                 <div key={item.label}>
@@ -306,7 +306,7 @@ export default async function LocaleRestaurantSlugPage({
 
       {/* ── GALLERY ──────────────────────────────────────────────────────────── */}
       <div style={{ background: sd.accentLight, padding: "0" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gridTemplateRows: "300px 300px", gap: 3 }}>
+        <div className="venue-detail-gallery" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gridTemplateRows: "300px 300px", gap: 3 }}>
           {(() => {
             const cells = [
               { row: "1 / 3", col: "1 / 2" }, { row: "1 / 2", col: "2 / 3" },
@@ -349,12 +349,12 @@ export default async function LocaleRestaurantSlugPage({
 
       {/* ── SUSHI BAR FEATURE (OKÜ only) ─────────────────────────────────────── */}
       {safeSlug === "oku" && sd.sushiBarPhotos && (
-        <div style={{ background: "#0e0c0a", padding: "96px 48px" }}>
+        <div className="venue-detail-section" style={{ background: "#0e0c0a", padding: "96px 48px" }}>
           <div style={{ maxWidth: 1000, margin: "0 auto" }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 24, display: "block" }}>
               {v.theKitchen as string}
             </span>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "48px 64px", alignItems: "center" }}>
+            <div className="venue-detail-feature-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "48px 64px", alignItems: "center" }}>
               <div>
                 <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(28px, 4vw, 44px)", color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 24 }}>
                   {(vd as Record<string, string>).sushiBarHeading}
@@ -378,12 +378,12 @@ export default async function LocaleRestaurantSlugPage({
 
       {/* ── SIGNATURE COCKTAILS (OKÜ only) ───────────────────────────────────── */}
       {safeSlug === "oku" && (
-        <div style={{ background: "#09070a", padding: "96px 48px" }}>
+        <div className="venue-detail-section" style={{ background: "#09070a", padding: "96px 48px" }}>
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 24, display: "block" }}>
               {v.atTheBar as string}
             </span>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "48px 80px", alignItems: "start" }}>
+            <div className="venue-detail-feature-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "48px 80px", alignItems: "start" }}>
               <div>
                 <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(28px, 4vw, 44px)", color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 24 }}>
                   {((vd as Record<string, string>).cocktailHeading || "").split("\n").map((line, i) => (
@@ -437,7 +437,7 @@ export default async function LocaleRestaurantSlugPage({
               </div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3 }}>
+          <div className="venue-detail-space-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3 }}>
             {[
               { src: "/images/oku/optimized/interior-koi-wall-03.jpg", alt: "The koi wall", pos: "center 40%" },
               { src: "/images/oku/optimized/interior-sushi-bar-01.jpg", alt: "OKÜ sushi counter", pos: "center 30%" },
@@ -458,7 +458,7 @@ export default async function LocaleRestaurantSlugPage({
       )}
 
       {/* ── MENU ─────────────────────────────────────────────────────────────── */}
-      <div id="menu" style={{ background: "#faf8f6", padding: "96px 48px", scrollMarginTop: 80 }}>
+      <div id="menu" className="venue-detail-section" style={{ background: "#faf8f6", padding: "96px 48px", scrollMarginTop: 80 }}>
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
           <span style={sectionLabel}>{v.theMenu as string}</span>
           {foodMenu ? (
@@ -497,7 +497,7 @@ export default async function LocaleRestaurantSlugPage({
       </div>
 
       {/* ── RESERVE ──────────────────────────────────────────────────────────── */}
-      <div style={{ background: sd.accent, padding: "96px 48px", textAlign: "center" }}>
+      <div className="venue-detail-section" style={{ background: sd.accent, padding: "96px 48px", textAlign: "center" }}>
         <div style={{ maxWidth: 600, margin: "0 auto" }}>
           <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(32px, 5vw, 52px)", color: "#fff", letterSpacing: "-0.03em", marginBottom: 20 }}>
             {common.reserveTable}
@@ -512,12 +512,12 @@ export default async function LocaleRestaurantSlugPage({
       </div>
 
       {/* ── OTHER VENUES ─────────────────────────────────────────────────────── */}
-      <div style={{ padding: "64px 48px", background: "#fff" }}>
+      <div className="venue-detail-section" style={{ padding: "64px 48px", background: "#fff" }}>
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#7d7269", marginBottom: 32 }}>
             {v.ourRestaurants as string}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="venue-detail-other-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {sd.others.map((other) => {
               const otherData = (v[other.slug] as Record<string, string>) || {};
               return (

@@ -1,7 +1,11 @@
 {
-  "eyebrow": "Curated Experiences",
+  "eyebrow": "Restaurants & Events",
   "headline": "OKÜ Hospitality Group",
-  "subtitle": "Intimate dining series, expert-led masterclasses, and exclusive community events across our venues.",
+  "subtitle": "Discover our restaurants, reserve a table, and explore upcoming events at Gold House in Casco Viejo.",
+  "browseRestaurants": "Explore Restaurants",
+  "browseEvents": "View Events",
+  "restaurantGatewayDesc": "Discover OKÜ, CATCH, and TERRACE, view current hours, and reserve a table.",
+  "eventGatewayDesc": "See upcoming events, available dates, and ticket options.",
   "signInCta": "Sign In to Explore",
   "browseSeries": "Browse Series"
 }

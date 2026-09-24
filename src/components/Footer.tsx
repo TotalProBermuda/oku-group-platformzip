@@ -24,7 +24,7 @@ export default function Footer({ locale = "en", labels }: Props) {
     careers: "Careers",
     signIn: "Sign In",
     venues: "Venues",
-    tagline: "Curated dining experiences, exclusive series, and community events across our venues.",
+    tagline: "Restaurants, reservations, and events at Gold House in Casco Viejo.",
     allRightsReserved: "All rights reserved.",
   };
 

@@ -233,6 +233,8 @@
   "partnerDashboard": "Panel de Socios",
   "partnerSupport": "Soporte a Socios",
   "cardPartnerSupportDesc": "Reenvía accesos seguros y apoya a propietarios y personas de socios",
+  "websiteContent": "Contenido del Sitio",
+  "cardWebsiteContentDesc": "Actualiza horarios y descripciones de los restaurantes sin desplegar código",
   "totalSeries": "Total de Series",
   "totalSessions": "Total de Sesiones",
   "ticketsSold": "Entradas Vendidas",

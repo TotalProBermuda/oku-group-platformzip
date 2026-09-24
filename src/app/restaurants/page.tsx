@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 const RESTAURANTS = [
   {
@@ -10,7 +11,7 @@ const RESTAURANTS = [
     cuisine: "Modern Mediterranean",
     covers: 27,
     setting: "Indoor · Air-conditioned",
-    hours: "Tue – Sun · 7 pm – 11 pm",
+    hours: "Mon – Thu · 5 pm – 12 am · Fri – Sun · 2 pm – 12 am",
     accent: "#1a1614",
     lightAccent: "#f5f2ef",
     tag: "Fine Dining",
@@ -22,16 +23,16 @@ const RESTAURANTS = [
   {
     slug: "catch",
     name: "CATCH",
-    headline: "Boho-Caribbean Nightlife",
-    tagline: "Sharing plates, live DJs, and Caribbean energy.",
-    description: "CATCH is where dining meets the night. Caribbean-inspired sharing plates, a curated cocktail programme, and a rotating DJ booth make every evening an event in itself.",
+    headline: "Relaxed Social Dining",
+    tagline: "A lively restaurant setting for shared plates, drinks, and conversation.",
+    description: "CATCH is a social restaurant at Gold House with a relaxed atmosphere, a menu made for sharing, and a welcoming space for groups and gatherings.",
     cuisine: "Caribbean-inspired sharing plates",
     covers: 24,
     setting: "Indoor / Outdoor hybrid",
-    hours: "Thu – Sat · 8 pm – 2 am",
+    hours: "Mon – Thu · 5 pm – 12 am · Fri – Sun · 2 pm – 12 am",
     accent: "#1e3a5f",
     lightAccent: "#f0f4f8",
-    tag: "Nightlife Dining",
+    tag: "Restaurant",
     logo: "/images/logo-catch.webp",
     logoNeedsWhiteBox: false,
     slabBg: "#1e3a5f",
@@ -46,7 +47,7 @@ const RESTAURANTS = [
     cuisine: "Pan-American sharing plates",
     covers: 42,
     setting: "Open-air rooftop",
-    hours: "Wed – Sun · 6 pm – midnight",
+    hours: "Mon – Thu · 5 pm – 12 am · Fri – Sun · 2 pm – 12 am",
     accent: "#2d4a1e",
     lightAccent: "#f2f5f0",
     tag: "Rooftop",
@@ -58,6 +59,8 @@ const RESTAURANTS = [
 ];
 
 export default function RestaurantsPage() {
+  redirect("/en/restaurants");
+
   return (
     <div style={{ background: "#faf8f6", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
 
@@ -172,7 +175,7 @@ export default function RestaurantsPage() {
           Gold House
         </div>
         <div style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", marginBottom: 20 }}>
-          Casco Viejo, Panama City · Open Tue – Sun
+          Casco Viejo, Panama City · Mon–Thu 5 pm–12 am · Fri–Sun 2 pm–12 am
         </div>
         <Link href="/reservations" style={{ display: "inline-block", border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)", borderRadius: 10, padding: "10px 24px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
           Book a Table

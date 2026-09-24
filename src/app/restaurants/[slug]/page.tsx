@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import MenuBlock from "@/components/menu/MenuBlock";
 import { getFoodMenuByVenueDb, getDrinksMenuByVenueDb } from "@/server/menus/menuService";
 
@@ -41,9 +41,8 @@ const RESTAURANTS = {
     phone: "+507 6000 0001",
     email: "reservations@okugroup.com",
     hours: [
-      { day: "Tuesday – Thursday", time: "7:00 pm – 11:00 pm" },
-      { day: "Friday – Saturday", time: "7:00 pm – 11:30 pm" },
-      { day: "Sunday", time: "7:00 pm – 10:30 pm" },
+      { day: "Monday – Thursday", time: "5:00 pm – 12:00 am" },
+      { day: "Friday – Sunday", time: "2:00 pm – 12:00 am" },
     ],
     accent: "#1a1614",
     accentLight: "#f5f2ef",
@@ -79,7 +78,7 @@ const RESTAURANTS = {
       },
     ],
     others: [
-      { slug: "catch", name: "CATCH", tag: "Caribbean Nightlife" },
+      { slug: "catch", name: "CATCH", tag: "Social Dining" },
       { slug: "terrace", name: "TERRACE", tag: "Open-Air Rooftop" },
     ],
   },
@@ -87,29 +86,29 @@ const RESTAURANTS = {
   catch: {
     name: "CATCH",
     tagline: "Caribbean Dining · Gold House",
-    heroLine1: "The night",
-    heroLine2: "starts here.",
+    heroLine1: "Gather.",
+    heroLine2: "Share.",
     heroLine3: "",
     logoHero: "/images/logo-catch.webp",
     logoLight: "/images/logo-catch.webp",
     logoDark: "/images/logo-catch.webp",
     logoNeedsWhiteBox: false,
     about: [
-      "CATCH was built for the hours after 9. For tables that linger, for rounds that become three, for the moment a dinner becomes a night.",
-      "The menu is designed for sharing — Caribbean-inspired plates that arrive in waves, each one an excuse to stay a little longer. The DJ booth rotates every Thursday through Saturday with local and international talent.",
-      "Rattan fixtures, exposed concrete, warm lighting. A space that's simultaneously casual and magnetic.",
+      "CATCH is designed around shared tables, generous plates, and easy conversation.",
+      "The room brings food, drinks, and music together without losing sight of the restaurant experience at its centre.",
+      "A relaxed and welcoming setting for groups, gatherings, and time together.",
     ],
     address: "Gold House, Casco Viejo, Panama City",
     phone: "+507 6000 0002",
     email: "catch@okugroup.com",
     hours: [
-      { day: "Thursday", time: "8:00 pm – 1:00 am" },
-      { day: "Friday – Saturday", time: "8:00 pm – 2:00 am" },
+      { day: "Monday – Thursday", time: "5:00 pm – 12:00 am" },
+      { day: "Friday – Sunday", time: "2:00 pm – 12:00 am" },
     ],
     accent: "#1e3a5f",
     accentLight: "#f0f4f8",
     accentMid: "rgba(30,58,95,0.88)",
-    tag: "Nightlife Dining",
+    tag: "Restaurant",
     dresscode: "Smart casual",
     menu: [
       {
@@ -164,9 +163,8 @@ const RESTAURANTS = {
     phone: "+507 6000 0003",
     email: "terrace@okugroup.com",
     hours: [
-      { day: "Wednesday – Thursday", time: "6:00 pm – midnight" },
-      { day: "Friday – Saturday", time: "6:00 pm – 1:00 am" },
-      { day: "Sunday", time: "6:00 pm – 11:00 pm" },
+      { day: "Monday – Thursday", time: "5:00 pm – 12:00 am" },
+      { day: "Friday – Sunday", time: "2:00 pm – 12:00 am" },
     ],
     accent: "#2d4a1e",
     accentLight: "#f2f5f0",
@@ -202,7 +200,7 @@ const RESTAURANTS = {
     ],
     others: [
       { slug: "oku", name: "OKÜ", tag: "Fine Dining" },
-      { slug: "catch", name: "CATCH", tag: "Caribbean Nightlife" },
+      { slug: "catch", name: "CATCH", tag: "Social Dining" },
     ],
   },
 } as const;
@@ -216,6 +214,7 @@ export async function generateStaticParams() {
 export default async function RestaurantPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   if (!(slug in RESTAURANTS)) notFound();
+  redirect(`/en/restaurants/${slug}`);
   const r = RESTAURANTS[slug as Slug];
 
   const foodMenu = (slug === "oku" || slug === "catch" || slug === "terrace")
