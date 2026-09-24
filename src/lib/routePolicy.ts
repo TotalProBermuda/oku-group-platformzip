@@ -36,6 +36,7 @@ export const ROLE_ROUTES: { prefix: string; allowed: string[] }[] = [
   { prefix: "/admin/referrers",    allowed: ["SUPERADMIN"] },
   { prefix: "/admin/partners",     allowed: ["SUPERADMIN"] },
   { prefix: "/admin/partner-support", allowed: ["SUPERADMIN"] },
+  { prefix: "/admin/website-content", allowed: ["SUPERADMIN"] },
   { prefix: "/admin/table-sessions", allowed: ["SUPERADMIN"] },
   { prefix: "/admin/review-queue", allowed: ["SUPERADMIN"] },
   { prefix: "/admin/integrations", allowed: ["SUPERADMIN"] },

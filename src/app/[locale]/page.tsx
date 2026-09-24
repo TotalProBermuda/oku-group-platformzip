@@ -124,17 +124,31 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
           </div>
           <p className="hero-subtitle">{home.subtitle}</p>
           <div className="hero-actions">
-            <Link href={localePath(safeLocale, "/login")} className="btn btn-primary btn-lg">
-              {home.signInCta}
+            <Link href={localePath(safeLocale, "/restaurants")} className="btn btn-primary btn-lg">
+              {home.browseRestaurants}
             </Link>
-            <Link href={localePath(safeLocale, "/series")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-              {home.browseSeries}
+            <Link href={localePath(safeLocale, "/experiences")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+              {home.browseEvents}
             </Link>
           </div>
         </div>
       </section>
 
       <div className="page-container">
+        {/* Primary public journeys stay ahead of portals and secondary content. */}
+        <section className="public-gateway-grid" aria-label={`${home.browseRestaurants} / ${home.browseEvents}`}>
+          <Link href={localePath(safeLocale, "/restaurants")} className="public-gateway-card">
+            <span className="public-gateway-eyebrow">01</span>
+            <strong>{home.browseRestaurants}</strong>
+            <span>{home.restaurantGatewayDesc}</span>
+          </Link>
+          <Link href={localePath(safeLocale, "/experiences")} className="public-gateway-card">
+            <span className="public-gateway-eyebrow">02</span>
+            <strong>{home.browseEvents}</strong>
+            <span>{home.eventGatewayDesc}</span>
+          </Link>
+        </section>
+
         {/* ── PORTAL CARDS — elevated roles only ─────────────────────── */}
         {showPortal && visiblePortals.length > 0 && (
           <section style={{ marginBottom: 56 }}>

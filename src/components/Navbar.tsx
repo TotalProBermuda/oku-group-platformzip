@@ -30,7 +30,7 @@ interface Props {
 export default function Navbar({ session, locale = "en", navLabels }: Props) {
   const labels = navLabels || {
     restaurants: "Restaurants",
-    experiences: "Experiences",
+    experiences: "Events",
     membership: "Membership",
     careers: "Careers",
     signIn: "Sign In",

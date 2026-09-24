@@ -1,7 +1,11 @@
 {
-  "eyebrow": "Experiencias Selectas",
+  "eyebrow": "Restaurantes y Eventos",
   "headline": "OKÜ Grupo de Hospitalidad",
-  "subtitle": "Series de cenas íntimas, clases magistrales con expertos y eventos exclusivos en nuestros locales.",
+  "subtitle": "Descubre nuestros restaurantes, reserva una mesa y explora los próximos eventos en Gold House, Casco Viejo.",
+  "browseRestaurants": "Explorar Restaurantes",
+  "browseEvents": "Ver Eventos",
+  "restaurantGatewayDesc": "Descubre OKÜ, CATCH y TERRACE, consulta los horarios y reserva una mesa.",
+  "eventGatewayDesc": "Consulta próximos eventos, fechas disponibles y opciones de entradas.",
   "signInCta": "Iniciar Sesión para Explorar",
   "browseSeries": "Explorar Series"
 }

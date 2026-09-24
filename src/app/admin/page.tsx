@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import Link from "next/link";
 import {
-  LayoutGrid, Package, ChevronRight, TriangleAlert, ClipboardList, Map, LifeBuoy,
+  LayoutGrid, Package, ChevronRight, TriangleAlert, ClipboardList, Map, LifeBuoy, Globe2,
 } from "lucide-react";
 import { useAdminRoles } from "@/contexts/AdminContext";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
@@ -40,6 +40,7 @@ const ACTION_CARDS: CardEntry[] = [
   // Finance / governance — SUPERADMIN only
   { labelKey: "users",        descKey: "cardUsersDesc",        href: "/admin/users",                 iconSrc: "/icons/flaticon/users.png",      roles: ["SUPERADMIN"] },
   { labelKey: "partnerSupport", descKey: "cardPartnerSupportDesc", href: "/admin/partner-support",   Icon: LifeBuoy,                             roles: ["SUPERADMIN"] },
+  { labelKey: "websiteContent", descKey: "cardWebsiteContentDesc", href: "/admin/website-content", Icon: Globe2,                              roles: ["SUPERADMIN"] },
   { labelKey: "payouts",      descKey: "cardPayoutsDesc",      href: "/admin/payouts",               iconSrc: "/icons/flaticon/briefcase.png",  roles: ["SUPERADMIN"] },
   { labelKey: "revenueTrust", descKey: "cardRevenueTrustDesc", href: "/admin/revenue",               iconSrc: "/icons/flaticon/wallet.png",     roles: ["SUPERADMIN"] },
   // Role-specific

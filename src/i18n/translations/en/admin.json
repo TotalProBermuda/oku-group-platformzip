@@ -233,6 +233,8 @@
   "partnerDashboard": "Partner Dashboard",
   "partnerSupport": "Partner Support",
   "cardPartnerSupportDesc": "Resend secure access and support partner owners and their people",
+  "websiteContent": "Website Content",
+  "cardWebsiteContentDesc": "Update restaurant hours and venue descriptions without a deployment",
   "totalSeries": "Total Series",
   "totalSessions": "Total Sessions",
   "ticketsSold": "Tickets Sold",
