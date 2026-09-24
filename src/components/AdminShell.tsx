@@ -26,6 +26,7 @@ interface AdminNavLabels {
   sponsorship: string;
   launchReadiness: string;
   commissionRules: string;
+  websiteContent: string;
 }
 
 interface Props {

@@ -35,6 +35,7 @@ interface AdminNavLabels {
   launchReadiness: string;
   referralMergeConflicts: string;
   commissionRules: string;
+  websiteContent: string;
 }
 
 interface AdminNavProps {
@@ -102,6 +103,7 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
     launchReadiness:        labels.launchReadiness        || "Launch Readiness",
     referralMergeConflicts: labels.referralMergeConflicts || "Referral Merge Conflicts",
     commissionRules:        labels.commissionRules        || "Commission Rules",
+    websiteContent:         labels.websiteContent         || "Website Content",
   };
 
   const NAV_GROUPS = [
@@ -158,6 +160,7 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
         { label: l.accounts,                 href: "/admin/accounts",               roles: ["SUPERADMIN"] },
         { label: "Security",                 href: "/admin/security",               roles: ["SUPERADMIN"] },
         { label: "Commerce",                 href: "/admin/commerce/settings",      roles: ["SUPERADMIN"] },
+        { label: l.websiteContent,            href: "/admin/website-content",        roles: ["SUPERADMIN"] },
         { label: l.integrations + " — INVU", href: "/admin/integrations/invu",      roles: ["SUPERADMIN"] },
         { label: "Conversion",               href: "/admin/operations/conversion",  roles: ["SUPERADMIN"] },
         { label: "Streetside",               href: "/admin/streetside",             roles: ["SUPERADMIN"] },

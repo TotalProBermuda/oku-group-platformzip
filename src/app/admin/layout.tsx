@@ -61,6 +61,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     partners:       c.adminNavPartners      || "Partners",
     scorecards:     c.adminNavScorecards    || "Scorecards",
     commissionRules: "Commission Rules",
+    websiteContent: adm.websiteContent || "Website Content",
     launchReadiness:        adm.launchReadiness?.navLabel              || "Launch Readiness",
     referralMergeConflicts: (translations.referrals as Record<string, Record<string, string>> | undefined)?.mergeConflicts?.navLabel || "Referral Merge Conflicts",
   };
