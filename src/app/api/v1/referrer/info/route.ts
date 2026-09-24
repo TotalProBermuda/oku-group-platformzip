@@ -85,11 +85,22 @@ export async function GET(req: Request) {
       where: { code: upperCode },
       include: {
         referralActor: {
-          select: { displayName: true, organizationName: true, actorType: true },
+          select: { displayName: true, organizationName: true, actorType: true, status: true },
         },
+        referralAssignment: { select: { isActive: true, status: true } },
       },
     });
-    if (link?.referralActor) {
+    const assignmentUnavailable = link?.referralAssignment
+      ? !link.referralAssignment.isActive || link.referralAssignment.status !== "ACTIVE"
+      : false;
+    if (link?.isActive && link.referralActor.status === "ACTIVE" && !assignmentUnavailable) {
+      // A scan is the first successful resolution of the public QR landing
+      // page. Reservation and checkout services resolve attribution later but
+      // must not inflate this acquisition metric.
+      await prisma.referralLink.update({
+        where: { id: link.id },
+        data: { clickCount: { increment: 1 }, lastClickedAt: new Date() },
+      });
       const actor = link.referralActor;
       const referrerType = actor.actorType ?? "REFERRER";
       return NextResponse.json({

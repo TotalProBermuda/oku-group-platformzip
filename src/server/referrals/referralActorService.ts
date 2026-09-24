@@ -140,10 +140,12 @@ export async function resolveActorFromCode(code: string) {
   });
 
   if (link) {
-    await prisma.referralLink.update({
-      where: { id: link.id },
-      data: { clickCount: { increment: 1 }, lastClickedAt: new Date() },
-    });
+    const assignmentUnavailable = link.referralAssignment
+      ? !link.referralAssignment.isActive || link.referralAssignment.status !== "ACTIVE"
+      : false;
+    if (!link.isActive || link.referralActor.status !== "ACTIVE" || assignmentUnavailable) {
+      return null;
+    }
     return {
       source: "REFERRAL_LINK" as const,
       referralActorId: link.referralActorId,
