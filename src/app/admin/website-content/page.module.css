@@ -1,0 +1,14 @@
+.toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.toolbar label { display: grid; gap: 6px; min-width: min(100%, 220px); }
+.toolbar select { min-height: 48px; }
+.form { display: grid; gap: 18px; }
+.field { display: grid; gap: 7px; }
+.field span { font-size: 12px; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .06em; }
+.field input, .field textarea { width: 100%; }
+.hours { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.heroLines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .hours, .heroLines { grid-template-columns: 1fr; }
+  .toolbar, .toolbar label, .actions, .actions button { width: 100%; }
+}

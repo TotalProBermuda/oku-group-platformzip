@@ -1,7 +1,7 @@
 {
   "backToGroup": "OKÜ Hospitality Group",
   "ourRestaurants": "Our Restaurants",
-  "restaurantsSubtitle": "Three distinct dining experiences under one roof — each with its own identity, cuisine, and atmosphere.",
+  "restaurantsSubtitle": "Three restaurant settings at Gold House, each with its own food, character, and atmosphere.",
   "reserveArrow": "Reserve a Table →",
   "viewProfile": "View Profile",
   "cuisine": "Cuisine",
@@ -42,20 +42,20 @@
     "spaceBody": "The fish-scale wall. The koi panel. The sushi counter. These are not décor choices — they are the identity of the room. Each element was sourced, designed, or built specifically for this space."
   },
   "catch": {
-    "headline": "Boho-Caribbean Nightlife",
-    "tagline": "Sharing plates, live DJs, and Caribbean energy.",
-    "tag": "Nightlife Dining",
-    "description": "CATCH is where dining meets the night. Caribbean-inspired sharing plates, a curated cocktail programme, and a rotating DJ booth make every evening an event in itself.",
-    "heroLine1": "The night",
-    "heroLine2": "starts here.",
+    "headline": "Relaxed Social Dining",
+    "tagline": "A lively restaurant setting for shared plates, drinks, and conversation.",
+    "tag": "Restaurant",
+    "description": "CATCH is a social restaurant at Gold House with a relaxed atmosphere, a menu made for sharing, and a welcoming space for groups and gatherings.",
+    "heroLine1": "Gather.",
+    "heroLine2": "Share.",
     "heroLine3": "",
     "cuisine": "Caribbean-inspired sharing plates",
     "setting": "Indoor / Outdoor hybrid",
     "dresscode": "Smart casual",
     "about": [
-      "CATCH was built for the hours after 9. For tables that linger, for rounds that become three, for the moment a dinner becomes a night.",
-      "The menu is designed for sharing — Caribbean-inspired plates that arrive in waves, each one an excuse to stay a little longer. The DJ booth rotates every Thursday through Saturday with local and international talent.",
-      "Rattan fixtures, exposed concrete, warm lighting. A space that's simultaneously casual and magnetic."
+      "CATCH is designed around shared tables, generous plates, and easy conversation.",
+      "The room brings food, drinks, and music together without losing sight of the restaurant experience at its centre.",
+      "A relaxed and welcoming setting for groups, gatherings, and time together."
     ]
   },
   "terrace": {

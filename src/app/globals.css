@@ -1352,6 +1352,22 @@ select.form-input { cursor: pointer; }
   .restaurant-index-actions { flex-direction: column; }
   .restaurant-index-actions a { width: 100%; min-height: 48px; display: inline-flex !important; align-items: center; justify-content: center; }
 
+  .venue-detail { overflow-x: clip; }
+  .venue-detail-hero { height: auto !important; min-height: calc(100svh - 64px) !important; }
+  .venue-detail-hero-nav { padding: 18px 16px !important; gap: 12px; }
+  .venue-detail-hero-nav > a:first-child { max-width: 56%; font-size: 10px !important; }
+  .venue-detail-hero-nav > a:last-child { min-height: 44px; display: inline-flex; align-items: center; }
+  .venue-detail-hero-content { padding: 24px 20px 48px !important; }
+  .venue-detail-hero-content > div:first-child img { max-width: 72vw; height: auto !important; max-height: 86px; }
+  .venue-detail-section { padding: 56px 20px !important; }
+  .venue-detail-about, .venue-detail-feature-grid, .venue-detail-other-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 32px !important; }
+  .venue-detail-gallery { grid-template-columns: 1fr 1fr !important; grid-template-rows: repeat(3, 220px) !important; }
+  .venue-detail-gallery > div:first-child { grid-row: 1 / 3 !important; grid-column: 1 / 3 !important; }
+  .venue-detail-gallery > div:nth-child(n+2) { grid-row: auto !important; grid-column: auto !important; }
+  .venue-detail-space-grid { grid-template-columns: 1fr !important; }
+  .venue-detail-space-grid > div { aspect-ratio: 4/3 !important; }
+  .venue-detail a.btn, .venue-detail-section a { min-height: 44px; }
+
   .experience-hero { padding: 48px 0 40px !important; min-height: 0 !important; }
   .experience-hero .page-container { padding-top: 0; padding-bottom: 0; }
   .experience-hero h1 { font-size: clamp(34px, 10vw, 46px) !important; line-height: 1.02 !important; }
@@ -1387,6 +1403,8 @@ select.form-input { cursor: pointer; }
 
 @media (max-width: 390px) {
   .restaurant-index-facts { grid-template-columns: minmax(0, 1fr) !important; }
+  .venue-detail-gallery { grid-template-columns: 1fr !important; grid-template-rows: repeat(5, 210px) !important; }
+  .venue-detail-gallery > div:first-child { grid-row: auto !important; grid-column: auto !important; }
   .experience-host { flex-wrap: wrap; }
   .experience-host > a { width: 100%; }
 }
@@ -2511,4 +2529,58 @@ tbody tr:hover td {
 .fab:hover {
   transform: translateY(-3px) scale(1.05);
   box-shadow: 0 8px 24px rgba(196,30,58,0.4), 0 3px 8px rgba(196,30,58,0.25);
+}
+
+/* ── Public homepage: restaurant/event-first journeys ─────────────────── */
+.public-gateway-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0 0 48px;
+}
+.public-gateway-card {
+  min-height: 154px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--color-text);
+  background: var(--color-surface);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.public-gateway-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  box-shadow: 0 14px 34px rgba(31, 26, 23, .08);
+}
+.public-gateway-card strong {
+  font-family: var(--font-heading);
+  font-size: clamp(25px, 3vw, 34px);
+  font-weight: 400;
+}
+.public-gateway-card > span:last-child {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.public-gateway-eyebrow {
+  color: var(--color-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+@media (max-width: 700px) {
+  .public-gateway-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+  .public-gateway-card {
+    min-height: 132px;
+    padding: 22px;
+  }
 }

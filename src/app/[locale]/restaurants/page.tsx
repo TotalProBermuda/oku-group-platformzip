@@ -5,6 +5,7 @@ import { localePath } from "@/i18n/utils";
 import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
+import { getWebsiteContent, hoursSummary, venueCopy } from "@/server/content/websiteContent";
 
 export async function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }));
@@ -24,7 +25,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function LocaleRestaurantsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const safeLocale = isValidLocale(locale) ? locale as Locale : "en";
-  const t = await getTranslations(safeLocale, ["venues", "common"]);
+  const [t, websiteContent] = await Promise.all([
+    getTranslations(safeLocale, ["venues", "common"]),
+    getWebsiteContent(),
+  ]);
   const v = t.venues as Record<string, unknown>;
   const common = t.common as Record<string, string>;
 
@@ -32,9 +36,9 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
     {
       slug: "oku",
       name: "OKÜ",
-      data: v.oku as Record<string, unknown>,
+      data: { ...(v.oku as Record<string, unknown>), ...venueCopy(websiteContent, "oku", safeLocale) },
       covers: 27,
-      hours: "Tue – Sun · 7 pm – 11 pm",
+      hours: hoursSummary(websiteContent, safeLocale),
       accent: "#1a1614",
       lightAccent: "#f5f2ef",
       logo: "/images/logo-oku-white-mark.png",
@@ -45,9 +49,9 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
     {
       slug: "catch",
       name: "CATCH",
-      data: v.catch as Record<string, unknown>,
+      data: { ...(v.catch as Record<string, unknown>), ...venueCopy(websiteContent, "catch", safeLocale) },
       covers: 24,
-      hours: "Thu – Sat · 8 pm – 2 am",
+      hours: hoursSummary(websiteContent, safeLocale),
       accent: "#1e3a5f",
       lightAccent: "#f0f4f8",
       logo: "/images/logo-catch.webp",
@@ -58,9 +62,9 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
     {
       slug: "terrace",
       name: "TERRACE",
-      data: v.terrace as Record<string, unknown>,
+      data: { ...(v.terrace as Record<string, unknown>), ...venueCopy(websiteContent, "terrace", safeLocale) },
       covers: 42,
-      hours: "Wed – Sun · 6 pm – midnight",
+      hours: hoursSummary(websiteContent, safeLocale),
       accent: "#2d4a1e",
       lightAccent: "#f2f5f0",
       logo: "/images/logo-terrace-cream.png",

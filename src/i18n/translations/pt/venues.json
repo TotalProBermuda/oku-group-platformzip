@@ -1,7 +1,7 @@
 {
   "backToGroup": "OKÜ Hospitality Group",
   "ourRestaurants": "Nossos Restaurantes",
-  "restaurantsSubtitle": "Três experiências gastronômicas únicas sob o mesmo teto — cada uma com sua própria identidade, culinária e atmosfera.",
+  "restaurantsSubtitle": "Três restaurantes no Gold House, cada um com sua própria comida, personalidade e atmosfera.",
   "reserveArrow": "Reservar uma Mesa →",
   "viewProfile": "Ver Perfil",
   "cuisine": "Culinária",
@@ -42,20 +42,20 @@
     "spaceBody": "A parede de escamas de peixe. O painel koi. O balcão de sushi. Estas não são escolhas decorativas — são a identidade do salão. Cada elemento foi selecionado, projetado ou construído especificamente para este espaço."
   },
   "catch": {
-    "headline": "Vida Noturna Caribenha Boho",
-    "tagline": "Pratos para compartilhar, DJs ao vivo e energia caribenha.",
-    "tag": "Restaurante Noturno",
-    "description": "CATCH é onde o jantar se transforma em noite. Pratos caribenhos para compartilhar, um programa de coquetéis curado e uma cabine de DJ rotatória fazem de cada noite um evento em si mesmo.",
-    "heroLine1": "A noite",
-    "heroLine2": "começa aqui.",
+    "headline": "Restaurante Social e Descontraído",
+    "tagline": "Um ambiente animado para compartilhar pratos, bebidas e conversa.",
+    "tag": "Restaurante",
+    "description": "CATCH é um restaurante social no Gold House, com ambiente descontraído, menu para compartilhar e um espaço acolhedor para grupos e encontros.",
+    "heroLine1": "Encontrem-se.",
+    "heroLine2": "Compartilhem.",
     "heroLine3": "",
     "cuisine": "Pratos caribenhos para compartilhar",
     "setting": "Híbrido interior/exterior",
     "dresscode": "Smart casual",
     "about": [
-      "CATCH foi criado para as horas depois das 9. Para mesas que se demoram, para rodadas que viram três, para o momento em que um jantar se transforma em uma noite.",
-      "O menu foi criado para compartilhar — pratos de inspiração caribenha que chegam em ondas, cada um uma desculpa para ficar um pouco mais. A cabine de DJ roda toda quinta a sábado com talentos locais e internacionais.",
-      "Acessórios de rattan, concreto exposto, iluminação quente. Um espaço ao mesmo tempo casual e magnético."
+      "CATCH foi pensado para mesas compartilhadas, pratos generosos e conversa tranquila.",
+      "O espaço reúne comida, bebidas e música sem perder de vista a experiência do restaurante.",
+      "Um ambiente descontraído e acolhedor para grupos, encontros e tempo juntos."
     ]
   },
   "terrace": {

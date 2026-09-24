@@ -22,7 +22,7 @@ const STRINGS = {
     chatPlaceholder: "Type your message…",
     chatSend: "Send",
     chatWait: "A host will reply shortly.",
-    infoMsg: "Our restaurants are open Wednesday–Sunday. Use the reservation form or chat with a host for specific queries.",
+    infoMsg: "Our restaurants are open Monday–Thursday, 5 pm–12 am, and Friday–Sunday, 2 pm–12 am. Use the reservation form or chat with a host for specific queries.",
     switchLang: "Switch language",
     poweredBy: "OKÜ Hospitality Group",
   },
@@ -243,7 +243,7 @@ export default function PublicChatbot() {
       }}>
         <div>
           <div style={{ fontWeight: 700, color: "#c8a96e", fontSize: 14 }}>OKÜ Hospitality</div>
-          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>Restaurant & Experiences</div>
+          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>Restaurants &amp; Events</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {/* Language switcher pill */}
