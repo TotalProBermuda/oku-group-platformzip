@@ -21,11 +21,58 @@ const localizedCopySchema = z.object({
   pt: copySchema,
 });
 
+const localizedLabelSchema = z.object({
+  en: z.string().trim().min(1).max(80),
+  es: z.string().trim().min(1).max(80),
+  pt: z.string().trim().min(1).max(80),
+});
+
+const timeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/, "Use HH:mm time format");
+const shiftSchema = z.object({
+  label: localizedLabelSchema,
+  start: timeSchema,
+  end: timeSchema,
+}).refine((shift) => shift.start < shift.end || shift.end === "24:00", "Shift end must be after its start");
+
 const contentSchema = z.object({
   hours: z.array(z.object({
     days: z.object({ en: z.string().trim().min(1).max(80), es: z.string().trim().min(1).max(80), pt: z.string().trim().min(1).max(80) }),
     time: z.string().trim().min(1).max(80),
   })).min(1).max(7),
+  operationalCalendar: z.object({
+    timezone: z.literal("America/Panama"),
+    weekly: z.array(z.object({
+      day: z.number().int().min(0).max(6),
+      enabled: z.boolean(),
+      shifts: z.array(shiftSchema).max(4),
+    })).length(7).refine((days) => new Set(days.map((entry) => entry.day)).size === 7, "Each weekday must appear once"),
+    exceptions: z.array(z.object({
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      name: localizedLabelSchema,
+      closed: z.boolean(),
+      shifts: z.array(shiftSchema).max(4),
+    })).max(100),
+  }).superRefine((calendar, context) => {
+    const validateShifts = (shifts: Array<{ start: string; end: string }>, path: Array<string | number>) => {
+      const sorted = [...shifts].sort((a, b) => a.start.localeCompare(b.start));
+      for (let index = 1; index < sorted.length; index += 1) {
+        if (sorted[index].start < sorted[index - 1].end) {
+          context.addIssue({ code: z.ZodIssueCode.custom, path, message: "Operating shifts cannot overlap" });
+        }
+      }
+    };
+    calendar.weekly.forEach((day, index) => {
+      if (day.enabled && day.shifts.length === 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ["weekly", index, "shifts"], message: "Open days require at least one shift" });
+      validateShifts(day.shifts, ["weekly", index, "shifts"]);
+    });
+    const dates = new Set<string>();
+    calendar.exceptions.forEach((entry, index) => {
+      if (dates.has(entry.date)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["exceptions", index, "date"], message: "Only one exception is allowed per date" });
+      dates.add(entry.date);
+      if (!entry.closed && entry.shifts.length === 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ["exceptions", index, "shifts"], message: "Special opening days require at least one shift" });
+      validateShifts(entry.shifts, ["exceptions", index, "shifts"]);
+    });
+  }),
   venues: z.object({
     oku: localizedCopySchema,
     catch: localizedCopySchema,

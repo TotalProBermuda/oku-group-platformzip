@@ -8,7 +8,7 @@ import { localePath } from "@/i18n/utils";
 import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
-import { getWebsiteContent, venueCopy } from "@/server/content/websiteContent";
+import { getWebsiteContent, operatingHoursRows, venueCopy } from "@/server/content/websiteContent";
 
 const VALID_SLUGS = ["oku", "catch", "terrace"] as const;
 type SlugType = (typeof VALID_SLUGS)[number];
@@ -191,8 +191,8 @@ export default async function LocaleRestaurantSlugPage({
 
   const v = t.venues as Record<string, unknown>;
   const common = t.common as Record<string, string>;
-  const vd = { ...((v[safeSlug] as Record<string, unknown>) || {}), ...venueCopy(websiteContent, safeSlug, safeLocale) };
-  const sd = { ...STATIC_DATA[safeSlug], hours: websiteContent.hours.map((entry) => ({ day: entry.days[safeLocale], time: entry.time })) };
+  const vd: Record<string, unknown> = { ...((v[safeSlug] as Record<string, unknown>) || {}), ...(venueCopy(websiteContent, safeSlug, safeLocale) as unknown as Record<string, unknown>) };
+  const sd = { ...STATIC_DATA[safeSlug], hours: operatingHoursRows(websiteContent, safeLocale).map((entry) => ({ day: entry.days, time: entry.time })) };
 
   const foodMenu = await getFoodMenuByVenueDb(safeSlug);
   const drinksMenu = await getDrinksMenuByVenueDb(safeSlug);
@@ -281,7 +281,11 @@ export default async function LocaleRestaurantSlugPage({
               ].map(item => (
                 <div key={item.label}>
                   <div style={{ fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7d7269", marginBottom: 2 }}>{item.label}</div>
-                  <div style={{ fontSize: 12, color: "#1f1a17", fontWeight: 500 }}>{item.value}</div>
+                  <div style={{ fontSize: 12, color: "#1f1a17", fontWeight: 500 }}>
+                    {item.label === v.hours
+                      ? <div style={{ display: "grid", gap: 5 }}>{sd.hours.map((row) => <div key={row.day}><div>{row.day}</div><div style={{ color: "#7d7269", fontWeight: 400 }}>{row.time}</div></div>)}</div>
+                      : item.value}
+                  </div>
                 </div>
               ))}
             </div>

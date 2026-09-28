@@ -5,7 +5,7 @@ import { localePath } from "@/i18n/utils";
 import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
-import { getWebsiteContent, hoursSummary, venueCopy } from "@/server/content/websiteContent";
+import { getWebsiteContent, operatingHoursRows, venueCopy } from "@/server/content/websiteContent";
 
 export async function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }));
@@ -36,9 +36,9 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
     {
       slug: "oku",
       name: "OKÜ",
-      data: { ...(v.oku as Record<string, unknown>), ...venueCopy(websiteContent, "oku", safeLocale) },
+      data: { ...(v.oku as Record<string, unknown>), ...(venueCopy(websiteContent, "oku", safeLocale) as unknown as Record<string, unknown>) },
       covers: 27,
-      hours: hoursSummary(websiteContent, safeLocale),
+      hours: operatingHoursRows(websiteContent, safeLocale),
       accent: "#1a1614",
       lightAccent: "#f5f2ef",
       logo: "/images/logo-oku-white-mark.png",
@@ -49,9 +49,9 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
     {
       slug: "catch",
       name: "CATCH",
-      data: { ...(v.catch as Record<string, unknown>), ...venueCopy(websiteContent, "catch", safeLocale) },
+      data: { ...(v.catch as Record<string, unknown>), ...(venueCopy(websiteContent, "catch", safeLocale) as unknown as Record<string, unknown>) },
       covers: 24,
-      hours: hoursSummary(websiteContent, safeLocale),
+      hours: operatingHoursRows(websiteContent, safeLocale),
       accent: "#1e3a5f",
       lightAccent: "#f0f4f8",
       logo: "/images/logo-catch.webp",
@@ -62,9 +62,9 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
     {
       slug: "terrace",
       name: "TERRACE",
-      data: { ...(v.terrace as Record<string, unknown>), ...venueCopy(websiteContent, "terrace", safeLocale) },
+      data: { ...(v.terrace as Record<string, unknown>), ...(venueCopy(websiteContent, "terrace", safeLocale) as unknown as Record<string, unknown>) },
       covers: 42,
-      hours: hoursSummary(websiteContent, safeLocale),
+      hours: operatingHoursRows(websiteContent, safeLocale),
       accent: "#2d4a1e",
       lightAccent: "#f2f5f0",
       logo: "/images/logo-terrace-cream.png",
@@ -137,7 +137,11 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
                       ].map(info => (
                         <div key={info.label} className="restaurant-index-fact">
                           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7d7269", marginBottom: 3 }}>{info.label}</div>
-                          <div style={{ fontSize: 13, color: "#1f1a17", fontWeight: 500 }}>{info.value}</div>
+                          <div style={{ fontSize: 13, color: "#1f1a17", fontWeight: 500 }}>
+                            {info.label === v.hours
+                              ? <div style={{ display: "grid", gap: 4 }}>{r.hours.map((row) => <div key={row.days}><div>{row.days}</div><div style={{ color: "#7d7269", fontWeight: 400 }}>{row.time}</div></div>)}</div>
+                              : info.value as string}
+                          </div>
                         </div>
                       ))}
                     </div>
