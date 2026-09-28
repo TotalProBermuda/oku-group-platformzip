@@ -1,29 +1,38 @@
-const WEEKEND_OPEN_MINUTES = 14 * 60;
+import type { WebsiteContent } from "@/server/content/websiteContent";
+import { minutesFromTime, operatingDayForDate } from "@/server/content/websiteContent";
 
-function isFridayThroughSunday(day: number): boolean {
-  return day === 0 || day === 5 || day === 6;
-}
-
-export function serviceStartForCalendarDate(
-  date: string | null,
-  configuredStartMinutes: number,
-): number {
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return configuredStartMinutes;
-  const [year, month, day] = date.split("-").map(Number);
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return isFridayThroughSunday(weekday) ? WEEKEND_OPEN_MINUTES : configuredStartMinutes;
-}
-
-export function serviceStartForInstant(
-  instant: Date,
-  timezone: string,
-  configuredStartMinutes: number,
-): number {
-  const weekday = new Intl.DateTimeFormat("en-US", {
+export function dateKeyInTimezone(instant: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
-    weekday: "short",
-  }).format(instant);
-  return ["Fri", "Sat", "Sun"].includes(weekday)
-    ? WEEKEND_OPEN_MINUTES
-    : configuredStartMinutes;
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(instant);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+export function minutesInTimezone(instant: Date, timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value);
+  return hour * 60 + minute;
+}
+
+export function reservationIsWithinOperatingHours(content: WebsiteContent, instant: Date): boolean {
+  const timezone = content.operationalCalendar.timezone;
+  const date = dateKeyInTimezone(instant, timezone);
+  const minutes = minutesInTimezone(instant, timezone);
+  const day = operatingDayForDate(content, date);
+  if (day.closed) return false;
+  return day.shifts.some((shift) => {
+    const start = minutesFromTime(shift.start);
+    const end = minutesFromTime(shift.end);
+    return minutes >= start && minutes < end;
+  });
 }

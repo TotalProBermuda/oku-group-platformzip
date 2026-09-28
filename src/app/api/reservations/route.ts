@@ -9,23 +9,12 @@ import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
 import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
 import { getCommerceSettings } from "@/server/commerce/commerceSettings";
-import { serviceStartForInstant } from "@/server/reservations/serviceWindow";
+import { getWebsiteContent } from "@/server/content/websiteContent";
+import { reservationIsWithinOperatingHours } from "@/server/reservations/serviceWindow";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-}
-
-function minutesInTimezone(date: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const hour = Number(parts.find((part) => part.type === "hour")?.value);
-  const minute = Number(parts.find((part) => part.type === "minute")?.value);
-  return hour * 60 + minute;
 }
 
 export async function POST(req: NextRequest) {
@@ -66,17 +55,11 @@ export async function POST(req: NextRequest) {
     if (Number.isNaN(reservationStartAt.getTime())) {
       return NextResponse.json({ error: "A valid reservation date and time is required." }, { status: 400 });
     }
-    const commerceSettings = await getCommerceSettings();
-    const reservationMinutes = minutesInTimezone(reservationStartAt, commerceSettings.timezone);
-    const serviceStartMinutes = serviceStartForInstant(
-      reservationStartAt,
-      commerceSettings.timezone,
-      commerceSettings.reservationServiceStartMinutes,
-    );
-    if (
-      reservationMinutes < serviceStartMinutes ||
-      reservationMinutes > commerceSettings.reservationServiceEndMinutes
-    ) {
+    const [commerceSettings, websiteContent] = await Promise.all([
+      getCommerceSettings(),
+      getWebsiteContent(),
+    ]);
+    if (!reservationIsWithinOperatingHours(websiteContent, reservationStartAt)) {
       return NextResponse.json(
         { error: "The requested time is outside the current reservation service window." },
         { status: 400 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { HoneypotField } from "@/components/HoneypotField";
+import { panamaReservationIso } from "@/lib/reservationDate";
 
 type Zone = { id: string; name: string; conceptKey: string; zoneType: string; description?: string | null; capacityCovers: number };
 type Step = "concept" | "details" | "addons" | "contact" | "review" | "confirmed";
@@ -123,9 +124,9 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
     fetch(`/api/reservations/service-window${query}`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data) => {
-        if (!cancelled && Array.isArray(data.slots) && data.slots.length > 0) {
+        if (!cancelled && Array.isArray(data.slots)) {
           setTimes(data.slots);
-          setTime((current) => data.slots.includes(current) ? current : data.slots[0]);
+          setTime((current) => data.slots.includes(current) ? current : (data.slots[0] ?? ""));
         }
       })
       .catch(() => {
@@ -257,11 +258,10 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const dateTime = new Date(`${date}T${time}:00`);
       const res = await fetch("/api/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conceptKey: selectedConcept, reservationDate: dateTime.toISOString(), partySize, occasion, seatingPreference: seatingPref, notes, addons, contactName, contactEmail, contactPhone, referralCode, _company: company }),
+        body: JSON.stringify({ conceptKey: selectedConcept, reservationDate: panamaReservationIso(date, time), partySize, occasion, seatingPreference: seatingPref, notes, addons, contactName, contactEmail, contactPhone, referralCode, _company: company }),
       });
       const data = await res.json();
       if (data.confirmationCode) {
@@ -384,7 +384,8 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
             />
           </WizardInput>
           <WizardInput label={t.time} required>
-            <select value={time} onChange={e => setTime(e.target.value)} style={inputStyle}>
+            <select value={time} disabled={times.length === 0} onChange={e => setTime(e.target.value)} style={inputStyle}>
+              {times.length === 0 && <option value="">Closed / no reservation times</option>}
               {times.map(tm => <option key={tm} value={tm}>{tm}</option>)}
             </select>
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 8, lineHeight: 1.5 }}>

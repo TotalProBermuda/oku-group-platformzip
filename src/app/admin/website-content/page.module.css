@@ -5,10 +5,18 @@
 .field { display: grid; gap: 7px; }
 .field span { font-size: 12px; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .06em; }
 .field input, .field textarea { width: 100%; }
-.hours { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.dayList { display: grid; gap: 12px; }
+.dayCard { border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; background: var(--color-surface); }
+.dayHeader, .exceptionHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 12px; }
+.dayHeader { margin: 0 0 12px; }
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.shiftList { display: grid; gap: 10px; margin-bottom: 10px; }
+.shiftRow { display: grid; grid-template-columns: minmax(150px, 1fr) 130px 130px auto; gap: 10px; align-items: end; }
+.exceptionGrid { display: grid; grid-template-columns: 160px minmax(180px, 1fr) auto auto; gap: 10px; align-items: end; }
 .heroLines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 700px) {
-  .hours, .heroLines { grid-template-columns: 1fr; }
+  .heroLines, .shiftRow, .exceptionGrid { grid-template-columns: 1fr; }
+  .dayHeader, .exceptionHeader { align-items: flex-start; }
   .toolbar, .toolbar label, .actions, .actions button { width: 100%; }
 }
