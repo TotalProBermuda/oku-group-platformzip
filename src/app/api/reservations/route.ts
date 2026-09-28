@@ -9,6 +9,7 @@ import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService
 import { DEFAULT_DURATION_MINUTES, FAR_FUTURE_EXPIRY } from "@/server/spaces/capacityService";
 import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server/events/eventOccupancyService";
 import { getCommerceSettings } from "@/server/commerce/commerceSettings";
+import { serviceStartForInstant } from "@/server/reservations/serviceWindow";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -67,8 +68,13 @@ export async function POST(req: NextRequest) {
     }
     const commerceSettings = await getCommerceSettings();
     const reservationMinutes = minutesInTimezone(reservationStartAt, commerceSettings.timezone);
+    const serviceStartMinutes = serviceStartForInstant(
+      reservationStartAt,
+      commerceSettings.timezone,
+      commerceSettings.reservationServiceStartMinutes,
+    );
     if (
-      reservationMinutes < commerceSettings.reservationServiceStartMinutes ||
+      reservationMinutes < serviceStartMinutes ||
       reservationMinutes > commerceSettings.reservationServiceEndMinutes
     ) {
       return NextResponse.json(

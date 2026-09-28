@@ -168,7 +168,10 @@ export function GuestBookingForm({
   // booking forms aligned with the superadmin-controlled service window.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/reservations/service-window", { cache: "no-store" })
+    const query = form.reservationDate
+      ? `?date=${encodeURIComponent(form.reservationDate)}`
+      : "";
+    fetch(`/api/reservations/service-window${query}`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data) => {
         if (!cancelled && Array.isArray(data.slots) && data.slots.length > 0) {
@@ -184,7 +187,7 @@ export function GuestBookingForm({
         // Keep the known-safe default window available if settings cannot load.
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [form.reservationDate]);
 
   // Space availability — only active when showDateTimePicker=true
   const [spaces, setSpaces] = useState<SpaceOption[]>([]);
