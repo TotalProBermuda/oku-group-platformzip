@@ -7,6 +7,10 @@ import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
 import { getWebsiteContent, operatingHoursRows, venueCopy } from "@/server/content/websiteContent";
 
+// Website copy and operating hours are edited by Superadmin and must be read
+// from the production database at request time, not during the Replit build.
+export const dynamic = "force-dynamic";
+
 export async function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }));
 }
