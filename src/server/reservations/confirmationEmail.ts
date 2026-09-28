@@ -1,4 +1,5 @@
 import { getResendClient, isResendConfigured } from "@/server/invitation/resend";
+import { PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 
 export interface ReservationConfirmationInput {
   contactName: string;
@@ -26,8 +27,6 @@ export interface ReservationConfirmationResult {
 }
 
 export type ReservationEmailKind = "REQUEST_RECEIVED" | "CONFIRMATION" | "RESERVATION_UPDATED";
-
-const PANAMA_TZ = "America/Panama";
 
 type ResendSendResult = { error?: { message?: string } | null };
 
@@ -94,12 +93,12 @@ function formatReservationDateTime(date: Date): { dateLine: string; timeLine: st
     month: "long",
     day: "numeric",
     year: "numeric",
-    timeZone: PANAMA_TZ,
+    timeZone: PANAMA_TIME_ZONE,
   }).format(date);
   const timeLine = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    timeZone: PANAMA_TZ,
+    timeZone: PANAMA_TIME_ZONE,
   }).format(date);
   return { dateLine, timeLine };
 }
