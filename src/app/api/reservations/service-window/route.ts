@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCommerceSettings } from "@/server/commerce/commerceSettings";
+import { serviceStartForCalendarDate } from "@/server/reservations/serviceWindow";
 
 function slotsBetween(startMinutes: number, endMinutes: number): string[] {
   const slots: string[] = [];
@@ -11,14 +12,19 @@ function slotsBetween(startMinutes: number, endMinutes: number): string[] {
 
 // Public, non-sensitive configuration for guest reservation surfaces. The
 // source of truth remains CommerceSettings and is edited by superadmins only.
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const settings = await getCommerceSettings();
+    const date = new URL(request.url).searchParams.get("date");
+    const serviceStartMinutes = serviceStartForCalendarDate(
+      date,
+      settings.reservationServiceStartMinutes,
+    );
     return NextResponse.json(
       {
-        serviceStartMinutes: settings.reservationServiceStartMinutes,
+        serviceStartMinutes,
         serviceEndMinutes: settings.reservationServiceEndMinutes,
-        slots: slotsBetween(settings.reservationServiceStartMinutes, settings.reservationServiceEndMinutes),
+        slots: slotsBetween(serviceStartMinutes, settings.reservationServiceEndMinutes),
       },
       { headers: { "Cache-Control": "no-store" } }
     );

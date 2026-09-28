@@ -119,7 +119,8 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/reservations/service-window", { cache: "no-store" })
+    const query = date ? `?date=${encodeURIComponent(date)}` : "";
+    fetch(`/api/reservations/service-window${query}`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data) => {
         if (!cancelled && Array.isArray(data.slots) && data.slots.length > 0) {
@@ -131,7 +132,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
         // The fallback above keeps booking usable during a short settings outage.
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [date]);
 
   // Auto-capture referrer from URL query string. Supports both ?ref= and
   // ?referrer= for compatibility with older shared links. We intentionally
