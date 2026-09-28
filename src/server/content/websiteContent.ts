@@ -18,7 +18,50 @@ type VenueCopy = {
 
 export type WebsiteContent = {
   hours: Array<{ days: Record<Locale, string>; time: string }>;
+  operationalCalendar: OperationalCalendar;
   venues: Record<WebsiteVenue, Record<Locale, VenueCopy>>;
+};
+
+export type OperatingShift = {
+  label: Record<Locale, string>;
+  start: string;
+  end: string;
+};
+
+export type WeeklyOperatingDay = {
+  day: number;
+  enabled: boolean;
+  shifts: OperatingShift[];
+};
+
+export type OperatingException = {
+  date: string;
+  name: Record<Locale, string>;
+  closed: boolean;
+  shifts: OperatingShift[];
+};
+
+export type OperationalCalendar = {
+  timezone: string;
+  weekly: WeeklyOperatingDay[];
+  exceptions: OperatingException[];
+};
+
+const DINNER_LABEL = { en: "Dinner", es: "Cena", pt: "Jantar" };
+const ALL_DAY_LABEL = { en: "Lunch & dinner", es: "Almuerzo y cena", pt: "Almoço e jantar" };
+
+export const DEFAULT_OPERATIONAL_CALENDAR: OperationalCalendar = {
+  timezone: "America/Panama",
+  weekly: [
+    { day: 0, enabled: true, shifts: [{ label: ALL_DAY_LABEL, start: "14:00", end: "24:00" }] },
+    { day: 1, enabled: true, shifts: [{ label: DINNER_LABEL, start: "17:00", end: "24:00" }] },
+    { day: 2, enabled: true, shifts: [{ label: DINNER_LABEL, start: "17:00", end: "24:00" }] },
+    { day: 3, enabled: true, shifts: [{ label: DINNER_LABEL, start: "17:00", end: "24:00" }] },
+    { day: 4, enabled: true, shifts: [{ label: DINNER_LABEL, start: "17:00", end: "24:00" }] },
+    { day: 5, enabled: true, shifts: [{ label: ALL_DAY_LABEL, start: "14:00", end: "24:00" }] },
+    { day: 6, enabled: true, shifts: [{ label: ALL_DAY_LABEL, start: "14:00", end: "24:00" }] },
+  ],
+  exceptions: [],
 };
 
 export const WEBSITE_CONTENT_DEFAULTS: WebsiteContent = {
@@ -26,6 +69,7 @@ export const WEBSITE_CONTENT_DEFAULTS: WebsiteContent = {
     { days: { en: "Monday – Thursday", es: "Lunes – Jueves", pt: "Segunda – Quinta" }, time: "5:00 pm – 12:00 am" },
     { days: { en: "Friday – Sunday", es: "Viernes – Domingo", pt: "Sexta – Domingo" }, time: "2:00 pm – 12:00 am" },
   ],
+  operationalCalendar: DEFAULT_OPERATIONAL_CALENDAR,
   venues: {
     oku: {
       en: { headline: "The Signature Dining Room", tag: "Restaurant", tagline: "Thoughtful food, warm hospitality, and a setting designed for time together.", description: "OKÜ is the signature restaurant at Gold House in Casco Viejo, bringing together considered cooking, attentive service, and an intimate dining room.", heroLine1: "Thoughtful food.", heroLine2: "Warm hospitality.", heroLine3: "Casco Viejo.", about: ["OKÜ is centred on the experience of sharing a well-prepared meal in a distinctive Casco Viejo setting.", "The dining room, sushi counter, kitchen, and bar work as one restaurant experience—from the first welcome through the final course."] },
@@ -51,10 +95,17 @@ function validStoredContent(value: unknown): value is WebsiteContent {
   return Array.isArray(content.hours) && Boolean(content.venues);
 }
 
+function normalizeContent(value: WebsiteContent): WebsiteContent {
+  return {
+    ...value,
+    operationalCalendar: value.operationalCalendar ?? DEFAULT_OPERATIONAL_CALENDAR,
+  };
+}
+
 export async function getWebsiteContent(): Promise<WebsiteContent> {
   try {
     const row = await prisma.commerceSettings.findUnique({ where: { id: "global" }, select: { websiteContent: true } });
-    return validStoredContent(row?.websiteContent) ? row.websiteContent : WEBSITE_CONTENT_DEFAULTS;
+    return validStoredContent(row?.websiteContent) ? normalizeContent(row.websiteContent) : WEBSITE_CONTENT_DEFAULTS;
   } catch {
     // Keeps public pages available during the deployment in which the new
     // column is being applied, and on local databases not yet migrated.
@@ -67,5 +118,85 @@ export function venueCopy(content: WebsiteContent, venue: WebsiteVenue, locale: 
 }
 
 export function hoursSummary(content: WebsiteContent, locale: Locale) {
-  return content.hours.map((entry) => `${entry.days[locale]} · ${entry.time}`).join("  |  ");
+  return operatingHoursRows(content, locale).map((entry) => `${entry.days} · ${entry.time}`).join("\n");
+}
+
+const DAY_NAMES: Record<Locale, string[]> = {
+  en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  es: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
+  pt: ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"],
+};
+
+export function minutesFromTime(value: string): number {
+  if (value === "24:00") return 24 * 60;
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return Number.NaN;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+export function operatingDayForDate(content: WebsiteContent, date: string) {
+  const exception = content.operationalCalendar.exceptions.find((entry) => entry.date === date);
+  if (exception) return { closed: exception.closed, shifts: exception.shifts, exception };
+  const [year, month, day] = date.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const weekly = content.operationalCalendar.weekly.find((entry) => entry.day === weekday);
+  return { closed: !weekly?.enabled, shifts: weekly?.enabled ? weekly.shifts : [], exception: null };
+}
+
+export function slotsForOperatingDate(content: WebsiteContent, date: string): string[] {
+  const day = operatingDayForDate(content, date);
+  if (day.closed) return [];
+  return day.shifts.flatMap((shift) => {
+    const slots: string[] = [];
+    const start = minutesFromTime(shift.start);
+    const end = minutesFromTime(shift.end);
+    for (let minutes = start; minutes < end; minutes += 30) {
+      slots.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
+    }
+    return slots;
+  });
+}
+
+export function operatingHoursRows(content: WebsiteContent, locale: Locale) {
+  const orderedDays = [1, 2, 3, 4, 5, 6, 0];
+  const rows: Array<{ days: string; time: string }> = [];
+  let group: number[] = [];
+  let signature = "";
+  const flush = () => {
+    if (!group.length) return;
+    const first = DAY_NAMES[locale][group[0]];
+    const last = DAY_NAMES[locale][group[group.length - 1]];
+    const days = group.length === 1 ? first : `${first} – ${last}`;
+    const source = content.operationalCalendar.weekly.find((entry) => entry.day === group[0]);
+    const time = source?.enabled
+      ? source.shifts.map((shift) => `${shift.start} – ${shift.end === "24:00" ? "00:00" : shift.end}`).join(", ")
+      : ({ en: "Closed", es: "Cerrado", pt: "Fechado" } as Record<Locale, string>)[locale];
+    rows.push({ days, time });
+    group = [];
+  };
+  for (const day of orderedDays) {
+    const source = content.operationalCalendar.weekly.find((entry) => entry.day === day);
+    const nextSignature = JSON.stringify({ enabled: source?.enabled ?? false, shifts: source?.shifts ?? [] });
+    if (group.length && nextSignature !== signature) flush();
+    if (!group.length) signature = nextSignature;
+    group.push(day);
+  }
+  flush();
+  const today = new Date().toISOString().slice(0, 10);
+  const localeCode: Record<Locale, string> = { en: "en-US", es: "es-PA", pt: "pt-BR" };
+  const closedLabel: Record<Locale, string> = { en: "Closed", es: "Cerrado", pt: "Fechado" };
+  content.operationalCalendar.exceptions
+    .filter((entry) => entry.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 5)
+    .forEach((entry) => {
+      const dateLabel = new Date(`${entry.date}T12:00:00Z`).toLocaleDateString(localeCode[locale], { month: "short", day: "numeric" });
+      rows.push({
+        days: `${entry.name[locale]} · ${dateLabel}`,
+        time: entry.closed
+          ? closedLabel[locale]
+          : entry.shifts.map((shift) => `${shift.start} – ${shift.end === "24:00" ? "00:00" : shift.end}`).join(", "),
+      });
+    });
+  return rows;
 }

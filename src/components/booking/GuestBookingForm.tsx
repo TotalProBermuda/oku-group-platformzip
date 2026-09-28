@@ -174,7 +174,7 @@ export function GuestBookingForm({
     fetch(`/api/reservations/service-window${query}`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data) => {
-        if (!cancelled && Array.isArray(data.slots) && data.slots.length > 0) {
+        if (!cancelled && Array.isArray(data.slots)) {
           setServiceSlots(data.slots);
           setForm((current) =>
             current.reservationTime && !data.slots.includes(current.reservationTime)
@@ -420,6 +420,11 @@ export function GuestBookingForm({
 
           {/* Time slot buttons */}
           <div style={subLabel}>{t("host", "streetForm.timeLabel")}</div>
+          {form.reservationDate && serviceSlots.length === 0 && (
+            <div role="status" style={{ padding: "12px 14px", marginBottom: 10, borderRadius: 9, background: "rgba(196,30,58,.12)", color: "#f3a8b5", fontSize: 13 }}>
+              Closed or no reservation times are available for this date.
+            </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
             {serviceSlots.map((slot) => {
               const active = form.reservationTime === slot;

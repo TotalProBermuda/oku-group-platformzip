@@ -6,9 +6,14 @@ import styles from "./page.module.css";
 type Locale = "en" | "es" | "pt";
 type Venue = "oku" | "catch" | "terrace";
 type Copy = { headline: string; tag: string; tagline: string; description: string; heroLine1: string; heroLine2: string; heroLine3: string; about: string[] };
-type Content = { hours: Array<{ days: Record<Locale, string>; time: string }>; venues: Record<Venue, Record<Locale, Copy>> };
+type Shift = { label: Record<Locale, string>; start: string; end: string };
+type WeeklyDay = { day: number; enabled: boolean; shifts: Shift[] };
+type Exception = { date: string; name: Record<Locale, string>; closed: boolean; shifts: Shift[] };
+type Content = { hours: Array<{ days: Record<Locale, string>; time: string }>; operationalCalendar: { timezone: "America/Panama"; weekly: WeeklyDay[]; exceptions: Exception[] }; venues: Record<Venue, Record<Locale, Copy>> };
 
 const localeLabels: Record<Locale, string> = { en: "English", es: "Español", pt: "Português" };
+const dayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const blankShift = (): Shift => ({ label: { en: "Service", es: "Servicio", pt: "Serviço" }, start: "17:00", end: "24:00" });
 
 export default function WebsiteContentPage() {
   const [content, setContent] = useState<Content | null>(null);
@@ -20,11 +25,10 @@ export default function WebsiteContentPage() {
   useEffect(() => { void fetch("/api/v1/admin/website-content").then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error); setContent(body.data); setMessage(""); }).catch((error) => setMessage(error.message)); }, []);
 
   const updateCopy = (key: keyof Copy, value: string | string[]) => setContent((current) => current ? ({ ...current, venues: { ...current.venues, [venue]: { ...current.venues[venue], [locale]: { ...current.venues[venue][locale], [key]: value } } } }) : current);
-  const updateHours = (index: number, key: "days" | "time", value: string) => setContent((current) => {
-    if (!current) return current;
-    const hours = current.hours.map((row, rowIndex) => rowIndex !== index ? row : key === "time" ? { ...row, time: value } : { ...row, days: { ...row.days, [locale]: value } });
-    return { ...current, hours };
-  });
+  const updateDay = (day: number, mutate: (entry: WeeklyDay) => WeeklyDay) => setContent((current) => current ? ({ ...current, operationalCalendar: { ...current.operationalCalendar, weekly: current.operationalCalendar.weekly.map((entry) => entry.day === day ? mutate(entry) : entry) } }) : current);
+  const updateShift = (day: number, index: number, key: "label" | "start" | "end", value: string) => updateDay(day, (entry) => ({ ...entry, shifts: entry.shifts.map((shift, shiftIndex) => shiftIndex !== index ? shift : key === "label" ? { ...shift, label: { ...shift.label, [locale]: value } } : { ...shift, [key]: value }) }));
+  const updateException = (index: number, mutate: (entry: Exception) => Exception) => setContent((current) => current ? ({ ...current, operationalCalendar: { ...current.operationalCalendar, exceptions: current.operationalCalendar.exceptions.map((entry, entryIndex) => entryIndex === index ? mutate(entry) : entry) } }) : current);
+  const updateExceptionShift = (exceptionIndex: number, shiftIndex: number, mutate: (shift: Shift) => Shift) => updateException(exceptionIndex, (entry) => ({ ...entry, shifts: entry.shifts.map((shift, index) => index === shiftIndex ? mutate(shift) : shift) }));
   const save = async () => {
     if (!content) return;
     setSaving(true); setMessage("Saving…");
@@ -41,9 +45,24 @@ export default function WebsiteContentPage() {
     {message && <p role="status" className="panel" style={{ padding: 14, marginTop: 18 }}>{message}</p>}
     {content && copy && <>
       <section className="panel" style={{ marginTop: 20 }}>
-        <div className="panel-title">Opening hours</div>
+        <div className="panel-title">Operating calendar & reservation hours</div>
+        <p className="panel-subtitle">This is the source of truth for public opening hours and every regular reservation surface. Add separate shifts for lunch and dinner. Event ticket times remain controlled by each event session.</p>
         <div className={styles.toolbar} style={{ margin: "16px 0" }}><label><span>Editing language</span><select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>{Object.entries(localeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
-        <div className={styles.hours}>{content.hours.map((row, index) => <div key={index} className={styles.form}><label className={styles.field}><span>Days</span><input value={row.days[locale]} onChange={(event) => updateHours(index, "days", event.target.value)} /></label><label className={styles.field}><span>Time</span><input value={row.time} onChange={(event) => updateHours(index, "time", event.target.value)} /></label></div>)}</div>
+        <div className={styles.dayList}>{[1, 2, 3, 4, 5, 6, 0].map((day) => { const entry = content.operationalCalendar.weekly.find((item) => item.day === day)!; return <div key={day} className={styles.dayCard}><div className={styles.dayHeader}><strong>{dayLabels[day]}</strong><label className={styles.toggle}><input type="checkbox" checked={entry.enabled} onChange={(event) => updateDay(day, (current) => ({ ...current, enabled: event.target.checked }))} /> Open</label></div>{entry.enabled && <><div className={styles.shiftList}>{entry.shifts.map((shift, index) => <div key={index} className={styles.shiftRow}><label className={styles.field}><span>Shift label</span><input value={shift.label[locale]} onChange={(event) => updateShift(day, index, "label", event.target.value)} /></label><label className={styles.field}><span>Opens</span><input type="time" value={shift.start} onChange={(event) => updateShift(day, index, "start", event.target.value)} /></label><label className={styles.field}><span>Closes</span><input type="time" value={shift.end === "24:00" ? "00:00" : shift.end} onChange={(event) => updateShift(day, index, "end", event.target.value === "00:00" ? "24:00" : event.target.value)} /></label><button type="button" className="btn btn-secondary" onClick={() => updateDay(day, (current) => ({ ...current, shifts: current.shifts.filter((_, shiftIndex) => shiftIndex !== index) }))}>Remove</button></div>)}</div><button type="button" className="btn btn-secondary" onClick={() => updateDay(day, (current) => ({ ...current, shifts: [...current.shifts, blankShift()] }))}>+ Add shift</button></>}</div>; })}</div>
+        <div className={styles.exceptionHeader}><div><div className="panel-title">Holiday & special hours</div><p className="panel-subtitle">A dated exception overrides the normal weekday schedule.</p></div><button type="button" className="btn btn-secondary" onClick={() => setContent((current) => current ? ({ ...current, operationalCalendar: { ...current.operationalCalendar, exceptions: [...current.operationalCalendar.exceptions, { date: "", name: { en: "Special hours", es: "Horario especial", pt: "Horário especial" }, closed: true, shifts: [] }] } }) : current)}>+ Add exception</button></div>
+        <div className={styles.dayList}>{content.operationalCalendar.exceptions.map((entry, index) => <div key={`${entry.date}-${index}`} className={styles.dayCard}>
+          <div className={styles.exceptionGrid}>
+            <label className={styles.field}><span>Date</span><input type="date" value={entry.date} onChange={(event) => updateException(index, (current) => ({ ...current, date: event.target.value }))} /></label>
+            <label className={styles.field}><span>Name</span><input value={entry.name[locale]} onChange={(event) => updateException(index, (current) => ({ ...current, name: { ...current.name, [locale]: event.target.value } }))} /></label>
+            <label className={styles.toggle}><input type="checkbox" checked={entry.closed} onChange={(event) => updateException(index, (current) => ({ ...current, closed: event.target.checked, shifts: event.target.checked ? [] : (current.shifts.length ? current.shifts : [blankShift()]) }))} /> Closed all day</label>
+            <button type="button" className="btn btn-secondary" onClick={() => setContent((current) => current ? ({ ...current, operationalCalendar: { ...current.operationalCalendar, exceptions: current.operationalCalendar.exceptions.filter((_, entryIndex) => entryIndex !== index) } }) : current)}>Delete</button>
+          </div>
+          {!entry.closed && <div className={styles.shiftList}>{entry.shifts.map((shift, shiftIndex) => <div key={shiftIndex} className={styles.shiftRow}>
+            <label className={styles.field}><span>Shift label</span><input value={shift.label[locale]} onChange={(event) => updateExceptionShift(index, shiftIndex, (current) => ({ ...current, label: { ...current.label, [locale]: event.target.value } }))} /></label>
+            <label className={styles.field}><span>Opens</span><input type="time" value={shift.start} onChange={(event) => updateExceptionShift(index, shiftIndex, (current) => ({ ...current, start: event.target.value }))} /></label>
+            <label className={styles.field}><span>Closes</span><input type="time" value={shift.end === "24:00" ? "00:00" : shift.end} onChange={(event) => updateExceptionShift(index, shiftIndex, (current) => ({ ...current, end: event.target.value === "00:00" ? "24:00" : event.target.value }))} /></label>
+          </div>)}</div>}
+        </div>)}</div>
       </section>
       <section className="panel" style={{ marginTop: 20 }}>
         <div className="panel-title">Venue copy</div>

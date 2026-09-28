@@ -5,6 +5,7 @@ import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
 import type { Locale } from "@/types/i18n";
 import { GuestBookingForm, type ConceptKey, type GuestBookingFormData } from "@/components/booking/GuestBookingForm";
+import { panamaReservationIso } from "@/lib/reservationDate";
 
 const MenuView = lazy(() => import("@/components/menu/MenuView"));
 
@@ -91,7 +92,7 @@ export default function ReferralLandingPage() {
           // Combine guest-selected date + time into one ISO datetime.
           // Falls back to "tomorrow noon" only if the picker was bypassed.
           reservationDate: (data.reservationDate && data.reservationTime)
-            ? new Date(`${data.reservationDate}T${data.reservationTime}:00`).toISOString()
+            ? panamaReservationIso(data.reservationDate, data.reservationTime)
             : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           requestedSpaceId: data.requestedSpaceId || null,
         }),

@@ -15,6 +15,7 @@ export async function GET() {
         select: {
           reservationServiceStartMinutes: true,
           reservationServiceEndMinutes: true,
+          websiteContent: true,
         },
       });
     } catch {
@@ -26,6 +27,7 @@ export async function GET() {
             application: "ok",
             database: "ok",
             reservationSettings: "unavailable",
+            operationalCalendar: "unavailable",
           },
         },
         { status: 503, headers: { "Cache-Control": "no-store" } },
@@ -40,6 +42,7 @@ export async function GET() {
           application: "ok",
           database: "ok",
           reservationSettings: "ok",
+          operationalCalendar: "ok",
         },
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -53,6 +56,7 @@ export async function GET() {
           application: "ok",
           database: "unavailable",
           reservationSettings: "unavailable",
+          operationalCalendar: "unavailable",
         },
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
