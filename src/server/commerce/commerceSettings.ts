@@ -33,21 +33,44 @@ export const COMMERCE_SETTINGS_DEFAULTS = {
   debugMode: "OFF" as "OFF" | "ERRORS_ONLY" | "VERBOSE",
 };
 
+function runtimeFallback(): CommerceSettings {
+  return {
+    id: COMMERCE_SETTINGS_ID,
+    ...COMMERCE_SETTINGS_DEFAULTS,
+    websiteContent: null,
+    updatedById: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  } as CommerceSettings;
+}
+
 export async function getCommerceSettings(): Promise<CommerceSettings> {
-  const existing = await prisma.commerceSettings.findUnique({
-    where: { id: COMMERCE_SETTINGS_ID },
-  });
-  if (existing) return existing;
   try {
-    return await prisma.commerceSettings.create({
-      data: { id: COMMERCE_SETTINGS_ID },
-    });
-  } catch {
-    // Race: another request created it between findUnique and create.
-    const row = await prisma.commerceSettings.findUnique({
+    const existing = await prisma.commerceSettings.findUnique({
       where: { id: COMMERCE_SETTINGS_ID },
     });
-    if (!row) throw new Error("Failed to initialize commerce settings");
-    return row;
+    if (existing) return existing;
+    try {
+      return await prisma.commerceSettings.create({
+        data: { id: COMMERCE_SETTINGS_ID },
+      });
+    } catch {
+      // Race: another request created it between findUnique and create.
+      const row = await prisma.commerceSettings.findUnique({
+        where: { id: COMMERCE_SETTINGS_ID },
+      });
+      if (!row) throw new Error("Failed to initialize commerce settings");
+      return row;
+    }
+  } catch (error) {
+    // A settings read must not take guest reservations or payment routing
+    // offline when a deployment has started before a newly added nullable or
+    // defaulted column reaches production. The repair migration restores the
+    // database shape; this fallback keeps safe defaults available meanwhile.
+    console.error(
+      "[commerce-settings] using runtime defaults after database read failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+    return runtimeFallback();
   }
 }
