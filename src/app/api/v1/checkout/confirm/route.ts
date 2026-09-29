@@ -169,7 +169,7 @@ export async function POST(req: Request) {
         }
         const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
         const enrollment = await checkPayerAuthentication({
-          transientToken: body.cybersourceTransientToken,
+          transientTokenJwt: body.cybersourceTransientToken,
           referenceId: pa.referenceId,
           amount: (order.totalCents / 100).toFixed(2),
           currency: order.currency,
