@@ -27,11 +27,13 @@ export async function assertCheckoutCatalogPolicy(input: {
       series: {
         select: {
           id: true,
+          venueId: true,
           status: true,
           minMembershipTier: true,
           isFounderOnly: true,
           commercialOwnerInfluencerId: true,
           influencerId: true,
+          membershipRuleMode: true,
         },
       },
     },
@@ -39,6 +41,9 @@ export async function assertCheckoutCatalogPolicy(input: {
   if (!session) throw new CatalogPolicyError("SESSION_NOT_FOUND", "Session not found", 404);
   if (session.status !== "SCHEDULED") {
     throw new CatalogPolicyError("SESSION_UNAVAILABLE", "This session is not available for purchase.");
+  }
+  if (session.endsAt <= now) {
+    throw new CatalogPolicyError("SESSION_ENDED", "This event has already ended.", 409);
   }
   if (session.series.status !== "PUBLISHED") {
     throw new CatalogPolicyError("EXPERIENCE_NOT_PUBLIC", "This experience is not available for purchase.");
@@ -51,9 +56,15 @@ export async function assertCheckoutCatalogPolicy(input: {
   }
 
   const [membership, user, tickets, addons] = await Promise.all([
-    prisma.membership.findFirst({ where: { userId: input.userId, status: "ACTIVE" }, select: { tier: true } }),
+    prisma.membership.findFirst({
+      where: { userId: input.userId, status: "ACTIVE" },
+      select: { tier: true, benefitsJson: true },
+    }),
     prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } }),
-    prisma.ticketType.findMany({ where: { id: { in: [...ticketQuantities.keys()] } } }),
+    prisma.ticketType.findMany({
+      where: { id: { in: [...ticketQuantities.keys()] } },
+      include: { pricingRules: { where: { isActive: true }, orderBy: { priority: "asc" } } },
+    }),
     prisma.experienceAddon.findMany({ where: { id: { in: [...addonQuantities.keys()] } } }),
   ]);
 
@@ -134,7 +145,7 @@ export async function assertCheckoutCatalogPolicy(input: {
     }
   }
 
-  return { session, tickets, addons };
+  return { session, tickets, addons, membership };
 }
 
 function aggregate(items: CheckoutItem[], key: "ticketTypeId" | "addonId") {
