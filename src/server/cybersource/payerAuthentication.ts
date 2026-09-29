@@ -52,6 +52,26 @@ export type PayerAuthenticationChallenge = {
 
 type Call = { httpStatus: number | null; body: any; networkError: string | null };
 
+/**
+ * Flex Microform returns a JWT. Payer Authentication's `transientToken`
+ * field is deliberately different from the Payments API's
+ * `transientTokenJwt` field: it expects the JWT's `jti` claim, not the full
+ * encoded JWT. Keep this conversion at the server boundary so the browser
+ * never has to interpret payment credentials.
+ */
+export function payerAuthenticationTransientToken(transientTokenJwt: string): string {
+  const payload = transientTokenJwt.split(".")[1];
+  if (!payload) throw new Error("The secure card token is malformed. Please start a fresh payment attempt.");
+
+  try {
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (typeof claims?.jti !== "string" || claims.jti.length < 20) throw new Error("missing jti");
+    return claims.jti;
+  } catch {
+    throw new Error("The secure card token is malformed. Please start a fresh payment attempt.");
+  }
+}
+
 async function postSigned(cfg: ResolvedCybersourceConfig, path: string, body: unknown): Promise<Call> {
   const host = cybersourceHost(cfg.env);
   const json = JSON.stringify(body);
@@ -88,10 +108,10 @@ function toAuthenticationData(info: any): PayerAuthenticationData {
 }
 
 /** Start the CyberSource browser 3-D Secure device-profiling session. */
-export async function setupPayerAuthentication(transientToken: string) {
+export async function setupPayerAuthentication(transientTokenJwt: string) {
   const cfg = await getResolvedCybersourceConfig();
   const result = await postSigned(cfg, "/risk/v1/authentication-setups", {
-    tokenInformation: { transientToken },
+    tokenInformation: { transientToken: payerAuthenticationTransientToken(transientTokenJwt) },
   });
   const info = result.body?.consumerAuthenticationInformation;
   if (!result.httpStatus || result.httpStatus >= 300 || !info?.referenceId || !info?.accessToken || !info?.deviceDataCollectionUrl) {
@@ -103,7 +123,7 @@ export async function setupPayerAuthentication(transientToken: string) {
 /** Check enrollment after browser device collection. The caller may then either
  * authorize a frictionless result or render the returned step-up iframe. */
 export async function checkPayerAuthentication(input: {
-  transientToken: string;
+  transientTokenJwt: string;
   referenceId: string;
   amount: string;
   currency: string;
@@ -137,7 +157,7 @@ export async function checkPayerAuthentication(input: {
       deviceChannel: "BROWSER", transactionMode: "eCommerce",
       referenceId: input.referenceId, returnUrl: input.returnUrl, acsWindowSize: "05",
     },
-    tokenInformation: { transientToken: input.transientToken },
+    tokenInformation: { transientToken: payerAuthenticationTransientToken(input.transientTokenJwt) },
   });
   const info = result.body?.consumerAuthenticationInformation;
   if (result.body?.status === "PENDING_AUTHENTICATION" && info?.authenticationTransactionId && info?.stepUpUrl && info?.token) {
