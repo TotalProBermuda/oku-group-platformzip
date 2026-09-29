@@ -81,6 +81,15 @@ const STATIC_DATA: Record<SlugType, {
     logoLight: "/images/logo-catch.webp",
     logoDark: "/images/logo-catch.webp",
     logoNeedsWhiteBox: false,
+    heroPhoto: "/images/catch/ambience.jpg",
+    gallery: [
+      { src: "/images/catch/carrusel-1.jpg", alt: "CATCH dining experience in Casco Viejo", pos: "center center" },
+      { src: "/images/catch/carrusel-2.jpg", alt: "CATCH restaurant atmosphere and design", pos: "center center" },
+      { src: "/images/catch/carrusel-3.jpg", alt: "An evening at CATCH Panama", pos: "center center" },
+      { src: "/images/catch/cocktail.jpg", alt: "Signature cocktail served at CATCH", pos: "center center" },
+      { src: "/images/catch/sushi-burger.jpg", alt: "CATCH sushi burger signature dish", pos: "center center" },
+      { src: "/images/catch/grill.jpg", alt: "A dish prepared on the CATCH grill", pos: "center center" },
+    ],
     accent: "#1e3a5f", accentLight: "#f0f4f8", accentMid: "rgba(30,58,95,0.88)",
     phone: "+507 6000 0002", email: "catch@okugroup.com",
     address: "Gold House, Casco Viejo, Panama City",
@@ -314,14 +323,16 @@ export default async function LocaleRestaurantSlugPage({
 
       {/* ── GALLERY ──────────────────────────────────────────────────────────── */}
       <div style={{ background: sd.accentLight, padding: "0" }}>
-        <div className="venue-detail-gallery" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gridTemplateRows: "300px 300px", gap: 3 }}>
+        <div className="venue-detail-gallery" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gridTemplateRows: sd.gallery && sd.gallery.length > 5 ? "300px 300px 360px" : "300px 300px", gap: 3 }}>
           {(() => {
             const cells = [
               { row: "1 / 3", col: "1 / 2" }, { row: "1 / 2", col: "2 / 3" },
               { row: "1 / 2", col: "3 / 4" }, { row: "2 / 3", col: "2 / 3" },
               { row: "2 / 3", col: "3 / 4" },
+              { row: "3 / 4", col: "1 / 4" },
             ];
-            return cells.map((cell, i) => {
+            const cellCount = Math.max(5, sd.gallery?.length ?? 0);
+            return cells.slice(0, cellCount).map((cell, i) => {
               const photo = sd.gallery?.[i];
               return (
                 <div key={i} style={{ gridRow: cell.row, gridColumn: cell.col, background: sd.accent, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
