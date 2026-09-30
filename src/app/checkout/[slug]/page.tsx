@@ -515,7 +515,7 @@ export default function CheckoutPage() {
                         <input aria-label="Phone number" type="tel" value={guest.phone} onChange={(event) => setGuest((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone (optional)" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                         <div style={{ marginTop: 8 }}>
                           <div style={{ fontSize: 12, fontWeight: 700, color: "#4b5563", marginBottom: 8 }}>Billing address</div>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div className="checkout-billing" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                             <input aria-label="Billing street address" value={billing.address1} onChange={(event) => setBilling((current) => ({ ...current, address1: event.target.value }))} placeholder="Street address" style={{ gridColumn: "1 / -1", padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                             <input aria-label="Billing city" value={billing.locality} onChange={(event) => setBilling((current) => ({ ...current, locality: event.target.value }))} placeholder="City" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
                             <input aria-label="Billing state or province" value={billing.administrativeArea} onChange={(event) => setBilling((current) => ({ ...current, administrativeArea: event.target.value }))} placeholder="State / province" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />

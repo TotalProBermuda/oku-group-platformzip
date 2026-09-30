@@ -142,6 +142,7 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
       label: "Finance",
       tabs: [
         { label: "Payments",        href: "/admin/payments",               roles: ["SUPERADMIN"] },
+        { label: "Ticket Fees & Tax", href: "/admin/checkout-finance", roles: ["SUPERADMIN"] },
         { label: "Payment Ledger",  href: "/admin/payments/payment-ledger",roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
         { label: "Payouts",         href: "/admin/payouts",                roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
         { label: "Beneficiaries",   href: "/admin/payouts/beneficiaries",  roles: ["SUPERADMIN", "ADMIN_FINANCE"] },

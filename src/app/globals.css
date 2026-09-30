@@ -1283,6 +1283,12 @@ select.form-input { cursor: pointer; }
 
   /* Ticket grid — single column on mobile */
   .ticket-grid { grid-template-columns: 1fr !important; }
+  .checkout-layout { grid-template-columns: minmax(0, 1fr) !important; gap: 24px !important; padding: 24px 16px !important; }
+  .checkout-layout > * { min-width: 0; }
+  .checkout-billing { grid-template-columns: minmax(0, 1fr) !important; }
+  .checkout-layout input, .checkout-layout select { min-width: 0; width: 100%; box-sizing: border-box; font-size: 16px !important; min-height: 44px; }
+  .account-purchases { overflow-wrap: anywhere; }
+  .account-purchases .tab { min-height: 44px; }
 
   /* Tables → scroll on mobile */
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -2209,6 +2215,8 @@ select.form-input { cursor: pointer; }
 
 /* ── Ticket card ───────────────────────────────────────────────── */
 .ticket-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
   background: var(--layer-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);

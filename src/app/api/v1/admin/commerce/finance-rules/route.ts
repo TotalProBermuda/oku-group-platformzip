@@ -6,6 +6,7 @@ import { requireSession } from "@/server/auth/session";
 const Body = z.object({
   effectiveFrom: z.string().datetime(),
   serviceFeeBps: z.number().int().min(0).max(10000),
+  serviceFeeFlatCents: z.number().int().min(0).max(1000000).default(0),
   taxBps: z.number().int().min(0).max(10000),
   taxServiceFee: z.boolean(),
 }).strict();

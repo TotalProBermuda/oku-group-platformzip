@@ -35,11 +35,6 @@ export default function NavbarAuth({ session, locale = "en", signInLabel = "Sign
   const [acctOpen, setAcctOpen] = useState(false);
 
   const roles: string[] = session?.user?.roles ?? [];
-  const isEmployee = roles.some((r) =>
-    ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR",
-     "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r) ||
-    r.startsWith("STAFF_")
-  );
   const isInfluencer = roles.includes("INFLUENCER");
 
   const dashboard = dashboardNavigationForUser(
@@ -113,8 +108,8 @@ export default function NavbarAuth({ session, locale = "en", signInLabel = "Sign
                     ▤ {dashLabel}
                   </Link>
 
-                  {/* Personal items — guests and members only, not employees */}
-                  {!isEmployee && (
+                  {/* Personal purchases remain accessible regardless of staff role. */}
+                  {session.user && (
                     <>
                       <div style={{ height: 1, background: "var(--color-border)" }} />
                       <Link href="/my/membership" onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>◇ My Membership</Link>
