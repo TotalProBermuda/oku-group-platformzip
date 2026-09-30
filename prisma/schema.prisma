@@ -2061,6 +2061,7 @@ model CheckoutFinanceRule {
   id String @id @default(cuid())
   effectiveFrom DateTime @unique
   serviceFeeBps Int
+  serviceFeeFlatCents Int @default(0)
   taxBps Int
   taxServiceFee Boolean @default(false)
   createdById String

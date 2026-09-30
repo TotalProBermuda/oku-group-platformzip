@@ -234,6 +234,8 @@
   "partnerSupport": "Partner Support",
   "cardPartnerSupportDesc": "Resend secure access and support partner owners and their people",
   "websiteContent": "Website Content",
+  "checkoutFinance": "Ticket Fees & Tax",
+  "cardCheckoutFinanceDesc": "Schedule percentage and flat service fees, tax rules, and preview checkout totals",
   "cardWebsiteContentDesc": "Update restaurant hours and venue descriptions without a deployment",
   "totalSeries": "Total Series",
   "totalSessions": "Total Sessions",
