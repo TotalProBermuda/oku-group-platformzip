@@ -9,6 +9,8 @@ import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
 function safePaymentFailureMessage(environment: unknown, code: unknown) {
+  if (code === "GATEWAY_NOT_READY") return "Payments are temporarily unavailable. Your card was not declined. Please contact support.";
+  if (code === "CHECKOUT_EXPIRED") return "Your checkout expired during verification. Payment authorization was not attempted. Please start a fresh checkout.";
   if (code === "CARDHOLDER_VERIFICATION_FAILED") {
     return "Secure cardholder verification could not be completed. Payment authorization was not attempted. Please contact support before trying again.";
   }
@@ -64,10 +66,12 @@ export default function CheckoutPage() {
   const [transientToken, setTransientToken] = useState<string | null>(null);
   const [payerChallenge, setPayerChallenge] = useState<{ authenticationTransactionId: string; stepUpUrl: string; token: string; cardType?: string } | null>(null);
   const [payerChallengeComplete, setPayerChallengeComplete] = useState(false);
+  const [challengeDelayed, setChallengeDelayed] = useState(false);
+  const challengeFrame = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.origin === window.location.origin && event.data?.type === "oku-3ds-complete") setPayerChallengeComplete(true);
+      if (event.origin === window.location.origin && event.source === challengeFrame.current?.contentWindow && event.data?.type === "oku-3ds-complete") setPayerChallengeComplete(true);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -75,8 +79,12 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!payerChallenge) return;
+    setPayerChallengeComplete(false);
+    setChallengeDelayed(false);
     const form = document.getElementById("oku-3ds-challenge-form") as HTMLFormElement | null;
     form?.submit();
+    const timer = window.setTimeout(() => setChallengeDelayed(true), 45000);
+    return () => window.clearTimeout(timer);
   }, [payerChallenge]);
 
   useEffect(() => {
@@ -549,13 +557,13 @@ export default function CheckoutPage() {
                     <div style={{ marginTop: 16, padding: 16, background: "#fff", border: "1px solid #d8d2ca", borderRadius: 8 }}>
                       <strong>Verify this payment with your bank</strong>
                       <p style={{ fontSize: 13, color: "#6b7280", margin: "8px 0 12px" }}>Complete the secure verification below. Your card details remain with CyberSource and your bank.</p>
-                      <iframe name="oku-3ds-challenge" title="Secure cardholder verification" style={{ width: "100%", minHeight: 420, border: 0 }} />
+                      <iframe ref={challengeFrame} name="oku-3ds-challenge" title="Secure cardholder verification" style={{ width: "100%", minHeight: 420, border: 0 }} />
                       <form id="oku-3ds-challenge-form" method="POST" target="oku-3ds-challenge" action={payerChallenge.stepUpUrl}>
                         <input type="hidden" name="JWT" value={payerChallenge.token} />
                       </form>
-                      <button type="button" onClick={() => setPayerChallengeComplete(true)} className="btn btn-ghost" style={{ marginTop: 8, width: "100%" }}>
-                        I’ve completed verification
-                      </button>
+                      <p role="status" style={{ fontSize: 14, marginTop: 12 }}>
+                        {payerChallengeComplete ? "Bank verification returned. Continue below to finish payment; the result will be checked securely." : challengeDelayed ? "If this window is blank or downloaded a file, verification has not completed. Do not submit again; contact support. Never share a bank verification code with us." : "Waiting for your bank’s verification screen. Follow its instructions here or in your banking app."}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -570,8 +578,8 @@ export default function CheckoutPage() {
 
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
                 <button onClick={startFreshPaymentAttempt} disabled={paymentUnderReview} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
-                <button onClick={completePurchase} disabled={paying || !secureReady || paymentDeclined || paymentUnderReview} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
-                  {paying ? "Processing…" : `Confirm & Pay ${fmt(quote.totalCents)}`}
+                <button onClick={completePurchase} disabled={paying || !secureReady || paymentDeclined || paymentUnderReview || Boolean(payerChallenge && !payerChallengeComplete)} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
+                  {paying ? "Processing…" : payerChallenge && !payerChallengeComplete ? "Waiting for bank verification…" : `Confirm & Pay ${fmt(quote.totalCents)}`}
                 </button>
               </div>
             </div>
