@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     include: {
       ticketTypes: { where: { ticketStatus: "ACTIVE" }, orderBy: { displayOrder: "asc" } },
       sessions: {
-        where: { status: "SCHEDULED", endsAt: { gt: now } },
+        where: { status: "SCHEDULED", OR: [{ startsAt: { gt: now } }, { allowLateSales: true }], endsAt: { gt: now } },
         orderBy: { startsAt: "asc" },
         ...(slug ? {} : { take: 3 }),
       },

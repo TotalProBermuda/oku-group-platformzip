@@ -10,9 +10,11 @@ import { createGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 import { createCheckoutHold, expireCheckoutHoldsForSession } from "@/server/commerce/checkoutHold";
 import { gatePublicPostAsync } from "@/server/rateLimit";
 import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
+import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
 
 const Body = z.object({
   sessionId: z.string(),
+  expectedTotalCents: z.number().int().nonnegative().optional(),
   items: z.array(z.object({
     ticketTypeId: z.string().optional(),
     addonId: z.string().optional(),
@@ -76,6 +78,11 @@ export async function POST(req: Request) {
       : (addon?.priceCents ?? 0);
     return sum + unitPrice * item.qty;
     }, 0);
+
+    const { feesCents, taxCents, totalCents, financeRule } = await priceCheckoutCharges(subtotalCents);
+    if (body.expectedTotalCents !== undefined && body.expectedTotalCents !== totalCents) {
+      return NextResponse.json({ ok: false, error: "PRICE_CHANGED", message: "The price has changed. Please review a fresh quote before paying." }, { status: 409 });
+    }
 
     // Reserve capacity atomically only after policy has passed.
     await reserveCatalogCapacityOrThrow({
@@ -141,9 +148,6 @@ export async function POST(req: Request) {
     // Keep the payment intent authoritative and aligned with the quote shown
     // to the guest.  Amounts are calculated server-side; the browser never
     // supplies a payable total.
-    const feesCents = Math.round(subtotalCents * 0.05);
-    const taxCents = Math.round(subtotalCents * 0.084);
-    const totalCents = subtotalCents + feesCents + taxCents;
 
     const order = await prisma.order.create({
     data: {
@@ -156,6 +160,7 @@ export async function POST(req: Request) {
       taxCents,
       totalCents,
       currency: "USD",
+      events: { create: { eventType: "OTHER", eventLabel: "checkout-finance-snapshot", eventPayload: financeRule } },
       couponCode: body.couponCode,
       attributionId: body.attributionId,
       // SYSTEM 1: OKU pays the influencer based on commissionRateBps

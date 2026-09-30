@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./commerce-settings.css";
+import FinanceRulesPanel from "./FinanceRulesPanel";
 
 type StoreStatus = "OPEN" | "CLOSED" | "TEST_MODE";
 type DebugMode = "OFF" | "ERRORS_ONLY" | "VERBOSE";
@@ -295,6 +296,7 @@ export default function CommerceSettingsPanel() {
 
   return (
     <main className="commerce-settings">
+      <FinanceRulesPanel />
       <header className="commerce-settings__header">
         <h1>Commerce Settings</h1>
         <p>

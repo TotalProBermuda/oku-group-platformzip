@@ -40,6 +40,10 @@ export async function reserveCatalogCapacityOrThrow(input: {
   return prisma.$transaction(async (tx) => {
     const session = await tx.session.findUnique({ where: { id: input.sessionId } });
     if (!session || session.status !== "SCHEDULED") throw new Error("Session not available");
+    const now = new Date();
+    if (session.endsAt <= now || (!session.allowLateSales && session.startsAt <= now)) {
+      throw new Error("Ticket sales have closed for this session");
+    }
     if (ticketQty > session.capacity - session.soldCount) throw new Error("Not enough seats remaining");
 
     // Compare-and-swap prevents two carts from both consuming the same seats.

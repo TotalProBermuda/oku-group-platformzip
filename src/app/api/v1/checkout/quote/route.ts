@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
+import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
 
 export async function POST(req: NextRequest) {
   const auth = await getOptionalSession();
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const sess = series.sessions[0];
   const now = new Date();
-  if (series.status !== "PUBLISHED" || sess.status !== "SCHEDULED" || sess.endsAt <= now) {
+  if (series.status !== "PUBLISHED" || sess.status !== "SCHEDULED" || (!sess.allowLateSales && sess.startsAt <= now) || sess.endsAt <= now) {
     return NextResponse.json({ error: "This event is no longer available for purchase." }, { status: 409 });
   }
 
@@ -117,9 +118,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const feesCents  = Math.round(subtotalCents * 0.05);
-  const taxCents   = Math.round(subtotalCents * 0.084);
-  const totalCents = subtotalCents + feesCents + taxCents;
+  const { feesCents, taxCents, totalCents, financeRule } = await priceCheckoutCharges(subtotalCents);
 
   return NextResponse.json({
     seriesId: series.id,
@@ -127,6 +126,7 @@ export async function POST(req: NextRequest) {
     lineItems,
     subtotalCents,
     feesCents,
+    financeRule,
     taxCents,
     totalCents,
     currency: "USD",

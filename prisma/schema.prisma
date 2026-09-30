@@ -1317,6 +1317,7 @@ model Session {
   status                 SessionStatus @default(SCHEDULED)
   overridesSeriesHost    Boolean       @default(false)
   inheritsSeriesSponsors Boolean       @default(true)
+  allowLateSales         Boolean       @default(false)
   giftBagEnabled         Boolean       @default(false)
   streetsideEnabled      Boolean       @default(false)
   createdAt              DateTime      @default(now())
@@ -2053,6 +2054,17 @@ model CommerceSettings {
   updatedById                  String?
   createdAt                    DateTime              @default(now())
   updatedAt                    DateTime              @updatedAt
+}
+
+// Append-only, effective-dated ticket checkout rates. Orders retain a snapshot.
+model CheckoutFinanceRule {
+  id String @id @default(cuid())
+  effectiveFrom DateTime @unique
+  serviceFeeBps Int
+  taxBps Int
+  taxServiceFee Boolean @default(false)
+  createdById String
+  createdAt DateTime @default(now())
 }
 
 model EventLog {

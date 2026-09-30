@@ -154,7 +154,7 @@ export default function CheckoutPage() {
       const intentResponse = await fetch("/api/v1/checkout/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: quote.sessionId, items: checkoutItems, guest: { ...guest, phone: guest.phone.trim() || undefined, locale: "en" } }),
+        body: JSON.stringify({ sessionId: quote.sessionId, expectedTotalCents: quote.totalCents, items: checkoutItems, guest: { ...guest, phone: guest.phone.trim() || undefined, locale: "en" } }),
       });
       const intentData = await intentResponse.json();
       if (!intentResponse.ok) throw new Error(intentData.message ?? intentData.error ?? "Unable to create payment order.");
@@ -483,8 +483,8 @@ export default function CheckoutPage() {
 
                 <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#6b7280" }}><span>Subtotal</span><span>{fmt(quote.subtotalCents)}</span></div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#6b7280" }}><span>Service fee (5%)</span><span>{fmt(quote.feesCents)}</span></div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#6b7280" }}><span>Tax (8.4%)</span><span>{fmt(quote.taxCents)}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#6b7280" }}><span>Service fee</span><span>{fmt(quote.feesCents)}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#6b7280" }}><span>Tax</span><span>{fmt(quote.taxCents)}</span></div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 700, color: "#1a1614", borderTop: "1px solid #e5e0d8", paddingTop: 12, marginTop: 4 }}><span>Total</span><span>{fmt(quote.totalCents)}</span></div>
                   {quote.memberDiscount && <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>Member discount applied</div>}
                 </div>
