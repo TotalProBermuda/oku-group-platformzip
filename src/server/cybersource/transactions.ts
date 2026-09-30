@@ -130,14 +130,16 @@ export async function cybersourceCharge(
     },
   };
 
-  if (input.payerAuthentication?.eciRaw) {
+  if (input.payerAuthentication) {
     body.consumerAuthenticationInformation = {
       eciRaw: input.payerAuthentication.eciRaw,
       cavv: input.payerAuthentication.cavv,
+      ucafCollectionIndicator: input.payerAuthentication.ucafCollectionIndicator,
+      ucafAuthenticationData: input.payerAuthentication.ucafAuthenticationData,
       xid: input.payerAuthentication.xid,
       directoryServerTransactionId: input.payerAuthentication.directoryServerTransactionId,
       threeDSServerTransactionId: input.payerAuthentication.threeDSServerTransactionId,
-      specificationVersion: input.payerAuthentication.specificationVersion,
+      paSpecificationVersion: input.payerAuthentication.specificationVersion,
       paresStatus: input.payerAuthentication.paresStatus,
     };
   }

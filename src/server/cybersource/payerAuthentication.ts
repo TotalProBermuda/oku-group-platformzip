@@ -36,6 +36,8 @@ export type PayerAuthenticationData = {
   indicator?: string;
   eciRaw?: string;
   cavv?: string;
+  ucafCollectionIndicator?: string;
+  ucafAuthenticationData?: string;
   xid?: string;
   directoryServerTransactionId?: string;
   threeDSServerTransactionId?: string;
@@ -109,9 +111,11 @@ async function postSigned(cfg: ResolvedCybersourceConfig, path: string, body: un
 
 function toAuthenticationData(info: any): PayerAuthenticationData {
   return {
-    indicator: info?.indicator,
+    indicator: info?.indicator ?? info?.ecommerceIndicator,
     eciRaw: info?.eciRaw ?? info?.eci,
     cavv: info?.cavv,
+    ucafCollectionIndicator: info?.ucafCollectionIndicator,
+    ucafAuthenticationData: info?.ucafAuthenticationData,
     xid: info?.xid,
     directoryServerTransactionId: info?.directoryServerTransactionId,
     threeDSServerTransactionId: info?.threeDSServerTransactionId,

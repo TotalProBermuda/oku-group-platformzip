@@ -4,7 +4,8 @@ vi.mock("@/server/payments/cybersourceSignature", () => ({
   cybersourceHost: () => "apitest.cybersource.com",
   buildCybersourceHttpSignatureHeaders: () => ({}),
 }));
-import { checkPayerAuthentication } from "@/server/cybersource/payerAuthentication";
+import { checkPayerAuthentication, validatePayerAuthentication } from "@/server/cybersource/payerAuthentication";
+import { cybersourceCharge } from "@/server/cybersource/transactions";
 
 const input = {
   transientTokenJwt: `header.${Buffer.from(JSON.stringify({ jti: "mock-flex-token-1234567890" })).toString("base64url")}.signature`,
@@ -16,6 +17,31 @@ const input = {
 };
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("Flex enrollment request", () => {
+  it.each([false, true])("preserves Mastercard authentication fields through authorization (challenge=%s)", async (challenge) => {
+    const info = { indicator: "spa", ecommerceIndicator: "spa", ucafCollectionIndicator: "2", ucafAuthenticationData: "mock-mastercard-aav", specificationVersion: "2.2.0", directoryServerTransactionId: "mock-directory-id" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ status: 201, text: async () => JSON.stringify({ status: "AUTHENTICATION_SUCCESSFUL", consumerAuthenticationInformation: info }) })
+      .mockResolvedValueOnce({ status: 201, text: async () => JSON.stringify({ status: "AUTHORIZED" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = challenge ? await validatePayerAuthentication({ authenticationTransactionId: "mock-auth", cardType: "002" }) : (await checkPayerAuthentication(input) as { authentication: any }).authentication;
+    await cybersourceCharge({ amount: "2.27", currency: "USD", invoiceNumber: "invoice", transactionId: "order", transientToken: input.transientTokenJwt, payerAuthentication: auth });
+    const payment = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(payment.processingInformation.commerceIndicator).toBe("spa");
+    expect(payment.consumerAuthenticationInformation).toMatchObject({ ucafCollectionIndicator: "2", ucafAuthenticationData: "mock-mastercard-aav", paSpecificationVersion: "2.2.0", directoryServerTransactionId: "mock-directory-id" });
+    expect(payment.consumerAuthenticationInformation.specificationVersion).toBeUndefined();
+  });
+  it("retains Visa CAVV without inventing Mastercard authentication data", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ status: 201, text: async () => JSON.stringify({ status: "AUTHENTICATION_SUCCESSFUL", consumerAuthenticationInformation: { indicator: "vbv", cavv: "mock-visa-cavv", eciRaw: "05" } }) })
+      .mockResolvedValueOnce({ status: 201, text: async () => JSON.stringify({ status: "AUTHORIZED" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = await validatePayerAuthentication({ authenticationTransactionId: "mock-auth" });
+    await cybersourceCharge({ amount: "2.27", currency: "USD", invoiceNumber: "invoice", transactionId: "order", transientToken: input.transientTokenJwt, payerAuthentication: auth });
+    const payment = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(payment.processingInformation.commerceIndicator).toBe("vbv");
+    expect(payment.consumerAuthenticationInformation.cavv).toBe("mock-visa-cavv");
+    expect(payment.consumerAuthenticationInformation.ucafCollectionIndicator).toBeUndefined();
+  });
   it("posts the accessToken, not the unrelated token field, to step-up", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 201, text: async () => JSON.stringify({ status: "PENDING_AUTHENTICATION", consumerAuthenticationInformation: {
       authenticationTransactionId: "auth-123", stepUpUrl: "https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp", accessToken: "correct-access-jwt", token: "wrong-token",
