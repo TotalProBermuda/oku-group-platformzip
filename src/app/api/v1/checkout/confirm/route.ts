@@ -53,7 +53,7 @@ const Body = z.object({
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Enter a complete billing address before paying." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Check billing details and card expiry before paying.", data: { code: "INVALID_CHECKOUT_DETAILS" } }, { status: 400 });
   }
   const body = parsed.data;
   const auth = await getOptionalSession();
@@ -186,7 +186,7 @@ export async function POST(req: Request) {
         payerAuthentication = enrollment.authentication;
       }
     } catch {
-      return NextResponse.json({ ok: false, error: "Your card could not complete secure verification. Please start a fresh payment attempt." }, { status: 402 });
+      return NextResponse.json({ ok: false, error: "Your card could not complete secure verification. Please start a fresh payment attempt.", data: { code: "CARDHOLDER_VERIFICATION_FAILED" } }, { status: 402 });
     }
   }
 
