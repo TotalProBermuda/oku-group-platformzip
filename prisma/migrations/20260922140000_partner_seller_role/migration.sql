@@ -1,4 +1,8 @@
+BEGIN;
 ALTER TYPE "RoleKey" ADD VALUE IF NOT EXISTS 'PARTNER_SELLER';
+COMMIT;
+
+BEGIN;
 
 INSERT INTO "Role" ("key", "label", "createdAt")
 VALUES ('PARTNER_SELLER', 'Partner Seller', CURRENT_TIMESTAMP)
@@ -16,3 +20,4 @@ FROM "PartnerCommerceSeat" AS seat
 WHERE seat."provisionedUserId" IS NOT NULL
   AND seat."status" <> 'REVOKED'
 ON CONFLICT ("userId", "roleKey") DO NOTHING;
+COMMIT;
