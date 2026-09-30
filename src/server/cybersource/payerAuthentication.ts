@@ -176,10 +176,13 @@ export async function checkPayerAuthentication(input: {
     tokenInformation: { transientToken: payerAuthenticationTransientToken(input.transientTokenJwt) },
   });
   const info = result.body?.consumerAuthenticationInformation;
-  if (result.body?.status === "PENDING_AUTHENTICATION" && info?.authenticationTransactionId && info?.stepUpUrl && info?.token) {
-    return { kind: "challenge" as const, challenge: { authenticationTransactionId: info.authenticationTransactionId, stepUpUrl: info.stepUpUrl, token: info.token, cardType: result.body?.paymentInformation?.card?.type } };
+  if (result.httpStatus && result.httpStatus < 300 && result.body?.status === "PENDING_AUTHENTICATION" && info?.authenticationTransactionId && info?.stepUpUrl && info?.accessToken) {
+    const url = new URL(info.stepUpUrl);
+    const expectedHost = cfg.env === "production" ? "centinelapi.cardinalcommerce.com" : "centinelapistag.cardinalcommerce.com";
+    if (url.protocol !== "https:" || url.hostname !== expectedHost || url.username || url.password) throw new Error("Invalid verification destination.");
+    return { kind: "challenge" as const, challenge: { authenticationTransactionId: info.authenticationTransactionId, stepUpUrl: info.stepUpUrl, token: info.accessToken, cardType: result.body?.paymentInformation?.card?.type } };
   }
-  if (result.body?.status === "AUTHENTICATION_SUCCESSFUL") return { kind: "authenticated" as const, authentication: toAuthenticationData(info) };
+  if (result.httpStatus && result.httpStatus < 300 && result.body?.status === "AUTHENTICATION_SUCCESSFUL") return { kind: "authenticated" as const, authentication: toAuthenticationData(info) };
   logAuthenticationFailure("enrollment", result);
   throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
 }
@@ -192,7 +195,7 @@ export async function validatePayerAuthentication(input: { authenticationTransac
     paymentInformation: input.cardType ? { card: { type: input.cardType } } : undefined,
     consumerAuthenticationInformation: { authenticationTransactionId: input.authenticationTransactionId },
   });
-  if (result.body?.status !== "AUTHENTICATION_SUCCESSFUL") {
+  if (!result.httpStatus || result.httpStatus >= 300 || result.body?.status !== "AUTHENTICATION_SUCCESSFUL") {
     logAuthenticationFailure("validation", result);
     throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
   }

@@ -12,6 +12,7 @@ import { getActiveCheckoutAdapter } from "@/server/payments/providers";
 import type { PaymentInstrument } from "@/server/payments/providers/types";
 import { hasValidGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 import { hasActiveCheckoutHold } from "@/server/commerce/checkoutHold";
+import { bindChallenge, requireBoundChallenge } from "@/server/cybersource/challengeBinding";
 import {
   checkPayerAuthentication,
   validatePayerAuthentication,
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
   const guard = await assertActiveGatewayReady();
   if (guard) {
     return NextResponse.json(
-      { ok: false, error: guard.error, data: { provider: guard.provider } },
+      { ok: false, error: guard.error, data: { provider: guard.provider, code: "GATEWAY_NOT_READY" } },
       { status: guard.status },
     );
   }
@@ -101,37 +102,8 @@ export async function POST(req: Request) {
 
   const { adapter, provider } = await getActiveCheckoutAdapter();
 
-  // Claim this order before calling the provider. `Payment.orderId` is unique,
-  // so this is the durable idempotency boundary for an external charge: only
-  // one request can obtain the claim, including requests arriving on separate
-  // server instances. A duplicate must never be retried automatically because
-  // its first attempt may already be in flight at Cybersource.
-  try {
-    await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        provider,
-        status: "INITIATED",
-        amountCents: order.totalCents,
-        currency: order.currency,
-        // Persist the merchant reference before calling the gateway. If the
-        // response is lost, a webhook or finance review can reconcile the
-        // payment without guessing which order it belonged to.
-        gatewayReferenceId: invoiceNumber,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Payment is already being processed. Please wait before trying again.",
-          data: { orderId: order.id },
-        },
-        { status: 409 },
-      );
-    }
-    throw error;
+  if (order.payment) {
+    return NextResponse.json({ ok: false, error: "This payment attempt already exists. Contact support before retrying.", data: { code: "PAYMENT_OUTCOME_UNKNOWN" } }, { status: 409 });
   }
 
   const instrument: PaymentInstrument = {
@@ -158,11 +130,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Secure cardholder verification is required before payment." }, { status: 400 });
     }
     try {
+      const challengeContext = { orderId: order.id, amountCents: order.totalCents, currency: order.currency, transientToken: body.cybersourceTransientToken, billing };
       if (pa.authenticationTransactionId) {
-        payerAuthentication = await validatePayerAuthentication({
-          authenticationTransactionId: pa.authenticationTransactionId,
-          cardType: pa.cardType,
-        });
+        const bound = await requireBoundChallenge(challengeContext, pa.authenticationTransactionId);
+        payerAuthentication = await validatePayerAuthentication(bound);
       } else {
         if (!pa.referenceId || !pa.browser || !pa.expirationMonth || !pa.expirationYear) {
           return NextResponse.json({ ok: false, error: "Secure cardholder verification has not started." }, { status: 400 });
@@ -181,6 +152,7 @@ export async function POST(req: Request) {
           expirationYear: pa.expirationYear,
         });
         if (enrollment.kind === "challenge") {
+          await bindChallenge(challengeContext, enrollment.challenge);
           return NextResponse.json({ ok: false, data: { payerAuthenticationChallenge: enrollment.challenge } }, { status: 202 });
         }
         payerAuthentication = enrollment.authentication;
@@ -188,6 +160,24 @@ export async function POST(req: Request) {
     } catch {
       return NextResponse.json({ ok: false, error: "Your card could not complete secure verification. Please start a fresh payment attempt.", data: { code: "CARDHOLDER_VERIFICATION_FAILED" } }, { status: 402 });
     }
+  }
+
+  // Authentication may span two browser requests. Claim only after server
+  // verification, but always BEFORE charging. The unique orderId still gates
+  // concurrent submissions and ambiguous gateway outcomes remain locked.
+  if (!(await hasActiveCheckoutHold(order.id))) {
+    return NextResponse.json({ ok: false, error: "Checkout expired during verification.", data: { code: "CHECKOUT_EXPIRED" } }, { status: 410 });
+  }
+  try {
+    await prisma.payment.create({ data: {
+      orderId: order.id, provider, status: "INITIATED", amountCents: order.totalCents,
+      currency: order.currency, gatewayReferenceId: invoiceNumber,
+    } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ ok: false, error: "Payment is already being processed. Please do not retry.", data: { code: "PAYMENT_OUTCOME_UNKNOWN" } }, { status: 409 });
+    }
+    throw error;
   }
 
   const result = await adapter.charge({

@@ -16,6 +16,19 @@ const input = {
 };
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("Flex enrollment request", () => {
+  it("posts the accessToken, not the unrelated token field, to step-up", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 201, text: async () => JSON.stringify({ status: "PENDING_AUTHENTICATION", consumerAuthenticationInformation: {
+      authenticationTransactionId: "auth-123", stepUpUrl: "https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp", accessToken: "correct-access-jwt", token: "wrong-token",
+    } }) }));
+    await expect(checkPayerAuthentication(input)).resolves.toMatchObject({ kind: "challenge", challenge: { token: "correct-access-jwt" } });
+  });
+  it("rejects a challenge with only the old token field", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 201, text: async () => JSON.stringify({ status: "PENDING_AUTHENTICATION", consumerAuthenticationInformation: {
+      authenticationTransactionId: "auth-123", stepUpUrl: "https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp", token: "wrong-token",
+    } }) }));
+    await expect(checkPayerAuthentication(input)).rejects.toThrow();
+  });
   it("does not send a local account ID as a TMS payment credential", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ status: 201, text: async () => JSON.stringify({ status: "AUTHENTICATION_SUCCESSFUL", consumerAuthenticationInformation: { eciRaw: "02" } }) });
     vi.stubGlobal("fetch", fetchMock);
