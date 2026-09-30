@@ -52,6 +52,19 @@ export type PayerAuthenticationChallenge = {
 
 type Call = { httpStatus: number | null; body: any; networkError: string | null };
 
+// Explicit allowlist only: never log request bodies, tokens, billing, or raw
+// provider messages (which can contain payment data).
+function logAuthenticationFailure(stage: "setup" | "enrollment" | "validation", result: Call) {
+  const code = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(value) ? value : undefined;
+  console.warn(JSON.stringify({
+    type: "checkout_authentication_failed", stage,
+    httpStatus: result.httpStatus,
+    status: code(result.body?.status),
+    reason: code(result.body?.errorInformation?.reason),
+    networkFailure: Boolean(result.networkError),
+  }));
+}
+
 /**
  * Flex Microform returns a JWT. Payer Authentication's `transientToken`
  * field is deliberately different from the Payments API's
@@ -115,6 +128,7 @@ export async function setupPayerAuthentication(transientTokenJwt: string) {
   });
   const info = result.body?.consumerAuthenticationInformation;
   if (!result.httpStatus || result.httpStatus >= 300 || !info?.referenceId || !info?.accessToken || !info?.deviceDataCollectionUrl) {
+    logAuthenticationFailure("setup", result);
     throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Unable to initialize cardholder verification.");
   }
   return { referenceId: info.referenceId as string, accessToken: info.accessToken as string, deviceDataCollectionUrl: info.deviceDataCollectionUrl as string };
@@ -137,8 +151,10 @@ export async function checkPayerAuthentication(input: {
   const cfg = await getResolvedCybersourceConfig();
   const result = await postSigned(cfg, "/risk/v1/authentications", {
     orderInformation: { amountDetails: { totalAmount: input.amount, currency: input.currency }, billTo: input.billing },
+    // This is our own user ID, not a CyberSource TMS customer token.
+    // Flex supplies the payment credential via tokenInformation below.
+    buyerInformation: { merchantCustomerId: input.customerId },
     paymentInformation: {
-      customer: { customerId: input.customerId },
       card: { expirationMonth: input.expirationMonth, expirationYear: input.expirationYear },
     },
     deviceInformation: {
@@ -164,6 +180,7 @@ export async function checkPayerAuthentication(input: {
     return { kind: "challenge" as const, challenge: { authenticationTransactionId: info.authenticationTransactionId, stepUpUrl: info.stepUpUrl, token: info.token, cardType: result.body?.paymentInformation?.card?.type } };
   }
   if (result.body?.status === "AUTHENTICATION_SUCCESSFUL") return { kind: "authenticated" as const, authentication: toAuthenticationData(info) };
+  logAuthenticationFailure("enrollment", result);
   throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
 }
 
@@ -176,6 +193,7 @@ export async function validatePayerAuthentication(input: { authenticationTransac
     consumerAuthenticationInformation: { authenticationTransactionId: input.authenticationTransactionId },
   });
   if (result.body?.status !== "AUTHENTICATION_SUCCESSFUL") {
+    logAuthenticationFailure("validation", result);
     throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
   }
   return toAuthenticationData(result.body?.consumerAuthenticationInformation);
