@@ -4,10 +4,17 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BILLING_COUNTRIES } from "@/lib/billingCountries";
+import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
 function safePaymentFailureMessage(environment: unknown, code: unknown) {
+  if (code === "CARDHOLDER_VERIFICATION_FAILED") {
+    return "Secure cardholder verification could not be completed. Payment authorization was not attempted. Please contact support before trying again.";
+  }
+  if (code === "INVALID_CHECKOUT_DETAILS") {
+    return "Check your billing address and card expiry date. Payment authorization was not attempted.";
+  }
   // A sandbox never reaches a card issuer. Make that explicit rather than
   // suggesting the guest's real card is defective. We deliberately do not
   // surface raw processor, AVS, fraud, or issuer messages here.
@@ -40,8 +47,7 @@ export default function CheckoutPage() {
   const [paymentDeclined, setPaymentDeclined] = useState(false);
   const [paymentUnderReview, setPaymentUnderReview] = useState(false);
   const [flexConfig, setFlexConfig] = useState<{ captureContext: string; clientLibrary: string; clientLibraryIntegrity?: string } | null>(null);
-  const [expiryMonth, setExpiryMonth] = useState("");
-  const [expiryYear, setExpiryYear] = useState("");
+  const [expiryInput, setExpiryInput] = useState("");
   // Billing details are deliberately held only in browser memory. They are
   // sent to the payment provider for authorization and are not persisted in
   // the OKÜ order record.
@@ -191,8 +197,7 @@ export default function CheckoutPage() {
     setTransientToken(null);
     setPayerChallenge(null);
     setPayerChallengeComplete(false);
-    setExpiryMonth("");
-    setExpiryYear("");
+    setExpiryInput("");
     setPaymentDeclined(false);
     setPaymentUnderReview(false);
     setError("");
@@ -200,9 +205,11 @@ export default function CheckoutPage() {
   }
 
   async function completePurchase() {
-    if (!intentId || !microformRef.current || !expiryMonth || !expiryYear) {
-      setError("Enter your card expiry month and year."); return;
+    const expiry = parseCardExpiry(expiryInput);
+    if (!intentId || !microformRef.current || !expiry) {
+      setError("Enter a valid, unexpired card expiry date (MM / YY)."); return;
     }
+    const { expirationMonth: expiryMonth, expirationYear: expiryYear } = expiry;
     setPaying(true); setError("");
     try {
       const nextTransientToken = transientToken ?? await new Promise<string>((resolve, reject) => {
@@ -527,14 +534,12 @@ export default function CheckoutPage() {
                       <input
                         aria-label="Card expiry date"
                         inputMode="numeric"
+                        autoComplete="cc-exp"
+                        dir="ltr"
                         maxLength={7}
                         placeholder="MM / YY"
-                        value={expiryMonth ? `${expiryMonth}${expiryYear ? ` / ${expiryYear.slice(-2)}` : ""}` : ""}
-                        onChange={(e) => {
-                          const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
-                          setExpiryMonth(digits.slice(0, 2));
-                          setExpiryYear(digits.length > 2 ? `20${digits.slice(2)}` : "");
-                        }}
+                        value={expiryInput}
+                        onChange={(e) => setExpiryInput(formatCardExpiry(e.target.value))}
                         style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }}
                       />
                       <div id="cybersource-security-code" className="cybersource-field" style={{ gridColumn: "1 / -1" }} />
