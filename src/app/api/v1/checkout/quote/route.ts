@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
+import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
+import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
 
 export async function POST(req: NextRequest) {
   const auth = await getOptionalSession();
@@ -29,6 +31,10 @@ export async function POST(req: NextRequest) {
   if (!series.sessions.length) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const sess = series.sessions[0];
+  const now = new Date();
+  if (series.status !== "PUBLISHED" || sess.status !== "SCHEDULED" || (!sess.allowLateSales && sess.startsAt <= now) || sess.endsAt <= now) {
+    return NextResponse.json({ error: "This event is no longer available for purchase." }, { status: 409 });
+  }
 
   // Load user membership
   let userMembership: any = null;
@@ -45,6 +51,16 @@ export async function POST(req: NextRequest) {
     if (item.ticketTypeId) {
       const tt = series.ticketTypes.find((t) => t.id === item.ticketTypeId);
       if (!tt) return NextResponse.json({ error: `Ticket type ${item.ticketTypeId} not found` }, { status: 400 });
+      if (tt.ticketStatus !== "ACTIVE") return NextResponse.json({ error: "This ticket is not available." }, { status: 409 });
+      if ((tt.saleStartsAt && now < tt.saleStartsAt) || (tt.saleEndsAt && now > tt.saleEndsAt)) {
+        return NextResponse.json({ error: "This ticket is not currently on sale." }, { status: 409 });
+      }
+      if (!Number.isInteger(item.qty) || item.qty < tt.minPerOrder || item.qty > tt.maxPerOrder) {
+        return NextResponse.json({ error: `Ticket quantity for ${tt.name} is outside its order limits.` }, { status: 400 });
+      }
+      if (tt.typeCapacity !== null && tt.soldCount + item.qty > tt.typeCapacity) {
+        return NextResponse.json({ error: `${tt.name} is sold out.` }, { status: 409 });
+      }
 
       // Access control
       const tierRank: Record<string, number> = { EXPLORER: 0, INSIDER: 1, PATRON: 2, FOUNDER: 3 };
@@ -83,27 +99,11 @@ export async function POST(req: NextRequest) {
       }
 
       // Dynamic pricing
-      let unitPrice = tt.priceCents;
-      const remaining = Math.max(0, (tt.typeCapacity ?? 9999) - tt.soldCount);
-      const remainingPct = remaining / (tt.typeCapacity ?? 1);
-
-      for (const rule of tt.pricingRules) {
-        const cond = rule.conditionJson as any;
-        const action = rule.actionJson as any;
-        let matches = false;
-
-        if (cond.field === "remainingPct" && cond.operator === "lt") {
-          matches = remainingPct < cond.value / 100;
-        }
-        if (matches && action.type === "price_increase_pct") {
-          unitPrice = Math.round(unitPrice * (1 + action.value / 100));
-        }
-      }
-
-      // Member discount
-      if (userMembership?.benefitsJson?.discountBps && series.membershipRuleMode === "MEMBERS_DISCOUNT") {
-        unitPrice = Math.round(unitPrice * (1 - userMembership.benefitsJson.discountBps / 10000));
-      }
+      const unitPrice = calculateTicketUnitPrice({
+        ticket: tt,
+        membershipDiscountBps: userMembership?.benefitsJson?.discountBps,
+        applyMembershipDiscount: series.membershipRuleMode === "MEMBERS_DISCOUNT",
+      });
 
       lineItems.push({ ticketTypeId: tt.id, nameSnapshot: tt.name, itemType: "ticket", qty: item.qty, unitPriceCents: unitPrice, totalCents: unitPrice * item.qty });
       subtotalCents += unitPrice * item.qty;
@@ -118,9 +118,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const feesCents  = Math.round(subtotalCents * 0.05);
-  const taxCents   = Math.round(subtotalCents * 0.084);
-  const totalCents = subtotalCents + feesCents + taxCents;
+  const { feesCents, taxCents, totalCents, financeRule } = await priceCheckoutCharges(subtotalCents);
 
   return NextResponse.json({
     seriesId: series.id,
@@ -128,6 +126,7 @@ export async function POST(req: NextRequest) {
     lineItems,
     subtotalCents,
     feesCents,
+    financeRule,
     taxCents,
     totalCents,
     currency: "USD",

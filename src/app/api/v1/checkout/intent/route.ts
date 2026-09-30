@@ -9,9 +9,12 @@ import { assertCheckoutCatalogPolicy, CatalogPolicyError } from "@/server/commer
 import { createGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 import { createCheckoutHold, expireCheckoutHoldsForSession } from "@/server/commerce/checkoutHold";
 import { gatePublicPostAsync } from "@/server/rateLimit";
+import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
+import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
 
 const Body = z.object({
   sessionId: z.string(),
+  expectedTotalCents: z.number().int().nonnegative().optional(),
   items: z.array(z.object({
     ticketTypeId: z.string().optional(),
     addonId: z.string().optional(),
@@ -62,12 +65,24 @@ export async function POST(req: Request) {
     const addons = catalog.addons;
 
     // Compute subtotal
+    const membershipDiscountBps = (catalog.membership?.benefitsJson as { discountBps?: number } | null)?.discountBps;
     const subtotalCents = body.items.reduce((sum, item) => {
-    const product = item.ticketTypeId
-      ? ticketTypes.find(t => t.id === item.ticketTypeId)
-      : addons.find(a => a.id === item.addonId);
-    return sum + (product?.priceCents ?? 0) * item.qty;
+    const ticket = item.ticketTypeId ? ticketTypes.find(t => t.id === item.ticketTypeId) : undefined;
+    const addon = item.addonId ? addons.find(a => a.id === item.addonId) : undefined;
+    const unitPrice = ticket
+      ? calculateTicketUnitPrice({
+          ticket,
+          membershipDiscountBps,
+          applyMembershipDiscount: catalog.session.series.membershipRuleMode === "MEMBERS_DISCOUNT",
+        })
+      : (addon?.priceCents ?? 0);
+    return sum + unitPrice * item.qty;
     }, 0);
+
+    const { feesCents, taxCents, totalCents, financeRule } = await priceCheckoutCharges(subtotalCents);
+    if (body.expectedTotalCents !== undefined && body.expectedTotalCents !== totalCents) {
+      return NextResponse.json({ ok: false, error: "PRICE_CHANGED", message: "The price has changed. Please review a fresh quote before paying." }, { status: 409 });
+    }
 
     // Reserve capacity atomically only after policy has passed.
     await reserveCatalogCapacityOrThrow({
@@ -109,8 +124,7 @@ export async function POST(req: Request) {
       const scopeOk =
         a.scopeType === "GLOBAL" ||
         (a.scopeType === "SERIES" && a.scopeId === series.id) ||
-        a.scopeType === "VENUE" ||
-        a.scopeType === "CAMPAIGN";
+        (a.scopeType === "VENUE" && !!series.venueId && a.scopeId === series.venueId);
       if (scopeOk) {
         referralAssignmentId = a.id;
         if (resolvedAttributionSource === "DIRECT") {
@@ -134,9 +148,6 @@ export async function POST(req: Request) {
     // Keep the payment intent authoritative and aligned with the quote shown
     // to the guest.  Amounts are calculated server-side; the browser never
     // supplies a payable total.
-    const feesCents = Math.round(subtotalCents * 0.05);
-    const taxCents = Math.round(subtotalCents * 0.084);
-    const totalCents = subtotalCents + feesCents + taxCents;
 
     const order = await prisma.order.create({
     data: {
@@ -149,6 +160,7 @@ export async function POST(req: Request) {
       taxCents,
       totalCents,
       currency: "USD",
+      events: { create: { eventType: "OTHER", eventLabel: "checkout-finance-snapshot", eventPayload: financeRule } },
       couponCode: body.couponCode,
       attributionId: body.attributionId,
       // SYSTEM 1: OKU pays the influencer based on commissionRateBps
@@ -174,6 +186,13 @@ export async function POST(req: Request) {
       const tt = i.ticketTypeId ? ticketTypes.find(t => t.id === i.ticketTypeId) : undefined;
       const addon = i.addonId ? addons.find(a => a.id === i.addonId) : undefined;
       const product = tt ?? addon!;
+      const unitPriceCents = tt
+        ? calculateTicketUnitPrice({
+            ticket: tt,
+            membershipDiscountBps,
+            applyMembershipDiscount: catalog.session.series.membershipRuleMode === "MEMBERS_DISCOUNT",
+          })
+        : product.priceCents;
       return {
         orderId: order.id,
         itemType: tt ? "ticket" : "addon",
@@ -181,8 +200,8 @@ export async function POST(req: Request) {
         addonId: addon?.id,
         nameSnapshot: product.name,
         qty: i.qty,
-        unitPriceCents: product.priceCents,
-        totalCents: product.priceCents * i.qty,
+        unitPriceCents,
+        totalCents: unitPriceCents * i.qty,
       };
     })
   });

@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   const venue     = searchParams.get("venue");
   const featured  = searchParams.get("featured");
   const slug      = searchParams.get("slug");
+  const now       = new Date();
 
   const where: any = {
     status: { in: ["PUBLISHED", "SOLD_OUT"] },
@@ -21,7 +22,11 @@ export async function GET(req: NextRequest) {
     orderBy: [{ isFeatured: "desc" }, { startsAt: "asc" }],
     include: {
       ticketTypes: { where: { ticketStatus: "ACTIVE" }, orderBy: { displayOrder: "asc" } },
-      sessions: { where: { status: "SCHEDULED" }, orderBy: { startsAt: "asc" }, take: 3 },
+      sessions: {
+        where: { status: "SCHEDULED", OR: [{ startsAt: { gt: now } }, { allowLateSales: true }], endsAt: { gt: now } },
+        orderBy: { startsAt: "asc" },
+        ...(slug ? {} : { take: 3 }),
+      },
       experienceInfluencer: {
         where: { isPubliclyVisible: true },
         orderBy: { sortOrder: "asc" },
