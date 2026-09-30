@@ -4,7 +4,9 @@
 # business data or any other migration record.
 set -eu
 
-MIGRATION_IDS="20260910010000_database_rate_limit 20260917100000_partner_commerce_signin_invites"
+# The seller-role migration now commits its enum addition before using it.
+# It can safely replay: enum creation and role inserts are idempotent.
+MIGRATION_IDS="20260910010000_database_rate_limit 20260917100000_partner_commerce_signin_invites 20260922140000_partner_seller_role"
 
 for MIGRATION_ID in $MIGRATION_IDS; do
   # `migrate resolve --rolled-back` succeeds only when this exact migration is
@@ -15,5 +17,7 @@ for MIGRATION_ID in $MIGRATION_IDS; do
   fi
 done
 
+echo "Applying production database migrations before starting the web server"
 npx prisma migrate deploy
+echo "Production database migrations completed"
 exec npm run start:next -- -p "${PORT:-5000}"
