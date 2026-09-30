@@ -9,6 +9,7 @@ import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
 function safePaymentFailureMessage(environment: unknown, code: unknown) {
+  if (code === "MISSING_FIELD" || code === "INVALID_DATA" || code === "INVALID_REQUEST") return "We could not submit the payment because of a checkout configuration error. Please contact support; trying another card will not resolve this error.";
   if (code === "GATEWAY_NOT_READY") return "Payments are temporarily unavailable. Your card was not declined. Please contact support.";
   if (code === "CHECKOUT_EXPIRED") return "Your checkout expired during verification. Payment authorization was not attempted. Please start a fresh checkout.";
   if (code === "CARDHOLDER_VERIFICATION_FAILED") {
