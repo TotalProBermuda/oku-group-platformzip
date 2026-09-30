@@ -45,6 +45,9 @@ export async function assertCheckoutCatalogPolicy(input: {
   if (session.endsAt <= now) {
     throw new CatalogPolicyError("SESSION_ENDED", "This event has already ended.", 409);
   }
+  if (session.startsAt <= now && !session.allowLateSales) {
+    throw new CatalogPolicyError("SESSION_SALES_CLOSED", "Ticket sales have closed because this event has started.", 409);
+  }
   if (session.series.status !== "PUBLISHED") {
     throw new CatalogPolicyError("EXPERIENCE_NOT_PUBLIC", "This experience is not available for purchase.");
   }

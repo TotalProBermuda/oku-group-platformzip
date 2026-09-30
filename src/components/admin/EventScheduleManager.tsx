@@ -9,6 +9,7 @@ type SessionRow = {
   endsAt: string;
   capacity: number;
   status: string;
+  allowLateSales?: boolean;
 };
 
 type FormState = {
@@ -233,6 +234,19 @@ export default function EventScheduleManager({
             </div>
             <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right" }}>
               <strong style={{ color: "#374151" }}>{session.status}</strong><br />Capacity {session.capacity}
+              <label style={{ display: "block", paddingTop: 12 }}>
+                <input type="checkbox" checked={!!session.allowLateSales} onChange={async event => {
+                  try {
+                    const response = await fetch(`/api/v1/admin/sessions/${session.id}`, {
+                      method: "PATCH", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ allowLateSales: event.target.checked }),
+                    });
+                    if (!response.ok) throw new Error("Unable to change late sales. Superadmin access is required.");
+                    await onCreated();
+                    setNotice("Sales cutoff updated.");
+                  } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to update cutoff"); }
+                }} /> Allow sales after start, until event ends
+              </label>
             </div>
           </div>
         ))}

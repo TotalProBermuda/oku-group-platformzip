@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { roles } = await requireSession();
+    const { roles, userId } = await requireSession();
     if (!roles.includes("SUPERADMIN")) {
       return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
@@ -37,13 +37,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json();
 
     const update: Prisma.SessionUpdateInput = {};
+    if (body.allowLateSales !== undefined) {
+      if (typeof body.allowLateSales !== "boolean") return NextResponse.json({ error: "Invalid late-sales setting" }, { status: 400 });
+      update.allowLateSales = body.allowLateSales;
+    }
     if (body.giftBagEnabled !== undefined) update.giftBagEnabled = Boolean(body.giftBagEnabled);
     if (body.streetsideEnabled !== undefined) update.streetsideEnabled = Boolean(body.streetsideEnabled);
 
-    const session = await prisma.session.update({
+    const session = await prisma.$transaction(async tx => {
+      const updated = await tx.session.update({
       where: { id },
       data: update,
-      select: { id: true, title: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true },
+      select: { id: true, title: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
+      });
+      if (body.allowLateSales !== undefined) await tx.auditLog.create({ data: {
+        actorId: userId, action: "session.late_sales.updated", metadata: { sessionId: id, allowLateSales: body.allowLateSales },
+      } });
+      return updated;
     });
 
     return NextResponse.json({ ok: true, data: session });
