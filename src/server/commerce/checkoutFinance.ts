@@ -9,6 +9,6 @@ export async function priceCheckoutCharges(subtotalCents: number, at = new Date(
   return {
     ...calculateCheckoutCharges(subtotalCents, rule),
     financeRule: { id: rule.id, effectiveFrom: rule.effectiveFrom.toISOString(),
-      serviceFeeBps: rule.serviceFeeBps, taxBps: rule.taxBps, taxServiceFee: rule.taxServiceFee },
+      serviceFeeBps: rule.serviceFeeBps, serviceFeeFlatCents: rule.serviceFeeFlatCents, taxBps: rule.taxBps, taxServiceFee: rule.taxServiceFee },
   };
 }

@@ -234,6 +234,8 @@
   "partnerSupport": "Suporte a Parceiros",
   "cardPartnerSupportDesc": "Reenvie acessos seguros e apoie proprietários e pessoas dos parceiros",
   "websiteContent": "Conteúdo do Site",
+  "checkoutFinance": "Taxas de ingressos e impostos",
+  "cardCheckoutFinanceDesc": "Configure taxas percentuais e fixas, impostos e visualize o total",
   "cardWebsiteContentDesc": "Atualize horários e descrições dos restaurantes sem implantar código",
   "totalSeries": "Total de Séries",
   "totalSessions": "Total de Sessões",

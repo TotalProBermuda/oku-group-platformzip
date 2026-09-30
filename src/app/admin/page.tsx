@@ -28,6 +28,7 @@ type CardEntry = {
 );
 
 const ACTION_CARDS: CardEntry[] = [
+  { labelKey: "checkoutFinance", descKey: "cardCheckoutFinanceDesc", href: "/admin/checkout-finance", Icon: Globe2, roles: ["SUPERADMIN"] },
   // Operations — FB_DIRECTOR and SUPERADMIN
   { labelKey: "hostDashboard", descKey: "cardHostDashboardDesc", href: "/host/dashboard",          Icon: ClipboardList,                       roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
   { labelKey: "operationsBoard", descKey: "cardOperationsBoardDesc", href: "/host/operations",     Icon: Map,                                 roles: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"] },
