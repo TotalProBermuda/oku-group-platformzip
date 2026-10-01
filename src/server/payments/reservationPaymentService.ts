@@ -478,6 +478,9 @@ export async function refundPayment(
   }
 
   const refundCents = input.amountCents ?? intent.amountCents;
+  if (!Number.isSafeInteger(refundCents) || refundCents <= 0 || refundCents > intent.amountCents) {
+    throw Object.assign(new Error("Refund amount must be positive integer cents within the payment amount"), { status: 400 });
+  }
 
   let callResult;
   try {

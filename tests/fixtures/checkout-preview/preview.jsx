@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import Checkout from '../../../src/app/checkout/[slug]/page';
 import NavbarAuth from '../../../src/components/NavbarAuth';
 import NavbarMobileMenu from '../../../src/components/NavbarMobileMenu';
+import AdminNav from '../../../src/components/AdminNav';
+import { AdminContext } from '../../../src/contexts/AdminContext';
 import '../../../src/app/globals.css';
 
 const scenario = new URLSearchParams(location.search).get('scenario') || 'approved';
@@ -35,6 +37,8 @@ window.fetch = async (url) => {
 };
 const role = new URLSearchParams(location.search).get('role') || 'REFERRER';
 const session = { user: { name: 'Isolated Tester', email: 'tester@example.invalid', roles: [role] } };
-createRoot(document.getElementById('root')).render(<React.StrictMode>{scenario === 'navigation'
+createRoot(document.getElementById('root')).render(<React.StrictMode>{scenario === 'admin-navigation'
+  ? <AdminContext.Provider value={{roles:[role]}}><AdminNav /></AdminContext.Provider>
+  : scenario === 'navigation'
   ? <><NavbarAuth session={session}/><NavbarMobileMenu session={session} locale="en" labels={{restaurants:'Restaurants',experiences:'Events',membership:'Membership',careers:'Careers'}}/></>
   : <Checkout />}</React.StrictMode>);

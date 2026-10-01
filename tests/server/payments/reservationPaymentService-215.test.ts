@@ -56,11 +56,12 @@ import {
   authorizePayment,
   voidPayment,
   capturePayment,
+  refundPayment,
   normalizeCybersourceError,
 } from "@/server/payments/reservationPaymentService";
 import { prisma } from "@/lib/prisma";
 import { cybersourceAuthorize } from "@/server/cybersource/authorize";
-import { cybersourceVoid } from "@/server/cybersource/transactions";
+import { cybersourceVoid, cybersourceRefund } from "@/server/cybersource/transactions";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -288,6 +289,24 @@ describe("capturePayment", () => {
       status: 409,
     });
   });
+});
+
+describe("refundPayment amount validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.paymentIntent.findUnique).mockResolvedValue(makeIntent({
+      status: "CAPTURED", cybersourceTransactionId: "isolated_test_transaction",
+    }) as any);
+  });
+
+  it.each([0, -1, 0.5, 5001, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects invalid cents %s before calling the gateway or recording a refund", async (amountCents) => {
+      await expect(refundPayment({ paymentIntentId: "pi_test_001", amountCents })).rejects.toMatchObject({ status: 400 });
+      expect(cybersourceRefund).not.toHaveBeenCalled();
+      expect(prisma.paymentAttempt.create).not.toHaveBeenCalled();
+      expect(prisma.paymentIntent.update).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("Reservation flow deposit-required condition logic", () => {
