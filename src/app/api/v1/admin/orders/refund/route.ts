@@ -140,6 +140,7 @@ export async function POST(req: Request) {
   const isAuthNet = adapter.provider === "AUTHORIZE_NET";
 
   await prisma.$transaction(async (tx) => {
+    if (isFullRefund) await tx.ticket.updateMany({ where: { orderId: order.id }, data: { ticketStatus: "REFUNDED" } });
     await tx.order.update({
       where: { id: order.id },
       data: {

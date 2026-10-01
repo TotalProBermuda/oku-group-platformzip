@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ticketRows } from "@/server/commerce/ticketIssuance";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -98,7 +99,6 @@ export async function POST(req: Request) {
   }
 
   const invoiceNumber = order.id.slice(-12);
-  const qtyTotal = order.lineItems.reduce((s, li) => s + li.qty, 0);
 
   const { adapter, provider } = await getActiveCheckoutAdapter();
 
@@ -200,22 +200,22 @@ export async function POST(req: Request) {
       : (result.rawSafeResponse as Prisma.InputJsonValue);
 
   if (!result.ok) {
-    // A transport error, or an upstream 5xx with no transaction identifier,
-    // is not proof that CyberSource did not receive the payment. Do not mark
+    // Transport errors, upstream 5xx responses and intermediate/review states
+    // are not proof that CyberSource did not receive the payment. Do not mark
     // the order failed, release its capacity, or invite the guest to submit a
     // second charge. Keep the durable payment claim in INITIATED state until
     // the gateway reference is reconciled by a webhook or finance.
     const responseIs5xx = /^5\d\d$/.test(result.responseCode ?? "");
     const outcomeUnknown =
       provider === "CYBERSOURCE" &&
-      !result.transactionId &&
-      (result.failureCode === "NETWORK" || responseIs5xx);
+      (result.failureCode === "PAYMENT_REVIEW_REQUIRED" || result.failureCode === "ADAPTER_ERROR" || result.failureCode === "NETWORK" || responseIs5xx);
 
     if (outcomeUnknown) {
       await prisma.payment.update({
         where: { orderId: order.id },
         data: {
           status: "INITIATED",
+          gatewayTransactionId: result.transactionId,
           gatewayResponseCode: result.responseCode,
           gatewayRawSafeJson,
         },
@@ -357,23 +357,9 @@ export async function POST(req: Request) {
       },
     });
 
-    // Create tickets (1 per qty)
-    const codes: string[] = [];
-    for (let i = 0; i < qtyTotal; i++) {
-      codes.push(
-        `T-${order.id.slice(0, 6)}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-      );
-    }
+    // Preserve purchased product identity; add-ons never create admission tickets.
     await tx.ticket.createMany({
-      data: codes.map((code) => ({
-        orderId: order.id,
-        userId: order.userId,
-        sessionId: order.sessionId,
-        code,
-        attendeeName: order.user.name,
-        attendeeEmail: order.user.email.trim().toLowerCase(),
-        attendeeEmailNormalized: order.user.email.trim().toLowerCase(),
-      })),
+      data: ticketRows(order),
     });
   });
 

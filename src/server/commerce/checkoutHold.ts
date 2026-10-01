@@ -39,6 +39,7 @@ export async function expireCheckoutHoldsForSession(sessionId: string) {
     where: {
       sessionId,
       status: "PENDING",
+      payment: { is: null },
       events: { some: { eventLabel: CHECKOUT_HOLD_EVENT, createdAt: { lte: cutoff } } },
     },
     include: { lineItems: true },
@@ -48,7 +49,7 @@ export async function expireCheckoutHoldsForSession(sessionId: string) {
     // The status transition is the idempotency gate: only the request that
     // changes PENDING to CANCELLED is permitted to release capacity.
     const changed = await prisma.order.updateMany({
-      where: { id: order.id, status: "PENDING" },
+      where: { id: order.id, status: "PENDING", payment: { is: null } },
       data: { status: "CANCELLED", cancelledAt: new Date() },
     });
     if (changed.count !== 1) continue;

@@ -5,6 +5,7 @@
  * `src/server/cybersource/transactions.ts`.
  */
 import { prisma } from "@/lib/prisma";
+import { classifyCharge } from "./chargeOutcome";
 import {
   decryptSecret,
   isEncryptionAvailable,
@@ -31,22 +32,7 @@ function centsToAmount(c: number): string {
   return (c / 100).toFixed(2);
 }
 
-/**
- * Cybersource success for an immediate-capture checkout is a 2xx response
- * whose status confirms the authorization or transmission. Reversed and
- * voided states must never be treated as paid.
- */
-function chargeOk(httpStatus: number | null, body: any): boolean {
-  if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
-  const s = body?.status;
-  return (
-    s === "AUTHORIZED" ||
-    s === "AUTHORIZED_PENDING_REVIEW" ||
-    s === "PARTIAL_AUTHORIZED" ||
-    s === "PENDING" ||
-    s === "TRANSMITTED"
-  );
-}
+/** Refund acceptance is distinct from settlement; reconciliation remains required. */
 function refundOk(httpStatus: number | null, body: any): boolean {
   if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
   const s = body?.status;
@@ -186,7 +172,8 @@ class CybersourceAdapter implements PaymentProviderAdapter {
         failureMessage: e?.message || "Cybersource charge failed",
       };
     }
-    const ok = chargeOk(result.httpStatus, result.body);
+    const outcome = classifyCharge(result.httpStatus, result.body);
+    const ok = outcome === "approved";
     return {
       ok,
       provider: this.provider,
@@ -204,7 +191,7 @@ class CybersourceAdapter implements PaymentProviderAdapter {
         String(result.httpStatus ?? ""),
       message: extractMessage(result.httpStatus, result.body),
       rawSafeResponse: safeTruncate(result.body),
-      failureCode: ok ? null : extractFailureCode(result.body) ?? (result.networkError ? "NETWORK" : null),
+      failureCode: ok ? null : outcome === "review" ? "PAYMENT_REVIEW_REQUIRED" : extractFailureCode(result.body) ?? (result.networkError ? "NETWORK" : null),
       failureMessage: ok ? null : extractMessage(result.httpStatus, result.body),
     };
   }
