@@ -55,7 +55,7 @@ export async function validateAndCheckIn(
           series: { select: { title: true, venue: true } },
         },
       },
-      order: { select: { id: true, seriesId: true } },
+      order: { select: { id: true, seriesId: true, status: true } },
       attendanceEvent: { select: { id: true, status: true } },
     },
   });
@@ -88,11 +88,11 @@ export async function validateAndCheckIn(
     };
   }
 
-  if (ticket.ticketStatus === "CANCELLED" || ticket.ticketStatus === "VOIDED" || ticket.ticketStatus === "REFUNDED") {
+  if (["CANCELLED", "REFUNDED", "FAILED"].includes(ticket.order.status) || ticket.ticketStatus === "CANCELLED" || ticket.ticketStatus === "VOIDED" || ticket.ticketStatus === "REFUNDED") {
     await prisma.checkInLog.create({
       data: { ...logBase, valid: false, result: "EXPIRED" },
     });
-    return { result: "EXPIRED", message: `Ticket is ${ticket.ticketStatus.toLowerCase()}`, ticket: buildTicketPayload(ticket) };
+    return { result: "EXPIRED", message: "Ticket or order is no longer valid for admission", ticket: buildTicketPayload(ticket) };
   }
 
   if (ticket.ticketStatus === "CHECKED_IN") {
@@ -108,7 +108,7 @@ export async function validateAndCheckIn(
 
   // Atomic claim — only one concurrent scan can flip ISSUED -> CHECKED_IN.
   const claim = await prisma.ticket.updateMany({
-    where: { id: ticket.id, ticketStatus: "ISSUED" },
+    where: { id: ticket.id, ticketStatus: "ISSUED", order: { status: { notIn: ["CANCELLED", "REFUNDED", "FAILED"] } } },
     data: { ticketStatus: "CHECKED_IN", checkedInAt: new Date(), checkedInById: scannedByUserId },
   });
 

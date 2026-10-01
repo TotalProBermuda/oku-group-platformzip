@@ -25,12 +25,15 @@ export async function POST(
 
     const ticket = await prisma.ticket.findUnique({
       where: { id },
-      select: { id: true, ticketStatus: true, checkedInAt: true, checkedInById: true, orderId: true },
+      select: { id: true, ticketStatus: true, checkedInAt: true, checkedInById: true, orderId: true, order: { select: { status: true } } },
     });
     if (!ticket) {
       return NextResponse.json({ ok: false, error: "Ticket not found" }, { status: 404 });
     }
 
+    if (["CANCELLED", "REFUNDED", "FAILED"].includes(ticket.order.status)) {
+      return NextResponse.json({ ok: false, error: "This order is no longer valid for admission." }, { status: 409 });
+    }
     if (ticket.ticketStatus === "CHECKED_IN") {
       return NextResponse.json({
         ok: true,
@@ -48,11 +51,12 @@ export async function POST(
     }
 
     const now = new Date();
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const claim = await prisma.ticket.updateMany({
+      where: { id, ticketStatus: "ISSUED", order: { status: { notIn: ["CANCELLED", "REFUNDED", "FAILED"] } } },
       data: { ticketStatus: "CHECKED_IN", checkedInAt: now, checkedInById: userId },
-      select: { id: true, checkedInAt: true, orderId: true },
     });
+    if (claim.count !== 1) return NextResponse.json({ ok: false, error: "Ticket changed during check-in. Refresh and try again." }, { status: 409 });
+    const updated = { id: ticket.id, orderId: ticket.orderId, checkedInAt: now };
 
     // Surface remaining siblings so the modal can chain-through without
     // a round-trip to the order tickets endpoint.

@@ -85,6 +85,7 @@ const RESTAURANTS = {
 
   catch: {
     name: "CATCH",
+    heroPhoto: "/images/catch/dining-room.jpg",
     tagline: "Caribbean Dining · Gold House",
     heroLine1: "Gather.",
     heroLine2: "Share.",
