@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { NavSession } from "./Navbar";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
+import { canonicalDestinationForRoles, rolesCanReachPath } from "@/lib/routePolicy";
 
 interface Props {
   session: NavSession;
@@ -14,18 +15,13 @@ interface Props {
 }
 
 function getDashboardHref(roles: string[]): string {
-  if (roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r))) return "/admin";
-  if (roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST")) return "/host/streetside";
-  if (roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r))) return "/host/dashboard";
-  if (roles.includes("INFLUENCER"))  return "/influencer/dashboard";
-  if (roles.includes("PARTNER"))     return "/partner/dashboard";
-  if (roles.includes("PARTNER_SELLER")) return "/partner/seller";
-  if (roles.includes("INVESTOR"))    return "/investor";
-  if (roles.some((r) => r.startsWith("STAFF_"))) return "/staff";
-  return "/my";
+  const destination = canonicalDestinationForRoles(roles);
+  return destination === "/experiences" || destination === "/" ? "/my" : destination;
 }
 
 function getDashboardLabel(roles: string[]): string {
+  if (getDashboardHref(roles) === "/referrer/dashboard") return "Referrer Dashboard";
+  if (getDashboardHref(roles) === "/admin/payouts") return "Finance Dashboard";
   if (roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r))) return "Admin Console";
   if (roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST")) return "Streetside";
   if (roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r))) return "Host Dashboard";
@@ -131,6 +127,8 @@ export default function NavbarAuth({ session, locale = "en", signInLabel = "Sign
                   {session.user && (
                     <>
                       <div style={{ height: 1, background: "var(--color-border)" }} />
+                      {rolesCanReachPath("/account", roles) && <Link href="/account" onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>My Account & Reservations</Link>}
+                      <Link href="/save-to-phone" onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>Save OKÜ to my phone</Link>
                       <Link href="/my/membership" onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>◇ My Membership</Link>
                       <Link href="/my/tickets"    onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>🎟 My Tickets</Link>
                       <Link href="/my/orders"     onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>📦 My Orders</Link>
