@@ -255,7 +255,14 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
         </div>
 
         {/* ── Group button bar ────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+        <div className="admin-nav-groups" onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            const group = (event.target as HTMLElement).closest(".admin-nav-group");
+            group?.querySelector<HTMLButtonElement>(".admin-nav-group-btn")?.focus();
+            cancelClose();
+            setOpenGroup(null);
+          }
+        }}>
           {groups.map((group) => {
             const active = groupIsActive(group);
             const open   = openGroup === group.label;
@@ -263,16 +270,19 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
             return (
               <div
                 key={group.label}
-                style={{ position: "relative" }}
+                className="admin-nav-group"
                 onMouseEnter={() => openMenu(group.label)}
                 onMouseLeave={scheduleClose}
+                onFocus={() => openMenu(group.label)}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleClose();
+                }}
               >
                 {/* Group label trigger */}
                 <button
                   className="admin-nav-group-btn"
                   data-active={active || open}
-                  onFocus={() => openMenu(group.label)}
-                  onBlur={scheduleClose}
+                  onClick={() => openMenu(group.label)}
                   aria-haspopup="true"
                   aria-expanded={open}
                 >
