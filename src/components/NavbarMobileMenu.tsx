@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import type { NavSession } from "./Navbar";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
+import { canonicalDestinationForRoles, rolesCanReachPath } from "@/lib/routePolicy";
 
 interface Props {
   session: NavSession;
@@ -29,6 +30,9 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
   const isPartnerSeller = roles.includes("PARTNER_SELLER");
   const isInvestor   = roles.includes("INVESTOR");
   const isStaff      = roles.some((r) => ["STAFF_OKU", "STAFF_CATCH"].includes(r));
+  const isHost = roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r));
+  const hostHref = roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST") ? "/host/streetside" : "/host/dashboard";
+  const primaryDashboard = canonicalDestinationForRoles(roles);
 
   const close = () => setOpen(false);
 
@@ -74,10 +78,13 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
             <Link href={localePath(locale, "/membership")}  className="mobile-nav-link" onClick={close}>{labels.membership}</Link>
             <Link href={localePath(locale, "/careers")}     className="mobile-nav-link" onClick={close}>{labels.careers}</Link>
 
-            {(isAdmin || isInfluencer || isPartner || isPartnerSeller || isInvestor || isStaff) && (
+            {(isAdmin || isHost || isInfluencer || isPartner || isPartnerSeller || isInvestor || isStaff) && (
               <div className="mobile-menu-divider" />
             )}
             {isAdmin      && <Link href="/admin"                className="mobile-nav-link" onClick={close}>Admin Console</Link>}
+            {isHost && <Link href={hostHref} className="mobile-nav-link" onClick={close}>Host Dashboard</Link>}
+            {primaryDashboard === "/referrer/dashboard" && <Link href={primaryDashboard} className="mobile-nav-link" onClick={close}>Referrer Dashboard</Link>}
+            {primaryDashboard === "/admin/payouts" && <Link href={primaryDashboard} className="mobile-nav-link" onClick={close}>Finance Dashboard</Link>}
             {isInfluencer && <Link href="/influencer/dashboard" className="mobile-nav-link" onClick={close}>Influencer Dashboard</Link>}
             {isPartner    && <Link href="/partner/dashboard"    className="mobile-nav-link" onClick={close}>Partner Portal</Link>}
             {isPartnerSeller && <Link href="/partner/seller" className="mobile-nav-link" onClick={close}>Seller Portal</Link>}
@@ -88,6 +95,8 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
 
             {session?.user ? (
               <>
+                {rolesCanReachPath("/account", roles) && <Link href="/account" className="mobile-nav-link" onClick={close}>My Account & Reservations</Link>}
+                <Link href="/save-to-phone" className="mobile-nav-link" onClick={close}>Save OKÜ to my phone</Link>
                 <Link href="/my/membership" className="mobile-nav-link" onClick={close}>◇ My Membership</Link>
                 <Link href="/my/tickets"    className="mobile-nav-link" onClick={close}>🎟 My Tickets</Link>
                 <Link href="/my/orders"     className="mobile-nav-link" onClick={close}>📦 My Orders</Link>
