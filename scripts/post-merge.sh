@@ -8,10 +8,9 @@ echo "==> Generating Prisma client..."
 npx prisma generate
 
 echo "==> Applying database migrations..."
-npx prisma migrate deploy || echo "No migration files found, skipping."
-
-echo "==> Syncing schema to database (db push)..."
-npx prisma db push --accept-data-loss
+# Apply reviewed migration files only. With set -e, any failure stops setup;
+# never fall back to schema push/reset or silently accept data loss.
+npx prisma migrate deploy
 
 echo "==> Verifying i18n parity across en/es/pt..."
 npm run i18n:check
