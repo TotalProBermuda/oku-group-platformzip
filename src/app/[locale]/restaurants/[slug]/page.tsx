@@ -81,7 +81,7 @@ const STATIC_DATA: Record<SlugType, {
     logoLight: "/images/logo-catch.webp",
     logoDark: "/images/logo-catch.webp",
     logoNeedsWhiteBox: false,
-    heroPhoto: "/images/catch/ambience.jpg",
+    heroPhoto: "/images/catch/dining-room.jpg",
     gallery: [
       { src: "/images/catch/carrusel-1.jpg", alt: "CATCH dining experience in Casco Viejo", pos: "center center" },
       { src: "/images/catch/carrusel-2.jpg", alt: "CATCH restaurant atmosphere and design", pos: "center center" },
