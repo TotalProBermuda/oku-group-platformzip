@@ -432,6 +432,8 @@ tr:last-child td { border-bottom: none; }
 }
 
 /* ── Admin nav grouped dropdowns ─────────────────────────────────────────── */
+.admin-nav-groups { display: flex; flex-wrap: wrap; gap: 0; align-items: stretch; }
+.admin-nav-group { position: relative; }
 .admin-nav-group-btn {
   display: inline-flex;
   align-items: center;
@@ -497,6 +499,11 @@ tr:last-child td { border-bottom: none; }
 @media (max-width: 767px) {
   .admin-shell-container,
   .admin-nav-container { --admin-gutter: 16px; }
+  .admin-nav-groups { position: relative; }
+  .admin-nav-group { position: static; flex: 0 0 50%; min-width: 0; }
+  .admin-nav-group-btn { width: 100%; min-height: 44px; white-space: normal; justify-content: space-between; text-align: left; }
+  .admin-nav-dropdown { width: 100%; min-width: 0; max-height: 60vh; overflow-y: auto; }
+  .admin-nav-dropdown-item { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
 }
 @media (min-width: 1440px) {
   .admin-shell-container,
