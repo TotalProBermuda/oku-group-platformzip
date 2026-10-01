@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getResendClient } from "@/server/invitation/resend";
+import { escapeEmailText, formatTicketSession } from "@/server/email/ticketPresentation";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || "https://oku.group";
 
@@ -25,6 +26,7 @@ export async function handleSendOrderEmail(orderId: string) {
     include: {
       user: { select: { name: true, email: true, profile: { select: { language: true } } } },
       series: { select: { title: true, startsAt: true, venue: true } },
+      session: { select: { startsAt: true } },
       tickets: { select: { code: true } },
       lineItems: { select: { nameSnapshot: true, qty: true, unitPriceCents: true, totalCents: true } },
     },
@@ -47,19 +49,19 @@ export async function handleSendOrderEmail(orderId: string) {
   const locale = order.user.profile?.language?.toLowerCase().split("-")[0];
   const bookingLabel = locale === "es" ? "Ver tu reserva" : locale === "pt" ? "Ver sua reserva" : "View Your Booking";
   const totalFormatted = `$${(order.totalCents / 100).toFixed(2)}`;
-  const eventDate = order.series?.startsAt
-    ? new Date(order.series.startsAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+  const eventDate = order.session?.startsAt
+    ? formatTicketSession(order.session.startsAt)
     : null;
 
   const ticketsHtml = ticketCodes.length
     ? ticketCodes
         .map(
           (code) => `
-        <div style="background:white;border:1px solid #e5e0d8;border-radius:8px;padding:16px 20px;margin-bottom:8px;display:flex;align-items:center;gap:16px">
+        <div style="background:white;border:1px solid #e5e0d8;border-radius:8px;padding:16px 20px;margin-bottom:8px;overflow-wrap:anywhere">
           <div style="background:#1a1614;border-radius:6px;padding:8px 12px">
-            <span style="font-family:monospace;font-size:13px;color:white;font-weight:600;letter-spacing:0.06em">${code}</span>
+            <span style="font-family:monospace;font-size:13px;color:white;font-weight:600;letter-spacing:0.06em">${escapeEmailText(code)}</span>
           </div>
-          <a href="${BASE_URL}/login?callbackUrl=%2Faccount" style="font-size:12px;color:#c41e3a;text-decoration:none">${bookingLabel} →</a>
+          <a href="${BASE_URL}/my/tickets" style="display:inline-block;padding:14px 0;font-size:14px;color:#c41e3a;text-decoration:none">${bookingLabel} →</a>
         </div>`
         )
         .join("")
@@ -68,7 +70,7 @@ export async function handleSendOrderEmail(orderId: string) {
   const lineItemsHtml = order.lineItems
     .map(
       (li) =>
-        `<tr><td style="padding:8px 0;color:#4b4540;font-size:14px">${li.nameSnapshot} × ${li.qty}</td><td style="padding:8px 0;color:#4b4540;font-size:14px;text-align:right">$${(li.totalCents / 100).toFixed(2)}</td></tr>`
+        `<tr><td style="padding:8px 0;color:#4b4540;font-size:14px">${escapeEmailText(li.nameSnapshot)} × ${li.qty}</td><td style="padding:8px 0;color:#4b4540;font-size:14px;text-align:right">$${(li.totalCents / 100).toFixed(2)}</td></tr>`
     )
     .join("");
 
@@ -78,11 +80,11 @@ export async function handleSendOrderEmail(orderId: string) {
       <div style="padding:40px 32px">
         <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#c41e3a">Booking Confirmed</p>
         <h1 style="margin:0 0 24px;font-family:Georgia,serif;font-size:28px;font-weight:400;color:#1a1614;letter-spacing:-0.01em">Your tickets are ready</h1>
-        <p style="color:#4b4540;margin:0 0 32px;font-size:15px;line-height:1.6">Hi ${order.user.name ?? "Guest"}, thank you for your booking. Your tickets for <strong>${order.series?.title ?? "the experience"}</strong> are confirmed.</p>
+        <p style="color:#4b4540;margin:0 0 32px;font-size:15px;line-height:1.6">Hi ${escapeEmailText(order.user.name ?? "Guest")}, thank you for your booking. Your tickets for <strong>${escapeEmailText(order.series?.title ?? "the experience")}</strong> are confirmed.</p>
         
         <div style="background:#f9f7f4;border-radius:12px;padding:24px;margin-bottom:32px">
-          ${order.series?.venue ? `<p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af">${order.series.venue}</p>` : ""}
-          <p style="margin:0 0 4px;font-size:20px;font-family:Georgia,serif;color:#1a1614;font-weight:400">${order.series?.title ?? "Experience"}</p>
+          ${order.series?.venue ? `<p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af">${escapeEmailText(order.series.venue)}</p>` : ""}
+          <p style="margin:0 0 4px;font-size:20px;font-family:Georgia,serif;color:#1a1614;font-weight:400">${escapeEmailText(order.series?.title ?? "Experience")}</p>
           ${eventDate ? `<p style="margin:0;font-size:14px;color:#7c7168">${eventDate}</p>` : ""}
         </div>
 
@@ -91,6 +93,9 @@ export async function handleSendOrderEmail(orderId: string) {
         <table style="width:100%;margin-top:24px;border-top:1px solid #e5e0d8;padding-top:16px">
           <tbody>${lineItemsHtml}</tbody>
           <tfoot>
+            <tr><td style="padding:8px 0">Service fee</td><td style="text-align:right">$${(order.feesCents / 100).toFixed(2)}</td></tr>
+            <tr><td style="padding:8px 0">Tax</td><td style="text-align:right">$${(order.taxCents / 100).toFixed(2)}</td></tr>
+            ${order.discountCents ? `<tr><td style="padding:8px 0">Discount</td><td style="text-align:right">−$${(order.discountCents / 100).toFixed(2)}</td></tr>` : ""}
             <tr style="border-top:1px solid #e5e0d8">
               <td style="padding:12px 0 0;font-weight:700;color:#1a1614;font-size:15px">Total paid</td>
               <td style="padding:12px 0 0;font-weight:700;color:#1a1614;font-size:15px;text-align:right">${totalFormatted}</td>
@@ -100,7 +105,7 @@ export async function handleSendOrderEmail(orderId: string) {
 
         <div style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e0d8">
           <p style="margin:0 0 8px;font-size:12px;color:#9ca3af">Order reference: <span style="font-family:monospace;color:#4b4540">${order.id.slice(-8).toUpperCase()}</span></p>
-          <a href="${BASE_URL}/login?callbackUrl=%2Faccount" style="display:inline-block;margin-top:12px;background:#c41e3a;color:white;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.02em">${bookingLabel}</a>
+          <a href="${BASE_URL}/my/tickets" style="display:inline-block;margin-top:12px;background:#c41e3a;color:white;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.02em">${bookingLabel}</a>
         </div>
       </div>
       ${emailFooter()}

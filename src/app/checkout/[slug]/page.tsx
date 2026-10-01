@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BILLING_COUNTRIES } from "@/lib/billingCountries";
 import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
+import { createCheckoutContinuation, isConfirmedCheckout, isVerificationReturn } from "@/lib/checkoutContinuation";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
@@ -69,10 +70,11 @@ export default function CheckoutPage() {
   const [payerChallengeComplete, setPayerChallengeComplete] = useState(false);
   const [challengeDelayed, setChallengeDelayed] = useState(false);
   const challengeFrame = useRef<HTMLIFrameElement>(null);
+  const continuation = useRef(createCheckoutContinuation());
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.origin === window.location.origin && event.source === challengeFrame.current?.contentWindow && event.data?.type === "oku-3ds-complete") setPayerChallengeComplete(true);
+      if (isVerificationReturn(event, window.location.origin, challengeFrame.current?.contentWindow)) setPayerChallengeComplete(true);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -87,6 +89,13 @@ export default function CheckoutPage() {
     const timer = window.setTimeout(() => setChallengeDelayed(true), 45000);
     return () => window.clearTimeout(timer);
   }, [payerChallenge]);
+
+  useEffect(() => {
+    if (payerChallengeComplete && payerChallenge && !paying && !done && !paymentDeclined && !paymentUnderReview &&
+        continuation.current.claimReturn(payerChallenge.authenticationTransactionId)) {
+      void completePurchase();
+    }
+  }, [payerChallengeComplete, payerChallenge, paying, done, paymentDeclined, paymentUnderReview]);
 
   useEffect(() => {
     fetch(`/api/v1/experiences?slug=${slug}`)
@@ -198,6 +207,7 @@ export default function CheckoutPage() {
    * valid retry against that old order.
    */
   function startFreshPaymentAttempt() {
+    if (paying || paymentUnderReview || (payerChallenge && !paymentDeclined)) return;
     microformRef.current = null;
     setFlexConfig(null);
     setSecureReady(false);
@@ -211,14 +221,18 @@ export default function CheckoutPage() {
     setPaymentUnderReview(false);
     setError("");
     setQuote(null);
+    continuation.current = createCheckoutContinuation();
   }
 
   async function completePurchase() {
+    if (done || paymentDeclined || paymentUnderReview) return;
     const expiry = parseCardExpiry(expiryInput);
     if (!intentId || !microformRef.current || !expiry) {
       setError("Enter a valid, unexpired card expiry date (MM / YY)."); return;
     }
     const { expirationMonth: expiryMonth, expirationYear: expiryYear } = expiry;
+    if (!continuation.current.begin()) return;
+    let submitted = false;
     setPaying(true); setError("");
     try {
       const nextTransientToken = transientToken ?? await new Promise<string>((resolve, reject) => {
@@ -248,6 +262,7 @@ export default function CheckoutPage() {
           expirationYear: expiryYear,
         };
       }
+      submitted = true;
       const res = await fetch("/api/v1/checkout/confirm", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -272,7 +287,7 @@ export default function CheckoutPage() {
         return;
       }
       if (!res.ok) {
-        if (data?.data?.code === "PAYMENT_OUTCOME_UNKNOWN") {
+        if (res.status >= 500 || data?.data?.code === "PAYMENT_OUTCOME_UNKNOWN") {
           setPaymentUnderReview(true);
           setError(data.error ?? "We are confirming your payment with the bank. Please do not try again.");
           setPaying(false);
@@ -283,15 +298,21 @@ export default function CheckoutPage() {
         setPaying(false);
         return;
       }
+      if (!isConfirmedCheckout(res.status, data)) throw new Error("Unconfirmed checkout response");
       setDone(true);
     } catch {
       // Keep the public message intentionally generic: provider responses can
       // reveal issuer and fraud-decision detail.  The server stores a safe,
       // auditable response code for authorised finance/support staff.
-      setPaymentDeclined(true);
-      setError("Payment was not approved. Your card information was not stored by OKÜ. Please start a fresh payment attempt or use another card.");
+      setPaymentUnderReview(submitted);
+      setPaymentDeclined(!submitted);
+      setError(submitted
+        ? "We could not confirm the payment result. It may have reached your bank. Please do not pay again; check My Orders or contact support."
+        : "Secure payment could not be prepared. No payment authorization was submitted. Please start a fresh payment attempt.");
+    } finally {
+      continuation.current.finish();
+      setPaying(false);
     }
-    setPaying(false);
   }
 
   function browserData() {
@@ -348,10 +369,11 @@ export default function CheckoutPage() {
       <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.55, margin: "0 0 32px" }}>
         Your booking is linked to this email. Use a one-time secure email link whenever you want to view your tickets—no password or Google account is required.
       </p>
-      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <Link href="/login?callbackUrl=/my/tickets" className="btn btn-primary">Access My Tickets</Link>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
+        <Link href="/my/tickets" className="btn btn-primary">Access My Tickets</Link>
         <Link href="/experiences" className="btn btn-ghost">More Experiences</Link>
       </div>
+      <p style={{ marginTop: 24 }}><Link href="/save-to-phone">Save OKÜ to your phone</Link> for an easier return to your tickets.</p>
     </div>
   );
 
@@ -558,18 +580,19 @@ export default function CheckoutPage() {
                     <div style={{ marginTop: 16, padding: 16, background: "#fff", border: "1px solid #d8d2ca", borderRadius: 8 }}>
                       <strong>Verify this payment with your bank</strong>
                       <p style={{ fontSize: 13, color: "#6b7280", margin: "8px 0 12px" }}>Complete the secure verification below. Your card details remain with CyberSource and your bank.</p>
-                      <iframe ref={challengeFrame} name="oku-3ds-challenge" title="Secure cardholder verification" style={{ width: "100%", minHeight: 420, border: 0 }} />
+                      <iframe ref={challengeFrame} name="oku-3ds-challenge" title="Secure cardholder verification" aria-hidden={payerChallengeComplete} tabIndex={payerChallengeComplete ? -1 : undefined} style={{ display: payerChallengeComplete ? "none" : "block", width: "100%", minHeight: 420, border: 0 }} />
                       <form id="oku-3ds-challenge-form" method="POST" target="oku-3ds-challenge" action={payerChallenge.stepUpUrl}>
                         <input type="hidden" name="JWT" value={payerChallenge.token} />
                       </form>
                       <p role="status" style={{ fontSize: 14, marginTop: 12 }}>
-                        {payerChallengeComplete ? "Bank verification returned. Continue below to finish payment; the result will be checked securely." : challengeDelayed ? "If this window is blank or downloaded a file, verification has not completed. Do not submit again; contact support. Never share a bank verification code with us." : "Waiting for your bank’s verification screen. Follow its instructions here or in your banking app."}
+                        {paymentUnderReview ? "Payment result needs review. See the guidance below before taking any further action." : paymentDeclined ? "Payment could not be completed. See the result below." : payerChallengeComplete ? "Bank verification returned. We are checking the result and finishing your payment securely. Please do not refresh or pay again." : challengeDelayed ? "If this window is blank or downloaded a file, verification has not completed. Do not submit again; contact support. Never share a bank verification code with us." : "Waiting for your bank’s verification screen. Follow its instructions here or in your banking app."}
                       </p>
                     </div>
                   )}
                 </div>
 
                 {error && <div style={{ color: "#dc2626", fontSize: 14, marginTop: 16, padding: "12px 16px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>{error}</div>}
+                {paymentUnderReview && <Link href="/my/orders" className="btn btn-ghost">Check My Orders</Link>}
                 {paymentDeclined && (
                   <button type="button" onClick={startFreshPaymentAttempt} className="btn btn-ghost" style={{ marginTop: 14, width: "100%" }}>
                     Start a fresh payment attempt
@@ -578,7 +601,7 @@ export default function CheckoutPage() {
               </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={startFreshPaymentAttempt} disabled={paymentUnderReview} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
+                <button onClick={startFreshPaymentAttempt} disabled={paying || paymentUnderReview || Boolean(payerChallenge)} className="btn btn-ghost" style={{ flex: 1 }}>← Back</button>
                 <button onClick={completePurchase} disabled={paying || !secureReady || paymentDeclined || paymentUnderReview || Boolean(payerChallenge && !payerChallengeComplete)} className="btn btn-primary" style={{ flex: 2, padding: "14px" }}>
                   {paying ? "Processing…" : payerChallenge && !payerChallengeComplete ? "Waiting for bank verification…" : `Confirm & Pay ${fmt(quote.totalCents)}`}
                 </button>

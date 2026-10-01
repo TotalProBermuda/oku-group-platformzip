@@ -6,6 +6,7 @@ import type { NavSession } from "./Navbar";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
 import { dashboardNavigationForUser } from "@/lib/dashboardNavigation";
+import { rolesCanReachPath } from "@/lib/routePolicy";
 
 interface Props {
   session: NavSession;
@@ -86,6 +87,8 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
 
             {session?.user ? (
               <>
+                {rolesCanReachPath("/account", roles) && <Link href="/account" className="mobile-nav-link" onClick={close}>My Account & Reservations</Link>}
+                <Link href="/save-to-phone" className="mobile-nav-link" onClick={close}>Save OKÜ to my phone</Link>
                 <Link href="/my/membership" className="mobile-nav-link" onClick={close}>◇ My Membership</Link>
                 <Link href="/my/tickets"    className="mobile-nav-link" onClick={close}>🎟 My Tickets</Link>
                 <Link href="/my/orders"     className="mobile-nav-link" onClick={close}>📦 My Orders</Link>

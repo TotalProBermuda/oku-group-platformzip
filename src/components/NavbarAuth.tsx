@@ -6,6 +6,7 @@ import type { NavSession } from "./Navbar";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
 import { dashboardNavigationForUser } from "@/lib/dashboardNavigation";
+import { rolesCanReachPath } from "@/lib/routePolicy";
 
 interface Props {
   session: NavSession;
@@ -112,6 +113,8 @@ export default function NavbarAuth({ session, locale = "en", signInLabel = "Sign
                   {session.user && (
                     <>
                       <div style={{ height: 1, background: "var(--color-border)" }} />
+                      {rolesCanReachPath("/account", roles) && <Link href="/account" onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>My Account & Reservations</Link>}
+                      <Link href="/save-to-phone" onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>Save OKÜ to my phone</Link>
                       <Link href="/my/membership" onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>◇ My Membership</Link>
                       <Link href="/my/tickets"    onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>🎟 My Tickets</Link>
                       <Link href="/my/orders"     onClick={() => setAcctOpen(false)} style={{ display: "block", padding: "10px 16px", fontSize: 13, color: "var(--color-text)", textDecoration: "none" }}>📦 My Orders</Link>
