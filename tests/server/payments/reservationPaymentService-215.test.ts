@@ -62,6 +62,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { cybersourceAuthorize } from "@/server/cybersource/authorize";
 import { cybersourceVoid, cybersourceRefund } from "@/server/cybersource/transactions";
+import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -307,6 +308,29 @@ describe("refundPayment amount validation", () => {
       expect(prisma.paymentIntent.update).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    { httpStatus: 400, body: { errorInformation: { reason: "PROCESSOR_DECLINED" } } },
+    { httpStatus: null, body: null },
+  ])("records failed attempts without asserting a verified refund", async (gatewayResult) => {
+    vi.mocked(cybersourceRefund).mockResolvedValue(gatewayResult as any);
+    const result = await refundPayment({ paymentIntentId: "pi_test_001", amountCents: 100 });
+    expect(result.ok).toBe(false);
+    expect(prisma.paymentAttempt.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "FAILED", amountCents: 100 }),
+    }));
+    expect(enqueueLedgerEvent).not.toHaveBeenCalled();
+    expect(prisma.paymentIntent.update).not.toHaveBeenCalled();
+  });
+
+  it("retains the refund ledger event for accepted refunds", async () => {
+    vi.mocked(cybersourceRefund).mockResolvedValue({ httpStatus: 201, body: { id: "mock-refund", status: "PENDING" } } as any);
+    const result = await refundPayment({ paymentIntentId: "pi_test_001", amountCents: 100 });
+    expect(result.ok).toBe(true);
+    expect(enqueueLedgerEvent).toHaveBeenCalledWith(prisma, expect.objectContaining({
+      eventType: "PAYMENT_REFUNDED", payload: expect.objectContaining({ ok: true, refundCents: 100 }),
+    }));
+  });
 });
 
 describe("Reservation flow deposit-required condition logic", () => {
