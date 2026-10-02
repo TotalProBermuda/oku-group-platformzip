@@ -520,7 +520,9 @@ export async function refundPayment(
     });
   }
 
-  await enqueueLedgerEvent(prisma, {
+  // Failed attempts are already recorded above. They must not enter the
+  // verified refund ledger; a gateway failure is not evidence of a refund.
+  if (ok) await enqueueLedgerEvent(prisma, {
     eventType: "PAYMENT_REFUNDED",
     source: { system: "reservation_payment_service", connector: null, recordId: null },
     confidenceClass: "VERIFIED_POS_EVENT",
