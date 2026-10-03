@@ -71,7 +71,7 @@ function QRScannerModal({ seriesId, onClose }: QRScannerModalProps) {
   const isRunningRef = useRef(false);
   const cooldownRef = useRef(false);
   const activeRef = useRef(true);
-  const resultTimer = useRef<ReturnType<typeof setTimeout>>();
+  const resultTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Load library once; tear down scanner on unmount
   useEffect(() => {

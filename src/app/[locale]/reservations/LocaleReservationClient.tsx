@@ -24,7 +24,7 @@ export default function LocaleReservationClient({ locale, t }: Props) {
         </p>
       </div>
 
-      <ReservationWizard locale={locale} t={t} />
+      <ReservationWizard locale={locale} t={t.booking} />
     </div>
   );
 }

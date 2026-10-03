@@ -49,6 +49,7 @@ export async function POST(
       contactName: true,
       status: true,
       commissionValidatedAt: true,
+      actualRevenueCents: true,
       venueId: true,
       assignedTableLabel: true,
       assignedRestaurantHostId: true,
