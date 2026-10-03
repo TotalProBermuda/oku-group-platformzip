@@ -26,7 +26,7 @@ export async function requireSession() {
   }
   const roles = (session.user.roles || []) as RoleKey[];
   const userId = await resolveDbUserId(session.user.id as string, session.user.email);
-  return { session, userId, roles };
+  return { session: { ...session, user: session.user }, userId, roles };
 }
 
 export async function getOptionalSession() {
@@ -34,5 +34,5 @@ export async function getOptionalSession() {
   if (!session?.user?.id) return null;
   const roles = (session.user.roles || []) as RoleKey[];
   const userId = await resolveDbUserId(session.user.id as string, session.user.email);
-  return { session, userId, roles };
+  return { session: { ...session, user: session.user }, userId, roles };
 }

@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
     let subtotalCents = 0;
     let totalQty = 0;
-    const lineItemsData: { ticketTypeId: string; qty: number; unitPriceCents: number; totalCents: number }[] = [];
+    const lineItemsData: { ticketTypeId: string; nameSnapshot: string; qty: number; unitPriceCents: number; totalCents: number }[] = [];
 
     for (const item of items) {
       const tt = ttMap.get(item.ticketTypeId);

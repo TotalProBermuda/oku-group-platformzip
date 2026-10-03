@@ -1,4 +1,3 @@
-import { getTranslations } from "@/i18n/getTranslations";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
@@ -17,7 +16,6 @@ const CAT_LABELS: Record<string, string> = {
 
 export default async function BrandPartnersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = await getTranslations(locale);
 
   const slots = await prisma.sponsorshipSlot.findMany({
     where: { isPublished: true, status: "OPEN" },

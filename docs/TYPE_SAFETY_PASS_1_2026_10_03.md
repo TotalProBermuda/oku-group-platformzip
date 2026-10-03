@@ -1,0 +1,69 @@
+# Type safety repair — pass 1
+
+Base: `c43c3c7c`. Branch: `codex/type-safety-pass-1`.
+
+## Changes
+
+- Await Next 15 asynchronous URL parameters in 13 INVU, host and payout route handlers across 12 files. Existing authorization and business operations remain unchanged.
+- Correct the authentication POST context type; preserve distributed rate limiting. The installed NextAuth adapter already awaits context.params.
+- Query Order.payment and Ticket.ticketStatus, preserving the existing customer payments-array and admin ticket-status response shapes.
+- Resolve the session before reading the waitlist email on the event page.
+
+## Evidence
+
+- Existing release regression suite plus six new route/query tests: 214 passed, 31 files.
+- Two additional auth context/rate-limit tests passed.
+- No live database, payment, refund, payout or customer invitation executed. No schema, financial settings, permission policy or TypeScript exclusions changed.
+- Full local TypeScript check remains failing (451 diagnostics). This checkout uses a shared, older generated Prisma client: it lacks fields such as attendeeEmailNormalized present in the schema. This count is NOT comparable to the user's 347-diagnostic Replit check. Application typing failures and mockup-project inclusion also remain unresolved.
+- No production deployment and no full build certification for this batch. Keep the PR draft pending further verification.
+
+## Next gates
+
+### Scoped merge assessment (supersedes the earlier draft-only gate)
+
+Reassessed this as a bounded repair PR, not a requirement to eliminate all historic repository debt before accepting any fix. Identical compiler configuration and freshly generated Prisma client were used for base `c43c3c7c` and branch `4ae682b`. The compiler host substituted the base revision of changed files and omitted branch-added files for the baseline; all unchanged sources/dependencies were identical.
+
+- Base: 418 diagnostics total / 195 application source diagnostics.
+- Branch: 266 total / 56 application source diagnostics.
+- No remaining diagnostics in files changed by this PR.
+- Four diagnostic messages differ in already-failing, unchanged routes: event creation, influencer invites, invitation sending, and registrants. These reflect the newly explicit optional session identity type (plus the existing nonexistent isAdmin field), not newly failing files. They remain tracked debt, not declared fixed.
+- Isolated Next 15.5.25 production build completed successfully. Environment was cleared and supplied only build-local settings, an unreachable localhost database URL, localhost app URLs, and a non-live authentication secret. No database migration or production access occurred. The build still skips type/lint validation under the existing configuration, so this is compile/build evidence only.
+- Added runtime guard tests proving INVU-confirmed revenue (including zero) cannot be overwritten manually, and an unrelated host cannot close a reservation. These use mocks only.
+- Final regression result: **239 passed, 37 files**. `git diff --check` passed.
+- Build logged expected localhost database-connection failures for data-backed static pages and existing CSS warnings; therefore it does not verify database-backed page content. All 309 static pages generated and the command exited 0. A staging/live data smoke test remains a deployment gate.
+
+Decision: eligible for review/merge as a tested incremental repair once the final regression run passes; **not** a global type-check pass or launch-ready certification. No production deployment is included. Preserve the remaining backlog rather than changing financial interpretation, permissions or unrelated modules to make this PR appear globally clean.
+
+### Continuation evidence
+
+Additional repairs on the same draft PR:
+
+- Added optional NextAuth identity/role declarations and narrowed authenticated helper return types without inventing a guaranteed authenticated session.
+- Corrected the partner dashboard's `links` Prisma relation; retained response format and existing authorization.
+- Made invitation validation results a discriminated union; incomplete sessions cannot write a free registration.
+- Fixed compensation-query type narrowing and selected the existing reservation actualRevenueCents field already consumed by close logic. No rates or amounts were edited.
+- Removed 438 lines of unreachable legacy restaurant rendering after its unconditional redirect; localized restaurant routes, assets and stored content are untouched. Redirect tests cover the three existing slugs and an unknown slug.
+- Corrected reservation translation namespace, menu description return typing, demo line-item declaration and timer initialization.
+
+Generated an isolated Prisma 5.22 client from the current schema, with an output override in a temporary schema copy. No DB connection/migration was performed and the shared client was not replaced. The first automatic package-resolution attempt failed; retry with an existing dependency link and autoinstall disabled succeeded.
+
+The fresh-client full-project check reports **266 diagnostics: 56 src, 190 artifacts, 2 attached_assets, 9 scripts, 9 tests**. No exclusions or type-check suppression were added. This remains a failing release check, not a clean-build claim. Generated Next route types already present locally were checked but not regenerated by a fresh build. The old 451 count used a stale client and is not a valid improvement baseline.
+
+The remaining source problems include unchecked/null admin sessions, JSON payload typing, event analytics queries, ticket/order client nullability and nested translation dictionaries. The event commission-performance endpoint also contains a hard-coded 10% estimate and invalid order fields: financial meaning and bundle attribution need explicit reconciliation, not a blind field rename. Nothing in that endpoint was changed in this batch.
+
+Regression run after the continuation: 232 tests passed across 35 files; four session-boundary tests were subsequently added and are included in the final run recorded with the PR update. No live emails or financial operations were used.
+
+Generate Prisma client in an isolated dependency installation; rerun the full type check with Next-generated route types. Continue repairing invalid runtime queries, session typings, translations and other application errors. Separate independently configured mockup source from application type checking without excluding production code. Verify a clean build before any release decision.
+
+After a tested PR is merged, Replit commands (not before):
+
+```sh
+git status
+GIT_EDITOR=true git pull --no-rebase origin main
+npx prisma generate
+npx vitest run tests/server/payments tests/server/cybersource tests/server/commerce tests/server/reservations tests/server/rbac/roleSplitAuthz.test.ts tests/server/dashboardNavigation.test.ts tests/server/referrerShareSurface.test.ts
+npx tsc --noEmit --pretty false
+npm run build
+```
+
+`prisma generate` generates code; do not substitute db push, migrate reset or accept-data-loss. Stop on conflicts or failing release checks; do not republish this batch alone.

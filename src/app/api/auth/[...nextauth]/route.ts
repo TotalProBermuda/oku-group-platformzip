@@ -10,8 +10,8 @@ export const GET = handler;
 
 // Only throttle mutation requests. This protects sign-in/token/CSRF actions
 // without rate-limiting OAuth GET callbacks or ordinary session reads.
-export async function POST(req: NextRequest, context: { params: { nextauth: string[] } }) {
-const requireDistributed = hasRedisConfig();
+export async function POST(req: NextRequest, context: { params: Promise<{ nextauth: string[] }> }) {
+  const requireDistributed = hasRedisConfig();
   const rateLimit = await checkRateLimitAsync({
     key: `nextauth-post:${clientIp(req)}`,
     limit: 30,

@@ -63,7 +63,7 @@ export async function GET() {
       where: { userId },
       select: {
         actorTypeCode: true,
-        referralLinks: {
+        links: {
           where: { isActive: true },
           select: { code: true },
           orderBy: { createdAt: "asc" },
@@ -83,7 +83,7 @@ export async function GET() {
       series: seriesList,
       referrals,
       referral: {
-        referralCode: referralActor?.referralLinks[0]?.code ?? null,
+        referralCode: referralActor?.links[0]?.code ?? null,
         actorTypeCode: referralActor?.actorTypeCode ?? null,
       },
     });

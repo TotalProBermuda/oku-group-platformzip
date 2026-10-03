@@ -25,8 +25,9 @@ const ALLOWED_ROLES = ["SUPERADMIN", "ADMIN_FINANCE"];
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: pendingParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await pendingParams;
   const session = await getServerSession(authOptions);
   const roles: string[] = (session?.user as { roles?: string[] })?.roles ?? [];
   if (!roles.some(r => ALLOWED_ROLES.includes(r))) {
@@ -58,8 +59,9 @@ export async function POST(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: pendingParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await pendingParams;
   const session = await getServerSession(authOptions);
   const roles: string[] = (session?.user as { roles?: string[] })?.roles ?? [];
   if (!roles.some(r => ALLOWED_ROLES.includes(r))) {

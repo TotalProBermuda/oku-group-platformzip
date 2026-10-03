@@ -31,9 +31,10 @@ export type VenueMenu = {
   sections: MenuSection[];
 };
 
-function clean(s?: string): string | undefined {
-  if (!s) return undefined;
-  return s.replace(/ Source copy appears truncated in Recafy\./g, "").trim() || undefined;
+function clean(s: string): string {
+  const cleaned = s.replace(/ Source copy appears truncated in Recafy\./g, "").trim();
+  if (!cleaned) throw new Error("Menu translation must not be empty");
+  return cleaned;
 }
 
 export const venueMenus: VenueMenu[] = [

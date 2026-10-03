@@ -8,8 +8,9 @@ import { pullBoundClosedOrder } from "@/server/services/invu/invuClosedOrdersSer
 // Hosts never submit a financial total or commission rate from this endpoint.
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: pendingParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await pendingParams;
   try {
     const { userId, roles } = await requireSession();
     const isSuperAdmin = roles.includes("SUPERADMIN");

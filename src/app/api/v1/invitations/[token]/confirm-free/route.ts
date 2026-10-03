@@ -7,7 +7,7 @@ import { validateToken, markRsvpConfirmed } from "@/server/invitation/tokenServi
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
   const result = await validateToken(token);
   if (!result.valid) return NextResponse.json({ error: result.reason }, { status: 404 });

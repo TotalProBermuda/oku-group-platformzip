@@ -13,10 +13,13 @@ export async function GET(_req: NextRequest) {
       series: { select: { title: true, slug: true, venue: true } },
       session: { select: { title: true, startsAt: true } },
       lineItems: { include: { ticketType: { select: { name: true } } } },
-      payments: { select: { status: true, amountCents: true } },
+      payment: { select: { status: true, amountCents: true } },
     },
   });
-  return NextResponse.json({ orders });
+  // Preserve the existing list-shaped API contract over the singular relation.
+  return NextResponse.json({ orders: orders.map(({ payment, ...order }) => ({
+    ...order, payments: payment ? [payment] : [],
+  })) });
 }
 
 export async function POST(req: NextRequest) {

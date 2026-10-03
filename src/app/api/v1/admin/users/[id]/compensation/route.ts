@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     let referrer:
-      | (typeof referrerBase & {
+      | (NonNullable<typeof referrerBase> & {
           commissions: Awaited<ReturnType<typeof prisma.commissionEntry.findMany>>;
           _count: { attributions: number; commissions: number };
         })
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         ...referrerBase,
         commissions,
         _count: { ...referrerBase._count, commissions: commissionsCount },
-      } as typeof referrer;
+      };
     }
 
     const influencerProfile = await prisma.influencerProfile.findUnique({
