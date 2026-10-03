@@ -5,7 +5,8 @@ import { signOut } from "next-auth/react";
 import type { NavSession } from "./Navbar";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
-import { canonicalDestinationForRoles, rolesCanReachPath } from "@/lib/routePolicy";
+import { dashboardNavigationForUser } from "@/lib/dashboardNavigation";
+import { rolesCanReachPath } from "@/lib/routePolicy";
 
 interface Props {
   session: NavSession;
@@ -24,15 +25,10 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
   const [open, setOpen] = useState(false);
 
   const roles: string[] = session?.user?.roles ?? [];
-  const isAdmin      = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r));
   const isInfluencer = roles.includes("INFLUENCER");
-  const isPartner    = roles.includes("PARTNER");
-  const isPartnerSeller = roles.includes("PARTNER_SELLER");
-  const isInvestor   = roles.includes("INVESTOR");
-  const isStaff      = roles.some((r) => ["STAFF_OKU", "STAFF_CATCH"].includes(r));
-  const isHost = roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r));
-  const hostHref = roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST") ? "/host/streetside" : "/host/dashboard";
-  const primaryDashboard = canonicalDestinationForRoles(roles);
+  const dashboard = session?.user
+    ? dashboardNavigationForUser(roles, session.user.hasReferrerDashboard ?? false)
+    : null;
 
   const close = () => setOpen(false);
 
@@ -78,18 +74,14 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
             <Link href={localePath(locale, "/membership")}  className="mobile-nav-link" onClick={close}>{labels.membership}</Link>
             <Link href={localePath(locale, "/careers")}     className="mobile-nav-link" onClick={close}>{labels.careers}</Link>
 
-            {(isAdmin || isHost || isInfluencer || isPartner || isPartnerSeller || isInvestor || isStaff) && (
+            {dashboard && (
               <div className="mobile-menu-divider" />
             )}
-            {isAdmin      && <Link href="/admin"                className="mobile-nav-link" onClick={close}>Admin Console</Link>}
-            {isHost && <Link href={hostHref} className="mobile-nav-link" onClick={close}>Host Dashboard</Link>}
-            {primaryDashboard === "/referrer/dashboard" && <Link href={primaryDashboard} className="mobile-nav-link" onClick={close}>Referrer Dashboard</Link>}
-            {primaryDashboard === "/admin/payouts" && <Link href={primaryDashboard} className="mobile-nav-link" onClick={close}>Finance Dashboard</Link>}
-            {isInfluencer && <Link href="/influencer/dashboard" className="mobile-nav-link" onClick={close}>Influencer Dashboard</Link>}
-            {isPartner    && <Link href="/partner/dashboard"    className="mobile-nav-link" onClick={close}>Partner Portal</Link>}
-            {isPartnerSeller && <Link href="/partner/seller" className="mobile-nav-link" onClick={close}>Seller Portal</Link>}
-            {isInvestor   && <Link href="/investor"             className="mobile-nav-link" onClick={close}>IR Portal</Link>}
-            {isStaff      && <Link href="/staff"                className="mobile-nav-link" onClick={close}>Staff SOPs</Link>}
+            {dashboard && (
+              <Link href={dashboard.href} className="mobile-nav-link" onClick={close}>
+                {dashboard.label}
+              </Link>
+            )}
 
             <div className="mobile-menu-divider" />
 

@@ -1,24 +1,10 @@
 import "./globals.css";
-import { Inter, Cormorant_Garamond } from "next/font/google";
 import { headers } from "next/headers";
 import Script from "next/script";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Providers } from "@/components/Providers";
 import { injectedExtensionErrorGuardScript } from "@/lib/clientErrorFilters";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--inter",
-  display: "swap",
-});
-
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--cormorant",
-  display: "swap",
-});
 
 export const metadata = {
   title: "OKÜ Hospitality Group",
@@ -48,9 +34,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       lang={htmlLang}
       translate="no"
       suppressHydrationWarning
-      className={`${inter.variable} ${cormorant.variable}`}
     >
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@100..900&display=swap"
+        />
         {/* Chrome extensions execute in the page context. Install this before
             Next's dev overlay so a known MetaMask injection failure cannot be
             misreported as an OKÜ application crash. */}

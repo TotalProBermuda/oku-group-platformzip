@@ -5,32 +5,14 @@ import { useState } from "react";
 import type { NavSession } from "./Navbar";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
-import { canonicalDestinationForRoles, rolesCanReachPath } from "@/lib/routePolicy";
+import { dashboardNavigationForUser } from "@/lib/dashboardNavigation";
+import { rolesCanReachPath } from "@/lib/routePolicy";
 
 interface Props {
   session: NavSession;
   locale?: Locale;
   signInLabel?: string;
   signOutLabel?: string;
-}
-
-function getDashboardHref(roles: string[]): string {
-  const destination = canonicalDestinationForRoles(roles);
-  return destination === "/experiences" || destination === "/" ? "/my" : destination;
-}
-
-function getDashboardLabel(roles: string[]): string {
-  if (getDashboardHref(roles) === "/referrer/dashboard") return "Referrer Dashboard";
-  if (getDashboardHref(roles) === "/admin/payouts") return "Finance Dashboard";
-  if (roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(r))) return "Admin Console";
-  if (roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST")) return "Streetside";
-  if (roles.some((r) => ["RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"].includes(r))) return "Host Dashboard";
-  if (roles.includes("INFLUENCER"))  return "My Dashboard";
-  if (roles.includes("PARTNER"))     return "Partner Portal";
-  if (roles.includes("PARTNER_SELLER")) return "Seller Portal";
-  if (roles.includes("INVESTOR"))    return "IR Portal";
-  if (roles.some((r) => r.startsWith("STAFF_"))) return "SOPs";
-  return "My Account";
 }
 
 function getRoleLabel(roles: string[]): string {
@@ -56,8 +38,12 @@ export default function NavbarAuth({ session, locale = "en", signInLabel = "Sign
   const roles: string[] = session?.user?.roles ?? [];
   const isInfluencer = roles.includes("INFLUENCER");
 
-  const dashHref  = getDashboardHref(roles);
-  const dashLabel = getDashboardLabel(roles);
+  const dashboard = dashboardNavigationForUser(
+    roles,
+    session?.user?.hasReferrerDashboard ?? false,
+  );
+  const dashHref = dashboard.href;
+  const dashLabel = dashboard.label;
   const roleLabel = getRoleLabel(roles);
 
   const userName    = session?.user?.name || session?.user?.email || "";

@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-describe("production migration startup", () => {
-  it.each([0, 1])("starts Next.js only after successful migrations (exit %s)", (exitCode) => {
+describe("production startup separation from migrations", () => {
+  it.each([0, 1])("does not invoke a migration runner regardless of its exit code (%s)", (exitCode) => {
     const dir = mkdtempSync(join(tmpdir(), "oku-startup-test-"));
     try {
       const log = join(dir, "calls");
@@ -15,10 +15,9 @@ describe("production migration startup", () => {
         env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, TEST_LOG: log, TEST_EXIT: String(exitCode), PORT: "5000" },
       });
       const calls = readFileSync(log, "utf8");
-      expect(calls).toContain("prisma migrate resolve --rolled-back 20260922140000_partner_seller_role");
-      expect(calls).toContain("prisma migrate deploy");
-      expect(calls.includes("npm run start:next -- -p 5000")).toBe(exitCode === 0);
-      expect(result.status).toBe(exitCode);
+      expect(calls).not.toContain("npx");
+      expect(calls).toBe("npm run start:next -- -p 5000\n");
+      expect(result.status).toBe(0);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

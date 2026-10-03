@@ -418,12 +418,13 @@ describe("Role isolation — no cross-contamination between new roles", () => {
 // ─── Login callback sanitization ─────────────────────────────────────────────
 
 describe("Role-aware callbackUrl sanitization", () => {
-  it("keeps partner sellers inside their restricted seller portal", () => {
+  it("uses the shared referrer dashboard for partner sellers", () => {
     expect(canReach("/partner/seller", ["PARTNER_SELLER"])).toBe(true);
+    expect(canReach("/referrer/dashboard", ["PARTNER_SELLER"])).toBe(true);
     expect(canReach("/partner/dashboard", ["PARTNER_SELLER"])).toBe(false);
     expect(canReach("/partner/series/example", ["PARTNER_SELLER"])).toBe(false);
     expect(canReach("/admin", ["PARTNER_SELLER"])).toBe(false);
-    expect(canonicalDestinationForRoles(["ATTENDEE", "PARTNER_SELLER"])).toBe("/partner/seller");
+    expect(canonicalDestinationForRoles(["ATTENDEE", "PARTNER_SELLER"])).toBe("/referrer/dashboard");
     expect(sanitizeCallbackUrlForRoles("/partner/seller", ["ATTENDEE", "PARTNER_SELLER"])).toBe("/partner/seller");
   });
 

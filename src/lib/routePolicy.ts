@@ -1,3 +1,5 @@
+import { REFERRER_DASHBOARD_ROLES } from "@/lib/referrerDashboardRoles";
+
 /**
  * Shared route-access policy table.
  *
@@ -63,9 +65,9 @@ export const ROLE_ROUTES: { prefix: string; allowed: string[] }[] = [
   { prefix: "/partner",            allowed: ["SUPERADMIN", "PARTNER"] },
   { prefix: "/investor",           allowed: ["SUPERADMIN", "INVESTOR"] },
   { prefix: "/staff",              allowed: ["SUPERADMIN", "STAFF_OKU", "STAFF_CATCH", "RESTAURANT_HOST"] },
-  // All referrer-capable roles — must mirror REFERRER_CAPABLE_ROLES in
-  // src/app/api/v1/referrer/dashboard/route.ts (Edge runtime cannot import it).
-  { prefix: "/referrer",           allowed: ["SUPERADMIN", "REFERRER", "TAXI_DRIVER", "HOTEL_CONCIERGE", "CONCIERGE", "TOUR_GUIDE", "PROMOTER", "PRIVATE_NETWORK", "INFLUENCER_SUB_REFERRER", "INFLUENCER", "PARTNER"] },
+  // ATTENDEE admits legacy Partner Matrix accounts to the server-side identity
+  // check. The layout and API still require a linked actor/referrer.
+  { prefix: "/referrer",           allowed: [...REFERRER_DASHBOARD_ROLES, "ATTENDEE"] },
   { prefix: "/host/streetside",    allowed: ["SUPERADMIN", "STREETSIDE_HOST"] },
   { prefix: "/host/dashboard",     allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"] },
   { prefix: "/host",               allowed: ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR"] },
@@ -108,8 +110,9 @@ export function canonicalDestinationForRoles(roles: string[]): string {
     return "/host/dashboard";
   }
   if (roles.includes("INFLUENCER")) return "/influencer/dashboard";
-  if (roles.includes("PARTNER")) return "/partner/dashboard";
-  if (roles.includes("PARTNER_SELLER")) return "/partner/seller";
+  if (roles.includes("PARTNER") || roles.includes("PARTNER_SELLER")) {
+    return "/referrer/dashboard";
+  }
   if (roles.includes("INVESTOR")) return "/investor";
   if (
     roles.some((role) =>
