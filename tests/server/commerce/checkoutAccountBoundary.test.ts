@@ -43,3 +43,10 @@ it("allows matching normalized account email to reach existing catalog checks", 
   expect(assertCheckoutCatalogPolicy).toHaveBeenCalledWith(expect.objectContaining({ userId: "test_buyer" }));
   expect(prisma.user.upsert).not.toHaveBeenCalled();
 });
+it("does not use an unverified guest account match as eligibility identity", async () => {
+  vi.mocked(getOptionalSession).mockResolvedValue(null);
+  vi.mocked(prisma.user.upsert).mockResolvedValue({ id: "existing_member" } as never);
+  vi.mocked(assertCheckoutCatalogPolicy).mockRejectedValue(new Error("isolated catalog stop"));
+  await expect(POST(request())).rejects.toThrow("isolated catalog stop");
+  expect(assertCheckoutCatalogPolicy).toHaveBeenCalledWith(expect.objectContaining({ userId: null }));
+});

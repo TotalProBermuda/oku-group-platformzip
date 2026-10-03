@@ -15,7 +15,8 @@ export class CatalogPolicyError extends Error {
  * from buying a hidden, expired, inactive, foreign, or invite-only product.
  */
 export async function assertCheckoutCatalogPolicy(input: {
-  userId: string;
+  /** Authenticated identity only; a guest contact/account match is not proof. */
+  userId: string | null;
   sessionId: string;
   items: CheckoutItem[];
   now?: Date;
@@ -59,11 +60,11 @@ export async function assertCheckoutCatalogPolicy(input: {
   }
 
   const [membership, user, tickets, addons] = await Promise.all([
-    prisma.membership.findFirst({
+    input.userId ? prisma.membership.findFirst({
       where: { userId: input.userId, status: "ACTIVE" },
       select: { tier: true, benefitsJson: true },
-    }),
-    prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } }),
+    }) : null,
+    input.userId ? prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } }) : null,
     prisma.ticketType.findMany({
       where: { id: { in: [...ticketQuantities.keys()] } },
       include: { pricingRules: { where: { isActive: true }, orderBy: { priority: "asc" } } },
@@ -83,14 +84,14 @@ export async function assertCheckoutCatalogPolicy(input: {
     email
       ? prisma.newsletterSubscription.findFirst({ where: { email, isActive: true }, select: { id: true } })
       : null,
-    prisma.eventInvitation.findMany({
+    input.userId ? prisma.eventInvitation.findMany({
       where: {
         seriesId: session.series.id,
         status: { notIn: ["DECLINED"] },
         OR: [{ recipientUserId: input.userId }, ...(email ? [{ recipientEmail: email }] : [])],
       },
       select: { id: true },
-    }),
+    }) : [],
   ]);
 
   const tierRank: Record<string, number> = { EXPLORER: 0, INSIDER: 1, PATRON: 2, FOUNDER: 3 };

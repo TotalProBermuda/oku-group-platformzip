@@ -41,6 +41,38 @@ describe("checkout catalog policy", () => {
   });
 
   it.each([
+    ["MEMBERS_ONLY", "MEMBERSHIP_REQUIRED"],
+    ["NEWSLETTER_ONLY", "NEWSLETTER_REQUIRED"],
+    ["INVITE_ONLY", "INVITATION_REQUIRED"],
+  ])("guest contact cannot unlock %s benefits", async (visibilityMode, code) => {
+    prisma.membership.findFirst.mockResolvedValue({ tier: "FOUNDER", benefitsJson: { discountBps: 5000 } });
+    prisma.newsletterSubscription.findFirst.mockResolvedValue({ id: "private_subscription" });
+    prisma.eventInvitation.findMany.mockResolvedValue([{ id: "private_invite" }]);
+    prisma.ticketType.findMany.mockResolvedValue([{
+      id: "ticket-1", seriesId: "series-1", name: "Restricted", ticketStatus: "ACTIVE",
+      minPerOrder: 1, maxPerOrder: 10, typeCapacity: null, soldCount: 0, visibilityMode,
+    }]);
+    await expect(assertCheckoutCatalogPolicy({ userId: null, sessionId: "session-1",
+      items: [{ ticketTypeId: "ticket-1", qty: 1 }], now: new Date("2098-01-01"),
+    })).rejects.toMatchObject({ code });
+    expect(prisma.membership.findFirst).not.toHaveBeenCalled();
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.newsletterSubscription.findFirst).not.toHaveBeenCalled();
+    expect(prisma.eventInvitation.findMany).not.toHaveBeenCalled();
+  });
+
+  it("preserves public guest purchases without account discounts", async () => {
+    prisma.ticketType.findMany.mockResolvedValue([{
+      id: "ticket-1", seriesId: "series-1", name: "Public", ticketStatus: "ACTIVE",
+      minPerOrder: 1, maxPerOrder: 10, typeCapacity: null, soldCount: 0, visibilityMode: "VISIBLE",
+    }]);
+    const result = await assertCheckoutCatalogPolicy({ userId: null, sessionId: "session-1",
+      items: [{ ticketTypeId: "ticket-1", qty: 1 }], now: new Date("2098-01-01"),
+    });
+    expect(result.membership).toBeNull();
+  });
+
+  it.each([
     ["2099-01-01T22:00:00Z", "SESSION_SALES_CLOSED"],
     ["2099-01-02T00:59:59Z", "SESSION_SALES_CLOSED"],
     ["2099-01-02T01:00:00Z", "SESSION_ENDED"],

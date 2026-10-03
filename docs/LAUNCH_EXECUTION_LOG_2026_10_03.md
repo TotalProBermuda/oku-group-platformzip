@@ -90,3 +90,20 @@ membership/newsletter/invitations. Verify unproven email cannot confer restricte
 pricing/access. Do not mistake this batch's signed-in mismatch guard for resolving
 that separate guest-eligibility issue. Any production access-policy change remains
 review-gated. No live exploit attempted.
+
+## Acceptance pass: build and guest eligibility
+
+See LAUNCH_ACCEPTANCE_CHECKLIST.md for the same ten workstreams and checked substeps.
+Replit clean source 2bd7322e built successfully (BUILD_EXIT=0), with no Next server
+running against its build directory. Output retained at
+/tmp/oku-release-build-2bd7322e.log. Build skips types/lint; not a clean type-check.
+Current Replit deployment ID is 8c0a8937, not a verified source SHA or rollback.
+Translation key parity passes EN/ES/PT across 23 namespaces.
+
+Guest eligibility repair passes only the authenticated session identity (or null)
+to catalog policy. Guest contact/account matching remains for purchase ownership,
+but cannot load that account's membership, newsletter or invitation eligibility.
+Public guest tickets still pass without a membership discount. Five additional
+isolated tests cover the route boundary and policy behavior. Regression selection:
+277 tests / 40 files pass. No live exploit, financial transaction or database change.
+This access-enforcement repair is intentionally review-gated and not deployed.
