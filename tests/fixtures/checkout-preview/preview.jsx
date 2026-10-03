@@ -4,6 +4,8 @@ import Checkout from '../../../src/app/checkout/[slug]/page';
 import NavbarAuth from '../../../src/components/NavbarAuth';
 import NavbarMobileMenu from '../../../src/components/NavbarMobileMenu';
 import AdminNav from '../../../src/components/AdminNav';
+import ReservationWizard from '../../../src/components/reservations/ReservationWizard';
+import bookingCopy from '../../../src/i18n/translations/en/booking.json';
 import { AdminContext } from '../../../src/contexts/AdminContext';
 import '../../../src/app/globals.css';
 
@@ -21,6 +23,7 @@ window.Flex = class { microform() { return {
 const script = document.createElement('script');
 script.src = '/mock-flex.js'; document.head.append(script);
 window.fetch = async (url) => {
+  if (url.startsWith('/api/reservations/service-window')) return respond({ slots: ['17:00', '17:30', '19:00'] });
   if (url.startsWith('/api/v1/experiences?')) return respond({ series: [{ title: 'Isolated event', city: 'Panama', sessions: [{ id: 's', startsAt: '2030-01-01T22:00:00Z' }], ticketTypes: [{ id: 't', name: 'Test ticket', priceCents: 200 }] }] });
   if (url.endsWith('/quote')) return respond({ sessionId: 's', subtotalCents: 200, feesCents: 10, taxCents: 17, totalCents: 227, lineItems: [{ nameSnapshot: 'Test ticket', qty: 1, unitPriceCents: 200, totalCents: 200 }] });
   if (url.endsWith('/intent')) return respond({ data: { intentId: 'isolated-order' } });
@@ -37,7 +40,9 @@ window.fetch = async (url) => {
 };
 const role = new URLSearchParams(location.search).get('role') || 'REFERRER';
 const session = { user: { name: 'Isolated Tester', email: 'tester@example.invalid', roles: [role] } };
-createRoot(document.getElementById('root')).render(<React.StrictMode>{scenario === 'admin-navigation'
+createRoot(document.getElementById('root')).render(<React.StrictMode>{scenario === 'reservation'
+  ? <ReservationWizard t={bookingCopy} locale="en" />
+  : scenario === 'admin-navigation'
   ? <AdminContext.Provider value={{roles:[role]}}><AdminNav /></AdminContext.Provider>
   : scenario === 'navigation'
   ? <><NavbarAuth session={session}/><NavbarMobileMenu session={session} locale="en" labels={{restaurants:'Restaurants',experiences:'Events',membership:'Membership',careers:'Careers'}}/></>

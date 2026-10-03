@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { BILLING_COUNTRIES } from "@/lib/billingCountries";
 import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
 import { createCheckoutContinuation, isConfirmedCheckout, isVerificationReturn } from "@/lib/checkoutContinuation";
@@ -34,6 +35,7 @@ function safePaymentFailureMessage(environment: unknown, code: unknown) {
 export default function CheckoutPage() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
 
   const [series, setSeries]       = useState<any>(null);
   const [loading, setLoading]     = useState(true);
@@ -64,6 +66,12 @@ export default function CheckoutPage() {
   });
   const microformRef = useRef<any>(null);
   const [guest, setGuest] = useState({ name: "", email: "", phone: "", marketingEmailConsent: false });
+  const [confirmationEmail, setConfirmationEmail] = useState("");
+  useEffect(() => {
+    if (session?.user?.email) {
+      setGuest(current => ({ ...current, email: session.user!.email!, name: current.name || session.user!.name || "" }));
+    }
+  }, [session?.user?.email, session?.user?.name]);
   const [guestCheckoutToken, setGuestCheckoutToken] = useState<string | undefined>();
   const [transientToken, setTransientToken] = useState<string | null>(null);
   const [payerChallenge, setPayerChallenge] = useState<{ authenticationTransactionId: string; stepUpUrl: string; token: string; cardType?: string } | null>(null);
@@ -167,6 +175,7 @@ export default function CheckoutPage() {
   }
 
   async function initializeSecurePayment() {
+    if (sessionStatus === "loading") return;
     if (!quote || !checkoutItems.length) return;
     if (!guest.name.trim() || !guest.email.trim()) { setError("Enter your name and email to continue as a guest."); return; }
     if (!billing.address1.trim() || !billing.locality.trim() || !billing.administrativeArea.trim() || !billing.postalCode.trim() || !billing.country.trim()) {
@@ -183,6 +192,7 @@ export default function CheckoutPage() {
       const intentData = await intentResponse.json();
       if (!intentResponse.ok) throw new Error(intentData.message ?? intentData.error ?? "Unable to create payment order.");
       const nextIntentId = intentData.data.intentId as string;
+      setConfirmationEmail(intentData.data.confirmationEmail ?? guest.email.trim());
       const contextResponse = await fetch("/api/v1/checkout/cybersource/capture-context", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -365,7 +375,7 @@ export default function CheckoutPage() {
     <div className="page-container" style={{ padding: "80px 24px", maxWidth: 560, textAlign: "center" }}>
       <div style={{ fontSize: 48, marginBottom: 24 }}>✓</div>
       <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 36, color: "#1a1614", marginBottom: 12 }}>You're booked!</h2>
-      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 12 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. A confirmation is being sent to {guest.email}.</p>
+      <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 12 }}>Your tickets for <strong>{series.title}</strong> have been confirmed. A confirmation is being sent to {confirmationEmail}.</p>
       <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.55, margin: "0 0 32px" }}>
         Your booking is linked to this email. Use a one-time secure email link whenever you want to view your tickets—no password or Google account is required.
       </p>
@@ -532,9 +542,9 @@ export default function CheckoutPage() {
                   {!intentId ? (
                     <>
                       <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
-                        <input aria-label="Full name" value={guest.name} onChange={(event) => setGuest((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
-                        <input aria-label="Email" type="email" value={guest.email} onChange={(event) => setGuest((current) => ({ ...current, email: event.target.value }))} placeholder="Email for confirmation" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
-                        <input aria-label="Phone number" type="tel" value={guest.phone} onChange={(event) => setGuest((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone (optional)" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 14 }} />
+                        <input aria-label="Full name" autoComplete="name" value={guest.name} onChange={(event) => setGuest((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 16 }} />
+                        <input aria-label="Email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} readOnly={Boolean(session?.user?.email)} value={guest.email} onChange={(event) => setGuest((current) => ({ ...current, email: event.target.value }))} placeholder="Email for confirmation" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 16 }} />
+                        <input aria-label="Phone number" type="tel" autoComplete="tel" value={guest.phone} onChange={(event) => setGuest((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone (optional)" style={{ padding: "10px 12px", border: "1px solid #d8d2ca", borderRadius: 8, fontSize: 16 }} />
                         <div style={{ marginTop: 8 }}>
                           <div style={{ fontSize: 12, fontWeight: 700, color: "#4b5563", marginBottom: 8 }}>Billing address</div>
                           <div className="checkout-billing" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -554,7 +564,8 @@ export default function CheckoutPage() {
                         <label style={{ display: "flex", gap: 8, fontSize: 12, color: "#4b5563" }}><input type="checkbox" checked={guest.marketingEmailConsent} onChange={(event) => setGuest((current) => ({ ...current, marketingEmailConsent: event.target.checked }))} />Send me occasional OKÜ news and experiences. Optional.</label>
                       </div>
                       <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5, margin: "0 0 16px" }}>No password is required. Your booking will be linked to this email, and secure one-time email access is available afterwards. Your billing address is sent securely to Cybersource for payment authorization and is not stored with this order. Card data is entered directly into Cybersource’s secure fields and is never stored by OKÜ.</p>
-                      <button onClick={initializeSecurePayment} disabled={paying} className="btn btn-primary" style={{ width: "100%" }}>
+                      {session?.user?.email && <p style={{ fontSize: 14 }}>Tickets and receipts will belong to your signed-in account: <strong>{session.user.email}</strong>. Use My Tickets in your account menu to return.</p>}
+                      <button onClick={initializeSecurePayment} disabled={paying || sessionStatus === "loading"} className="btn btn-primary" style={{ width: "100%" }}>
                         {paying ? "Preparing secure card entry…" : "Continue to secure card entry"}
                       </button>
                     </>

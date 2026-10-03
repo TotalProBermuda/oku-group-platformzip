@@ -11,6 +11,7 @@ import { createCheckoutHold, expireCheckoutHoldsForSession } from "@/server/comm
 import { gatePublicPostAsync } from "@/server/rateLimit";
 import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
 import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
+import { checkoutEmailsMatch } from "@/lib/checkoutContact";
 
 const Body = z.object({
   sessionId: z.string(),
@@ -49,6 +50,10 @@ export async function POST(req: Request) {
     const body = Body.parse(rawBody);
     const auth = await getOptionalSession();
     if (!auth && !body.guest) return NextResponse.json({ ok: false, error: "Guest contact details are required." }, { status: 400 });
+    const account = auth ? await prisma.user.findUnique({ where: { id: auth.userId }, select: { email: true } }) : null;
+    if (auth && (!account?.email || (body.guest && !checkoutEmailsMatch(account.email, body.guest.email)))) {
+      return NextResponse.json({ ok: false, error: "CHECKOUT_ACCOUNT_MISMATCH", message: "Use your signed-in account email for this purchase. To book with another email, sign out first and restart checkout." }, { status: 409 });
+    }
     const guestUser = auth ? null : await prisma.user.upsert({
       where: { email: body.guest!.email }, update: {},
       create: { email: body.guest!.email, name: body.guest!.name, phone: body.guest!.phone }, select: { id: true },
@@ -209,6 +214,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, data: {
       intentId: order.id, orderId: order.id, totalCents: order.totalCents, currency: order.currency,
       checkoutHoldExpiresAt: checkoutHoldExpiresAt.toISOString(),
+      confirmationEmail: account?.email ?? body.guest!.email,
       ...(guestCredential ? { guestCheckoutToken: guestCredential.token } : {}),
     } });
   } catch (error) {
