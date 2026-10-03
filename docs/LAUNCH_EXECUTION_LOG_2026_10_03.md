@@ -1,5 +1,21 @@
 # Launch execution log — 3 October 2026
 
+## Release and durable refund follow-up
+
+- Source candidate from latest user pull: 763e65b8. No newer welcome-sender work
+  included. Replit showed reconnect failure and blank shell, then loading spinner
+  after one reload. Deployment log visible before reload was 8c0a8937, successful
+  October 2 at 03:21 UTC. No current source-to-deployment or rollback verification.
+  No build/publish command sent to the disconnected shell; owner asked to reopen it.
+- Added review-gated SQL refund persistence and eight isolated PostgreSQL tests,
+  including restart with UNKNOWN balance preserved. 45 focused tests pass.
+  PGlite is single-connection, so multi-connection concurrency remains unverified.
+- No real database, migration, gateway, refund, payout, invitation or financial
+  configuration touched. Partial bundle restoration and owner decisions still open.
+- Workstream #1 remains blocked, #2 advances but is not complete. #3–#10 unchanged.
+- Regression after reconciling this branch with main 763e65b8: 331 tests passed
+  across 44 files, including the opt-in database suite. git diff --check passed.
+
 ## Batch A: release baseline (partial)
 
 - Fetched GitHub main: ce36935b7adc30f0d2acf8cea4baa7ae66950a60.
