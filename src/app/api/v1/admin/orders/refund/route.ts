@@ -8,10 +8,10 @@ import { releaseCapacity } from "@/server/commerce/capacity";
 import { getProviderAdapterSafe } from "@/server/payments/providers";
 
 const Body = z.object({
-  orderId: z.string(),
-  amountCents: z.number().int().positive(),
+  orderId: z.string().trim().min(1),
+  amountCents: z.number().int().positive().safe(),
   reason: z.string().max(500).optional(),
-});
+}).strict();
 
 export async function POST(req: Request) {
   const { userId, roles } = await requireSession();
