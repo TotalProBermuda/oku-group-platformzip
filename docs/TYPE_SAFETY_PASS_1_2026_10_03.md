@@ -19,6 +19,21 @@ Base: `c43c3c7c`. Branch: `codex/type-safety-pass-1`.
 
 ## Next gates
 
+### Scoped merge assessment (supersedes the earlier draft-only gate)
+
+Reassessed this as a bounded repair PR, not a requirement to eliminate all historic repository debt before accepting any fix. Identical compiler configuration and freshly generated Prisma client were used for base `c43c3c7c` and branch `4ae682b`. The compiler host substituted the base revision of changed files and omitted branch-added files for the baseline; all unchanged sources/dependencies were identical.
+
+- Base: 418 diagnostics total / 195 application source diagnostics.
+- Branch: 266 total / 56 application source diagnostics.
+- No remaining diagnostics in files changed by this PR.
+- Four diagnostic messages differ in already-failing, unchanged routes: event creation, influencer invites, invitation sending, and registrants. These reflect the newly explicit optional session identity type (plus the existing nonexistent isAdmin field), not newly failing files. They remain tracked debt, not declared fixed.
+- Isolated Next 15.5.25 production build completed successfully. Environment was cleared and supplied only build-local settings, an unreachable localhost database URL, localhost app URLs, and a non-live authentication secret. No database migration or production access occurred. The build still skips type/lint validation under the existing configuration, so this is compile/build evidence only.
+- Added runtime guard tests proving INVU-confirmed revenue (including zero) cannot be overwritten manually, and an unrelated host cannot close a reservation. These use mocks only.
+- Final regression result: **239 passed, 37 files**. `git diff --check` passed.
+- Build logged expected localhost database-connection failures for data-backed static pages and existing CSS warnings; therefore it does not verify database-backed page content. All 309 static pages generated and the command exited 0. A staging/live data smoke test remains a deployment gate.
+
+Decision: eligible for review/merge as a tested incremental repair once the final regression run passes; **not** a global type-check pass or launch-ready certification. No production deployment is included. Preserve the remaining backlog rather than changing financial interpretation, permissions or unrelated modules to make this PR appear globally clean.
+
 ### Continuation evidence
 
 Additional repairs on the same draft PR:
