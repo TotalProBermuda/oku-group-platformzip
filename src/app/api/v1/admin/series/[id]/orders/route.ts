@@ -19,7 +19,7 @@ export async function GET(
         user: { select: { id: true, name: true, email: true } },
         session: { select: { id: true, startsAt: true } },
         payment: { select: { status: true, amountCents: true } },
-        tickets: { select: { id: true, status: true } },
+        tickets: { select: { id: true, ticketStatus: true } },
       },
     });
 
@@ -29,7 +29,9 @@ export async function GET(
 
     return NextResponse.json({
       ok: true,
-      data: { orders, totalRevenueCents, count: orders.length },
+      data: { orders: orders.map(order => ({ ...order,
+        tickets: order.tickets.map(({ id, ticketStatus }) => ({ id, status: ticketStatus })),
+      })), totalRevenueCents, count: orders.length },
     });
   } catch (e: any) {
     return NextResponse.json(

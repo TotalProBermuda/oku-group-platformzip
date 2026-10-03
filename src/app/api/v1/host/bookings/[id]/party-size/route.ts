@@ -8,8 +8,9 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: pendingParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await pendingParams;
   // Operational reservation control — restaurant hosts / admins only. Also
   // closes a pre-existing hole where any logged-in user could change any
   // reservation's party size.

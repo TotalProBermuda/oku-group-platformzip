@@ -17,11 +17,13 @@ export async function GET(
         series: { select: { id: true, title: true, slug: true } },
         session: { select: { id: true, startsAt: true } },
         payment: { select: { id: true, status: true, amountCents: true } },
-        tickets: { select: { id: true, status: true } },
+        tickets: { select: { id: true, ticketStatus: true } },
       },
     });
 
-    return NextResponse.json({ ok: true, data: orders });
+    return NextResponse.json({ ok: true, data: orders.map(order => ({ ...order,
+      tickets: order.tickets.map(({ id, ticketStatus }) => ({ id, status: ticketStatus })),
+    })) });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e.message },

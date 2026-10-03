@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
@@ -31,9 +33,10 @@ const venueGrad: Record<string, string> = {
 
 export default async function ExperienceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [series, availability] = await Promise.all([
+  const [series, availability, session] = await Promise.all([
     getSeries(slug),
     getAvailability(slug),
+    getServerSession(authOptions),
   ]);
 
   if (!series) notFound();
