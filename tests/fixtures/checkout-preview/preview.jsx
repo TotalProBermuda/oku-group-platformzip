@@ -6,6 +6,9 @@ import NavbarMobileMenu from '../../../src/components/NavbarMobileMenu';
 import AdminNav from '../../../src/components/AdminNav';
 import ReservationWizard from '../../../src/components/reservations/ReservationWizard';
 import bookingCopy from '../../../src/i18n/translations/en/booking.json';
+import VerifyMagicLinkPage from '../../../src/app/auth/verify/page';
+import { LocaleProvider } from '../../../src/components/i18n/LocaleProvider';
+import authCopy from '../../../src/i18n/translations/en/auth.json';
 import { AdminContext } from '../../../src/contexts/AdminContext';
 import '../../../src/app/globals.css';
 
@@ -40,7 +43,9 @@ window.fetch = async (url) => {
 };
 const role = new URLSearchParams(location.search).get('role') || 'REFERRER';
 const session = { user: { name: 'Isolated Tester', email: 'tester@example.invalid', roles: [role] } };
-createRoot(document.getElementById('root')).render(<React.StrictMode>{scenario === 'reservation'
+createRoot(document.getElementById('root')).render(<React.StrictMode>{scenario === 'signin-recovery'
+  ? <LocaleProvider locale="en" translations={{auth:authCopy}}><VerifyMagicLinkPage /></LocaleProvider>
+  : scenario === 'reservation'
   ? <ReservationWizard t={bookingCopy} locale="en" />
   : scenario === 'admin-navigation'
   ? <AdminContext.Provider value={{roles:[role]}}><AdminNav /></AdminContext.Provider>

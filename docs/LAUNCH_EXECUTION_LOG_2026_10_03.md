@@ -105,3 +105,19 @@ login bearer credential. A separate non-login onboarding invitation/exchange mus
 be designed; extending the existing login credential is not approved by this work.
 The ten-workstream checklist carries evidence from the independent guest-eligibility
 and refund-model branches; those source fixes are not implicitly merged here.
+
+## Sign-in recovery pass
+
+Based on main 26db4227 (user confirmed clean Replit fast-forward). Verification
+previously left submitting=true when signOut/signIn rejected; session lookup also
+had no recovery path. Extracted tested exchange helper catches failures without
+logging credentials or automatically replaying the token, requires a session before
+navigation, and limits destination to a local path. Form adds same-tick duplicate
+submission guard and one-time fragment read to survive StrictMode effect replay.
+EN/ES/PT recovery copy added; translation parity passed.
+
+31 authentication tests passed, including ten new exchange cases. Actual page in
+local isolated fixture: fabricated fragment token survives mount, simulated auth
+failure shows recovery alert and enabled button. At 320px document width is 320px.
+No real auth request, email or database was used. 24-hour invitation remains open:
+REFERRER_INVITE presently signs in directly and cannot safely be extended unchanged.
