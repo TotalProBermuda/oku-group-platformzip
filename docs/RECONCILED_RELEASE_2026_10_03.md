@@ -22,7 +22,7 @@
 npx vitest run tests/server/payments tests/server/cybersource tests/server/commerce tests/server/reservations tests/server/rbac/roleSplitAuthz.test.ts tests/server/dashboardNavigation.test.ts tests/server/referrerShareSurface.test.ts
 ```
 
-Local candidate: **208 tests passed across 30 files**. `git diff --check` passed. `prisma validate` passed. Tests use isolated mocks; no real payment, refund, invitation, database migration or live customer data operation was performed. This is not a full build, real-device or production certification.
+The first startup-change run exposed two legacy tests that required automatic migration execution (206 passed, 2 failed). Updated those expectations to enforce the new schema-neutral startup contract; the migration SQL ordering test is retained. Final test result is recorded in the PR after rerun. `prisma validate` passed. Tests use isolated mocks; no real payment, refund, invitation, database migration or live customer data operation was performed. This is not a full build, real-device or production certification.
 
 ## Release hold / remaining checks
 
