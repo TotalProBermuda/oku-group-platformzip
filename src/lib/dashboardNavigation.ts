@@ -12,6 +12,9 @@ export function dashboardNavigationForUser(
   if (roles.some((role) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR"].includes(role))) {
     return { href: "/admin", label: "Admin Console" };
   }
+  if (roles.includes("ADMIN_FINANCE")) {
+    return { href: "/admin/payouts", label: "Finance Dashboard" };
+  }
   if (roles.includes("STREETSIDE_HOST") && !roles.includes("RESTAURANT_HOST")) {
     return { href: "/host/streetside", label: "Streetside" };
   }

@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { dashboardNavigationForUser } from "@/lib/dashboardNavigation";
 
 describe("dashboardNavigationForUser", () => {
+  it.each([["ADMIN_FINANCE"], ["ADMIN_FINANCE", "REFERRER"]])("preserves the finance destination for %s", (...roles) => {
+    expect(dashboardNavigationForUser(roles, true)).toEqual({
+      href: "/admin/payouts", label: "Finance Dashboard",
+    });
+  });
   it.each([
     ["PARTNER"],
     ["PARTNER_SELLER"],
