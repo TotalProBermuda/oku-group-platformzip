@@ -2,10 +2,10 @@ import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from "vites
 import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   findIntent: vi.fn(), findPayment: vi.fn(), update: vi.fn(), audit: vi.fn(),
-  enqueue: vi.fn(), verify: vi.fn(),
+  enqueue: vi.fn(), verify: vi.fn(), updateIntent: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: {
-  paymentIntent: { findFirst: mocks.findIntent },
+  paymentIntent: { findFirst: mocks.findIntent, updateMany: mocks.updateIntent },
   payment: { findFirst: mocks.findPayment, updateMany: mocks.update },
   auditLog: { create: mocks.audit },
 } }));
@@ -23,6 +23,7 @@ beforeEach(() => {
   mocks.findIntent.mockResolvedValue(null);
   mocks.findPayment.mockResolvedValue({ id: "payment-test", status: "INITIATED", order: { id: "order-test", status: "PENDING" } });
   mocks.update.mockResolvedValue({ count: 1 });
+  mocks.updateIntent.mockResolvedValue({ count: 1 });
   mocks.enqueue.mockResolvedValue(undefined);
   mocks.audit.mockResolvedValue({});
 });
@@ -31,6 +32,34 @@ const deliver = (type: string) => POST(new NextRequest("http://localhost/api/v1/
 }));
 
 describe("gateway notification state guards (isolated mocks only)", () => {
+  it.each([
+    ["payments.payments.captured", "CAPTURED"],
+    ["payments.payments.voided", "CANCELLED"],
+  ])("guards reservation transition for %s", async (eventType, status) => {
+    mocks.findIntent.mockResolvedValue({ id: "intent-test", status: "AUTHORIZED" });
+    await deliver(eventType);
+    expect(mocks.updateIntent).toHaveBeenCalledWith({
+      where: { id: "intent-test", status: "AUTHORIZED" }, data: { status },
+    });
+  });
+  it("retries reservation state races rather than acknowledging lost updates", async () => {
+    mocks.findIntent.mockResolvedValue({ id: "intent-test", status: "AUTHORIZED" });
+    mocks.updateIntent.mockResolvedValue({ count: 0 });
+    expect((await deliver("payments.payments.captured")).status).toBe(503);
+  });
+  it("retries a reservation write failure even after its event was recorded", async () => {
+    mocks.findIntent.mockResolvedValue({ id: "intent-test", status: "AUTHORIZED" });
+    mocks.updateIntent.mockRejectedValueOnce(new Error("isolated write failure"));
+    expect((await deliver("payments.payments.captured")).status).toBe(503);
+    mocks.enqueue.mockRejectedValue({ code: "P2002" });
+    expect((await deliver("payments.payments.captured")).status).toBe(200);
+    expect(mocks.updateIntent).toHaveBeenCalledTimes(2);
+  });
+  it.each(["CAPTURED", "REFUNDED", "CANCELLED"])("preserves terminal reservation status %s", async (status) => {
+    mocks.findIntent.mockResolvedValue({ id: "intent-test", status });
+    await deliver("payments.payments.voided");
+    expect(mocks.updateIntent).not.toHaveBeenCalled();
+  });
   it("rejects invalid signatures before database access", async () => {
     mocks.verify.mockReturnValue(false);
     expect((await deliver("payments.payments.captured")).status).toBe(401);

@@ -194,9 +194,8 @@ export async function POST(req: NextRequest) {
   }
 
   // 8. Advance intent status based on event type (if not already in terminal state)
-  // Note: these service calls are advisory (best-effort). The durable state is the
-  // PaymentIntent row; any failure here is logged and the webhook returns 200 so
-  // Cybersource does not retry (re-delivery is deduplicated via the ledger outbox).
+  // Recording the event is not enough: failed state updates must be retried.
+  // Compare-and-set prevents a delayed event overwriting a concurrent transition.
   const terminalStatuses = ["CAPTURED", "REFUNDED", "CANCELLED"];
   if (intent && !terminalStatuses.includes(intent.status)) {
     try {
@@ -205,20 +204,22 @@ export async function POST(req: NextRequest) {
         csEventType.includes("transmitted")
       ) {
         if (intent.status === "AUTHORIZED") {
-          await prisma.paymentIntent.update({
-            where: { id: intent.id },
+          const updated = await prisma.paymentIntent.updateMany({
+            where: { id: intent.id, status: intent.status },
             data: { status: "CAPTURED" },
           });
+          if (updated.count !== 1) return NextResponse.json({ error: "Payment state changed; retry notification" }, { status: 503 });
         }
       } else if (
         csEventType.includes("voided") ||
         csEventType.includes("reversed")
       ) {
         if (intent.status === "AUTHORIZED") {
-          await prisma.paymentIntent.update({
-            where: { id: intent.id },
+          const updated = await prisma.paymentIntent.updateMany({
+            where: { id: intent.id, status: intent.status },
             data: { status: "CANCELLED" },
           });
+          if (updated.count !== 1) return NextResponse.json({ error: "Payment state changed; retry notification" }, { status: 503 });
         }
       } else if (csEventType.includes("refund")) {
         if (intent.status === "CAPTURED") {
@@ -230,6 +231,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error("[cybersource-webhook] intent status advance failed", err);
+      return NextResponse.json({ error: "Unable to update payment state" }, { status: 503 });
     }
   }
 
