@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { HoneypotField } from "@/components/HoneypotField";
 import { panamaReservationIso } from "@/lib/reservationDate";
+import { reservationConceptFromQuery } from "@/lib/reservationConcept";
 
 type Zone = { id: string; name: string; conceptKey: string; zoneType: string; description?: string | null; capacityCovers: number };
 type Step = "concept" | "details" | "addons" | "contact" | "review" | "confirmed";
@@ -21,6 +22,7 @@ function ZoneCard({ zone, selected, onSelect, t }: { zone: Zone; selected: boole
   return (
     <button
       type="button"
+      aria-pressed={selected}
       onClick={onSelect}
       style={{
         width: "100%", textAlign: "left",
@@ -142,6 +144,8 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const concept = reservationConceptFromQuery(window.location.search);
+    if (concept) setSelectedConcept(concept);
 
     // Pre-fill date from ?date= param (set by streetside host QR panel).
     const dateParam = params.get("date") ?? "";

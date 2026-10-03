@@ -57,3 +57,36 @@ Required design before implementation:
 
 Other nine-area acceptance work remains open per LAUNCH_EXECUTION_PLAN_2026_10_03.md.
 Neither baseline reconciliation nor the entire cart flow is marked complete.
+
+## Batch C1: contact ownership and reservation continuity
+
+Base main 07bbb124. Ticket checkout previously displayed the entered email on
+success even when the server assigned the order to a different signed-in account.
+Now signed-in name/email prefill is provided, account email is read-only in the
+form, and the server rejects mismatches against the current account email before
+order/hold mutations. Confirmation uses the server-returned email. No profile is
+overwritten, marketing opt-in remains false by default, and guest checkout remains.
+Contact fields gain browser autofill hints and 16px text. CATCH/other supported
+concept links now preselect a preference without skipping availability or review;
+the selected option has an accessible pressed state.
+
+Evidence:
+- 19 new isolated tests cover account mismatch/missing account/normalized match,
+  absence of order-side effects on rejection, and allowed/invalid concept hints.
+- Regression selection: 272 passed across 40 files. git diff --check passes.
+- Actual checkout component in isolated fixture at 390px: signed-in account
+  prefilled, no document overflow, simulated bank return auto-completed; duplicate
+  callback produced exactly two total confirm calls (challenge plus continuation).
+  Success displayed buyer@example.invalid. No real gateway/database/email used.
+- Actual reservation wizard fixture at 390px: CATCH pressed on entry; Continue
+  advanced to Details without selecting again; document width 390px.
+- Full tsc still fails on existing repository debt (406 output lines with shared
+  client/dependencies). No diagnostics matched changed source/test files. This is
+  not a clean full type-check or production certification.
+
+New audit lead: unauthenticated checkout resolves an existing user by supplied
+email before catalog eligibility checks; catalog policy queries that user's
+membership/newsletter/invitations. Verify unproven email cannot confer restricted
+pricing/access. Do not mistake this batch's signed-in mismatch guard for resolving
+that separate guest-eligibility issue. Any production access-policy change remains
+review-gated. No live exploit attempted.
