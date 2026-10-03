@@ -64,7 +64,8 @@ export async function POST(req: Request) {
 
     // Validate identity, product scope, visibility, access, sale windows, and
     // per-product inventory before any capacity is reserved or order is made.
-    const catalog = await assertCheckoutCatalogPolicy({ userId, sessionId: body.sessionId, items: body.items });
+    // Contact matching must never grant another account's private benefits.
+    const catalog = await assertCheckoutCatalogPolicy({ userId: auth?.userId ?? null, sessionId: body.sessionId, items: body.items });
 
     const ticketTypes = catalog.tickets;
     const addons = catalog.addons;
