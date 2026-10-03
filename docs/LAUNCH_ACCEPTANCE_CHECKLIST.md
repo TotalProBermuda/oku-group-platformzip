@@ -36,7 +36,16 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [ ] Both flows pass failure/retry/back/refresh matrix, 320/390px and supported locales.
 - [ ] Deployed receipt, ticket/booking access and returning-customer journey verified.
 
-## 4. Onboarding — OPEN
+## 4. Onboarding — IN PROGRESS
+- [x] Sign-in failure recovery implemented and tested: network errors restore
+      controls, no automatic credential replay, confirmed session required for
+      navigation. Actual isolated page at 320px: error visible, button enabled,
+      document width 320px. Existing fragment token survives StrictMode replay.
+      This is not the separate 24-hour invitation feature or live verification.
+- [x] Failed/uncertain email delivery revokes only its own unused token; concurrent
+      resend is not revoked. Authentication suite: 21 tests passed. No real sends.
+- [x] Existing expiry/replay/suspension and same-purpose resend guards tested.
+      Login lifetime remains 15 minutes; this does not complete 24-hour invitations.
 - [ ] Separate 24-hour invitation purpose from short-lived login authentication.
 - [ ] Resend/revoke/expiry/replay and owner/seller/independent affiliation tested.
 - [ ] Authorized delivery test and end-to-end onboarding completed.

@@ -90,3 +90,34 @@ membership/newsletter/invitations. Verify unproven email cannot confer restricte
 pricing/access. Do not mistake this batch's signed-in mismatch guard for resolving
 that separate guest-eligibility issue. Any production access-policy change remains
 review-gated. No live exploit attempted.
+
+## Onboarding delivery safety pass
+
+On isolated branch from 2bd7322e, failed/uncertain passwordless email delivery now
+revokes that exact token hash (only if unused/unrevoked), then propagates failure.
+A concurrently issued token is not revoked by this cleanup. If cleanup itself
+fails the operation still throws; durable email delivery/outbox remains separate.
+No real email, token, account, role, database or financial changes were performed.
+
+Authentication tests: 21 passed, including four new delivery/resend/lifetime checks.
+24-hour invitation remains incomplete: current REFERRER_INVITE is consumed as a
+login bearer credential. A separate non-login onboarding invitation/exchange must
+be designed; extending the existing login credential is not approved by this work.
+The ten-workstream checklist carries evidence from the independent guest-eligibility
+and refund-model branches; those source fixes are not implicitly merged here.
+
+## Sign-in recovery pass
+
+Based on main 26db4227 (user confirmed clean Replit fast-forward). Verification
+previously left submitting=true when signOut/signIn rejected; session lookup also
+had no recovery path. Extracted tested exchange helper catches failures without
+logging credentials or automatically replaying the token, requires a session before
+navigation, and limits destination to a local path. Form adds same-tick duplicate
+submission guard and one-time fragment read to survive StrictMode effect replay.
+EN/ES/PT recovery copy added; translation parity passed.
+
+31 authentication tests passed, including ten new exchange cases. Actual page in
+local isolated fixture: fabricated fragment token survives mount, simulated auth
+failure shows recovery alert and enabled button. At 320px document width is 320px.
+No real auth request, email or database was used. 24-hour invitation remains open:
+REFERRER_INVITE presently signs in directly and cannot safely be extended unchanged.
