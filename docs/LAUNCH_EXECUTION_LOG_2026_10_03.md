@@ -90,3 +90,18 @@ membership/newsletter/invitations. Verify unproven email cannot confer restricte
 pricing/access. Do not mistake this batch's signed-in mismatch guard for resolving
 that separate guest-eligibility issue. Any production access-policy change remains
 review-gated. No live exploit attempted.
+
+## Onboarding delivery safety pass
+
+On isolated branch from 2bd7322e, failed/uncertain passwordless email delivery now
+revokes that exact token hash (only if unused/unrevoked), then propagates failure.
+A concurrently issued token is not revoked by this cleanup. If cleanup itself
+fails the operation still throws; durable email delivery/outbox remains separate.
+No real email, token, account, role, database or financial changes were performed.
+
+Authentication tests: 21 passed, including four new delivery/resend/lifetime checks.
+24-hour invitation remains incomplete: current REFERRER_INVITE is consumed as a
+login bearer credential. A separate non-login onboarding invitation/exchange must
+be designed; extending the existing login credential is not approved by this work.
+The ten-workstream checklist carries evidence from the independent guest-eligibility
+and refund-model branches; those source fixes are not implicitly merged here.
