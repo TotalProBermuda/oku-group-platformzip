@@ -1,5 +1,48 @@
 # Launch execution log — 3 October 2026
 
+## 4 October: refund origins and policy clarification
+
+- Live /my/orders verified: order history, View Tickets and View Experience;
+  no customer refund-request button. Left this page open for owner inspection.
+- Live /admin/payments?tab=refunds loads Refunds & Voids and Open order controls;
+  no refund/void activity reported. No action submitted. Source admin/orders
+  and OrderDrawer expose Refund/Full Refund for PAID orders; the API requires
+  admin:payments:refund. The payment-intent refund API allows SUPERADMIN and
+  ADMIN_FINANCE. These are administrative operations, not customer requests.
+- Owner clarified tickets are non-refundable. Do not introduce a customer ticket
+  refund request flow. Exceptional administrative refunds require a separately
+  agreed policy; no policy enforcement or financial settings changed in this pass.
+- Patron checkout-session source records PENDING_APPROVAL, not automated card
+  checkout. No implemented membership refund window found in reviewed routes.
+  Owner must specify duration, start date basis and benefit-use restrictions.
+- Existing isolated coordinator/admission rerun: 31 tests passed in two files.
+  Added a ten-caller duplicate request/claim test; results recorded below.
+- Final rerun: 32 tests passed in two files. Ten simultaneous same-key requests
+  produced one new operation and nine replays; ten claims produced one winner.
+  git diff --check passed. This remains a draft, unintegrated production control.
+- Shared Vitest files were missing; used separate temporary test runtime rather
+  than modifying application dependencies. Attempted local PostgreSQL install
+  for multi-connection testing, stopped because Homebrew required unsupported
+  source builds. Homebrew updated its runtime and installed icu4c/ca-certificates
+  before cancellation. No PostgreSQL service started. Multi-connection gate stays
+  open; embedded PGlite serializes one connection and cannot certify that gate.
+
+## Release and durable refund follow-up
+
+- Source candidate from latest user pull: 763e65b8. No newer welcome-sender work
+  included. Replit showed reconnect failure and blank shell, then loading spinner
+  after one reload. Deployment log visible before reload was 8c0a8937, successful
+  October 2 at 03:21 UTC. No current source-to-deployment or rollback verification.
+  No build/publish command sent to the disconnected shell; owner asked to reopen it.
+- Added review-gated SQL refund persistence and eight isolated PostgreSQL tests,
+  including restart with UNKNOWN balance preserved. 45 focused tests pass.
+  PGlite is single-connection, so multi-connection concurrency remains unverified.
+- No real database, migration, gateway, refund, payout, invitation or financial
+  configuration touched. Partial bundle restoration and owner decisions still open.
+- Workstream #1 remains blocked, #2 advances but is not complete. #3–#10 unchanged.
+- Regression after reconciling this branch with main 763e65b8: 331 tests passed
+  across 44 files, including the opt-in database suite. git diff --check passed.
+
 ## Batch A: release baseline (partial)
 
 - Fetched GitHub main: ce36935b7adc30f0d2acf8cea4baa7ae66950a60.

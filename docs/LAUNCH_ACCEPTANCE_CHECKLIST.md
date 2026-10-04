@@ -13,14 +13,26 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [x] Replit build of 2bd7322e completed: BUILD_EXIT=0. Build skips types/lint;
       those checks remain separate under operational readiness.
 - [ ] Eligible release deployed and smoke-tested. No republish performed in this batch.
+      Latest user-confirmed source is 763e65b8. On this pass Replit first displayed
+      "Attempting to reconnect", then remained on a loading screen after reload.
+      Old deployment 8c0a8937 logs date to October 2, not proof of this candidate.
+      Current build, production SHA and rollback cannot yet be verified; no publish.
 
 ## 2. Payments and refunds — IN PROGRESS / APPROVAL GATES
+- Policy clarification (4 October): owner says tickets are non-refundable;
+  membership refunds may have an eligibility window, not yet specified. Refund
+  safety is not authorization to add customer ticket-refund functionality.
+  Live /my/orders has no refund control. Existing admin controls remain separate.
 - [x] Ticket refund request validation implemented, merged in PR110 and tested.
 - [x] Existing payment/webhook regression selection passes; not settlement evidence.
 - [x] Pure refund admission rules implemented: cumulative balance, reserved/unknown
       amounts, replay and request binding. 23 model tests; 49 focused tests pass.
       Not wired to live routes; NOT proof of database concurrency safety.
 - [ ] Durable cumulative/concurrent refund limits and unknown-result reconciliation.
+      Draft SQL-backed coordinator now persists reservations, single submission
+      claims and reconciliation states. Isolated PostgreSQL restart/replay tests
+      pass; production integration and multi-connection PostgreSQL tests remain.
+      Proposal tables exist ONLY in test fixtures, not deployable migrations.
 - [ ] Partial bundle refunds restore each affected entitlement/capacity exactly once.
 - [ ] Owner approves refund policy, any migration, and controlled live financial tests.
 
