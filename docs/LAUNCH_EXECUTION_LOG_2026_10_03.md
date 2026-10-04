@@ -141,6 +141,15 @@ No real auth request, email or database was used. 24-hour invitation remains ope
 REFERRER_INVITE presently signs in directly and cannot safely be extended unchanged.
 # 4 October — Superadmin membership control implementation
 
+Follow-up release validation: 353 tests / 45 files passed; isolated Next production
+build exits 0; mobile actual-component checks repeated successfully with locked
+React 18. Six server access-boundary tests now exercise the real guard with mocked
+sessions and no database. Global type-check still fails: candidate and unchanged
+main each have 267 diagnostics with identical location/code keys; no added errors.
+PR116 foundation is eligible for review/merge, not full-feature activation. No
+production deployment or data changes. Recorded rollback and Replit commands in
+MEMBERSHIP_REFUND_POLICY_IMPLEMENTATION.md. All ten workstreams remain open.
+
 PR116 remains review-only. Added a server-guarded draft editor, Memberships link,
 typed rule contracts and a conservative synthetic commission decision preview.
 No server persistence, live commission enforcement, POS configuration or financial

@@ -6,6 +6,10 @@ Source evidence: LAUNCH_EXECUTION_LOG_2026_10_03.md and the linked tests/PRs.
 An entire workstream closes only when its remaining acceptance checks pass.
 
 ## 1. Release baseline — IN PROGRESS
+- [x] PR116 foundation candidate: isolated Next production build passes; 353 tests
+      across 45 files pass. Compared with unchanged main 763e65b8: 267 existing
+      TypeScript diagnostics on each, identical file/line/code keys, none added.
+      Build skips type/lint checks; this is not a clean global type-check or deployment.
 - [x] GitHub/Replit source synchronized at 2bd7322e; Replit working tree clean.
 - [x] Replit regression selection: 272 tests / 40 files passed.
 - [x] Replit automatic post-merge hook inspected: absent; pull ran no migration.
@@ -65,6 +69,8 @@ An entire workstream closes only when its remaining acceptance checks pass.
       Superadmin-guarded on server. Isolated Chrome component checks at 320/390/1024px
       pass (no overflow/errors; controls/export functional). Not a role-session or
       full dashboard acceptance test; English-only draft copy still needs localization.
+- [x] Server access boundary tested with absent, finance, partner, malformed and
+      Superadmin sessions. Mobile fixture repeated with locked application React 18.
 - [x] Dashboard navigation regression tests included in passing Replit selection.
 - [ ] Task-based mobile checks for customer, Superadmin, F&B, events, hosts,
       partner, seller, independent referrer and finance/beneficiary.

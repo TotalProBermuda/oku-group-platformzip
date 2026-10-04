@@ -150,3 +150,38 @@ Reproduce focused browser checks with isolated test dependencies:
 `UI_TEST_RUNTIME=/path/to/isolated/runtime node tests/fixtures/membership-controls/mobile-check.mjs`
 Runtime needs esbuild, react, react-dom and playwright; Chrome must be installed.
 No database, payment, email or POS API is called. No production migration or deploy.
+
+## Foundation release verification — 4 October
+
+The GitHub PR can leave draft for this bounded foundation; that does NOT activate
+member exclusion or the refund policy. The application editor intentionally remains
+draft-only, without persistence, and cannot configure POS buttons. Full feature
+acceptance and production deployment remain separate gates.
+
+- Locked dependencies installed in this worktree with scripts disabled; Prisma
+  client generated locally only. Initial sandbox cache write failure was resolved
+  by allowing local code generation, not by connecting to a database.
+- 353 tests / 45 files pass, including six actual server access-boundary cases.
+  Initial access test hit the runner's preserved JSX; the page now calls a directly
+  testable server guard. No auth mocks or bypasses are shipped in application code.
+- `npm run build` exits 0 with database address restricted to unreachable localhost.
+  The new /admin/memberships/controls route is in the build output. Expected data
+  fallback warnings are not evidence of live data health.
+- `tsc --noEmit`: 267 diagnostics on candidate and an isolated unchanged main export,
+  identical file/line/error-code keys, no additions. Existing global errors remain
+  operational-readiness debt. Next skips type/lint checks, so build is not proof
+  that those checks pass.
+- Actual component Chrome tests pass 320/390/1024px with the repository's locked
+  React 18 dependencies, including export and decision controls. No real-device claim.
+- Rollback for this code-only foundation: revert the PR merge commit and rebuild.
+  No schema, financial setting, permissions, POS or database changes to undo.
+
+After merge, Replit (only if clean; stop on conflicts/divergence):
+```sh
+git status
+GIT_EDITOR=true git pull --ff-only origin main
+npx vitest run tests/server/membershipRefundPolicy.test.ts tests/server/membershipControls.test.ts tests/server/membershipControlsAccess.test.ts
+npm run build
+```
+No `db push`, migration or data-loss command is needed. Publish only after verifying
+the deployed/source identity and usable Replit rollback, which remain checklist #1.

@@ -1,10 +1,7 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+import { requireMembershipControlAccess } from "@/server/membership/requireControlAccess";
 import MembershipControls from "./MembershipControls";
 
 export default async function MembershipControlsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.roles?.includes("SUPERADMIN")) redirect("/admin");
+  await requireMembershipControlAccess();
   return <MembershipControls />;
 }

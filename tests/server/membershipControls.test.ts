@@ -41,7 +41,7 @@ describe("review-only membership controls", () => {
   });
   it("guards page on server and offers no production save API", () => {
     const page = readFileSync("src/app/admin/memberships/controls/page.tsx", "utf8");
-    expect(page).toContain('roles?.includes("SUPERADMIN")');
+    expect(page).toContain('await requireMembershipControlAccess()');
     const client = readFileSync("src/app/admin/memberships/controls/MembershipControls.tsx", "utf8");
     expect(client).not.toContain("fetch(");
     expect(client).toContain("activationBlocked: true");
