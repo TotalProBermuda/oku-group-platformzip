@@ -139,3 +139,22 @@ local isolated fixture: fabricated fragment token survives mount, simulated auth
 failure shows recovery alert and enabled button. At 320px document width is 320px.
 No real auth request, email or database was used. 24-hour invitation remains open:
 REFERRER_INVITE presently signs in directly and cannot safely be extended unchanged.
+# 4 October — Superadmin membership control implementation
+
+PR116 remains review-only. Added a server-guarded draft editor, Memberships link,
+typed rule contracts and a conservative synthetic commission decision preview.
+No server persistence, live commission enforcement, POS configuration or financial
+actions are implied. The owner scope remains undecided rather than guessed.
+
+Verification: 47 focused unit tests passed; component/CSS bundled successfully.
+Isolated Chrome actual-component checks passed 320/390/1024px: no overflow/errors,
+scope/identity/split decision changes, extra deduction inputs and draft JSON download.
+Screenshots inspected; long dropdown options shortened. Local UI runtime dependencies
+installed only under /private/tmp/oku-refund-test-runtime; application lockfile unchanged.
+Shared old test runtime had a missing esbuild binary, so it was not repaired or reused.
+
+Next sequence: additive audited persistence/snapshot proposal and POS payload review;
+then every commission entry point and replay tests. In parallelizable checklist work,
+prioritize checkout failure/retry matrix and role navigation tests over upsells.
+No whole workstream newly completed. Release SHA/rollback, durable live refund
+integration, invitation delivery, actual-device checks and bank specification remain open.

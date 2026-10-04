@@ -90,7 +90,7 @@ Confirmed gaps:
   has no dedicated verified member identity/discount-code mapping columns.
 - Membership is linked to User.id, but lacks historical accepted term snapshots.
 
-Required Superadmin controls (not implemented or active in this PR):
+Required Superadmin controls (draft editor now implemented below; none active):
 1. Versioned benefit catalogue: included access / separately purchased /
    deductible extra, benefit category, value disclosed at acceptance, effective dates.
 2. Separate discount surfaces: INVU_POS or WEB_CHECKOUT, never inferred or silently
@@ -115,3 +115,38 @@ Activation blockers: tier scope decision; actual INVU discount IDs and represent
 redacted closed-receipt payload; member identity/transaction-time snapshot storage;
 explicit schema approval and tests across all commission minting entry points.
 This audit is not proof that exclusions, POS buttons or Superadmin controls are live.
+
+## Execution plan and delivered slice — 4 October
+
+1. DONE: establish review-only contracts and conservative decision preview. Unknown
+   identity/history/scope and unresolved split checks return REVIEW, not eligibility.
+2. DONE: server-guarded Superadmin draft workspace at /admin/memberships/controls,
+   linked from Memberships. POS/web surfaces are separate, owner scope defaults to
+   undecided, and benefit treatment cannot silently double-deduct. Export is a local
+   JSON review artifact, not a persisted or authoritative configuration. No API writes.
+3. DONE: focused unit/boundary tests and isolated actual-component browser checks.
+4. NEXT: propose additive versioned rule/audit, membership-time and check-identity
+   records. Review migration separately before applying anywhere in production.
+5. GATED: owner chooses all-active vs paid-active scope; supply actual INVU code IDs
+   and redacted receipt. Verify discount shape, eligible items, stacking and dates
+   against the POS, not invented configuration. The current draft is not a complete
+   benefit catalogue or POS provisioning tool.
+6. NEXT after contracts approved: transactional server validation/persistence,
+   change audit, activation review and member snapshot integration across web order,
+   direct subcommission, INVU minting and repair/backfill entry points. No live guard
+   enabled until ambiguity has an operational review queue, not silent data loss.
+7. Acceptance: role denial, stale/concurrent edits, historical membership changes,
+   split checks, verified non-members, no-discount member purchases, repeated close
+   imports and all minting paths; then isolated end-to-end tests before deployment.
+
+Evidence: 47 tests / 2 files passed (refund quote + controls); esbuild bundled the
+component/CSS. Real Chrome isolated fixture passed 320/390/1024px: no horizontal
+overflow or page errors, identity/split decision changes, deduction inputs and draft
+download. Screenshot inspection prompted shorter dropdown labels. This does not
+verify the complete Next production build, authenticated role integration, translations,
+real mobile devices or deployment. Editor copy is currently English.
+
+Reproduce focused browser checks with isolated test dependencies:
+`UI_TEST_RUNTIME=/path/to/isolated/runtime node tests/fixtures/membership-controls/mobile-check.mjs`
+Runtime needs esbuild, react, react-dom and playwright; Chrome must be installed.
+No database, payment, email or POS API is called. No production migration or deploy.

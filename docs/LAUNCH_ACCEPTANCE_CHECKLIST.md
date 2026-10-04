@@ -15,6 +15,11 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [ ] Eligible release deployed and smoke-tested. No republish performed in this batch.
 
 ## 2. Payments and refunds — IN PROGRESS / APPROVAL GATES
+- [x] Review-branch Superadmin draft controls and membership exclusion preview:
+      POS/web separation, verified identity/history gates, no split-table blanket
+      exclusion, draft-only export. 47 focused tests pass; NOT live commission enforcement.
+- [ ] Audited rule persistence, owner scope decision, verified INVU mapping and
+      transaction-time snapshots integrated across every commission creation path.
 - [x] Membership annual refund quote engine implemented in a review branch:
       approved 30-day structure, actual-paid principal proration, disclosed extras,
       no ordinary discount clawback or separate ticket cancellation. 27 tests pass.
@@ -56,6 +61,10 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [ ] Authorized delivery test and end-to-end onboarding completed.
 
 ## 5. Dashboard discovery and mobile — IN PROGRESS
+- [x] New membership draft workspace linked from Memberships and explicitly
+      Superadmin-guarded on server. Isolated Chrome component checks at 320/390/1024px
+      pass (no overflow/errors; controls/export functional). Not a role-session or
+      full dashboard acceptance test; English-only draft copy still needs localization.
 - [x] Dashboard navigation regression tests included in passing Replit selection.
 - [ ] Task-based mobile checks for customer, Superadmin, F&B, events, hosts,
       partner, seller, independent referrer and finance/beneficiary.
