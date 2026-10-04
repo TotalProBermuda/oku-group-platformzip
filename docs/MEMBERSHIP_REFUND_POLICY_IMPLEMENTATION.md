@@ -73,3 +73,45 @@ Preserve previously purchased ticket rights; exceptional ticket refund policy is
 - Controlled live financial tests remain separately approval-gated.
 
 No invitations, refunds, payouts, financial settings or production data changed.
+
+## Superadmin / INVU / commission control mapping — 4 October audit
+
+Owner requires POS discounts to remain distinct from website benefits and member
+transactions to be excluded from referrer commissions. Scope of membership tiers
+is awaiting clarification (paid Patron/Founder versus every active tier).
+
+Confirmed gaps:
+- commerce/commissions.ts creates order commission/subcommission without a member guard.
+- events/subCommissionService.ts can independently create seller subcommissions.
+- services/invu/commissionMintingService.ts has match/eligibility guards but no
+  explicit member check in the inspected minting path. Exclusion must cover each
+  path and repair/backfill/reconciliation, not merely hide referral UI.
+- INVU normalization extracts aggregate discount amounts. InvuOrderNormalized
+  has no dedicated verified member identity/discount-code mapping columns.
+- Membership is linked to User.id, but lacks historical accepted term snapshots.
+
+Required Superadmin controls (not implemented or active in this PR):
+1. Versioned benefit catalogue: included access / separately purchased /
+   deductible extra, benefit category, value disclosed at acceptance, effective dates.
+2. Separate discount surfaces: INVU_POS or WEB_CHECKOUT, never inferred or silently
+   mirrored. POS mapping needs actual venue/branch + stable INVU discount code ID,
+   label, percentage/flat amount, eligible items, stacking/exclusions and dates.
+3. POS readiness: DRAFT -> CONFIGURED_IN_INVU -> VERIFIED_ON_IMPORTED_TEST_RECEIPT.
+   Website saving a mapping must not claim it creates an INVU till button. Do not
+   implement remote POS writes without documented supported API and permission.
+4. Member identity: internal user/member ID; verified email is lookup, not authority.
+   Unverified email-only matches, walk-ins and ambiguous/split bills go to review.
+   Never normalize away provider-specific dots/plus tags or merge shared emails.
+5. Noncommissionability: snapshot at purchase/service transaction time; member
+   exclusion applies even if no discount used. Preserve referral source for audit,
+   but don't mint referrer payable/subcommission on excluded transactions.
+   Do not alter HOST compensation or other non-referrer contracts by inference.
+6. Split checks: do not suppress an entire table's commission because one diner is
+   a member. Require member-linked payer/check/line evidence or hold for review.
+7. Audit/review: who changed what, previous/new rule, effective date, receipt evidence
+   and reason. Existing earned commissions are not retroactively reversed.
+
+Activation blockers: tier scope decision; actual INVU discount IDs and representative
+redacted closed-receipt payload; member identity/transaction-time snapshot storage;
+explicit schema approval and tests across all commission minting entry points.
+This audit is not proof that exclusions, POS buttons or Superadmin controls are live.
