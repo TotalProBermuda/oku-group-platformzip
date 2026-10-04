@@ -15,6 +15,11 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [ ] Eligible release deployed and smoke-tested. No republish performed in this batch.
 
 ## 2. Payments and refunds — IN PROGRESS / APPROVAL GATES
+- [x] Membership annual refund quote engine implemented in a review branch:
+      approved 30-day structure, actual-paid principal proration, disclosed extras,
+      no ordinary discount clawback or separate ticket cancellation. 27 tests pass.
+      No live route, request workflow, migration or financial action. See
+      MEMBERSHIP_REFUND_POLICY_IMPLEMENTATION.md for integration/approval gates.
 - [x] Ticket refund request validation implemented, merged in PR110 and tested.
 - [x] Existing payment/webhook regression selection passes; not settlement evidence.
 - [x] Pure refund admission rules implemented: cumulative balance, reserved/unknown

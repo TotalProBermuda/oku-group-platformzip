@@ -1,5 +1,23 @@
 # Launch execution log — 3 October 2026
 
+## 4 October: membership policy calculation implementation
+
+- Owner approved implementing the recommended annual 30-day refund structure and
+  described membership value as private dinners, specialised products, keynotes,
+  entertainment and year-round discounts. No event price/deduction value invented.
+- Implemented a quote-only engine for explicitly accepted new annual USD terms.
+  Actual paid principal is prorated; included access and separately purchased
+  tickets are not double-deducted. Only disclosed redeemed extra values count.
+  Billing/service exceptions, renewals, legacy terms, unknown payment/redemption
+  evidence and existing refund operations require review.
+- 27 focused tests pass. No live imports, migration, access changes, automatic
+  refund, invitations, payments or production settings. Customer/admin request
+  screens and persistent source records remain unimplemented, explicitly gated.
+- Existing Membership lacks verified payment/policy/redemption/request records;
+  manual Patron enrollment does not prove a payment was captured. The exact new
+  schema and production migration require separate review before route integration.
+- Ten-item tracker: #2 advanced; #1 and #3–#10 not closed by this work.
+
 ## Batch A: release baseline (partial)
 
 - Fetched GitHub main: ce36935b7adc30f0d2acf8cea4baa7ae66950a60.
