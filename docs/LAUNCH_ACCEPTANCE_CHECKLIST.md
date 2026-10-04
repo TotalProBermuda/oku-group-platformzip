@@ -19,6 +19,10 @@ An entire workstream closes only when its remaining acceptance checks pass.
       Current build, production SHA and rollback cannot yet be verified; no publish.
 
 ## 2. Payments and refunds — IN PROGRESS / APPROVAL GATES
+- Policy clarification (4 October): owner says tickets are non-refundable;
+  membership refunds may have an eligibility window, not yet specified. Refund
+  safety is not authorization to add customer ticket-refund functionality.
+  Live /my/orders has no refund control. Existing admin controls remain separate.
 - [x] Ticket refund request validation implemented, merged in PR110 and tested.
 - [x] Existing payment/webhook regression selection passes; not settlement evidence.
 - [x] Pure refund admission rules implemented: cumulative balance, reserved/unknown

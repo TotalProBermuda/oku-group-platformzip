@@ -25,6 +25,17 @@ const evidence = (status: "PENDING" | "SETTLED" | "FAILED" = "SETTLED") => ({
 });
 
 suite("refund persistence — isolated PostgreSQL, no gateway", () => {
+  it("deduplicates simultaneous retries of one admin request and permits only one submission claim", async () => {
+    await setup();
+    const requests = await Promise.all(Array.from({length: 10}, () => reserveRefund(db, req())));
+    expect(requests.filter(result => !result.replay)).toHaveLength(1);
+    expect(requests.filter(result => result.replay)).toHaveLength(9);
+    const claims = await Promise.all(Array.from({length: 10}, () => claimRefund(db,"one")));
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    const records = await db.query('SELECT * FROM "RefundSafetyOperation"');
+    expect(records.rows).toHaveLength(1);
+    expect(records.rows[0]).toMatchObject({amountCents:600,state:"SUBMITTED"});
+  });
   it("reserves cumulative amounts and rejects an over-refund", async () => {
     await setup(); await reserveRefund(db, req());
     await expect(reserveRefund(db, req("two",401))).rejects.toThrow("INSUFFICIENT_BALANCE");

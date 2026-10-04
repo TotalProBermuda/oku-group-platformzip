@@ -1,5 +1,32 @@
 # Launch execution log — 3 October 2026
 
+## 4 October: refund origins and policy clarification
+
+- Live /my/orders verified: order history, View Tickets and View Experience;
+  no customer refund-request button. Left this page open for owner inspection.
+- Live /admin/payments?tab=refunds loads Refunds & Voids and Open order controls;
+  no refund/void activity reported. No action submitted. Source admin/orders
+  and OrderDrawer expose Refund/Full Refund for PAID orders; the API requires
+  admin:payments:refund. The payment-intent refund API allows SUPERADMIN and
+  ADMIN_FINANCE. These are administrative operations, not customer requests.
+- Owner clarified tickets are non-refundable. Do not introduce a customer ticket
+  refund request flow. Exceptional administrative refunds require a separately
+  agreed policy; no policy enforcement or financial settings changed in this pass.
+- Patron checkout-session source records PENDING_APPROVAL, not automated card
+  checkout. No implemented membership refund window found in reviewed routes.
+  Owner must specify duration, start date basis and benefit-use restrictions.
+- Existing isolated coordinator/admission rerun: 31 tests passed in two files.
+  Added a ten-caller duplicate request/claim test; results recorded below.
+- Final rerun: 32 tests passed in two files. Ten simultaneous same-key requests
+  produced one new operation and nine replays; ten claims produced one winner.
+  git diff --check passed. This remains a draft, unintegrated production control.
+- Shared Vitest files were missing; used separate temporary test runtime rather
+  than modifying application dependencies. Attempted local PostgreSQL install
+  for multi-connection testing, stopped because Homebrew required unsupported
+  source builds. Homebrew updated its runtime and installed icu4c/ca-certificates
+  before cancellation. No PostgreSQL service started. Multi-connection gate stays
+  open; embedded PGlite serializes one connection and cannot certify that gate.
+
 ## Release and durable refund follow-up
 
 - Source candidate from latest user pull: 763e65b8. No newer welcome-sender work
