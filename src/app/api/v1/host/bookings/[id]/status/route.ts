@@ -55,10 +55,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const {
     status, tableLabel, assignedSpaceId, confirmedReservationDate, lossReason,
     lossReasonNotes, internalNotes, arrivedHeadcount, confirmCapacityOverride,
-    capacityOverrideReason,
+    capacityOverrideReason, noSaleConfirmed, noSaleReason,
   } = body;
   if (!status || !VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+  const wantsNoSaleClose = noSaleConfirmed === true || noSaleConfirmed === "true";
+  if (noSaleConfirmed !== undefined && typeof noSaleConfirmed !== "boolean" && noSaleConfirmed !== "true" && noSaleConfirmed !== "false") {
+    return NextResponse.json({ ok: false, error: "noSaleConfirmed must be an explicit boolean." }, { status: 400 });
+  }
+  if (wantsNoSaleClose && (typeof noSaleReason !== "string" || noSaleReason.trim().length < 8 || noSaleReason.trim().length > 500)) {
+    return NextResponse.json({ ok: false, error: "Explain why the guests left without a purchase (8–500 characters)." }, { status: 400 });
   }
 
   if (confirmCapacityOverride) {
@@ -94,6 +101,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       arrivedHeadcount: parsedHeadcount,
       confirmCapacityOverride: Boolean(confirmCapacityOverride),
       capacityOverrideReason: typeof capacityOverrideReason === "string" ? capacityOverrideReason.trim() : undefined,
+      noSaleConfirmed: wantsNoSaleClose,
+      noSaleReason: typeof noSaleReason === "string" ? noSaleReason.trim() : undefined,
     });
     return NextResponse.json({ ok: true, data: reservation });
   } catch (e: unknown) {

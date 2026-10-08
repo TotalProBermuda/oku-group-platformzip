@@ -13,6 +13,7 @@ import { deliverReservationStateEmail } from "@/server/reservations/reservationN
 import { buildReservationConfirmationSubject } from "@/server/reservations/confirmationEmail";
 import { assertTransitionOperationalRequirements } from "@/server/host/transitionRequirements";
 import { hostQueueWhere, type QueueSelection } from "./queueSelection";
+import { noSaleCloseBlockReason } from "@/server/host/reservationArchivePolicy";
 
 export const INCLUDE_FULL = {
   zone: true,
@@ -339,6 +340,9 @@ export async function transitionStatus(
     confirmCapacityOverride?: boolean;
     /** Mandatory operational justification for an over-capacity approval. */
     capacityOverrideReason?: string;
+    /** Host explicitly records that the seated guests left with no sale. */
+    noSaleConfirmed?: boolean;
+    noSaleReason?: string;
   }
 ) {
   const existing = await prisma.reservation.findUniqueOrThrow({
@@ -352,6 +356,7 @@ export async function transitionStatus(
           bindings: { select: { invuOrderId: true }, take: 1 },
         },
       },
+      paymentIntent: { select: { id: true } },
     },
   });
 
@@ -375,8 +380,28 @@ export async function transitionStatus(
 
   assertTransitionOperationalRequirements(existing, toStatus, opts);
 
+  if (opts?.noSaleConfirmed) {
+    if (toStatus !== "COMPLETED") throw Object.assign(new Error("No-sale close must complete the reservation."), { status: 400 });
+    const boundOrderId = existing.attributionSession?.tableSession?.openedInvuOrderId
+      ?? existing.attributionSession?.bindings[0]?.invuOrderId
+      ?? null;
+    const blockReason = noSaleCloseBlockReason({
+      status: existing.status,
+      actualRevenueCents: existing.actualRevenueCents,
+      boundInvuOrderId: boundOrderId,
+      hasPaymentIntent: Boolean(existing.paymentIntent),
+      reason: opts.noSaleReason ?? "",
+    });
+    if (blockReason) throw Object.assign(new Error(blockReason), { status: existing.status !== "SEATED" || (opts.noSaleReason?.trim().length ?? 0) < 8 ? 400 : 409 });
+  }
+
   const now = new Date();
   const update: Record<string, unknown> = { status: toStatus };
+  if (opts?.noSaleConfirmed) {
+    update.actualRevenueCents = 0;
+    update.commissionEligible = false;
+    update.commissionValidatedAt = null;
+  }
   const confirmedReservationDate = opts?.reservationDate ? new Date(opts.reservationDate) : null;
   if (confirmedReservationDate && Number.isNaN(confirmedReservationDate.getTime())) {
     const e = new Error("confirmedReservationDate must be a valid ISO timestamp") as Error & { status?: number };
@@ -436,7 +461,7 @@ export async function transitionStatus(
         update.commissionValidatedAt = now;
       }
     }
-    if (toStatus === "COMPLETED") {
+    if (toStatus === "COMPLETED" && !opts?.noSaleConfirmed) {
       const validationMode = existing.venue.commissionValidationMode;
       if (validationMode === "ON_COMPLETED") {
         update.commissionEligible = true;
@@ -496,6 +521,30 @@ export async function transitionStatus(
     // same reservation, preventing orphan active holds on terminal reservations.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(1, hashtext(${reservationId}))`;
 
+    if (opts?.noSaleConfirmed) {
+      const current = await tx.reservation.findUnique({
+        where: { id: reservationId },
+        select: { status: true, actualRevenueCents: true, paymentIntent: { select: { id: true } } },
+      });
+      const currentBlock = current && noSaleCloseBlockReason({
+        status: current.status,
+        actualRevenueCents: current.actualRevenueCents,
+        boundInvuOrderId: null,
+        hasPaymentIntent: Boolean(current.paymentIntent),
+        reason: opts.noSaleReason ?? "",
+      });
+      if (!current || currentBlock) throw Object.assign(new Error(currentBlock ?? "Reservation changed while closing."), { status: 409 });
+      const attribution = await tx.attributionSession.findUnique({
+        where: { reservationId },
+        select: { tableSession: { select: { openedInvuOrderId: true } }, bindings: { select: { invuOrderId: true }, take: 1 } },
+      });
+      if (attribution?.tableSession?.openedInvuOrderId || attribution?.bindings[0]?.invuOrderId) {
+        const e = new Error("An INVU order was bound while closing. Reconcile its POS close instead.") as Error & { status?: number };
+        e.status = 409;
+        throw e;
+      }
+    }
+
     // ── Status log — inside the transaction so it only persists if every
     // subsequent write (reservation update, outbox) also succeeds. The ID
     // is used as the LedgerEvent idempotency key suffix so each distinct
@@ -508,9 +557,11 @@ export async function transitionStatus(
         changedByUserId: actorId,
         lossReason: opts?.lossReason ?? null,
         lossReasonNotes: opts?.lossReasonNotes ?? null,
-        notes: opts?.confirmCapacityOverride
-          ? [opts.internalNotes, `Capacity override: ${opts.capacityOverrideReason!.trim()}`].filter(Boolean).join(" · ")
-          : opts?.internalNotes ?? null,
+        notes: [
+          opts?.internalNotes,
+          opts?.noSaleConfirmed ? `NO_SALE_CLOSE: ${opts.noSaleReason!.trim()}` : null,
+          opts?.confirmCapacityOverride ? `Capacity override: ${opts.capacityOverrideReason!.trim()}` : null,
+        ].filter(Boolean).join(" · ") || null,
       },
       select: { id: true },
     });
@@ -800,6 +851,8 @@ export async function transitionStatus(
           actorId,
           tableLabel: opts?.tableLabel ?? null,
           lossReason: opts?.lossReason ?? null,
+          noSaleConfirmed: Boolean(opts?.noSaleConfirmed),
+          noSaleReason: opts?.noSaleConfirmed ? opts.noSaleReason!.trim() : null,
         },
       });
     }

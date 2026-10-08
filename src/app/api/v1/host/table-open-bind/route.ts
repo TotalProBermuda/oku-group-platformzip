@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
         : { bookingCode: body.bookingCode! },
       select: {
         id: true,
+        reservationId: true,
         venueId: true,
         bookingCode: true,
         status: true,
@@ -136,6 +137,22 @@ export async function POST(req: NextRequest) {
     const trimmedOrderId = body.invuOrderId.trim();
 
     const result = await prisma.$transaction(async (tx) => {
+      // Serialize table binding with host status changes/closure. In
+      // particular, an explicit no-sale close and a new INVU bind must not
+      // race and leave a completed $0 booking carrying a live POS order.
+      if (attribution.reservationId) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(1, hashtext(${attribution.reservationId}))`;
+        const [currentReservation, currentTable] = await Promise.all([
+          tx.reservation.findUnique({ where: { id: attribution.reservationId }, select: { status: true } }),
+          tx.tableSession.findUnique({ where: { id: tableSessionId }, select: { openedInvuOrderId: true } }),
+        ]);
+        if (!currentReservation || (!currentTable?.openedInvuOrderId && currentReservation.status !== "SEATED")) {
+          const e = new Error("This reservation is no longer seated and cannot be newly bound to an INVU check") as Error & { status?: number };
+          e.status = 409;
+          throw e;
+        }
+      }
+
       // Global uniqueness guard: an INVU order may only be bound to one
       // attribution session at a time. If another session already claims
       // this order, fail closed rather than corrupting the trust chain.
