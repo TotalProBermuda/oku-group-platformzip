@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Brandmark from "@/components/Brandmark";
+import { reservationPhone, panamaDateTimeInput, panamaInputToDate } from "@/lib/hostReservationDisplay";
 import LiveAttendanceFeed from "./LiveAttendanceFeed";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 
@@ -42,6 +43,7 @@ type Reservation = {
   contactName: string;
   contactEmail: string;
   contactWhatsapp?: string | null;
+  contactPhone?: string | null;
   partySize: number;
   conceptRequested?: string | null;
   status: string;
@@ -169,11 +171,12 @@ const PANEL_GROUPS = [
   { labelKey: "operations.panelWaitlist",     statuses: ["WAITLISTED"], accent: "#7e22ce" },
   { labelKey: "operations.panelArrived",      statuses: ["ARRIVED"], accent: "#065f46" },
   { labelKey: "operations.panelSeated",       statuses: ["SEATED"], accent: "#15803d" },
-  { labelKey: "operations.panelClosed",       statuses: ["COMPLETED", "NO_SHOW", "CANCELLED"], accent: "#94a3b8" },
+  { labelKey: "operations.panelClosed",       statuses: ["COMPLETED", "NO_SHOW", "CANCELLED", "REJECTED"], accent: "#94a3b8" },
 ];
 
 function elapsed(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) return "Upcoming";
   const m = Math.floor(diff / 60000);
   if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
@@ -181,13 +184,11 @@ function elapsed(iso: string) {
 }
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(iso).toLocaleString("en-US", { timeZone: "America/Panama", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) + " (Panama)";
 }
 
 function toDateTimeLocalValue(iso: string) {
-  const date = new Date(iso);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
+  return panamaDateTimeInput(iso);
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -278,7 +279,7 @@ function GuestDrawer({
 
   useEffect(() => {
     if (res.status !== "PENDING_APPROVAL" || !confirmedReservationDate) return;
-    const startAt = new Date(confirmedReservationDate);
+    const startAt = panamaInputToDate(confirmedReservationDate);
     if (Number.isNaN(startAt.getTime())) return;
     const endAt = new Date(startAt.getTime() + 120 * 60_000);
     const controller = new AbortController();
@@ -431,7 +432,7 @@ function GuestDrawer({
   const approvalSpaces = scheduledSpaces.filter((space) => space.isActive && space.reservable);
 
   return (
-    <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: 420, background: "#fff", borderLeft: "1px solid #e2e8f0", zIndex: 200, display: "flex", flexDirection: "column", boxShadow: "-8px 0 32px rgba(0,0,0,0.1)" }}>
+    <div role="dialog" aria-label="Reservation details" style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: "min(420px, 100%)", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #e2e8f0", zIndex: 200, display: "flex", flexDirection: "column", boxShadow: "-8px 0 32px rgba(0,0,0,0.1)" }}>
       {/* Header */}
       <div style={{ padding: "20px 24px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
@@ -448,13 +449,13 @@ function GuestDrawer({
       {/* Guest info */}
       <div style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
         <div>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>{t("host", "operations.fieldGuestEmail")}</div>
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>Email</div>
           <a href={`mailto:${res.contactEmail}`} style={{ display: "block", overflowWrap: "anywhere", fontSize: 12, fontWeight: 600, color: "#1d4ed8", marginTop: 1 }}>{res.contactEmail}</a>
         </div>
         <div>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>{t("host", "operations.fieldGuestWhatsapp")}</div>
-          {res.contactWhatsapp ? (
-            <a href={`tel:${res.contactWhatsapp}`} style={{ display: "block", overflowWrap: "anywhere", fontSize: 12, fontWeight: 600, color: "#1d4ed8", marginTop: 1 }}>{res.contactWhatsapp}</a>
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>Phone / WhatsApp</div>
+          {reservationPhone(res) ? (
+            <a href={`tel:${reservationPhone(res)!.replace(/[^+0-9]/g, "")}`} style={{ display: "block", overflowWrap: "anywhere", fontSize: 12, fontWeight: 600, color: "#1d4ed8", marginTop: 1 }}>{reservationPhone(res)}</a>
           ) : (
             <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", marginTop: 1 }}>—</div>
           )}
@@ -607,7 +608,7 @@ function GuestDrawer({
             {res.status === "PENDING_APPROVAL" && (
               <div style={{ marginBottom: 8, padding: "12px 14px", background: "#fdf4ff", border: "1px solid #e9d5ff", borderRadius: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#7e22ce", marginBottom: 8 }}>Confirmation plan</div>
-                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#64748b", marginBottom: 4 }}>Confirmed date and time</label>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#64748b", marginBottom: 4 }}>Confirmed date and time (Panama)</label>
                 <input
                   type="datetime-local"
                   value={confirmedReservationDate}
@@ -726,7 +727,7 @@ function GuestDrawer({
                   if (confirmingApproval) {
                     return onAction(res.id, a.status, {
                       assignedSpaceId: selectedSpaceId,
-                      confirmedReservationDate: new Date(confirmedReservationDate).toISOString(),
+                      confirmedReservationDate: panamaInputToDate(confirmedReservationDate).toISOString(),
                       ...(selectedIsOverCapacity ? {
                         confirmCapacityOverride: "true",
                         capacityOverrideReason: capacityOverrideReason.trim(),
@@ -842,11 +843,13 @@ export default function HostOperationsBoard({
   waitlist: initialWl,
   zones,
   canOverrideCapacity = false,
+  selectedDate = "",
 }: {
   reservations: Reservation[];
   waitlist: WaitlistEntry[];
   zones: VenueZone[];
   canOverrideCapacity?: boolean;
+  selectedDate?: string;
 }) {
   const t = useTranslation();
   const [reservations, setReservations] = useState(initial);
@@ -891,6 +894,7 @@ export default function HostOperationsBoard({
   const [sourceFilter, setSourceFilter] = useState("all");
   const [savingZone, setSavingZone] = useState<string | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
+  const [queueError, setQueueError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [boardView, setBoardView] = useState<"operations" | "attendance">("operations");
   const [attendanceSessionId, setAttendanceSessionId] = useState<string>("");
@@ -931,10 +935,12 @@ export default function HostOperationsBoard({
 
   const refresh = useCallback(async () => {
     try {
-      const r = await fetch("/api/v1/host/queue");
+      const r = await fetch(`/api/v1/host/queue${window.location.search}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("Reservation refresh failed. Displayed bookings may be out of date.");
       if (r.ok) {
         const d = await r.json();
         const next: Reservation[] = d.data.reservations ?? [];
+        setActiveRes(previous => previous ? next.find(row => row.id === previous.id) ?? null : null);
         // Stable merge: keep prior object identity for unchanged rows so
         // React preserves DOM/component state and we don't get a flicker.
         setReservations((prev) => {
@@ -952,8 +958,9 @@ export default function HostOperationsBoard({
           return anyChange ? merged : prev;
         });
         setLastRefreshTime(new Date().toLocaleTimeString());
+        setQueueError(null);
       }
-    } catch {}
+    } catch (error) { setQueueError(error instanceof Error ? error.message : "Reservation refresh failed"); }
   }, []);
 
   useEffect(() => {
@@ -1033,7 +1040,7 @@ export default function HostOperationsBoard({
         borderBottom: "1px solid rgba(255,255,255,0.07)",
         padding: "0 20px",
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", minHeight: 54, display: "flex", flexWrap: "wrap", padding: "8px 0", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Brandmark size={18} color="#e8d9b3" showTagline={false} />
             <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.1)" }} />
@@ -1056,9 +1063,9 @@ export default function HostOperationsBoard({
       {/* Header */}
       <div style={{ background: "#0f172a", color: "#fff", padding: "20px 24px 18px" }}>
         <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>OKÜ Hospitality Group</div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 20, fontWeight: 800 }}>{t("host", "operations.floorControl")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", background: "rgba(255,255,255,0.1)", borderRadius: 8, padding: 3 }}>
               {(["operations", "attendance"] as const).map((v) => (
                 <button key={v} onClick={() => setBoardView(v)}
@@ -1085,6 +1092,14 @@ export default function HostOperationsBoard({
         </div>
       </div>
 
+      <form action="/host/operations" method="get" style={{ padding: 16, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+        <label>Reservation date (Panama)<input aria-label="Reservation date (Panama)" type="date" name="date" defaultValue={selectedDate} style={{ display: "block", minHeight: 44, maxWidth: "100%" }} /></label>
+        <strong style={{ width: "100%" }}>{selectedDate ? `Service date: ${selectedDate} (Panama)` : "All upcoming & unresolved reservations"}</strong>
+        <button type="submit" style={{ minHeight: 44 }}>Show date / history</button>
+        <a href="/host/operations" style={{ padding: 12 }}>All upcoming & unresolved</a>
+        <p style={{ margin: 0, width: "100%", fontSize: 12 }}>Default: all future bookings and unresolved requests, plus recent service. Date search includes closed and cancelled bookings. Space utilisation below is live now; confirmation checks the booking’s selected time.</p>
+        {queueError && <div role="alert">{queueError} <button type="button" onClick={() => void refresh()}>Retry</button></div>}
+      </form>
       {/* Operations View — Zone, Filters, Kanban, Waitlist */}
       {boardView === "operations" && <><div style={{ display: "flex", gap: 8, padding: "12px 20px", borderBottom: "1px solid #e2e8f0", background: "#fff", overflowX: "auto" }}>
         {spaceLoadError && (
