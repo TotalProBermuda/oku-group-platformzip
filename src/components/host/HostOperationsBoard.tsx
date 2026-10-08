@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Brandmark from "@/components/Brandmark";
 import { reservationPhone, panamaDateTimeInput, panamaInputToDate } from "@/lib/hostReservationDisplay";
 import LiveAttendanceFeed from "./LiveAttendanceFeed";
+import ReservationReviewPanel from "./ReservationReviewPanel";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 
 type StatusLog = { fromStatus?: string | null; toStatus: string; changedByLabel?: string | null; lossReason?: string | null; changedAt: string; notes?: string | null };
@@ -209,9 +210,9 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
-function ActionButton({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
+function ActionButton({ label, color, onClick, disabled = false }: { label: string; color: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button onClick={onClick} style={{ padding: "5px 11px", borderRadius: 7, border: `1.5px solid ${color}`, background: "transparent", color, fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: "0.03em", transition: "background 0.15s" }}
+    <button onClick={onClick} disabled={disabled} style={{ padding: "5px 11px", borderRadius: 7, border: `1.5px solid ${color}`, background: "transparent", color, fontSize: 11, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", letterSpacing: "0.03em", transition: "background 0.15s", opacity: disabled ? 0.45 : 1 }}
       onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = color; (e.target as HTMLButtonElement).style.color = "#fff"; }}
       onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = "transparent"; (e.target as HTMLButtonElement).style.color = color; }}>
       {label}
@@ -745,6 +746,20 @@ function GuestDrawer({
                   : ""}
               </button>;
             })}
+            {res.status === "SEATED" && (
+              <ActionButton
+                label="Close — no purchase"
+                color="#b45309"
+                disabled={!!boundInvuOrderId || res.actualRevenueCents != null}
+                onClick={() => {
+                  const reason = window.prompt("Briefly explain why the guest left without a purchase (required for the audit log):");
+                  if (!reason || reason.trim().length < 8) { if (reason !== null) window.alert("Please enter at least 8 characters."); return; }
+                  if (window.confirm("Confirm this party left without a purchase? This records $0 revenue, releases the table hold, and keeps the reservation audit history.")) {
+                    onAction(res.id, "COMPLETED", { noSaleConfirmed: "true", noSaleReason: reason.trim() });
+                  }
+                }}
+              />
+            )}
             {canReopenForInvu && (
               <div style={{ marginTop: 6, padding: "10px 12px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde68a" }}>
                 <div style={{ fontSize: 11, color: "#92400e", marginBottom: 8 }}>
@@ -1100,6 +1115,7 @@ export default function HostOperationsBoard({
         <p style={{ margin: 0, width: "100%", fontSize: 12 }}>Default: all future bookings and unresolved requests, plus recent service. Date search includes closed and cancelled bookings. Space utilisation below is live now; confirmation checks the booking’s selected time.</p>
         {queueError && <div role="alert">{queueError} <button type="button" onClick={() => void refresh()}>Retry</button></div>}
       </form>
+      <div style={{ padding: "0 16px" }}><ReservationReviewPanel onArchived={() => void refresh()} /></div>
       {/* Operations View — Zone, Filters, Kanban, Waitlist */}
       {boardView === "operations" && <><div style={{ display: "flex", gap: 8, padding: "12px 20px", borderBottom: "1px solid #e2e8f0", background: "#fff", overflowX: "auto" }}>
         {spaceLoadError && (
