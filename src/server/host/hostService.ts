@@ -12,6 +12,7 @@ import { assertNoBlockingOccupancy } from "@/server/events/eventOccupancyService
 import { deliverReservationStateEmail } from "@/server/reservations/reservationNotificationService";
 import { buildReservationConfirmationSubject } from "@/server/reservations/confirmationEmail";
 import { assertTransitionOperationalRequirements } from "@/server/host/transitionRequirements";
+import { hostQueueWhere, type QueueSelection } from "./queueSelection";
 
 export const INCLUDE_FULL = {
   zone: true,
@@ -43,24 +44,10 @@ export const INCLUDE_FULL = {
   assignedSpace:  { select: { id: true, name: true, capacity: true } },
 };
 
-export async function getHostQueue(venueId: string) {
-  // Rolling window instead of UTC-midnight bounds. The server runs in UTC
-  // and Venue has no timezone column, so a Panama booking at 22:30 local
-  // (= 03:30 UTC next day) was being shoved into "yesterday" and dropped
-  // from the queue. The window below shows anything from a few hours ago
-  // (still-seated tables) through the next ~30h (tonight + tomorrow), which
-  // is timezone-tolerant for any venue between roughly UTC-12 and UTC+12.
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-  const windowEnd = new Date(now.getTime() + 30 * 60 * 60 * 1000);
-
+export async function getHostQueue(venueId: string, selection: QueueSelection = {}) {
   const [reservations, waitlist, zones] = await Promise.all([
     prisma.reservation.findMany({
-      where: {
-        venueId,
-        reservationDate: { gte: windowStart, lt: windowEnd },
-        status: { notIn: ["CANCELLED"] },
-      },
+      where: hostQueueWhere(venueId, selection),
       include: INCLUDE_FULL,
       orderBy: { reservationDate: "asc" },
     }),
