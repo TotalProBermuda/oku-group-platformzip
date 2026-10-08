@@ -33,4 +33,11 @@ describe("reservation transition operational requirements", () => {
       { ...pendingApproval, status: "ARRIVED" }, "SEATED", { tableLabel: "OKU-12" },
     )).not.toThrow();
   });
+
+  it("allows a seated reservation to close but blocks cancellation/no-show after seating", () => {
+    const seated = { ...pendingApproval, status: "SEATED" as const, assignedTableLabel: "OKU-12" };
+    expect(() => assertTransitionOperationalRequirements(seated, "COMPLETED")).not.toThrow();
+    expect(() => assertTransitionOperationalRequirements(seated, "CANCELLED")).toThrow("A seated reservation can only be closed");
+    expect(() => assertTransitionOperationalRequirements(seated, "NO_SHOW")).toThrow("A seated reservation can only be closed");
+  });
 });

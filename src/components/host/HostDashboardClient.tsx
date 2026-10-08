@@ -8,6 +8,7 @@ import { useTranslation } from "@/components/i18n/LocaleProvider";
 const QRScanner = lazy(() => import("./QRScanner"));
 import BindInvuOrderControl, { type AttributionSessionForBind } from "./BindInvuOrderControl";
 import ScanResultModal from "./ScanResultModal";
+import ReservationReviewPanel from "./ReservationReviewPanel";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -713,6 +714,13 @@ function ReservationCard({ res, onAction }: {
               {res.status === "SEATED" && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <QuickBtn label={t("host", "actions.complete")} color="#6b7280" disabled={updating} onClick={() => act("COMPLETED")} />
+                  <QuickBtn label="Close — no purchase" color="#b45309" disabled={updating || !!boundInvuOrderId || res.actualRevenueCents != null} onClick={() => {
+                    const reason = window.prompt("Briefly explain why the guest left without a purchase (required for the audit log):");
+                    if (!reason || reason.trim().length < 8) { if (reason !== null) window.alert("Please enter at least 8 characters."); return; }
+                    if (window.confirm("Confirm this party left without a purchase? This records $0 revenue, releases the table hold, and keeps the reservation audit history.")) {
+                      void act("COMPLETED", { noSaleConfirmed: "true", noSaleReason: reason.trim() });
+                    }
+                  }} />
                   <QuickBtn label={invuSyncing ? "Syncing INVU close…" : "Sync closed INVU check"} color="#c8a96e" disabled={invuSyncing || !boundInvuOrderId} onClick={syncInvuClose} />
                   <QuickBtn label={showManualClose ? "Hide manual fallback" : "Record manual fallback close"} color="#f59e0b" disabled={manualSaving} onClick={() => setShowManualClose((open) => !open)} />
                 </div>
@@ -1204,11 +1212,15 @@ export default function HostDashboardClient() {
   }, [load]);
 
   async function handleAction(id: string, status: string, extra?: Record<string, string>) {
-    await fetch(`/api/v1/host/bookings/${id}/status`, {
+    const response = await fetch(`/api/v1/host/bookings/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, ...extra }),
     });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      window.alert(payload.error ?? "Could not update this reservation.");
+    }
     await load();
   }
 
@@ -1347,6 +1359,8 @@ export default function HostDashboardClient() {
             {data.venue && <span style={{ color: "#374151", marginLeft: 8 }}>· {data.venue.name}</span>}
           </div>
         </div>
+
+        <ReservationReviewPanel dark onArchived={() => void load()} />
 
         {/* Shift clock-in/out — streetside hosts only */}
         {isStreetsideHost && shiftOn !== null && (

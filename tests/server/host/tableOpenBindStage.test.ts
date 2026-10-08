@@ -41,6 +41,7 @@ describe("INVU table-open binding service stage", () => {
     async (status) => {
       mocks.findAttribution.mockResolvedValue({
         id: "attr-1",
+        reservationId: "reservation-1",
         venueId: "venue-1",
         bookingCode: "OKU-2026-TEST",
         status,
@@ -63,6 +64,7 @@ describe("INVU table-open binding service stage", () => {
   it("allows an idempotent retry after the session has already been bound", async () => {
     mocks.findAttribution.mockResolvedValue({
       id: "attr-1",
+      reservationId: "reservation-1",
       venueId: "venue-1",
       bookingCode: "OKU-2026-TEST",
       status: "POS_BIND_INTENT_RECORDED",
@@ -71,11 +73,14 @@ describe("INVU table-open binding service stage", () => {
       tableSession: { id: "table-session-1", openedInvuOrderId: "4831" },
     });
     mocks.transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn({
+      $executeRaw: vi.fn(),
+      reservation: { findUnique: vi.fn().mockResolvedValue({ status: "SEATED" }) },
       operationalBinding: {
         findFirst: vi.fn().mockResolvedValue(null),
         upsert: vi.fn().mockResolvedValue({ id: "binding-1", bindingType: "TABLE_OPEN_BINDING" }),
       },
       tableSession: {
+        findUnique: vi.fn().mockResolvedValue({ openedInvuOrderId: "4831" }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         update: vi.fn(),
       },
