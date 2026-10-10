@@ -24,6 +24,7 @@ export async function assertCheckoutCatalogPolicy(input: {
   const session = await prisma.session.findUnique({
     where: { id: input.sessionId },
     include: {
+      ticketPrices: true,
       series: {
         select: {
           id: true,

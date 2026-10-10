@@ -5,12 +5,13 @@ import { authOptions } from "@/lib/auth";
 import { getTranslations } from "@/i18n/getTranslations";
 import { isValidLocale } from "@/i18n/config";
 import { localePath } from "@/i18n/utils";
-import { getSeriesContent, getSessionTitle, getTicketTypeName } from "@/data/seriesTranslations";
+import { getSeriesContent, getTicketTypeName } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
 import EventPageSponsorBlock from "@/components/sponsors/EventPageSponsorBlock";
 import EventMenusSection from "@/components/experiences/EventMenusSection";
-import AddToCalendar from "@/components/ui/AddToCalendar";
 import ShareButtons from "@/components/ui/ShareButtons";
+import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsView";
+import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
 import type { Metadata } from "next";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
@@ -141,6 +142,16 @@ export default async function ExperienceDetailPage({ params }: Props) {
               instagram: c.shareInstagram,
             }}
           />
+          {series.socialLinksJson && typeof series.socialLinksJson === "object" && Object.keys(series.socialLinksJson).length > 0 ? (
+            <nav aria-label="Series social links" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 }}>
+              {Object.entries(series.socialLinksJson as Record<string, unknown>).map(([key, value]) => {
+                if (typeof value !== "string" || !/^https:\/\//i.test(value)) return null;
+                const label = SERIES_SOCIAL_LINK_LABELS[key as keyof typeof SERIES_SOCIAL_LINK_LABELS];
+                if (!label) return null;
+                return <a key={key} href={value} target="_blank" rel="noopener noreferrer" style={{ border: "1px solid rgba(255,255,255,.35)", borderRadius: 999, color: "white", fontSize: 12, padding: "7px 11px", textDecoration: "none" }}>{label}</a>;
+              })}
+            </nav>
+          ) : null}
         </div>
       </div>
 
@@ -170,45 +181,24 @@ export default async function ExperienceDetailPage({ params }: Props) {
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
                 {c.sessionsHeading}
               </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {sessions.map((s: any) => (
-                  <div key={s.id} className="experience-session" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px" }}>
-                    <div className="experience-session-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: "#1a1614", marginBottom: 4 }}>
-                          {getSessionTitle(s.title ?? c.sessionLabel, safeLocale)}
-                        </div>
-                        <div style={{ fontSize: 13, color: "#6b7280" }}>{fmtDate(s.startsAt)} · {fmtTime(s.startsAt)} – {fmtTime(s.endsAt)}</div>
-                      </div>
-                      <div className="experience-session-availability" style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-                        <div style={{ fontSize: 12, color: "#9ca3af" }}>{s.capacity - s.soldCount} {c.left}</div>
-                        <span className={`badge ${s.status === "SOLD_OUT" ? "badge-error" : s.status === "CANCELLED" ? "badge-neutral" : "badge-success"}`}>
-                          {s.status === "SOLD_OUT" ? c.sessionStatusSoldOut
-                            : s.status === "CANCELLED" ? c.sessionStatusCancelled
-                            : s.status === "COMPLETED" ? c.sessionStatusCompleted
-                            : c.sessionStatusScheduled}
-                        </span>
-                      </div>
-                    </div>
-                    {s.status === "SCHEDULED" && (
-                      <AddToCalendar
-                        sessionId={s.id}
-                        title={s.title ?? series.title}
-                        startsAt={s.startsAt}
-                        endsAt={s.endsAt}
-                        location={locationStr}
-                        description={series.description ?? ""}
-                        labels={{
-                          addToCalendar: c.addToCalendar,
-                          google: c.calGoogleCalendar,
-                          apple: c.calAppleIcal,
-                          outlook: c.calOutlook,
-                          yahoo: c.calYahoo,
-                        }}
-                      />
-                    )}
-                  </div>
-                ))}
+              <div id="sessions">
+              <ExperienceSessionsView
+                sessions={sessions}
+                ticketTypes={ticketTypes}
+                seriesTitle={title}
+                seriesDescription={description ?? ""}
+                seriesImage={series.heroImageUrl}
+                checkoutHrefBase={localePath(safeLocale, `/checkout/${slug}`)}
+                venue={locationStr}
+                locale={safeLocale}
+                labels={{
+                  left: c.left, addToCalendar: c.addToCalendar, calGoogleCalendar: c.calGoogleCalendar,
+                  calAppleIcal: c.calAppleIcal, calOutlook: c.calOutlook, calYahoo: c.calYahoo,
+                  selectTickets: c.selectTickets, sessionView: "Session display options", listView: "List", calendarView: "Calendar",
+                  from: "From",
+                  previousMonth: "Previous month", nextMonth: "Next month", events: "events", chooseDate: "Choose a date with an event to see its details.", noSessions: c.noSessions ?? "No upcoming sessions.",
+                }}
+              />
               </div>
             </section>
           )}
@@ -315,7 +305,10 @@ export default async function ExperienceDetailPage({ params }: Props) {
                   <div key={t.id} className="experience-ticket-type" style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{getTicketTypeName(t.name, safeLocale)}</div>
-                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{fmt(t.priceCents)}</div>
+                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{sessions.some((eventSession: any) => eventSession.ticketPrices?.some((price: any) => price.ticketTypeId === t.id && price.priceCents !== t.priceCents)) ? `${c.from ?? "From"} ` : ""}{fmt(sessions.reduce((lowest: number, eventSession: any) => {
+                        const override = eventSession.ticketPrices?.find((price: { ticketTypeId: string; priceCents: number }) => price.ticketTypeId === t.id)?.priceCents;
+                        return Math.min(lowest, override ?? t.priceCents);
+                      }, t.priceCents))}</div>
                     </div>
                     {t.description && <div style={{ fontSize: 12, color: "#9ca3af" }}>{t.description}</div>}
                     {t.requiresMembership && <div style={{ fontSize: 11, color: "#c41e3a", fontWeight: 600, marginTop: 4 }}>
@@ -329,7 +322,11 @@ export default async function ExperienceDetailPage({ params }: Props) {
               </div>
             )}
             <div>
-              <Link href={localePath(safeLocale, `/checkout/${slug}`)} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+              {sessions.length > 0 ? (
+                <Link href="#sessions" className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+              ) : (
+                <span className="btn btn-ghost" aria-disabled="true" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.noSessions ?? "No upcoming sessions"}</span>
+              )}
               <p style={{ fontSize: 12, color: "#6b7280", textAlign: "center", marginTop: 8 }}>Continue as a guest. We’ll email your booking confirmation after payment.</p>
             </div>
           </div>

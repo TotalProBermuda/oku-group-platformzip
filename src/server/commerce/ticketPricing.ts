@@ -13,11 +13,13 @@ type PriceableTicket = {
 /** One authoritative ticket-price calculation shared by quote and intent. */
 export function calculateTicketUnitPrice(input: {
   ticket: PriceableTicket;
+  sessionPriceCents?: number | null;
   membershipDiscountBps?: number | null;
   applyMembershipDiscount?: boolean;
 }): number {
   const { ticket } = input;
-  let unitPrice = ticket.priceCents;
+  const sessionPrice = input.sessionPriceCents;
+  let unitPrice = Number.isInteger(sessionPrice) && sessionPrice! >= 0 ? sessionPrice! : ticket.priceCents;
   const remaining = Math.max(0, (ticket.typeCapacity ?? 9999) - ticket.soldCount);
   const remainingPct = remaining / (ticket.typeCapacity ?? 1);
 
