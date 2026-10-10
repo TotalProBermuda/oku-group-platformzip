@@ -1,10 +1,16 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import MediaUpload from "@/components/ui/MediaUpload";
+import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 
 type SessionRow = {
   id: string;
   title?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  flyerImageUrl?: string | null;
+  ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
   startsAt: string;
   endsAt: string;
   capacity: number;
@@ -14,6 +20,10 @@ type SessionRow = {
 
 type FormState = {
   title: string;
+  subtitle: string;
+  description: string;
+  flyerImageUrl: string;
+  ticketPrices: Record<string, string>;
   startsAt: string;
   endsAt: string;
   capacity: string;
@@ -23,8 +33,7 @@ type FormState = {
 };
 
 function localInput(date: Date) {
-  const timezoneOffset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+  return panamaDateTimeLocalInput(date);
 }
 
 function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
@@ -36,6 +45,10 @@ function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
 
   return {
     title: "",
+    subtitle: "",
+    description: "",
+    flyerImageUrl: "",
+    ticketPrices: {},
     startsAt: localInput(start),
     endsAt: localInput(end),
     capacity: String(Math.max(1, defaultCapacity || 1)),
@@ -75,19 +88,27 @@ export default function EventScheduleManager({
   defaultCapacity,
   hasOperationalVenue,
   hasPhysicalSpace,
+  ticketTypes = [],
   onCreated,
+  canManageSessionContent = false,
 }: {
   seriesId: string;
   sessions: SessionRow[];
   defaultCapacity: number;
   hasOperationalVenue: boolean;
   hasPhysicalSpace: boolean;
+  ticketTypes?: Array<{ id: string; name: string; priceCents: number }>;
   onCreated: () => Promise<void> | void;
+  canManageSessionContent?: boolean;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(() => initialForm(defaultCapacity, hasPhysicalSpace));
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "" });
+  const [editTicketPrices, setEditTicketPrices] = useState<Record<string, string>>({});
+  const [savingContent, setSavingContent] = useState(false);
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()),
@@ -120,8 +141,12 @@ export default function EventScheduleManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: form.title.trim() || undefined,
-          startsAt: new Date(form.startsAt).toISOString(),
-          endsAt: new Date(form.endsAt).toISOString(),
+          subtitle: form.subtitle.trim() || undefined,
+          description: form.description.trim() || undefined,
+          flyerImageUrl: form.flyerImageUrl || undefined,
+          ticketPrices: Object.entries(form.ticketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })),
+          startsAt: panamaDateTimeLocalIso(form.startsAt),
+          endsAt: panamaDateTimeLocalIso(form.endsAt),
           capacity: form.capacity,
           occupancyScope: form.occupancyScope,
           setupMinutes: form.setupMinutes,
@@ -177,6 +202,10 @@ export default function EventScheduleManager({
               <input value={form.title} maxLength={160} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} style={inputStyle} />
             </label>
             <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
+              Theme / subtitle (optional)
+              <input value={form.subtitle} maxLength={240} onChange={(e) => setForm((current) => ({ ...current, subtitle: e.target.value }))} style={inputStyle} />
+            </label>
+            <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
               Capacity
               <input required type="number" min="1" max="100000" value={form.capacity} onChange={(e) => setForm((current) => ({ ...current, capacity: e.target.value }))} style={inputStyle} />
             </label>
@@ -209,6 +238,20 @@ export default function EventScheduleManager({
               </>
             ) : null}
           </div>
+          <label style={{ color: "#534942", display: "block", fontSize: 12, fontWeight: 700, marginTop: 14, textTransform: "uppercase" }}>
+            Session description (optional)
+            <textarea rows={3} maxLength={5000} value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} />
+          </label>
+          <MediaUpload value={form.flyerImageUrl} onChange={(url) => setForm((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image (optional)" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
+          {canManageSessionContent && ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
+            <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
+            <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave a price blank to inherit the series ticket price. Existing paid orders keep their recorded prices.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+              {ticketTypes.map((ticket) => <label key={ticket.id} style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>{ticket.name} · base ${(ticket.priceCents / 100).toFixed(2)}
+                <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="Use series price" value={form.ticketPrices[ticket.id] ?? ""} onChange={(event) => setForm((current) => ({ ...current, ticketPrices: { ...current.ticketPrices, [ticket.id]: event.target.value } }))} style={inputStyle} />
+              </label>)}
+            </div>
+          </div> : null}
           <p style={{ color: "#7c7168", fontSize: 12, lineHeight: 1.5, margin: "14px 0 0" }}>
             Dining coverage creates a linked draft block. Existing reservations are flagged for review and are never cancelled automatically.
           </p>
@@ -225,29 +268,70 @@ export default function EventScheduleManager({
         {sortedSessions.length === 0 ? (
           <p style={{ color: "#8a817a", fontSize: 14, margin: 0 }}>No event sessions yet.</p>
         ) : sortedSessions.map((session) => (
-          <div key={session.id} style={{ alignItems: "center", background: "#fff", border: "1px solid #e5e0d8", borderRadius: 10, display: "flex", gap: 14, justifyContent: "space-between", padding: 14, flexWrap: "wrap" }}>
-            <div>
-              <strong style={{ color: "#1a1614", display: "block", fontSize: 14 }}>{session.title || "Event session"}</strong>
-              <span style={{ color: "#6b7280", fontSize: 13 }}>
-                {new Date(session.startsAt).toLocaleString()} – {new Date(session.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
+          <div key={session.id} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 10, padding: 14 }}>
+            <div style={{ alignItems: "center", display: "flex", gap: 14, justifyContent: "space-between", flexWrap: "wrap" }}>
+              <div style={{ minWidth: 0 }}>
+                <strong style={{ color: "#1a1614", display: "block", fontSize: 14 }}>{session.title || "Event session"}</strong>
+                {session.subtitle && <span style={{ color: "#7c7168", display: "block", fontSize: 13 }}>{session.subtitle}</span>}
+                <span style={{ color: "#6b7280", fontSize: 13 }}>
+                  {new Date(session.startsAt).toLocaleString(undefined, { timeZone: PANAMA_TIME_ZONE })} – {new Date(session.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: PANAMA_TIME_ZONE })} (Panama)
+                </span>
+                {session.flyerImageUrl && <img src={session.flyerImageUrl} alt={`${session.title || "Session"} flyer`} style={{ display: "block", borderRadius: 8, marginTop: 10, maxHeight: 120, maxWidth: "100%", objectFit: "cover" }} />}
+              </div>
+              <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right" }}>
+                <strong style={{ color: "#374151" }}>{session.status}</strong><br />Capacity {session.capacity}
+                <label style={{ display: "block", paddingTop: 12 }}>
+                  <input type="checkbox" checked={!!session.allowLateSales} onChange={async event => {
+                    try {
+                      const response = await fetch(`/api/v1/admin/sessions/${session.id}`, {
+                        method: "PATCH", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ allowLateSales: event.target.checked }),
+                      });
+                      if (!response.ok) throw new Error("Unable to change late sales. Superadmin access is required.");
+                      await onCreated();
+                      setNotice("Sales cutoff updated.");
+                    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to update cutoff"); }
+                  }} /> Allow sales after start, until event ends
+                </label>
+                {canManageSessionContent && <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => {
+                  setNotice("");
+                  setEditingSessionId(editingSessionId === session.id ? null : session.id);
+                  setEditContent({ title: session.title ?? "", subtitle: session.subtitle ?? "", description: session.description ?? "", flyerImageUrl: session.flyerImageUrl ?? "" });
+                  setEditTicketPrices(Object.fromEntries((session.ticketPrices ?? []).map((price) => [price.ticketTypeId, (price.priceCents / 100).toFixed(2)])));
+                }}>{editingSessionId === session.id ? "Close content editor" : "Edit session content"}</button>}
+              </div>
             </div>
-            <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right" }}>
-              <strong style={{ color: "#374151" }}>{session.status}</strong><br />Capacity {session.capacity}
-              <label style={{ display: "block", paddingTop: 12 }}>
-                <input type="checkbox" checked={!!session.allowLateSales} onChange={async event => {
-                  try {
-                    const response = await fetch(`/api/v1/admin/sessions/${session.id}`, {
-                      method: "PATCH", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ allowLateSales: event.target.checked }),
-                    });
-                    if (!response.ok) throw new Error("Unable to change late sales. Superadmin access is required.");
-                    await onCreated();
-                    setNotice("Sales cutoff updated.");
-                  } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to update cutoff"); }
-                }} /> Allow sales after start, until event ends
-              </label>
-            </div>
+            {editingSessionId === session.id && canManageSessionContent && (
+              <div style={{ borderTop: "1px solid #eee7df", marginTop: 14, paddingTop: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
+                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>Session title<input maxLength={160} value={editContent.title} onChange={(e) => setEditContent((current) => ({ ...current, title: e.target.value }))} style={inputStyle} /></label>
+                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>Theme / subtitle<input maxLength={240} value={editContent.subtitle} onChange={(e) => setEditContent((current) => ({ ...current, subtitle: e.target.value }))} style={inputStyle} /></label>
+                </div>
+                <label style={{ color: "#534942", display: "block", fontSize: 12, fontWeight: 700, marginTop: 12, textTransform: "uppercase" }}>Session description<textarea rows={3} maxLength={5000} value={editContent.description} onChange={(e) => setEditContent((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} /></label>
+                <MediaUpload value={editContent.flyerImageUrl} onChange={(url) => setEditContent((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
+                {ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
+                  <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
+                  <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave blank to inherit the series price. Paid orders are not repriced.</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                    {ticketTypes.map((ticket) => <label key={ticket.id} style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>{ticket.name} · base ${(ticket.priceCents / 100).toFixed(2)}
+                      <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="Use series price" value={editTicketPrices[ticket.id] ?? ""} onChange={(event) => setEditTicketPrices((current) => ({ ...current, [ticket.id]: event.target.value }))} style={inputStyle} />
+                    </label>)}
+                  </div>
+                </div> : null}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                  <button type="button" className="btn btn-primary" disabled={savingContent} onClick={async () => {
+                    setSavingContent(true); setNotice("");
+                    try {
+                      const response = await fetch(`/api/v1/admin/sessions/${session.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: editContent.title, subtitle: editContent.subtitle, description: editContent.description, flyerImageUrl: editContent.flyerImageUrl, ticketPrices: Object.entries(editTicketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })) }) });
+                      const payload = await response.json().catch(() => null);
+                      if (!response.ok) throw new Error(payload?.error ?? "Unable to save session content.");
+                      setEditingSessionId(null); setNotice("Session content saved."); await onCreated();
+                    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to save session content."); }
+                    finally { setSavingContent(false); }
+                  }}>{savingContent ? "Saving…" : "Save session content"}</button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { BILLING_COUNTRIES } from "@/lib/billingCountries";
 import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
 import { createCheckoutContinuation, isConfirmedCheckout, isVerificationReturn } from "@/lib/checkoutContinuation";
+import { PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
@@ -111,7 +112,10 @@ export default function CheckoutPage() {
       .then((d) => {
         const s = d.series?.[0];
         setSeries(s);
-        if (s?.sessions?.[0]) setSession(s.sessions[0].id);
+        const requestedSessionId = new URLSearchParams(window.location.search).get("sessionId");
+        const requestedSession = s?.sessions?.find((candidate: any) => candidate.id === requestedSessionId);
+        if (requestedSession) setSession(requestedSession.id);
+        else if (s?.sessions?.[0]) setSession(s.sessions[0].id);
       })
       .finally(() => setLoading(false));
   }, [slug]);
@@ -388,6 +392,8 @@ export default function CheckoutPage() {
   );
 
   const sessions    = series.sessions    ?? [];
+  const activeSession = sessions.find((event: any) => event.id === selectedSession);
+  const ticketPriceForSession = (ticket: any) => activeSession?.ticketPrices?.find((price: any) => price.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents;
   const ticketTypes = series.ticketTypes ?? [];
   const addons      = series.addons      ?? [];
 
@@ -396,6 +402,7 @@ export default function CheckoutPage() {
       <div style={{ background: "#fafaf9", borderBottom: "1px solid #e5e0d8", padding: "32px 0" }}>
         <div className="page-container">
           <Link href={`/experiences/${slug}`} style={{ fontSize: 13, color: "#9ca3af", textDecoration: "none" }}>← Back to {series.title}</Link>
+          {activeSession && <p style={{ color: "#6b7280", fontSize: 14, margin: "10px 0 0" }}>{activeSession.title || series.title}{activeSession.subtitle ? ` · ${activeSession.subtitle}` : ""} · {new Date(activeSession.startsAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: PANAMA_TIME_ZONE })} (Panama)</p>}
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 400, color: "#1a1614", margin: "12px 0 0", letterSpacing: "-0.02em" }}>
             {quote ? "Review & Pay" : "Select Tickets"}
           </h1>
@@ -436,7 +443,7 @@ export default function CheckoutPage() {
                         <div>
                           <div style={{ fontWeight: 600, color: "#1a1614" }}>{t.name}</div>
                           {t.description && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{t.description}</div>}
-                          <div style={{ fontSize: 14, color: "#c41e3a", fontWeight: 700, marginTop: 4 }}>${(t.priceCents / 100).toFixed(0)}</div>
+                          <div style={{ fontSize: 14, color: "#c41e3a", fontWeight: 700, marginTop: 4 }}>${(ticketPriceForSession(t) / 100).toFixed(2)}</div>
                           {t.requiresMembership && <div style={{ fontSize: 11, color: "#c41e3a", fontWeight: 600 }}>Members only</div>}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -486,7 +493,7 @@ export default function CheckoutPage() {
                 {ticketTypes.filter((t: any) => (quantities[t.id] ?? 0) > 0).map((t: any) => (
                   <div key={t.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 10 }}>
                     <span>{t.name} × {quantities[t.id]}</span>
-                    <span>${((t.priceCents * quantities[t.id]) / 100).toFixed(2)}</span>
+                    <span>${((ticketPriceForSession(t) * quantities[t.id]) / 100).toFixed(2)}</span>
                   </div>
                 ))}
                 {addons.filter((a: any) => (addonQty[a.id] ?? 0) > 0).map((a: any) => (
@@ -499,7 +506,7 @@ export default function CheckoutPage() {
                   <span>Estimated Total</span>
                   <span>${Object.entries(quantities).reduce((sum, [id, qty]) => {
                     const t = ticketTypes.find((tt: any) => tt.id === id);
-                    return sum + (t ? t.priceCents * qty : 0);
+                    return sum + (t ? ticketPriceForSession(t) * qty : 0);
                   }, Object.entries(addonQty).reduce((sum, [id, qty]) => {
                     const a = addons.find((aa: any) => aa.id === id);
                     return sum + (a ? a.priceCents * qty : 0);

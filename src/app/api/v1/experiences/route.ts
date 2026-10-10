@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       sessions: {
         where: { status: "SCHEDULED", OR: [{ startsAt: { gt: now } }, { allowLateSales: true }], endsAt: { gt: now } },
         orderBy: { startsAt: "asc" },
+        include: { ticketPrices: { select: { ticketTypeId: true, priceCents: true } } },
         ...(slug ? {} : { take: 3 }),
       },
       experienceInfluencer: {
