@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { randomUUID } from "node:crypto";
 
 type SeriesWithRelations = Prisma.SeriesGetPayload<{
   include: {
     ticketTypes: { include: { pricingRules: true }; orderBy: { displayOrder: "asc" } };
-    sessions: { orderBy: { startsAt: "asc" } };
+    sessions: { orderBy: { startsAt: "asc" }; include: { ticketPrices: true } };
   };
 }>;
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id },
     include: {
       ticketTypes: { include: { pricingRules: true }, orderBy: { displayOrder: "asc" } },
-      sessions: { orderBy: { startsAt: "asc" } },
+      sessions: { orderBy: { startsAt: "asc" }, include: { ticketPrices: true } },
     },
   });
 
@@ -66,6 +67,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     attempt++;
     slug = `${original.slug}-copy-${attempt}`;
   }
+
+  // Give copied ticket products stable new IDs so session-specific price
+  // overrides can be remapped without ever pointing at the original series.
+  const copiedTicketTypeIds = new Map(original.ticketTypes.map((ticket) => [ticket.id, randomUUID()]));
 
   const newSeries = await prisma.series.create({
     data: {
@@ -100,6 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       newsletterCaptureEnabled: original.newsletterCaptureEnabled,
       isFeatured: false,
       communityUrl: original.communityUrl,
+      socialLinksJson: original.socialLinksJson ?? Prisma.JsonNull,
       seoTitle: original.seoTitle,
       seoDescription: original.seoDescription,
       status: "DRAFT",
@@ -110,6 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       isFounderOnly: original.isFounderOnly,
       ticketTypes: {
         create: original.ticketTypes.map((tt) => ({
+          id: copiedTicketTypeIds.get(tt.id)!,
           name: tt.name,
           description: tt.description,
           tierCode: tt.tierCode,
@@ -130,8 +137,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             ? {
                 create: tt.pricingRules.map((pr) => ({
                   ruleType: pr.ruleType,
-                  conditionJson: pr.conditionJson,
-                  actionJson: pr.actionJson,
+                  conditionJson: pr.conditionJson === null ? Prisma.JsonNull : pr.conditionJson as Prisma.InputJsonValue,
+                  actionJson: pr.actionJson === null ? Prisma.JsonNull : pr.actionJson as Prisma.InputJsonValue,
                   priority: pr.priority,
                   isActive: pr.isActive,
                 })),
@@ -142,6 +149,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       sessions: {
         create: original.sessions.map((s) => ({
           title: s.title,
+          subtitle: s.subtitle,
+          description: s.description,
+          flyerImageUrl: s.flyerImageUrl,
           startsAt: shiftDate(s.startsAt, anchorOriginal, anchorNew),
           endsAt: shiftDate(s.endsAt, anchorOriginal, anchorNew),
           capacity: s.capacity,
@@ -151,6 +161,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           inheritsSeriesSponsors: s.inheritsSeriesSponsors,
           giftBagEnabled: s.giftBagEnabled,
           streetsideEnabled: s.streetsideEnabled,
+          ticketPrices: s.ticketPrices.length ? {
+            create: s.ticketPrices.flatMap((price) => {
+              const ticketTypeId = copiedTicketTypeIds.get(price.ticketTypeId);
+              return ticketTypeId ? [{ ticketTypeId, priceCents: price.priceCents }] : [];
+            }),
+          } : undefined,
         })),
       },
     },

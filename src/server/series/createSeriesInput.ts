@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { seriesSocialLinksSchema } from "@/lib/socialLinks";
 
 const blankToUndefined = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? undefined : value;
@@ -50,6 +51,7 @@ export const createSeriesInputSchema = z.object({
       .optional(),
   ),
   communityUrl: z.preprocess(blankToUndefined, z.string().url("Enter a valid community URL.").optional()),
+  socialLinksJson: seriesSocialLinksSchema.optional(),
 }).superRefine((value, ctx) => {
   if (value.hostType === "INFLUENCER" && !value.influencerId) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["influencerId"], message: "Select an influencer host." });

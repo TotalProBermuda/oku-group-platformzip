@@ -77,6 +77,7 @@ export async function POST(req: Request) {
     const unitPrice = ticket
       ? calculateTicketUnitPrice({
           ticket,
+          sessionPriceCents: catalog.session.ticketPrices.find((price) => price.ticketTypeId === ticket.id)?.priceCents,
           membershipDiscountBps,
           applyMembershipDiscount: catalog.session.series.membershipRuleMode === "MEMBERS_DISCOUNT",
         })
@@ -194,6 +195,7 @@ export async function POST(req: Request) {
       const unitPriceCents = tt
         ? calculateTicketUnitPrice({
             ticket: tt,
+            sessionPriceCents: catalog.session.ticketPrices.find((price) => price.ticketTypeId === tt.id)?.priceCents,
             membershipDiscountBps,
             applyMembershipDiscount: catalog.session.series.membershipRuleMode === "MEMBERS_DISCOUNT",
           })

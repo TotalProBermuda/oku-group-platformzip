@@ -1234,6 +1234,8 @@ model Series {
   // Media
   heroImageUrl String?
   galleryJson  Json?
+  // Optional network links for this programme (website, social profiles, etc.).
+  socialLinksJson Json?
 
   // Capacity
   capacityTotal    Int @default(0)
@@ -1337,6 +1339,9 @@ model Session {
   id                     String        @id @default(cuid())
   seriesId               String
   title                  String?
+  subtitle               String?
+  description            String?
+  flyerImageUrl          String?
   startsAt               DateTime
   endsAt                 DateTime
   capacity               Int
@@ -1352,6 +1357,7 @@ model Session {
 
   series             Series                     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   tickets            Ticket[]
+  ticketPrices        SessionTicketPrice[]
   Order              Order[]
   checkins           ExperienceCheckin[]
   attendanceEvents   AttendanceEvent[]
@@ -1399,6 +1405,24 @@ model TicketType {
   pricingRules        TicketPricingRule[]
   tickets             Ticket[]
   intendedInvitations EventInvitation[]   @relation("InvitationIntendedTicketType")
+  sessionPrices       SessionTicketPrice[]
+}
+
+// Optional per-session price override for a shared series ticket product.
+// A missing row means the ticket's series-level price is inherited.
+model SessionTicketPrice {
+  id           String   @id @default(cuid())
+  sessionId    String
+  ticketTypeId String
+  priceCents   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  session    Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, ticketTypeId])
+  @@index([ticketTypeId])
 }
 
 model TicketPricingRule {

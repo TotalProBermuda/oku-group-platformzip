@@ -26,7 +26,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: dbMock.prisma }));
 
 import { POST } from "@/app/api/v1/admin/series/[id]/sessions/route";
 
-const validBody = { title: "Terrace dinner", startsAt: "2026-09-01T18:00:00.000Z", endsAt: "2026-09-01T21:00:00.000Z", capacity: 40 };
+const validBody = { title: "Terrace dinner", subtitle: "Provence tasting", description: "A seasonal wine evening.", flyerImageUrl: "https://cdn.example.com/provence.png", startsAt: "2026-09-01T18:00:00.000Z", endsAt: "2026-09-01T21:00:00.000Z", capacity: 40 };
 const request = (body: unknown) => new Request("http://localhost/api/v1/admin/series/series-1/sessions", {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
@@ -35,7 +35,7 @@ const context = () => ({ params: Promise.resolve({ id: "series-1" }) });
 beforeEach(() => {
   vi.clearAllMocks();
   sessionMock.requireSession.mockResolvedValue({ userId: "fb-director-1", roles: ["FB_DIRECTOR"] });
-  dbMock.prisma.series.findUnique.mockResolvedValue({ id: "series-1", venueId: "venue-1", spaceId: "space-1", status: "DRAFT" });
+  dbMock.prisma.series.findUnique.mockResolvedValue({ id: "series-1", venueId: "venue-1", spaceId: "space-1", status: "DRAFT", ticketTypes: [{ id: "ticket-1" }] });
   dbMock.tx.session.create.mockResolvedValue({ id: "event-1", seriesId: "series-1", ...validBody });
   dbMock.tx.auditLog.create.mockResolvedValue({ id: "audit-1" });
   dbMock.tx.eventSpaceOccupancy.create.mockResolvedValue({ id: "occupancy-1", venueId: "venue-1", scope: "SPACE", spaceId: "space-1" });
@@ -48,7 +48,7 @@ describe("POST /api/v1/admin/series/[id]/sessions", () => {
   it("creates an event and records the action", async () => {
     const response = await POST(request(validBody), context());
     expect(response.status).toBe(201);
-    expect(dbMock.tx.session.create).toHaveBeenCalledWith({ data: expect.objectContaining({ seriesId: "series-1", capacity: 40, status: "SCHEDULED" }) });
+    expect(dbMock.tx.session.create).toHaveBeenCalledWith({ data: expect.objectContaining({ seriesId: "series-1", capacity: 40, status: "SCHEDULED", subtitle: "Provence tasting", description: "A seasonal wine evening.", flyerImageUrl: "https://cdn.example.com/provence.png" }) });
     expect(dbMock.tx.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "EXPERIENCE_SESSION_CREATED" }) });
   });
 
@@ -56,6 +56,17 @@ describe("POST /api/v1/admin/series/[id]/sessions", () => {
     const response = await POST(request({ ...validBody, endsAt: "2026-09-01T17:00:00.000Z" }), context());
     expect(response.status).toBe(400);
     expect(dbMock.tx.session.create).not.toHaveBeenCalled();
+  });
+
+  it("allows only superadmins to set session-specific prices", async () => {
+    const response = await POST(request({ ...validBody, ticketPrices: [{ ticketTypeId: "ticket-1", priceCents: 4500 }] }), context());
+    expect(response.status).toBe(403);
+    expect(dbMock.tx.session.create).not.toHaveBeenCalled();
+
+    sessionMock.requireSession.mockResolvedValue({ userId: "superadmin-1", roles: ["SUPERADMIN"] });
+    const approved = await POST(request({ ...validBody, ticketPrices: [{ ticketTypeId: "ticket-1", priceCents: 4500 }] }), context());
+    expect(approved.status).toBe(201);
+    expect(dbMock.tx.session.create).toHaveBeenCalledWith({ data: expect.objectContaining({ ticketPrices: { create: [{ ticketTypeId: "ticket-1", priceCents: 4500 }] } }) });
   });
 
   it("returns 404 when the series does not exist", async () => {

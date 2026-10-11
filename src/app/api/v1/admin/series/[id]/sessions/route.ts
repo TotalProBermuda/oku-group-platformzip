@@ -33,9 +33,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const parent = await prisma.series.findUnique({
       where: { id: seriesId },
-      select: { id: true, venueId: true, spaceId: true, status: true },
+      select: { id: true, venueId: true, spaceId: true, status: true, ticketTypes: { select: { id: true } } },
     });
     if (!parent) return NextResponse.json({ ok: false, error: "Series not found." }, { status: 404 });
+    if (body.data.ticketPrices?.length && !roles.includes("SUPERADMIN")) {
+      return NextResponse.json({ ok: false, error: "Only a superadmin can set session-specific ticket prices." }, { status: 403 });
+    }
+    const ticketTypeIds = new Set(parent.ticketTypes.map((ticket) => ticket.id));
+    if (body.data.ticketPrices?.some((price) => !ticketTypeIds.has(price.ticketTypeId))) {
+      return NextResponse.json({ ok: false, error: "Session prices must reference ticket types in this series." }, { status: 400 });
+    }
     if (body.data.occupancyScope !== "NONE" && !parent.venueId) {
       return NextResponse.json({ ok: false, error: "Select an operational venue before creating a dining block." }, { status: 400 });
     }
@@ -48,6 +55,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           seriesId,
           title: body.data.title || null,
+          subtitle: body.data.subtitle || null,
+          description: body.data.description || null,
+          flyerImageUrl: body.data.flyerImageUrl || null,
+          ticketPrices: body.data.ticketPrices?.length ? { create: body.data.ticketPrices } : undefined,
           startsAt: body.data.startsAt,
           endsAt: body.data.endsAt,
           capacity: body.data.capacity,
@@ -99,7 +110,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorId: userId,
           action: "EXPERIENCE_SESSION_CREATED",
-          metadata: { seriesId, sessionId: created.id, occupancyId: occupancy?.id ?? null, conflicts: conflictCount },
+          metadata: { seriesId, sessionId: created.id, occupancyId: occupancy?.id ?? null, conflicts: conflictCount, sessionTicketPriceOverrides: body.data.ticketPrices?.length ?? 0 },
         },
       });
       return { event: created, occupancy, conflictCount };
