@@ -228,7 +228,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
                   <span style={{ alignItems: "center", background: isToday ? "#c41e3a" : "transparent", borderRadius: 99, display: "inline-flex", height: 26, justifyContent: "center", width: 26, fontSize: 13, fontWeight: isToday || selected ? 700 : 500 }}>{day}</span>
                   {active ? <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "#c41e3a" }} /> : <span aria-hidden="true" style={{ height: 6 }} />}
                 </button>
-                {preview.length > 0 ? <div role="tooltip" style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, boxShadow: "0 12px 32px rgba(26,22,20,.18)", left: index % 7 < 4 ? 0 : undefined, padding: 8, position: "absolute", right: index % 7 < 4 ? undefined : 0, top: 58, width: "min(300px, calc(100vw - 48px))", zIndex: 4 }}>
+                {preview.length > 0 ? <div role="group" aria-label={`Event previews for ${day}`} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, boxShadow: "0 12px 32px rgba(26,22,20,.18)", left: index % 7 < 4 ? 0 : undefined, padding: 8, position: "absolute", right: index % 7 < 4 ? undefined : 0, top: 58, width: "min(300px, calc(100vw - 48px))", zIndex: 4 }}>
                   {preview.map((session) => sessionCard(session, true))}
                   {daySessions.length > preview.length ? <p style={{ color: "#6b7280", fontSize: 12, margin: "8px 4px 2px" }}>+{daySessions.length - preview.length} more · select date to view all</p> : null}
                 </div> : null}
