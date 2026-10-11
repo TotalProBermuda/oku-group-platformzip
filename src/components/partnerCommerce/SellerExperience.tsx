@@ -1,6 +1,7 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
+import type { CSSProperties } from "react";
 import { ShareSurfacePanel } from "@/components/referral/ShareSurfacePanel";
 import { PureReferrerConsole } from "@/components/referral/console/PureReferrerConsole";
 import { resolveConsoleConfig } from "@/components/referral/console/roleConfig";
@@ -58,7 +59,7 @@ export function SellerExperience({ data, supportMode = false }: { data: SellerEx
       "--color-text": "#f3f4f6",
       "--color-text-muted": "#9ca3af",
       "--color-bg": "#050505",
-    } as React.CSSProperties}>
+    } as CSSProperties}>
       <PureReferrerConsole
         config={config}
         identity={identity}
