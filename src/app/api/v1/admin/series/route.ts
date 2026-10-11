@@ -33,6 +33,7 @@ export async function GET() {
         sessions: {
           include: {
             _count: { select: { tickets: true } },
+            ticketPrices: true,
             occupancies: { select: { id: true, scope: true, status: true, space: { select: { id: true, name: true } } } },
           },
           orderBy: { startsAt: "asc" },

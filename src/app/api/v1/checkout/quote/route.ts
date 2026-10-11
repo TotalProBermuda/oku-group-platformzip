@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     include: {
       ticketTypes: { include: { pricingRules: { where: { isActive: true }, orderBy: { priority: "asc" } } } },
       addons: { where: { isActive: true } },
-      sessions: { where: { id: sessionId } },
+      sessions: { where: { id: sessionId }, include: { ticketPrices: true } },
     },
   });
 
@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
       // Dynamic pricing
       const unitPrice = calculateTicketUnitPrice({
         ticket: tt,
+        sessionPriceCents: sess.ticketPrices.find((price) => price.ticketTypeId === tt.id)?.priceCents,
         membershipDiscountBps: userMembership?.benefitsJson?.discountBps,
         applyMembershipDiscount: series.membershipRuleMode === "MEMBERS_DISCOUNT",
       });

@@ -17,6 +17,11 @@ import EventOccupancyPanel from "@/components/admin/EventOccupancyPanel";
 import EventScheduleManager from "@/components/admin/EventScheduleManager";
 import MediaUpload from "@/components/ui/MediaUpload";
 
+const SERIES_SOCIAL_FIELDS = [
+  ["website", "Website"], ["instagram", "Instagram"], ["facebook", "Facebook"],
+  ["tiktok", "TikTok"], ["youtube", "YouTube"], ["x", "X"], ["whatsapp", "WhatsApp"],
+] as const;
+
 const SECTION_TABS = [
   { id: "basics",            label: "Basic Info" },
   { id: "dates",             label: "Dates & Capacity" },
@@ -325,6 +330,24 @@ export default function AdminExperienceEditPage() {
                 />
               </div>
               {field("communityUrl", t("admin", "community_url") ?? "Community/Discord URL")}
+              <div style={{ borderTop: "1px solid #e5e0d8", margin: "24px 0" }} />
+              <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 20, fontWeight: 400, color: "#1a1614", margin: "0 0 8px" }}>Series social links</h3>
+              <p style={{ color: "#6b7280", fontSize: 13, lineHeight: 1.5, margin: "0 0 16px" }}>These links belong to the shared series programme and appear on its public experience page.</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0 14px" }}>
+                {SERIES_SOCIAL_FIELDS.map(([key, label]) => (
+                  <label key={key} style={{ display: "block", marginBottom: 16, fontSize: 12, fontWeight: 600, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {label}
+                    <input
+                      type="url"
+                      inputMode="url"
+                      placeholder="https://"
+                      value={(form.socialLinksJson && typeof form.socialLinksJson === "object" ? form.socialLinksJson[key] : "") ?? ""}
+                      onChange={(event) => setForm((current: any) => ({ ...current, socialLinksJson: { ...(current.socialLinksJson ?? {}), [key]: event.target.value } }))}
+                      style={{ width: "100%", boxSizing: "border-box", marginTop: 6, padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14 }}
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
           )}
 
@@ -343,6 +366,8 @@ export default function AdminExperienceEditPage() {
                 defaultCapacity={Number(form.capacityTotal) || 1}
                 hasOperationalVenue={Boolean(series.venueId)}
                 hasPhysicalSpace={Boolean(series.spaceId)}
+                canManageSessionContent={userRoles.includes("SUPERADMIN")}
+                ticketTypes={series.ticketTypes ?? []}
                 onCreated={loadSeries}
               />
             </div>

@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
     select: {
       id: true,
       title: true,
+      subtitle: true,
+      flyerImageUrl: true,
       startsAt: true,
       endsAt: true,
       capacity: true,
