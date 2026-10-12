@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { seriesArtworkCandidates, type SeriesArtwork } from "@/lib/eventArtwork";
 
 interface InviteData {
   invitation: {
@@ -12,7 +14,7 @@ interface InviteData {
     status: string;
     recipientName: string | null;
   };
-  series: {
+  series: SeriesArtwork & {
     id: string;
     slug: string;
     title: string;
@@ -118,7 +120,10 @@ export function RsvpContent() {
   }
 
   const { series } = data;
-  const flyerUrl = series.inviteFlyerImageUrl ?? series.heroImageUrl;
+  const artwork = [...new Set([
+    ...seriesArtworkCandidates({ ...series, heroImageUrl: series.inviteFlyerImageUrl ?? series.heroImageUrl }, locale),
+    ...seriesArtworkCandidates(series, locale),
+  ])];
 
   return (
     <>
@@ -131,8 +136,8 @@ export function RsvpContent() {
 
         <div style={{ maxWidth: 560, margin: "0 auto", padding: "48px 24px" }}>
           <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden" }}>
-            {flyerUrl && (
-              <img src={flyerUrl} alt={series.title} style={{ width: "100%", display: "block", maxHeight: 280, objectFit: "cover" }} />
+            {artwork.length > 0 && (
+              <EventArtwork candidates={artwork} alt={series.title} style={{ width: "100%", display: "block", maxHeight: 280, objectFit: "cover" }} />
             )}
             <div style={{ padding: "36px 36px 40px" }}>
               <p style={{ margin: "0 0 8px", color: "#7c7168", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>{t("events", "youAreInvited")}</p>

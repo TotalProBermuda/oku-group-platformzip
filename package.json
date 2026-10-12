@@ -36,6 +36,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@google-cloud/storage": "^7.19.0",
     "@prisma/client": "^5.22.0",
+    "@types/react-dom": "^19.2.3",
     "@uppy/aws-s3": "^5.1.0",
     "@uppy/core": "^5.2.0",
     "@uppy/dashboard": "^5.1.1",

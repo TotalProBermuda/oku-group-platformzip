@@ -15,6 +15,7 @@ import ReservationBlocksPanel from "@/components/admin/ReservationBlocksPanel";
 import SeriesMenusPanel from "@/components/admin/SeriesMenusPanel";
 import EventOccupancyPanel from "@/components/admin/EventOccupancyPanel";
 import EventScheduleManager from "@/components/admin/EventScheduleManager";
+import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
 import MediaUpload from "@/components/ui/MediaUpload";
 
 const SERIES_SOCIAL_FIELDS = [
@@ -111,7 +112,7 @@ export default function AdminExperienceEditPage() {
     const res = await fetch(`/api/v1/admin/experiences/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(Object.fromEntries(Object.entries(form).filter(([key]) => userRoles.includes("SUPERADMIN") || !["heroImageUrlEn", "heroImageUrlEs", "heroImageUrlPt"].includes(key)))),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -329,6 +330,7 @@ export default function AdminExperienceEditPage() {
                   maxSizeMB={10}
                 />
               </div>
+              {userRoles.includes("SUPERADMIN") && <LocalizedArtworkEditor kind="series" value={form} onChange={(field, url) => setForm((current: any) => ({ ...current, [field]: url }))} />}
               {field("communityUrl", t("admin", "community_url") ?? "Community/Discord URL")}
               <div style={{ borderTop: "1px solid #e5e0d8", margin: "24px 0" }} />
               <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 20, fontWeight: 400, color: "#1a1614", margin: "0 0 8px" }}>Series social links</h3>

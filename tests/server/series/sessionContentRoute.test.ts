@@ -28,6 +28,22 @@ beforeEach(() => {
 });
 
 describe("PATCH /api/v1/admin/sessions/[id] session content", () => {
+  it("preserves edits to sessions whose legacy flyer came from the existing same-origin upload service", async () => {
+    const response = await PATCH(request({ title: "Existing session", flyerImageUrl: "/api/v1/media/bucket/public/uploads/legacy.png", flyerImageUrlEs: "/es.jpg" }), context());
+    expect(response.status).toBe(200);
+    expect(db.tx.session.update).toHaveBeenCalledWith(expect.objectContaining({ data: { title: "Existing session", flyerImageUrl: "/api/v1/media/bucket/public/uploads/legacy.png", flyerImageUrlEs: "/es.jpg" } }));
+  });
+  it("saves and removes locale artwork without touching legacy or unspecified locales", async () => {
+    const response = await PATCH(request({ flyerImageUrlEs: "/api/v1/media/bucket/public/uploads/es.png", flyerImageUrlPt: "" }), context());
+    expect(response.status).toBe(200);
+    expect(db.tx.session.update).toHaveBeenCalledWith(expect.objectContaining({ data: { flyerImageUrlEs: "/api/v1/media/bucket/public/uploads/es.png", flyerImageUrlPt: null }, select: expect.objectContaining({ flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true }) }));
+  });
+
+  it.each(["FB_DIRECTOR", "PARTNER_ADMIN", "INFLUENCER", "CUSTOMER"])("denies session artwork PATCH from %s", async role => {
+    auth.requireSession.mockResolvedValue({ userId: "other-1", roles: [role] });
+    expect((await PATCH(request({ flyerImageUrlEs: "/es.jpg" }), context())).status).toBe(403);
+    expect(db.tx.session.update).not.toHaveBeenCalled();
+  });
   it("saves optional session-specific content and audits changed fields", async () => {
     const response = await PATCH(request({ title: "Discover Bordeaux", subtitle: "W02", description: "A themed session.", flyerImageUrl: "https://cdn.example.com/w02.png" }), context());
     expect(response.status).toBe(200);

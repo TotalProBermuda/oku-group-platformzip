@@ -7,8 +7,10 @@ import { localePath } from "@/i18n/utils";
 import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { seriesArtworkCandidates, type SeriesArtwork } from "@/lib/eventArtwork";
 
-interface SeriesItem {
+interface SeriesItem extends SeriesArtwork {
   id: string; slug: string; title: string; description: string | null;
   venue: string | null; hostType: string;
   ticketTypes: { priceCents: number }[];
@@ -179,7 +181,8 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
             <div className="card-grid">
               {series.map((s) => (
                 <Link key={s.id} href={localePath(safeLocale, `/series/${s.slug}`)} className="series-card">
-                  <div className="series-card-image" style={{ background: venueGradients[s.venue || "OKU"] }}>
+                  <div className="series-card-image" style={{ background: venueGradients[s.venue || "OKU"], position: "relative" }}>
+                    <EventArtwork candidates={seriesArtworkCandidates(s, safeLocale)} alt={s.title} loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                     <span style={{ fontFamily: "var(--font-heading)", fontSize: 52, color: "rgba(255,255,255,0.07)", fontWeight: 400, letterSpacing: "-0.02em", userSelect: "none", position: "absolute" }}>
                       {s.venue === "CATCH" ? "CATCH" : s.venue === "TERRACE" ? "TERRACE" : "OKÜ"}
                     </span>

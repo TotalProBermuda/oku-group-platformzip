@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { assertSeriesReadyForPublication, SeriesPublicationError, syncSeriesOccupanciesForStatus } from "@/server/series/publicationLifecycle";
 import { seriesSocialLinksSchema } from "@/lib/socialLinks";
+import { parseArtworkEdit } from "@/server/series/artworkInput";
 
 function isAdmin(session: any) {
   return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r));
@@ -42,6 +43,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     "publicReleaseAt","earlyReleaseAt","newsletterCaptureEnabled","waitlistEnabled","membershipRuleMode",
     "isFeatured","seoTitle","seoDescription","status","startsAt","endsAt","communityUrl","socialLinksJson"];
   const data: any = {};
+  try {
+    Object.assign(data, parseArtworkEdit(body, session?.user?.roles ?? [], "series"));
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: (error as { status: number }).status });
+  }
   for (const k of allowed) if (k in body) data[k] = body[k];
   if ("socialLinksJson" in data) {
     const links = seriesSocialLinksSchema.safeParse(data.socialLinksJson ?? {});

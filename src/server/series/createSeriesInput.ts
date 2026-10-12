@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { seriesSocialLinksSchema } from "@/lib/socialLinks";
+import { seriesArtworkShape } from "@/server/series/artworkInput";
 
 const blankToUndefined = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? undefined : value;
@@ -11,6 +12,7 @@ const optionalText = (maxLength: number) =>
   z.preprocess(blankToUndefined, z.string().trim().max(maxLength).optional());
 
 export const createSeriesInputSchema = z.object({
+  ...seriesArtworkShape,
   slug: z
     .string()
     .trim()
