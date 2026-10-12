@@ -1,7 +1,10 @@
 "use client";
+import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
 
 import { FormEvent, useMemo, useState } from "react";
 import MediaUpload from "@/components/ui/MediaUpload";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { sessionArtworkCandidates } from "@/lib/eventArtwork";
 import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 
 type SessionRow = {
@@ -10,6 +13,9 @@ type SessionRow = {
   subtitle?: string | null;
   description?: string | null;
   flyerImageUrl?: string | null;
+  flyerImageUrlEn?: string | null;
+  flyerImageUrlEs?: string | null;
+  flyerImageUrlPt?: string | null;
   ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
   startsAt: string;
   endsAt: string;
@@ -23,6 +29,9 @@ type FormState = {
   subtitle: string;
   description: string;
   flyerImageUrl: string;
+  flyerImageUrlEn: string;
+  flyerImageUrlEs: string;
+  flyerImageUrlPt: string;
   ticketPrices: Record<string, string>;
   startsAt: string;
   endsAt: string;
@@ -48,6 +57,7 @@ function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
     subtitle: "",
     description: "",
     flyerImageUrl: "",
+    flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "",
     ticketPrices: {},
     startsAt: localInput(start),
     endsAt: localInput(end),
@@ -106,7 +116,7 @@ export default function EventScheduleManager({
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "" });
+  const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "", flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "" });
   const [editTicketPrices, setEditTicketPrices] = useState<Record<string, string>>({});
   const [savingContent, setSavingContent] = useState(false);
 
@@ -144,6 +154,7 @@ export default function EventScheduleManager({
           subtitle: form.subtitle.trim() || undefined,
           description: form.description.trim() || undefined,
           flyerImageUrl: form.flyerImageUrl || undefined,
+          ...(canManageSessionContent ? { flyerImageUrlEn: form.flyerImageUrlEn, flyerImageUrlEs: form.flyerImageUrlEs, flyerImageUrlPt: form.flyerImageUrlPt } : {}),
           ticketPrices: Object.entries(form.ticketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })),
           startsAt: panamaDateTimeLocalIso(form.startsAt),
           endsAt: panamaDateTimeLocalIso(form.endsAt),
@@ -243,6 +254,7 @@ export default function EventScheduleManager({
             <textarea rows={3} maxLength={5000} value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} />
           </label>
           <MediaUpload value={form.flyerImageUrl} onChange={(url) => setForm((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image (optional)" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
+          {canManageSessionContent && <LocalizedArtworkEditor kind="session" value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
           {canManageSessionContent && ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
             <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
             <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave a price blank to inherit the series ticket price. Existing paid orders keep their recorded prices.</p>
@@ -276,7 +288,7 @@ export default function EventScheduleManager({
                 <span style={{ color: "#6b7280", fontSize: 13 }}>
                   {new Date(session.startsAt).toLocaleString(undefined, { timeZone: PANAMA_TIME_ZONE })} – {new Date(session.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: PANAMA_TIME_ZONE })} (Panama)
                 </span>
-                {session.flyerImageUrl && <img src={session.flyerImageUrl} alt={`${session.title || "Session"} flyer`} style={{ display: "block", borderRadius: 8, marginTop: 10, maxHeight: 120, maxWidth: "100%", objectFit: "cover" }} />}
+                <EventArtwork candidates={sessionArtworkCandidates(session, "en")} alt={`${session.title || "Session"} flyer`} style={{ display: "block", borderRadius: 8, marginTop: 10, maxHeight: 120, maxWidth: "100%", objectFit: "cover" }} />
               </div>
               <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right" }}>
                 <strong style={{ color: "#374151" }}>{session.status}</strong><br />Capacity {session.capacity}
@@ -296,7 +308,7 @@ export default function EventScheduleManager({
                 {canManageSessionContent && <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => {
                   setNotice("");
                   setEditingSessionId(editingSessionId === session.id ? null : session.id);
-                  setEditContent({ title: session.title ?? "", subtitle: session.subtitle ?? "", description: session.description ?? "", flyerImageUrl: session.flyerImageUrl ?? "" });
+                  setEditContent({ title: session.title ?? "", subtitle: session.subtitle ?? "", description: session.description ?? "", flyerImageUrl: session.flyerImageUrl ?? "", flyerImageUrlEn: session.flyerImageUrlEn ?? "", flyerImageUrlEs: session.flyerImageUrlEs ?? "", flyerImageUrlPt: session.flyerImageUrlPt ?? "" });
                   setEditTicketPrices(Object.fromEntries((session.ticketPrices ?? []).map((price) => [price.ticketTypeId, (price.priceCents / 100).toFixed(2)])));
                 }}>{editingSessionId === session.id ? "Close content editor" : "Edit session content"}</button>}
               </div>
@@ -309,6 +321,7 @@ export default function EventScheduleManager({
                 </div>
                 <label style={{ color: "#534942", display: "block", fontSize: 12, fontWeight: 700, marginTop: 12, textTransform: "uppercase" }}>Session description<textarea rows={3} maxLength={5000} value={editContent.description} onChange={(e) => setEditContent((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} /></label>
                 <MediaUpload value={editContent.flyerImageUrl} onChange={(url) => setEditContent((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
+                <LocalizedArtworkEditor kind="session" value={editContent} onChange={(field, url) => setEditContent(current => ({ ...current, [field]: url }))} />
                 {ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
                   <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
                   <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave blank to inherit the series price. Paid orders are not repriced.</p>
@@ -322,7 +335,7 @@ export default function EventScheduleManager({
                   <button type="button" className="btn btn-primary" disabled={savingContent} onClick={async () => {
                     setSavingContent(true); setNotice("");
                     try {
-                      const response = await fetch(`/api/v1/admin/sessions/${session.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: editContent.title, subtitle: editContent.subtitle, description: editContent.description, flyerImageUrl: editContent.flyerImageUrl, ticketPrices: Object.entries(editTicketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })) }) });
+                      const response = await fetch(`/api/v1/admin/sessions/${session.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...editContent, ticketPrices: Object.entries(editTicketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })) }) });
                       const payload = await response.json().catch(() => null);
                       if (!response.ok) throw new Error(payload?.error ?? "Unable to save session content.");
                       setEditingSessionId(null); setNotice("Session content saved."); await onCreated();

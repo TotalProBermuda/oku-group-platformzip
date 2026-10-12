@@ -4,6 +4,8 @@ import { isValidLocale } from "@/i18n/config";
 import { localePath } from "@/i18n/utils";
 import { getSeriesContent } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
@@ -69,6 +71,7 @@ export default async function ExperiencesPage({ params }: Props) {
               return (
                 <Link key={s.id} href={localePath(safeLocale, `/experiences/${s.slug}`)} className="series-card" style={{ textDecoration: "none" }}>
                   <div className="series-card-image" style={{ background: venueGrad[s.venue] ?? venueGrad.OKU, position: "relative" }}>
+                    <EventArtwork candidates={seriesArtworkCandidates(s, safeLocale)} alt={title} loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                     <span style={{ fontFamily: "var(--font-heading)", fontSize: 52, color: "rgba(255,255,255,0.07)", fontWeight: 400, letterSpacing: "-0.02em", userSelect: "none" }}>
                       {s.venue === "CATCH" ? "CATCH" : "OKÜ"}
                     </span>

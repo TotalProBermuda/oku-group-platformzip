@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { createSeriesInputSchema } from "@/server/series/createSeriesInput";
+import { parseArtworkEdit } from "@/server/series/artworkInput";
 
 function failure(error: unknown) {
   const status = typeof (error as { status?: unknown })?.status === "number"
@@ -57,7 +58,9 @@ export async function POST(req: Request) {
     const { roles, userId } = await requireSession();
     requirePermission(roles, "admin:experiences:write");
 
-    const parsed = createSeriesInputSchema.safeParse(await req.json());
+    const input = await req.json();
+    parseArtworkEdit(input, roles, "series");
+    const parsed = createSeriesInputSchema.safeParse(input);
     if (!parsed.success) {
       return NextResponse.json(
         { ok: false, error: "Please correct the highlighted details.", fields: parsed.error.flatten().fieldErrors },

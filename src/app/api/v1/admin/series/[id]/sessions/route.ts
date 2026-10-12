@@ -5,6 +5,7 @@ import { requireSession } from "@/server/auth/session";
 import { createSessionInputSchema } from "@/server/series/createSessionInput";
 import { createReservationConflictRecords } from "@/server/events/eventOccupancyService";
 import { lockOccupancySpaces } from "@/server/series/publicationLifecycle";
+import { parseArtworkEdit } from "@/server/series/artworkInput";
 
 function failure(error: unknown) {
   const status = typeof (error as { status?: unknown })?.status === "number"
@@ -23,7 +24,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { roles, userId } = await requireSession();
     requirePermission(roles, "admin:experiences:write");
 
-    const body = createSessionInputSchema.safeParse(await req.json());
+    const input = await req.json();
+    const artwork = parseArtworkEdit(input, roles, "session");
+    const body = createSessionInputSchema.safeParse(input);
     if (!body.success) {
       return NextResponse.json(
         { ok: false, error: "Please correct the highlighted details.", fields: body.error.flatten().fieldErrors },
@@ -53,6 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const result = await prisma.$transaction(async (tx) => {
       const created = await tx.session.create({
         data: {
+          ...artwork,
           seriesId,
           title: body.data.title || null,
           subtitle: body.data.subtitle || null,
