@@ -30,7 +30,7 @@ test.describe("localized artwork guest rendering", () => {
       await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 800 });
       await stubImages(page);
       const session = row();
-      await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session, { ...session, id: "series-fallback", title: "Series fallback", flyerImageUrl: null, flyerImageUrlEn: null, flyerImageUrlEs: null, flyerImageUrlPt: null }] } }));
+      await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session, { ...session, id: "series-fallback", title: "Series fallback", flyerImageUrl: null, flyerImageUrlEn: null, flyerImageUrlEs: null, flyerImageUrlPt: null, flyerImageUrlMobileEn: null, flyerImageUrlMobileEs: null, flyerImageUrlMobilePt: null }] } }));
       await page.goto(`/${locale}/calendar`, { waitUntil: "domcontentloaded" });
       const mobilePrefix = testInfo.project.name === "mobile" ? "mobile-" : "";
       const sessionImage = artworkSessionCard(page).locator(`img[src="/__artwork/session-${mobilePrefix}${locale}.gif"]`);
