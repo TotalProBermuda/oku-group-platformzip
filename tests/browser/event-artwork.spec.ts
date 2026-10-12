@@ -22,7 +22,7 @@ async function stubImages(page: Page, failed: string[] = []) {
 test.describe("localized artwork guest rendering", () => {
   for (const locale of ["en", "es", "pt"]) {
     test(`calendar renders matching ${locale} session and series artwork`, async ({ page }, testInfo) => {
-      await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 375, height: 667 } : { width: 1280, height: 800 });
+      await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 800 });
       await stubImages(page);
       const session = row();
       await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session, { ...session, id: "series-fallback", title: "Series fallback", flyerImageUrl: null, flyerImageUrlEn: null, flyerImageUrlEs: null, flyerImageUrlPt: null }] } }));
@@ -47,7 +47,7 @@ test.describe("localized artwork guest rendering", () => {
   });
 
   test("failed Spanish image uses English, then legacy; all failures remove img", async ({ page }, testInfo) => {
-    await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 375, height: 667 } : { width: 1280, height: 800 });
+    await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 800 });
     const session = row();
     const mobilePrefix = testInfo.project.name === "mobile" ? "mobile-" : "";
     let failed = [`session-${mobilePrefix}es.gif`];
