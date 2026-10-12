@@ -26,7 +26,8 @@ test.describe("localized artwork guest rendering", () => {
       const session = row();
       await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session, { ...session, id: "series-fallback", title: "Series fallback", flyerImageUrl: null, flyerImageUrlEn: null, flyerImageUrlEs: null, flyerImageUrlPt: null }] } }));
       await page.goto(`/${locale}/calendar`, { waitUntil: "domcontentloaded" });
-      const sessionImage = page.locator(`article img[src="/__artwork/session-${locale}.gif"]`);
+      const mobilePrefix = (page.viewportSize()?.width ?? 1280) <= 640 ? "mobile-" : "";
+      const sessionImage = page.locator(`article img[src="/__artwork/session-${mobilePrefix}${locale}.gif"]`);
       const seriesImage = page.locator(`article img[src="/__artwork/series-${locale}.gif"]`);
       await expect(sessionImage).toHaveCount(1);
       await expect(seriesImage).toHaveCount(1);
@@ -46,18 +47,19 @@ test.describe("localized artwork guest rendering", () => {
 
   test("failed Spanish image uses English, then legacy; all failures remove img", async ({ page }) => {
     const session = row();
-    let failed = ["session-es.gif"];
+    const mobilePrefix = (page.viewportSize()?.width ?? 1280) <= 640 ? "mobile-" : "";
+    let failed = [`session-${mobilePrefix}es.gif`];
     await page.route("**/__artwork/**", route => {
       const path = new URL(route.request().url()).pathname;
       return failed.some(name => path.endsWith(name)) ? route.fulfill({ status: 404, body: "Missing" }) : route.fulfill({ contentType: "image/gif", body: pixel });
     });
     await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [{ ...session, series: { ...session.series, heroImageUrl: null, heroImageUrlEn: null, heroImageUrlEs: null, heroImageUrlPt: null } }] } }));
     await page.goto("/es/calendar", { waitUntil: "domcontentloaded" });
-    await expect(page.locator('article img[src="/__artwork/session-en.gif"]')).toHaveCount(1);
-    failed = ["session-es.gif", "session-en.gif"];
+    await expect(page.locator(`article img[src="/__artwork/session-${mobilePrefix}en.gif"]`)).toHaveCount(1);
+    failed = [`session-${mobilePrefix}es.gif`, `session-${mobilePrefix}en.gif`];
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator('article img[src="/__artwork/session-legacy.gif"]')).toHaveCount(1);
-    failed.push("session-legacy.gif");
+    await expect(page.locator(`article img[src="/__artwork/session-${mobilePrefix}legacy.gif"]`)).toHaveCount(1);
+    failed.push(`session-${mobilePrefix}legacy.gif`);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("article")).toHaveCount(1);
     await expect(page.locator("article img")).toHaveCount(0);
