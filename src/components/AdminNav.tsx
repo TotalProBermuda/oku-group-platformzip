@@ -174,6 +174,7 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
         { label: l.hiring,      href: "/admin/hiring",            roles: ["SUPERADMIN", "ADMIN_HR"] },
         { label: l.sponsorship, href: "/admin/sponsorship",       roles: ["SUPERADMIN"] },
         { label: l.partners,    href: "/admin/partners/reports",  roles: ["SUPERADMIN"] },
+        { label: "Partner Support", href: "/admin/partner-support", roles: ["SUPERADMIN"] },
         { label: l.memberships, href: "/admin/memberships",       roles: ["SUPERADMIN"] },
       ],
     },
