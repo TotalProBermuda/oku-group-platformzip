@@ -21,12 +21,13 @@ async function stubImages(page: Page, failed: string[] = []) {
 
 test.describe("localized artwork guest rendering", () => {
   for (const locale of ["en", "es", "pt"]) {
-    test(`calendar renders matching ${locale} session and series artwork`, async ({ page }) => {
+    test(`calendar renders matching ${locale} session and series artwork`, async ({ page }, testInfo) => {
+      await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 375, height: 667 } : { width: 1280, height: 800 });
       await stubImages(page);
       const session = row();
       await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session, { ...session, id: "series-fallback", title: "Series fallback", flyerImageUrl: null, flyerImageUrlEn: null, flyerImageUrlEs: null, flyerImageUrlPt: null }] } }));
       await page.goto(`/${locale}/calendar`, { waitUntil: "domcontentloaded" });
-      const mobilePrefix = (page.viewportSize()?.width ?? 1280) <= 640 ? "mobile-" : "";
+      const mobilePrefix = testInfo.project.name === "mobile" ? "mobile-" : "";
       const sessionImage = page.locator(`article img[src="/__artwork/session-${mobilePrefix}${locale}.gif"]`);
       const seriesImage = page.locator(`article img[src="/__artwork/series-${locale}.gif"]`);
       await expect(sessionImage).toHaveCount(1);
@@ -45,9 +46,10 @@ test.describe("localized artwork guest rendering", () => {
     await expect.poll(() => mobileImage.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   });
 
-  test("failed Spanish image uses English, then legacy; all failures remove img", async ({ page }) => {
+  test("failed Spanish image uses English, then legacy; all failures remove img", async ({ page }, testInfo) => {
+    await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 375, height: 667 } : { width: 1280, height: 800 });
     const session = row();
-    const mobilePrefix = (page.viewportSize()?.width ?? 1280) <= 640 ? "mobile-" : "";
+    const mobilePrefix = testInfo.project.name === "mobile" ? "mobile-" : "";
     let failed = [`session-${mobilePrefix}es.gif`];
     await page.route("**/__artwork/**", route => {
       const path = new URL(route.request().url()).pathname;
