@@ -262,8 +262,8 @@ export default function EventScheduleManager({
             <textarea rows={3} maxLength={5000} value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} />
           </label>
           <MediaUpload value={form.flyerImageUrl} onChange={(url) => setForm((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image (optional)" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
-          {canManageSessionContent && <LocalizedArtworkEditor kind="session" value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />
-          {canManageSessionContent && <MobileSessionArtworkEditor value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}}
+          {canManageSessionContent && <LocalizedArtworkEditor kind="session" value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
+          {canManageSessionContent && <MobileSessionArtworkEditor value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
           {canManageSessionContent && ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
             <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
             <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave a price blank to inherit the series ticket price. Existing paid orders keep their recorded prices.</p>
