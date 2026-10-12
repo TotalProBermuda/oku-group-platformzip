@@ -1,0 +1,55 @@
+[33mcommit abe9a3b079421d34799d12aceb7a5c5b50543fb5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31mgitsafe-backup/main[m[33m)[m
+Author:     Replit Agent <agent@replit.com>
+AuthorDate: Mon Oct 12 00:14:33 2026 +0000
+Commit:     Replit Agent <agent@replit.com>
+CommitDate: Mon Oct 12 00:14:33 2026 +0000
+
+    Implement experience duplication and update project dependencies
+    
+    Replit-Commit-Author: Agent
+
+M	.agents/memory/MEMORY.md
+A	.agents/memory/localized-artwork-boundaries.md
+A	docs/localized-event-artwork.md
+M	package-lock.json
+M	package.json
+A	prisma/migrations/20261011120000_localized_event_artwork/migration.sql
+M	prisma/schema.prisma
+M	src/app/[locale]/experiences/[slug]/page.tsx
+M	src/app/[locale]/experiences/page.tsx
+M	src/app/[locale]/page.tsx
+M	src/app/admin/experiences/[id]/page.tsx
+A	src/app/api/v1/admin/event-artwork/upload/route.ts
+M	src/app/api/v1/admin/experiences/[id]/duplicate/route.ts
+M	src/app/api/v1/admin/experiences/[id]/route.ts
+M	src/app/api/v1/admin/experiences/route.ts
+M	src/app/api/v1/admin/series/[id]/sessions/route.ts
+M	src/app/api/v1/admin/series/route.ts
+M	src/app/api/v1/admin/sessions/[id]/route.ts
+M	src/app/api/v1/membership/me/eligible-events/route.ts
+M	src/app/api/v1/sessions/route.ts
+M	src/app/experiences/[slug]/page.tsx
+M	src/app/invite/[token]/rsvp/RsvpContent.tsx
+M	src/components/account/MembershipDashboardContent.tsx
+M	src/components/admin/EventScheduleManager.tsx
+A	src/components/admin/LocalizedArtworkEditor.tsx
+M	src/components/experiences/ExperienceSessionsView.tsx
+A	src/components/ui/EventArtwork.tsx
+M	src/components/ui/EventsCalendarView.tsx
+M	src/components/ui/MediaUpload.tsx
+A	src/lib/eventArtwork.ts
+M	src/server/invitation/tokenService.ts
+A	src/server/series/artworkInput.ts
+M	src/server/series/createSeriesInput.ts
+M	src/server/series/createSessionInput.ts
+A	tests/browser/event-artwork.spec.ts
+A	tests/components/eventArtwork.test.tsx
+A	tests/lib/eventArtwork.test.ts
+A	tests/server/series/artworkUploadRoute.test.ts
+M	tests/server/series/createSeriesRoute.test.ts
+M	tests/server/series/createSessionInput.test.ts
+M	tests/server/series/createSessionRoute.test.ts
+A	tests/server/series/publicArtworkMapping.test.ts
+A	tests/server/series/seriesArtworkEditRoute.test.ts
+M	tests/server/series/sessionContentRoute.test.ts
+M	vitest.config.ts
