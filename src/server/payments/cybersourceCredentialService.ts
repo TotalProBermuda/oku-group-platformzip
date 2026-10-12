@@ -225,10 +225,12 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
     "portfolioIdLast4"
   );
 
-  // Reset test state when any core credential field changes — the prior test
-  // result is no longer valid for the new key material. Non-secret config
-  // changes (checkout title, debug mode, etc.) do not invalidate the test.
-  if (merchantIdChanged || keyIdChanged || sharedSecretChanged) {
+  // Reset certification when core credentials or the endpoint environment
+  // changes. The pass remains valid indefinitely only for this exact setup;
+  // checkout title, debug mode, and other display-only changes do not expire it.
+  const environmentChanged =
+    body.environment !== undefined && body.environment !== prev.environment;
+  if (merchantIdChanged || keyIdChanged || sharedSecretChanged || environmentChanged) {
     data.lastTestStatus = null;
     data.lastTestedAt = null;
     data.lastTestMessage = null;

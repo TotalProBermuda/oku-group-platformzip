@@ -121,6 +121,23 @@ export function evaluateTestRecency(opts: {
   return null;
 }
 
+/**
+ * Production certification is required before selecting a gateway, but it is
+ * not a daily checkout dependency. Once this provider is active, a previously
+ * passing connection test remains valid until its credential/environment is
+ * changed (those edits clear the persisted test result).
+ */
+export function evaluateActiveGatewayTestRecency(opts: {
+  passed: boolean;
+  testedAt: Date | null;
+  environment: "sandbox" | "test" | "production" | null;
+  providerLabel: string;
+  alreadyActive: boolean;
+}): string | null {
+  if (opts.alreadyActive && opts.passed && opts.testedAt) return null;
+  return evaluateTestRecency(opts);
+}
+
 async function getAuthNetLastTest(): Promise<{
   passed: boolean;
   testedAt: Date | null;
@@ -229,7 +246,7 @@ async function readAuthNetReadiness(): Promise<GatewayReadiness> {
   };
 }
 
-async function readCybersourceReadiness(): Promise<GatewayReadiness> {
+async function readCybersourceReadiness(alreadyActive: boolean): Promise<GatewayReadiness> {
   const cred = await prisma.cybersourceGatewayCredential
     .findUnique({ where: { provider: "CYBERSOURCE" } })
     .catch(() => null);
@@ -296,11 +313,12 @@ async function readCybersourceReadiness(): Promise<GatewayReadiness> {
       passed,
       testedAt: testedAt ? testedAt.toISOString() : null,
     };
-    const recencyBlocker = evaluateTestRecency({
+    const recencyBlocker = evaluateActiveGatewayTestRecency({
       passed,
       testedAt,
       environment,
       providerLabel: PROVIDER_LABELS.CYBERSOURCE,
+      alreadyActive,
     });
     if (recencyBlocker) blockers.push(recencyBlocker);
   }
@@ -319,14 +337,13 @@ async function readCybersourceReadiness(): Promise<GatewayReadiness> {
 }
 
 export async function getActiveCheckoutGateway(): Promise<ActiveGatewaySnapshot> {
-  const [settings, authNet, cybersource] = await Promise.all([
-    getCommerceSettings(),
-    readAuthNetReadiness(),
-    readCybersourceReadiness(),
-  ]);
-
+  const settings = await getCommerceSettings();
   const active = (settings.activeCheckoutGateway ??
     "AUTHORIZE_NET") as ActiveProvider;
+  const [authNet, cybersource] = await Promise.all([
+    readAuthNetReadiness(),
+    readCybersourceReadiness(active === "CYBERSOURCE"),
+  ]);
   const providers = {
     AUTHORIZE_NET: authNet,
     CYBERSOURCE: cybersource,
