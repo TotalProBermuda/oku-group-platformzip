@@ -1,5 +1,6 @@
 "use client";
 import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
+import MobileSessionArtworkEditor from "@/components/admin/MobileSessionArtworkEditor";
 
 import { FormEvent, useMemo, useState } from "react";
 import MediaUpload from "@/components/ui/MediaUpload";
@@ -16,6 +17,9 @@ type SessionRow = {
   flyerImageUrlEn?: string | null;
   flyerImageUrlEs?: string | null;
   flyerImageUrlPt?: string | null;
+  flyerImageUrlMobileEn?: string | null;
+  flyerImageUrlMobileEs?: string | null;
+  flyerImageUrlMobilePt?: string | null;
   ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
   startsAt: string;
   endsAt: string;
@@ -32,6 +36,9 @@ type FormState = {
   flyerImageUrlEn: string;
   flyerImageUrlEs: string;
   flyerImageUrlPt: string;
+  flyerImageUrlMobileEn: string;
+  flyerImageUrlMobileEs: string;
+  flyerImageUrlMobilePt: string;
   ticketPrices: Record<string, string>;
   startsAt: string;
   endsAt: string;
@@ -58,6 +65,7 @@ function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
     description: "",
     flyerImageUrl: "",
     flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "",
+    flyerImageUrlMobileEn: "", flyerImageUrlMobileEs: "", flyerImageUrlMobilePt: "",
     ticketPrices: {},
     startsAt: localInput(start),
     endsAt: localInput(end),
@@ -116,7 +124,7 @@ export default function EventScheduleManager({
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "", flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "" });
+  const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "", flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "", flyerImageUrlMobileEn: "", flyerImageUrlMobileEs: "", flyerImageUrlMobilePt: "" });
   const [editTicketPrices, setEditTicketPrices] = useState<Record<string, string>>({});
   const [savingContent, setSavingContent] = useState(false);
 
@@ -154,7 +162,7 @@ export default function EventScheduleManager({
           subtitle: form.subtitle.trim() || undefined,
           description: form.description.trim() || undefined,
           flyerImageUrl: form.flyerImageUrl || undefined,
-          ...(canManageSessionContent ? { flyerImageUrlEn: form.flyerImageUrlEn, flyerImageUrlEs: form.flyerImageUrlEs, flyerImageUrlPt: form.flyerImageUrlPt } : {}),
+          ...(canManageSessionContent ? { flyerImageUrlEn: form.flyerImageUrlEn, flyerImageUrlEs: form.flyerImageUrlEs, flyerImageUrlPt: form.flyerImageUrlPt, flyerImageUrlMobileEn: form.flyerImageUrlMobileEn, flyerImageUrlMobileEs: form.flyerImageUrlMobileEs, flyerImageUrlMobilePt: form.flyerImageUrlMobilePt } : {}),
           ticketPrices: Object.entries(form.ticketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })),
           startsAt: panamaDateTimeLocalIso(form.startsAt),
           endsAt: panamaDateTimeLocalIso(form.endsAt),
@@ -254,7 +262,8 @@ export default function EventScheduleManager({
             <textarea rows={3} maxLength={5000} value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} />
           </label>
           <MediaUpload value={form.flyerImageUrl} onChange={(url) => setForm((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image (optional)" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
-          {canManageSessionContent && <LocalizedArtworkEditor kind="session" value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
+          {canManageSessionContent && <LocalizedArtworkEditor kind="session" value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />
+          {canManageSessionContent && <MobileSessionArtworkEditor value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}}
           {canManageSessionContent && ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
             <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
             <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave a price blank to inherit the series ticket price. Existing paid orders keep their recorded prices.</p>
@@ -308,7 +317,7 @@ export default function EventScheduleManager({
                 {canManageSessionContent && <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => {
                   setNotice("");
                   setEditingSessionId(editingSessionId === session.id ? null : session.id);
-                  setEditContent({ title: session.title ?? "", subtitle: session.subtitle ?? "", description: session.description ?? "", flyerImageUrl: session.flyerImageUrl ?? "", flyerImageUrlEn: session.flyerImageUrlEn ?? "", flyerImageUrlEs: session.flyerImageUrlEs ?? "", flyerImageUrlPt: session.flyerImageUrlPt ?? "" });
+                  setEditContent({ title: session.title ?? "", subtitle: session.subtitle ?? "", description: session.description ?? "", flyerImageUrl: session.flyerImageUrl ?? "", flyerImageUrlEn: session.flyerImageUrlEn ?? "", flyerImageUrlEs: session.flyerImageUrlEs ?? "", flyerImageUrlPt: session.flyerImageUrlPt ?? "", flyerImageUrlMobileEn: session.flyerImageUrlMobileEn ?? "", flyerImageUrlMobileEs: session.flyerImageUrlMobileEs ?? "", flyerImageUrlMobilePt: session.flyerImageUrlMobilePt ?? "" });
                   setEditTicketPrices(Object.fromEntries((session.ticketPrices ?? []).map((price) => [price.ticketTypeId, (price.priceCents / 100).toFixed(2)])));
                 }}>{editingSessionId === session.id ? "Close content editor" : "Edit session content"}</button>}
               </div>
@@ -322,6 +331,7 @@ export default function EventScheduleManager({
                 <label style={{ color: "#534942", display: "block", fontSize: 12, fontWeight: 700, marginTop: 12, textTransform: "uppercase" }}>Session description<textarea rows={3} maxLength={5000} value={editContent.description} onChange={(e) => setEditContent((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} /></label>
                 <MediaUpload value={editContent.flyerImageUrl} onChange={(url) => setEditContent((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
                 <LocalizedArtworkEditor kind="session" value={editContent} onChange={(field, url) => setEditContent(current => ({ ...current, [field]: url }))} />
+                <MobileSessionArtworkEditor value={editContent} onChange={(field, url) => setEditContent(current => ({ ...current, [field]: url }))} />
                 {ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
                   <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
                   <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave blank to inherit the series price. Paid orders are not repriced.</p>

@@ -44,6 +44,11 @@ describe("artwork input and permissions", () => {
     expect(() => parseArtworkEdit({ flyerImageUrlPt: "/pt.jpg" }, [role], "session")).toThrow();
     expect(parseArtworkEdit({ title: "Unrelated" }, [role], "series")).toEqual({});
   });
+  it("allows clearing mobile artwork and restricts its changes to Superadmin", () => {
+    expect(parseArtworkEdit({ flyerImageUrlMobileEs: "" }, ["SUPERADMIN"], "session")).toEqual({ flyerImageUrlMobileEs: null });
+    expect(() => parseArtworkEdit({ flyerImageUrlMobileEs: "/es-mobile.jpg" }, ["FB_DIRECTOR"], "session")).toThrow();
+    expect(updateSessionContentSchema.parse({ flyerImageUrlMobilePt: "" })).toEqual({ flyerImageUrlMobilePt: null });
+  });
   it("normalizes removal and does not overwrite unspecified locales or legacy URLs", () => {
     expect(parseArtworkEdit({ heroImageUrlEs: " ", heroImageUrl: "/legacy.jpg" }, ["SUPERADMIN"], "series")).toEqual({ heroImageUrlEs: null });
     expect(updateSessionContentSchema.parse({ flyerImageUrlPt: "" })).toEqual({ flyerImageUrlPt: null });

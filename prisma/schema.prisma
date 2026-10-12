@@ -1348,6 +1348,9 @@ model Session {
   flyerImageUrlEn        String?
   flyerImageUrlEs        String?
   flyerImageUrlPt        String?
+  flyerImageUrlMobileEn  String?
+  flyerImageUrlMobileEs  String?
+  flyerImageUrlMobilePt  String?
   startsAt               DateTime
   endsAt                 DateTime
   capacity               Int

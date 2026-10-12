@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isSafeArtworkUrl, seriesArtworkFields, sessionArtworkFields } from "@/lib/eventArtwork";
+import { isSafeArtworkUrl, seriesArtworkFields, sessionArtworkFields, sessionMobileArtworkFields } from "@/lib/eventArtwork";
 
 export const artworkUrlSchema = z.preprocess(
   value => typeof value === "string" ? value.trim() || null : value,
@@ -10,17 +10,18 @@ export const seriesArtworkShape = {
 };
 export const sessionArtworkShape = {
   flyerImageUrlEn: artworkUrlSchema, flyerImageUrlEs: artworkUrlSchema, flyerImageUrlPt: artworkUrlSchema,
+  flyerImageUrlMobileEn: artworkUrlSchema, flyerImageUrlMobileEs: artworkUrlSchema, flyerImageUrlMobilePt: artworkUrlSchema,
 };
 
 type SeriesEdit = Partial<Record<typeof seriesArtworkFields[number], string | null>>;
-type SessionEdit = Partial<Record<typeof sessionArtworkFields[number], string | null>>;
+type SessionEdit = Partial<Record<typeof sessionArtworkFields[number] | typeof sessionMobileArtworkFields[number], string | null>>;
 export function parseArtworkEdit(body: Record<string, unknown>, roles: readonly string[], kind: "series"): SeriesEdit;
 export function parseArtworkEdit(body: Record<string, unknown>, roles: readonly string[], kind: "session"): SessionEdit;
 export function parseArtworkEdit(body: Record<string, unknown>, roles: readonly string[], kind: "series" | "session"): SeriesEdit | SessionEdit {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw Object.assign(new Error("Expected an artwork object."), { status: 400 });
   }
-  const fields = kind === "series" ? seriesArtworkFields : sessionArtworkFields;
+  const fields = kind === "series" ? seriesArtworkFields : [...sessionArtworkFields, ...sessionMobileArtworkFields];
   const input = Object.fromEntries(fields.filter(field => field in body).map(field => [field, body[field]]));
   if (Object.keys(input).length && !roles.includes("SUPERADMIN")) {
     throw Object.assign(new Error("Only a superadmin can manage localized event artwork."), { status: 403 });

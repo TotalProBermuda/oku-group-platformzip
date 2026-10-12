@@ -8,6 +8,7 @@ function row() {
     id: "artwork-session", title: "Artwork session", startsAt: start.toISOString(), endsAt: new Date(start.getTime() + 3600000).toISOString(),
     capacity: 10, soldCount: 0, status: "SCHEDULED",
     flyerImageUrl: "/__artwork/session-legacy.gif", flyerImageUrlEn: "/__artwork/session-en.gif", flyerImageUrlEs: "/__artwork/session-es.gif", flyerImageUrlPt: "/__artwork/session-pt.gif",
+    flyerImageUrlMobileEn: "/__artwork/session-mobile-en.gif", flyerImageUrlMobileEs: "/__artwork/session-mobile-es.gif", flyerImageUrlMobilePt: "/__artwork/session-mobile-pt.gif",
     series: { id: "artwork-series", slug: "artwork-series", title: "Artwork series", venue: "OKU", heroImageUrl: "/__artwork/series-legacy.gif", heroImageUrlEn: "/__artwork/series-en.gif", heroImageUrlEs: "/__artwork/series-es.gif", heroImageUrlPt: "/__artwork/series-pt.gif" },
   };
 }
@@ -32,6 +33,17 @@ test.describe("localized artwork guest rendering", () => {
       await expect.poll(() => sessionImage.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
     });
   }
+  test("small-screen calendar cards use the matching mobile flyer", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await stubImages(page);
+    const session = row();
+    await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session] } }));
+    await page.goto("/es/calendar", { waitUntil: "domcontentloaded" });
+    const mobileImage = page.locator('article img[src="/__artwork/session-mobile-es.gif"]');
+    await expect(mobileImage).toHaveCount(1);
+    await expect.poll(() => mobileImage.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  });
+
   test("failed Spanish image uses English, then legacy; all failures remove img", async ({ page }) => {
     const session = row();
     let failed = ["session-es.gif"];
@@ -72,4 +84,7 @@ test("superadmin editor exposes distinct EN/ES/PT series and session upload cont
   const sessionEditor = page.locator("fieldset").filter({ hasText: "Localized session flyer" });
   await expect(sessionEditor).toHaveCount(1);
   for (const language of ["English (EN)", "Spanish (ES)", "Portuguese (PT)"]) await expect(sessionEditor.getByLabel(language)).toHaveCount(1);
+  const mobileEditor = page.locator("fieldset").filter({ hasText: "Mobile flyer artwork (optional)" });
+  await expect(mobileEditor).toHaveCount(1);
+  for (const language of ["English (EN)", "Spanish (ES)", "Portuguese (PT)"]) await expect(mobileEditor.getByLabel(language)).toHaveCount(1);
 });

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import Link from "next/link";
-import EventArtwork from "@/components/ui/EventArtwork";
-import { sessionArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
+import ResponsiveEventArtwork from "@/components/ui/ResponsiveEventArtwork";
+import { sessionArtworkCandidates, sessionMobileArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
 
 interface SessionRow extends SessionArtwork {
   id: string;
@@ -172,6 +172,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   function sessionCard(session: SessionRow, compact = false) {
     const title = session.title ?? session.series.title;
     const artwork = sessionArtworkCandidates(session, locale, session.series);
+    const mobileArtwork = sessionMobileArtworkCandidates(session, locale, session.series);
     const { view, buy } = eventLinks(session);
     return (
       <article key={session.id} style={{
@@ -179,7 +180,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
         display: "grid", gridTemplateColumns: compact ? "88px minmax(0, 1fr)" : "minmax(110px, 190px) minmax(0, 1fr)",
       }}>
         {artwork.length ? (
-          <div style={{ background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }}><EventArtwork candidates={artwork} alt="" loading="lazy" style={{ width: "100%", height: "100%", minHeight: compact ? 100 : 150, objectFit: "cover" }} /></div>
+          <div style={{ background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }}><ResponsiveEventArtwork desktopCandidates={artwork} mobileCandidates={mobileArtwork} mobileFit="cover" alt="" loading="lazy" style={{ width: "100%", height: "100%", minHeight: compact ? 100 : 150 }} /></div>
         ) : <div aria-hidden="true" style={{ minHeight: compact ? 100 : 150, background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }} />}
         <div style={{ minWidth: 0, padding: compact ? 12 : 16, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
           <div style={{ color: "#1a1614", fontSize: compact ? 15 : 17, fontWeight: 650, lineHeight: 1.3 }}>{title}</div>

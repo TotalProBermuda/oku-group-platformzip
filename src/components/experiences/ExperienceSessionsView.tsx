@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import AddToCalendar from "@/components/ui/AddToCalendar";
-import EventArtwork from "@/components/ui/EventArtwork";
-import { sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
+import ResponsiveEventArtwork from "@/components/ui/ResponsiveEventArtwork";
+import { sessionArtworkCandidates, sessionMobileArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
 
 type Session = SessionArtwork & {
   id: string; title: string | null; subtitle?: string | null; description?: string | null;
@@ -64,12 +64,13 @@ export default function ExperienceSessionsView({
   function renderSession(session: Session) {
     const title = session.title || seriesTitle;
     const artwork = sessionArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
+    const mobileArtwork = sessionMobileArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
     const description = session.description || seriesDescription;
     const prices = ticketTypes.map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
     const fromPrice = prices.length ? Math.min(...prices) : null;
     return (
       <article key={session.id} style={{ ...cardStyle, overflow: "hidden" }}>
-        <EventArtwork candidates={artwork} alt={`${title} event artwork`} loading="lazy" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 8, marginBottom: 14 }} />
+        <ResponsiveEventArtwork desktopCandidates={artwork} mobileCandidates={mobileArtwork} alt={`${title} event artwork`} loading="lazy" style={{ borderRadius: 8, marginBottom: 14 }} />
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <h3 style={{ color: "#1a1614", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{title}</h3>
