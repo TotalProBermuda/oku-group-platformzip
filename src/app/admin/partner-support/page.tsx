@@ -22,10 +22,20 @@ function QRCard({ link }: { link: LinkData }) {
   </div>;
 }
 
+export function partnerIdFromSearch(search: string): string | null {
+  return new URLSearchParams(search).get("partnerId");
+}
+
 export default function PartnerSupportPage() {
   const [partners, setPartners] = useState<Partner[]>([]); const [detail, setDetail] = useState<Detail | null>(null); const [message, setMessage] = useState(""); const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [role, setRole] = useState("TEAM_SELLER"); const [partnerName, setPartnerName] = useState(""); const [partnerEmail, setPartnerEmail] = useState(""); const [busy, setBusy] = useState(""); const [query, setQuery] = useState(""); const [statusFilter, setStatusFilter] = useState("ALL"); const [sort, setSort] = useState("NAME_ASC"); const [page, setPage] = useState(1);
   const loadPartners = async () => { const r = await fetch("/api/v1/admin/partner-support"); const d = await r.json(); if (!r.ok) setMessage(d.error ?? "Unable to load partners"); else { setPartners(d.partners ?? []); setMessage(""); } };
-  useEffect(() => { void loadPartners().catch(() => setMessage("Unable to load partners. Please refresh.")); }, []);
+  useEffect(() => {
+    const partnerId = partnerIdFromSearch(window.location.search);
+    void (async () => {
+      await loadPartners();
+      if (partnerId) await open(partnerId);
+    })().catch(() => setMessage("Unable to load partner workspace. Please refresh."));
+  }, []);
   const open = async (id: string) => { setMessage("Loading audited workspace…"); const r = await fetch(`/api/v1/admin/partner-support?partnerId=${encodeURIComponent(id)}`); const d = await r.json(); if (r.ok) { setDetail(d.partner); setMessage("Workspace review recorded in the audit log."); } else setMessage(d.error ?? "Unable to open workspace"); };
   const addSeller = async (e: FormEvent) => { e.preventDefault(); if (!detail) return; const r = await fetch("/api/v1/admin/partner-support", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ partnerId: detail.id, displayName: name, email, commercialRole: role }) }); const d = await r.json(); if (!r.ok) return setMessage(d.error ?? "Unable to save seller"); setName(""); setEmail(""); setMessage("Seller draft saved."); await open(detail.id); };
   const invite = async (seat: Seat) => { if (!window.confirm(`Send a new secure sign-in link to ${seat.displayName} at ${seat.email}? Any earlier unused link will stop working.`)) return; setBusy(seat.id); const r = await fetch(`/api/v1/admin/partner-support/seats/${encodeURIComponent(seat.id)}/invite`, { method: "POST" }); const d = await r.json(); setBusy(""); if (!r.ok) return setMessage(d.error ?? "Unable to send invitation"); setMessage(`${d.result.resent ? "New" : "Secure"} sign-in email sent to ${d.result.email}. The link expires in 15 minutes.`); if (detail) await open(detail.id); };
