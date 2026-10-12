@@ -45,6 +45,17 @@ beforeEach(() => {
 });
 
 describe("POST /api/v1/admin/series/[id]/sessions", () => {
+  it("denies localized artwork to non-superadmins even when they can create sessions", async () => {
+    const response = await POST(request({ ...validBody, flyerImageUrlEs: "/es.jpg" }), context());
+    expect(response.status).toBe(403);
+    expect(dbMock.tx.session.create).not.toHaveBeenCalled();
+  });
+  it("maps localized session artwork into storage for superadmins", async () => {
+    sessionMock.requireSession.mockResolvedValue({ userId: "superadmin-1", roles: ["SUPERADMIN"] });
+    const response = await POST(request({ ...validBody, flyerImageUrlEs: "/es.jpg" }), context());
+    expect(response.status).toBe(201);
+    expect(dbMock.tx.session.create).toHaveBeenCalledWith({ data: expect.objectContaining({ flyerImageUrlEs: "/es.jpg" }) });
+  });
   it("creates an event and records the action", async () => {
     const response = await POST(request(validBody), context());
     expect(response.status).toBe(201);

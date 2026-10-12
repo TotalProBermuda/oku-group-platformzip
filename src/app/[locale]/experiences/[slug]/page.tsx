@@ -13,6 +13,8 @@ import ShareButtons from "@/components/ui/ShareButtons";
 import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsView";
 import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
 import type { Metadata } from "next";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
@@ -48,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const content = getSeriesContent(series.slug, safeLocale);
   const title = content?.title ?? series.title;
   const description = content?.description ?? series.description ?? "";
-  const imageUrl = series.heroImageUrl ?? undefined;
+  const imageUrl = seriesArtworkCandidates(series, safeLocale)[0];
   const canonicalUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
 
   return {
@@ -113,11 +115,11 @@ export default async function ExperienceDetailPage({ params }: Props) {
   return (
     <div>
       {/* Hero */}
-      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: series.heroImageUrl ? 360 : undefined }}>
-        {series.heroImageUrl && (
-          <img src={series.heroImageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
+      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: seriesArtworkCandidates(series, safeLocale).length ? 360 : undefined }}>
+        {seriesArtworkCandidates(series, safeLocale).length > 0 && (
+          <EventArtwork candidates={seriesArtworkCandidates(series, safeLocale)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
         )}
-        <div style={{ position: "absolute", inset: 0, background: series.heroImageUrl ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.72) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: seriesArtworkCandidates(series, safeLocale).length ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.72) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
         <div className="page-container" style={{ position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
             {series.venue && <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>{series.venue}</span>}
@@ -133,7 +135,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
           <ShareButtons
             url={pageUrl}
             title={title}
-            imageUrl={series.heroImageUrl ?? undefined}
+            imageUrl={seriesArtworkCandidates(series, safeLocale)[0]}
             labels={{
               shareHeading: c.shareHeading,
               copyLink: c.shareCopyLink,
@@ -188,6 +190,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
                 seriesTitle={title}
                 seriesDescription={description ?? ""}
                 seriesImage={series.heroImageUrl}
+                seriesArtwork={series}
                 checkoutHrefBase={localePath(safeLocale, `/checkout/${slug}`)}
                 venue={locationStr}
                 locale={safeLocale}

@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import AddToCalendar from "@/components/ui/AddToCalendar";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
 
-type Session = {
+type Session = SessionArtwork & {
   id: string; title: string | null; subtitle?: string | null; description?: string | null;
   flyerImageUrl?: string | null; startsAt: string; endsAt: string; capacity: number;
   soldCount: number; status: string; ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
@@ -22,9 +24,10 @@ function eventDateKey(value: Date) {
 }
 
 export default function ExperienceSessionsView({
-  sessions, ticketTypes, seriesTitle, seriesDescription, seriesImage, checkoutHrefBase, venue, locale, labels,
+  sessions, ticketTypes, seriesTitle, seriesDescription, seriesImage, seriesArtwork, checkoutHrefBase, venue, locale, labels,
 }: {
   sessions: Session[]; seriesTitle: string; seriesDescription: string; seriesImage?: string | null;
+  seriesArtwork?: SeriesArtwork;
   ticketTypes: Array<{ id: string; priceCents: number }>;
   checkoutHrefBase: string; venue: string; locale: string;
   labels: Record<string, string>;
@@ -60,13 +63,13 @@ export default function ExperienceSessionsView({
 
   function renderSession(session: Session) {
     const title = session.title || seriesTitle;
-    const flyer = session.flyerImageUrl || seriesImage;
+    const artwork = sessionArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
     const description = session.description || seriesDescription;
     const prices = ticketTypes.map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
     const fromPrice = prices.length ? Math.min(...prices) : null;
     return (
       <article key={session.id} style={{ ...cardStyle, overflow: "hidden" }}>
-        {flyer ? <img src={flyer} alt={`${title} event artwork`} loading="lazy" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 8, marginBottom: 14 }} /> : null}
+        <EventArtwork candidates={artwork} alt={`${title} event artwork`} loading="lazy" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 8, marginBottom: 14 }} />
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <h3 style={{ color: "#1a1614", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{title}</h3>

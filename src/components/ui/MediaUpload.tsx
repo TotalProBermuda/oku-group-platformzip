@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useRef, useCallback, useId } from "react";
+import EventArtwork from "@/components/ui/EventArtwork";
 
 type MediaType = "image" | "video" | "icon" | "any";
 
 interface MediaUploadProps {
+  uploadEndpoint?: string;
   value?: string;
   onChange: (url: string) => void;
   label?: string;
@@ -44,6 +46,7 @@ function isVideo(url: string) {
 }
 
 export default function MediaUpload({
+  uploadEndpoint = "/api/v1/uploads",
   value,
   onChange,
   label,
@@ -82,7 +85,7 @@ export default function MediaUpload({
 
     try {
       // Step 1: request presigned PUT URL
-      const presignRes = await fetch("/api/v1/uploads", {
+      const presignRes = await fetch(uploadEndpoint, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
@@ -117,7 +120,7 @@ export default function MediaUpload({
       setUploading(false);
       setTimeout(() => setProgress(0), 800);
     }
-  }, [maxSizeMB, onChange]);
+  }, [maxSizeMB, onChange, uploadEndpoint]);
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (files?.length) upload(files[0]);
@@ -207,8 +210,8 @@ export default function MediaUpload({
                 muted loop
               />
             ) : (
-              <img
-                src={value}
+              <EventArtwork
+                candidates={[value!]}
                 alt="Media preview"
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: 9 }}
               />

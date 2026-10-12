@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { artworkUrlSchema, sessionArtworkShape } from "@/server/series/artworkInput";
+import { isSafeArtworkUrl } from "@/lib/eventArtwork";
 
 const optionalContent = (maxLength: number) => z.preprocess(
   (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
@@ -7,9 +9,7 @@ const optionalContent = (maxLength: number) => z.preprocess(
 
 const safeImageUrl = z.preprocess(
   (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
-  z.string().trim().max(2048).url().refine((value) => {
-    try { return new URL(value).protocol === "https:"; } catch { return false; }
-  }, "Use a secure HTTPS image URL.").optional(),
+  z.string().trim().max(2048).refine(isSafeArtworkUrl, "Use a secure HTTPS image URL or same-origin asset path.").optional(),
 );
 
 export const sessionTicketPriceInputSchema = z.array(z.object({
@@ -22,6 +22,7 @@ export const sessionTicketPriceInputSchema = z.array(z.object({
 
 export const createSessionInputSchema = z
   .object({
+    ...sessionArtworkShape,
     title: z.string().trim().max(160, "Event title must be 160 characters or fewer.").optional(),
     subtitle: optionalContent(240),
     description: optionalContent(5000),
@@ -44,10 +45,9 @@ export const createSessionInputSchema = z
   });
 
 export const updateSessionContentSchema = z.object({
+  ...sessionArtworkShape,
   title: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? null : value, z.string().trim().max(160).nullable().optional()),
   subtitle: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? null : value, z.string().trim().max(240).nullable().optional()),
   description: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? null : value, z.string().trim().max(5000).nullable().optional()),
-  flyerImageUrl: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? null : value, z.string().trim().max(2048).url().refine((value) => {
-    try { return new URL(value).protocol === "https:"; } catch { return false; }
-  }, "Use a secure HTTPS image URL.").nullable().optional()),
+  flyerImageUrl: artworkUrlSchema,
 }).strict();

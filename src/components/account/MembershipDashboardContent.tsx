@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { seriesArtworkCandidates, type SeriesArtwork } from "@/lib/eventArtwork";
 import Link from "next/link";
 import Image from "next/image";
 import MembershipBadge from "@/components/membership/MembershipBadge";
@@ -20,7 +22,7 @@ interface MembershipData {
   avacaContributionBps: number | null;
 }
 
-interface SeriesItem {
+interface SeriesItem extends SeriesArtwork {
   id: string;
   title: string;
   heroImageUrl: string | null;
@@ -228,8 +230,8 @@ export function MembershipDashboardContent({ membership, eligibleData, recentOrd
             {eligibleData.map((s) => (
               <Link key={s.id} href="/experiences" style={{ textDecoration: "none" }}>
                 <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 10, overflow: "hidden" }}>
-                  {s.heroImageUrl ? (
-                    <div style={{ height: 120, backgroundImage: `url(${s.heroImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                  {seriesArtworkCandidates(s, locale).length ? (
+                    <div style={{ height: 120, background: "#f0ece9" }}><EventArtwork candidates={seriesArtworkCandidates(s, locale)} alt={s.title} loading="lazy" style={{ height: 120, width: "100%", objectFit: "cover" }} /></div>
                   ) : (
                     <div style={{ height: 120, background: "#f0ece9", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <div style={{ width: 32, height: 3, background: "var(--color-border)", borderRadius: 2 }} />

@@ -1233,6 +1233,9 @@ model Series {
 
   // Media
   heroImageUrl String?
+  heroImageUrlEn String?
+  heroImageUrlEs String?
+  heroImageUrlPt String?
   galleryJson  Json?
   // Optional network links for this programme (website, social profiles, etc.).
   socialLinksJson Json?
@@ -1342,6 +1345,9 @@ model Session {
   subtitle               String?
   description            String?
   flyerImageUrl          String?
+  flyerImageUrlEn        String?
+  flyerImageUrlEs        String?
+  flyerImageUrlPt        String?
   startsAt               DateTime
   endsAt                 DateTime
   capacity               Int

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import EventArtwork from "@/components/ui/EventArtwork";
+import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -52,11 +54,11 @@ export default async function ExperienceDetailPage({ params }: { params: Promise
   return (
     <div>
       {/* Hero */}
-      <div style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: series.heroImageUrl ? 360 : undefined }}>
-        {series.heroImageUrl && (
-          <img src={series.heroImageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
+      <div style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: seriesArtworkCandidates(series, "en").length ? 360 : undefined }}>
+        {seriesArtworkCandidates(series, "en").length > 0 && (
+          <EventArtwork candidates={seriesArtworkCandidates(series, "en")} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
         )}
-        <div style={{ position: "absolute", inset: 0, background: series.heroImageUrl ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.72) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: seriesArtworkCandidates(series, "en").length ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.72) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
         <div className="page-container" style={{ position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
             {series.venue && <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>{series.venue}</span>}
