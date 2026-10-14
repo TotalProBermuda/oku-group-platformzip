@@ -13,8 +13,6 @@ export function financialDiffs(seriesId: string, rows: FinancialAssignment[], in
     const row = rows.find(r => r.id === edit.assignmentId);
     if (!row || row.scopeType !== "SERIES" || row.scopeId !== seriesId)
       return reject(400, "Only existing financial assignments scoped to this series can change here. GLOBAL, VENUE and CAMPAIGN assignments stay in canonical scope administration.");
-    if (row.status !== "ACTIVE" && row.status !== "PAUSED")
-      return reject(409, "Draft or retired assignments require canonical referral administration.");
     if (edit.status === "ACTIVE" && row.referralActor.status !== "ACTIVE")
       return reject(409, "Only an active referral actor can have an assignment activated.");
     const isActive = edit.status === "ACTIVE";

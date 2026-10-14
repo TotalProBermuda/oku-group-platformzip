@@ -8,8 +8,8 @@ The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths r
 
 [tsconfig-paths] An error occurred while parsing "/home/runner/workspace/.local/skills/replit-auth/templates/lib/replit-auth-web/tsconfig.json". See below for details. To disable this message, set the `ignoreConfigErrors` option to true.
 
- Test Files  35 passed | 1 skipped (36)
-      Tests  174 passed | 18 skipped (192)
-   Start at  15:00:54
-   Duration  4.52s (transform 1.77s, setup 0ms, import 5.59s, tests 801ms, environment 6ms)
+ Test Files  36 passed | 1 skipped (37)
+      Tests  177 passed | 31 skipped (208)
+   Start at  19:38:41
+   Duration  11.61s (transform 6.06s, setup 0ms, import 15.31s, tests 2.02s, environment 7ms)
 

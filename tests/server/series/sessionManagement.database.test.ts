@@ -1,11 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import { NextRequest } from "next/server";
 
 // Deliberately cannot use DATABASE_URL or the project's shared database.
-const { client, auth } = vi.hoisted(() => ({
+const { client, auth, emit } = vi.hoisted(() => ({
   client: { current: null as unknown as PrismaClient }, auth: { userId: "", roles: ["SUPERADMIN"] },
+  emit: vi.fn(),
 }));
+vi.mock("next-auth", () => ({ getServerSession: async () => ({ user: { id: auth.userId, roles: auth.roles } }) }));
+vi.mock("@/lib/auth", () => ({ authOptions: {} }));
+vi.mock("@/lib/checkInEmitter", () => ({ checkInEmitter: { emit } }));
 vi.mock("@/lib/prisma", () => ({ prisma: new Proxy({}, { get: (_target, key) => {
   const value = Reflect.get(client.current, key);
   return typeof value === "function" ? value.bind(client.current) : value;
@@ -13,7 +18,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: new Proxy({}, { get: (_target, key) => 
 vi.mock("@/server/auth/session", () => ({ requireSession: async () => auth }));
 vi.mock("@/server/queue/queue", () => ({ safeEnqueue: vi.fn(() => { throw new Error("Mail/queue must never be invoked"); }) }));
 import { applySessionManagement, previewSessionManagement } from "@/server/series/sessionManagement";
-import { loadSessionState, inventory, effectiveField } from "@/server/series/sessionState";
+import { loadSessionState, inventory, effectiveField, defaultField } from "@/server/series/sessionState";
 import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";
 import { assertCheckoutCatalogPolicy } from "@/server/commerce/catalogPolicy";
 import { claimAdmission } from "@/server/checkin/claimAdmission";
@@ -23,6 +28,7 @@ import { ticketRows } from "@/server/commerce/ticketIssuance";
 import { POST as issueComp } from "@/app/api/v1/admin/tickets/issue/route";
 import { expireCheckoutHoldsForSession, CHECKOUT_HOLD_EVENT } from "@/server/commerce/checkoutHold";
 import { GET as managementGET } from "@/app/api/v1/admin/series/[id]/session-management/route";
+import { POST as adminCheckin } from "@/app/api/v1/admin/experiences/[id]/attendees/route";
 
 const suite = process.env.RUN_SESSION_MANAGEMENT_DB_TESTS === "1" ? describe : describe.skip;
 suite("dynamic sessions — isolated PostgreSQL transactions", () => {
@@ -122,15 +128,94 @@ suite("dynamic sessions — isolated PostgreSQL transactions", () => {
       await expect(applySessionManagement(f.series.id, f.user.id, roles, p.previewId, p.requestId)).rejects.toMatchObject({ status: 409 });
     }
   });
-  it("blocks draft/retired assignment lifecycle changes and activation of inactive actors", async () => {
+  it("supports the canonical assignment lifecycle without rewriting terms and blocks inactive-actor activation", async () => {
     const f = await fixture(), a = await financialFixture(f);
-    for (const status of ["DRAFT", "RETIRED"] as const) {
-      await db.referralAssignment.update({ where: { id: a.assignment.id }, data: { status } });
-      await expect(previewSessionManagement(f.series.id, f.user.id, roles, a.input)).rejects.toMatchObject({ status: 409 });
+    for (const status of ["DRAFT", "ACTIVE", "PAUSED", "RETIRED"] as const) {
+      await change(f, { ...a.input, assignmentChanges: [{ assignmentId: a.assignment.id, status }] });
+      expect(await db.referralAssignment.findUniqueOrThrow({ where: { id: a.assignment.id } })).toMatchObject({
+        ...a.assignment, status, isActive: status === "ACTIVE", updatedAt: expect.any(Date),
+      });
     }
     await db.referralAssignment.update({ where: { id: a.assignment.id }, data: { status: "PAUSED", isActive: false } });
     await db.referralActor.update({ where: { id: a.actor.id }, data: { status: "SUSPENDED" } });
     await expect(previewSessionManagement(f.series.id, f.user.id, roles, { ...a.input, assignmentChanges: [{ assignmentId: a.assignment.id, status: "ACTIVE" }] })).rejects.toMatchObject({ status: 409 });
+  });
+  it("new sessions keep submitted capacity unless an explicit per-session default is opted into", async () => {
+    const f = await fixture();
+    await db.series.update({ where: { id: f.series.id }, data: { capacityTotal: 9999 } });
+    const create = async (useSeriesDefaults: boolean, expected: number) => {
+      const response = await createSession(new Request("http://fixture.invalid/sessions", { method: "POST",
+        headers: { "content-type": "application/json" }, body: JSON.stringify({
+          startsAt: "2099-12-01T23:00:00Z", endsAt: "2099-12-02T01:00:00Z", capacity: 17, useSeriesDefaults,
+        }) }), { params: Promise.resolve({ id: f.series.id }) });
+      expect(response.status).toBe(201);
+      const { data } = await response.json();
+      expect(data.capacity).toBe(expected);
+      expect((await db.session.findUniqueOrThrow({ where: { id: data.id } })).capacity).toBe(expected);
+    };
+    await create(false, 17);
+    await create(true, 17);
+    await db.series.update({ where: { id: f.series.id }, data: { sessionDefaults: { capacity: { mode: "override", value: 33 } } } });
+    await create(true, 33);
+    await create(false, 17);
+    await db.series.update({ where: { id: f.series.id }, data: { sessionDefaults: { capacity: { mode: "inherit" } } } });
+    await create(true, 17);
+  });
+  it("capacity resolution never presents or propagates the aggregate as an occurrence default", async () => {
+    const f = await fixture(17);
+    await db.series.update({ where: { id: f.series.id }, data: { capacityTotal: 9999 } });
+    const state = await db.$transaction(tx => loadSessionState(tx, f.series.id));
+    expect(defaultField(state, "capacity").value).toBeNull();
+    const inherited = { ...state.sessions[0], fieldModes: { capacity: { mode: "inherit" } } };
+    expect(effectiveField(state, inherited, "capacity").value).toBe(17);
+    await change(f, { kind: "sessions", sessionIds: [f.sessions[0].id], patch: { capacity: { mode: "inherit" } } });
+    expect((await db.session.findUniqueOrThrow({ where: { id: f.sessions[0].id } })).capacity).toBe(17);
+    await db.session.deleteMany({ where: { seriesId: f.series.id } });
+    const empty = await db.$transaction(tx => loadSessionState(tx, f.series.id));
+    expect(defaultField(empty, "capacity").value).toBeNull();
+  });
+  async function checkin(f: Awaited<ReturnType<typeof fixture>>, ticketId: string) {
+    return adminCheckin(new NextRequest("http://fixture.invalid/attendees", { method: "POST",
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ ticketId }) }),
+      { params: Promise.resolve({ id: f.series.id }) });
+  }
+  it("rolls back admin admission on ExperienceCheckin failure and emits only after a successful audited retry", async () => {
+    const f = await fixture(), order = await paid(f);
+    const ticket = await db.ticket.findFirstOrThrow({ where: { orderId: order.id } });
+    emit.mockClear();
+    await db.$executeRawUnsafe(`ALTER TABLE "ExperienceCheckin" ADD CONSTRAINT fixture_checkin_audit_failure CHECK (method <> 'ADMIN_OVERRIDE') NOT VALID`);
+    try {
+      expect((await checkin(f, ticket.id)).status).toBe(409);
+      expect(await db.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).toMatchObject({
+        ticketStatus: "ISSUED", checkedInAt: null, checkedInById: null,
+      });
+      expect(await db.experienceCheckin.count({ where: { ticketId: ticket.id } })).toBe(0);
+      expect(emit).not.toHaveBeenCalled();
+    } finally { await db.$executeRawUnsafe(`ALTER TABLE "ExperienceCheckin" DROP CONSTRAINT fixture_checkin_audit_failure`); }
+    expect((await checkin(f, ticket.id)).status).toBe(200);
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).ticketStatus).toBe("CHECKED_IN");
+    expect(await db.experienceCheckin.count({ where: { ticketId: ticket.id } })).toBe(1);
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+  it("rejects paused admin check-in without creating an audit or broadcasting admission", async () => {
+    const f = await fixture(), order = await paid(f);
+    const ticket = await db.ticket.findFirstOrThrow({ where: { orderId: order.id } });
+    await db.session.update({ where: { id: f.sessions[0].id }, data: { status: "PAUSED" } });
+    emit.mockClear();
+    expect((await checkin(f, ticket.id)).status).toBe(409);
+    expect((await db.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).ticketStatus).toBe("ISSUED");
+    expect(await db.experienceCheckin.count({ where: { ticketId: ticket.id } })).toBe(0);
+    expect(emit).not.toHaveBeenCalled();
+  });
+  it("admits once under concurrent admin check-in and records exactly one ExperienceCheckin", async () => {
+    const f = await fixture(), order = await paid(f);
+    const ticket = await db.ticket.findFirstOrThrow({ where: { orderId: order.id } });
+    emit.mockClear();
+    const responses = await Promise.all([checkin(f, ticket.id), checkin(f, ticket.id)]);
+    expect(responses.filter(r => r.status === 200)).toHaveLength(1);
+    expect(responses.every(r => [200, 400, 409].includes(r.status))).toBe(true);
+    expect(await db.experienceCheckin.count({ where: { ticketId: ticket.id } })).toBe(1);
+    expect(emit).toHaveBeenCalledTimes(1);
   });
   it("rolls back financial lifecycle and operational edits together if the transactional financial audit fails", async () => {
     const f = await fixture(), a = await financialFixture(f);

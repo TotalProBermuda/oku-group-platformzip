@@ -80,7 +80,8 @@ export function effectiveField(state: State, session: ManagedSession, key: strin
   const { series } = state;
   const [kind, name, locale] = key.split(".");
   let legacy: unknown = null, base: unknown = null, inherits = true;
-  if (key === "capacity") { legacy = session.capacity; base = series.capacityTotal || session.capacity; inherits = false; }
+  // capacityTotal is a series aggregate, never a per-occurrence template.
+  if (key === "capacity") { legacy = session.capacity; base = session.capacity; inherits = false; }
   else if (key === "schedule") {
     legacy = { localStart: panamaDateTimeLocalInput(session.startsAt).slice(11), durationMinutes: (session.endsAt.getTime() - session.startsAt.getTime()) / 60000 };
     base = legacy; inherits = false;
@@ -131,6 +132,8 @@ export function effectiveField(state: State, session: ManagedSession, key: strin
   return resolveField(key, session.fieldModes, series.sessionDefaults, legacy, inherits, base);
 }
 export function defaultField(state: State, key: string): EffectiveField {
+  if (key === "capacity" && modes(state.series.sessionDefaults).capacity?.mode !== "override")
+    return { value: null, source: "series", mode: "inherit" };
   const dummy = state.sessions[0];
   if (dummy) {
     const field = effectiveField(state, { ...dummy, fieldModes: { [key]: { mode: "inherit" } } }, key);
@@ -139,7 +142,7 @@ export function defaultField(state: State, key: string): EffectiveField {
   }
   const [kind, name, locale] = key.split(".");
   let base: unknown = null;
-  if (key === "capacity") base = state.series.capacityTotal || 1;
+  if (key === "capacity") base = null;
   else if (key === "schedule") base = { localStart: "18:00", durationMinutes: 180 };
   else if (["giftBagEnabled", "streetsideEnabled", "allowLateSales"].includes(key)) base = false;
   else if (kind === "content") {

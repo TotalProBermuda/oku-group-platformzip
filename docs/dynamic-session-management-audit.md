@@ -60,3 +60,17 @@ Only preserved admission on a confirmed replacement date, or pending-date hold
 with sales/check-in paused. No refunds, cancellation, reissue, transfer, notice
 delivery or new financial referral scopes. Notice release and attendee-consent
 policy require explicit owner decisions outside this implementation.
+
+## Review-pass compatibility audit
+
+The preceding sections record the original pre-implementation audit, not current verification counts. See the updated handoff for exact review-pass logs and outcomes.
+
+| Area | Current bounded behavior |
+|---|---|
+| Session capacity | Explicit per-occurrence default only; absent/inherit-only defaults preserve submitted/materialized occurrence capacity. Never inherit the series aggregate. |
+| Admin admission | Occurrence lock, ticket claim and ExperienceCheckin record share one transaction; failed audit cannot leave a checked-in ticket or trigger SSE. |
+| Operational identities | Primary/co-host/sponsor/profile display assignments remain separate from commercial ownership and earning eligibility. |
+| Financial identities | Existing current-SERIES assignment DRAFT/ACTIVE/PAUSED/RETIRED lifecycle uses the same payload-bound preview/apply, SUPERADMIN only, with versions and transactional audit. |
+| Shared financial scopes | GLOBAL/VENUE remain read-only here; CAMPAIGN relationships are not guessed. Canonical tools own cross-series scope/identity/financial-term changes. No SESSION scope exists. |
+| Purchased rights/economics | Lifecycle edits do not accept rates, plans, eligibility, links or historical order/ticket/commission writes. Existing terms are fingerprinted so stale financial previews reject. |
+| Migration | SQL moved into the established tracked Prisma migration path; unapplied to shared/managed/production databases. Release requires approved Replit Publish schema-diff review and publication. |

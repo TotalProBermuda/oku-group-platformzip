@@ -81,6 +81,8 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = [], role
   const previewRequests: unknown[] = [];
   const committed: unknown[] = [];
   const createRequests: Array<Record<string, unknown>> = [];
+  const referrals = managementFixture.options.referrals.map((item) => ({ ...item }));
+  let pendingAssignmentChanges: Array<{ assignmentId: string; status: "DRAFT" | "ACTIVE" | "PAUSED" | "RETIRED" }> = [];
 
   // Default-deny API traffic: known fixture requests below override this route.
   await page.route("**/api/**", async (route: Route) => {
@@ -103,10 +105,11 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = [], role
   });
   await page.route(MANAGEMENT_URL, async (route) => {
     const method = route.request().method();
-    if (method === "GET") return route.fulfill({ json: { ok: true, data: managementFixture } });
+    if (method === "GET") return route.fulfill({ json: { ok: true, data: { ...managementFixture, options: { ...managementFixture.options, referrals } } } });
     if (method === "POST") {
-      const body = route.request().postDataJSON() as { kind: string; patch: Record<string, { mode: string; value?: unknown }>; assignmentChanges?: Array<{ assignmentId: string; status: "ACTIVE" | "PAUSED" }> };
+      const body = route.request().postDataJSON() as { kind: string; patch: Record<string, { mode: string; value?: unknown }>; assignmentChanges?: Array<{ assignmentId: string; status: "DRAFT" | "ACTIVE" | "PAUSED" | "RETIRED" }> };
       previewRequests.push(body);
+      pendingAssignmentChanges = body.assignmentChanges ?? [];
       const target = sessions[0];
       const changes = Object.entries(body.patch).map(([field, change]) => ({
         field,
@@ -114,7 +117,7 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = [], role
         after: fixtureEffective(change.mode === "override" ? change.value : change.mode === "clear" ? null : "inherited fixture value", change.mode === "override" ? "override" : "series", change.mode as "inherit" | "override" | "clear"),
       }));
        const assignmentDiffs = (body.assignmentChanges ?? []).map(({ assignmentId, status }) => {
-         const assignment = managementFixture.options.referrals.find((item) => item.id === assignmentId)!;
+        const assignment = referrals.find((item) => item.id === assignmentId)!;
          return {
            field: `referral.${assignmentId}.status`,
            before: fixtureEffective(assignment.status, "series", "inherit"),
@@ -134,6 +137,12 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = [], role
     if (method === "PATCH") {
       committed.push(route.request().postDataJSON());
       const status = patchStatuses.shift() ?? 200;
+      if (status === 200) {
+        for (const change of pendingAssignmentChanges) {
+          const assignment = referrals.find((item) => item.id === change.assignmentId);
+          if (assignment) assignment.status = change.status;
+        }
+      }
       return route.fulfill({ status, json: status === 200 ? { ok: true, data: { changeId: "fixture-change", targetIds: [sessions[0].id], noticeCount: 2 } } : { ok: false, error: "Preview is stale" } });
     }
     return route.fulfill({ status: 405, json: { ok: false, error: "Unexpected method" } });
@@ -145,7 +154,8 @@ async function openDatesTab(page: Page, context: BrowserContext, baseURL?: strin
   await addFixtureAuth(context, baseURL, roles);
   const fixtures = await installApiFixtures(page, patchStatuses, roles);
   await page.goto(`/admin/experiences/${SERIES_ID}?tab=dates`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Session management" })).toBeVisible();
+  // A cold Next dev compilation may finish the shell before hydrating the editor.
+  await expect(page.getByRole("heading", { name: "Session management" })).toBeVisible({ timeout: 20_000 });
   return fixtures;
 }
 
@@ -164,7 +174,7 @@ test.describe("session management fixture workflow", () => {
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width + 2);
 
     await expect(page.getByLabel("María Velasquez Assignment status")).toBeVisible();
-    await expect(page.getByLabel("Draft referral Assignment status")).toHaveCount(0);
+    await expect(page.getByLabel("Draft referral Assignment status")).toBeVisible();
     await expect(page.getByText("Global referral")).toBeVisible();
     await expect(page.getByRole("link", { name: "Manage referrers" })).toHaveAttribute("href", "/admin/referrals");
     await page.getByLabel("María Velasquez Assignment status").selectOption("PAUSED");
@@ -197,6 +207,44 @@ test.describe("session management fixture workflow", () => {
       { previewId: "fixture-preview", requestId: "fixture-request" },
       { previewId: "fixture-preview", requestId: "fixture-request" },
     ]);
+  });
+
+  test("activates a draft SERIES assignment then retires it through preview/apply", async ({ baseURL, context, page }) => {
+    const { previewRequests, committed } = await openDatesTab(page, context, baseURL);
+    await page.getByLabel("Change scope").selectOption("defaults");
+    const assignmentStatus = page.getByLabel("Draft referral Assignment status");
+
+    await assignmentStatus.selectOption("ACTIVE");
+    await page.getByRole("button", { name: "Preview changes" }).click();
+    let dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Referral assignment · Draft referral · Status");
+    await expect(dialog).toContainText("DRAFT");
+    await expect(dialog).toContainText("ACTIVE");
+    expect(previewRequests[0]).toMatchObject({
+      kind: "defaults", sessionIds: [], patch: {},
+      assignmentChanges: [{ assignmentId: "referral-draft", status: "ACTIVE" }],
+    });
+    await dialog.getByRole("button", { name: "Confirm and apply" }).click();
+    await expect(page.getByRole("status")).toContainText("Session changes saved.");
+    await expect(page.getByLabel("Draft referral Assignment status")).toHaveValue("");
+
+    await page.getByLabel("Draft referral Assignment status").selectOption("RETIRED");
+    await page.getByRole("button", { name: "Preview changes" }).click();
+    dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Referral assignment · Draft referral · Status");
+    await expect(dialog).toContainText("ACTIVE");
+    await expect(dialog).toContainText("RETIRED");
+    expect(previewRequests[1]).toMatchObject({
+      kind: "defaults", sessionIds: [], patch: {},
+      assignmentChanges: [{ assignmentId: "referral-draft", status: "RETIRED" }],
+    });
+    await dialog.getByRole("button", { name: "Confirm and apply" }).click();
+    await expect(page.getByRole("status")).toContainText("Session changes saved.");
+    expect(committed).toEqual([
+      { previewId: "fixture-preview", requestId: "fixture-request" },
+      { previewId: "fixture-preview", requestId: "fixture-request" },
+    ]);
+    expect(previewRequests).toHaveLength(2);
   });
 
   test("previews a date-only session change with an empty patch", async ({ baseURL, context, page }) => {

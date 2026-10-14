@@ -14,3 +14,4 @@
 - [Partner Matrix referrer access](partner-matrix-referrer-access.md) — active referral identity, not role alone, governs the shared Referrer Dashboard for legacy Matrix accounts.
 - [Localized artwork boundaries](localized-artwork-boundaries.md) — artwork is independent of text translation; clearing a reference must not delete a potentially shared asset.
 - [Session-change policy boundaries](session-change-policy-boundaries.md) — postponement is not consent to refunds, transfers, notice delivery or session-only referral economics.
+- [Generated validation baselines](validation-baseline-comparison.md) — generated Next checks can expose unchanged source errors; compare ancestry, not only diagnostic counts.

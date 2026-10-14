@@ -61,7 +61,7 @@ export const managementInputSchema = z.object({
   sessionIds: z.array(id).max(50).refine(v => new Set(v).size === v.length, "Duplicate session selection"),
   patch: fieldPatchSchema,
   assignmentChanges: z.array(z.object({
-    assignmentId: id, status: z.enum(["ACTIVE", "PAUSED"]),
+    assignmentId: id, status: z.enum(["DRAFT", "ACTIVE", "PAUSED", "RETIRED"]),
   }).strict()).max(50).refine(rows => new Set(rows.map(r => r.assignmentId)).size === rows.length, "Duplicate financial assignment").optional(),
   schedules: z.record(id, z.object({ startsAt: z.string().datetime(), endsAt: z.string().datetime() }).strict()
     .refine(v => new Date(v.endsAt) > new Date(v.startsAt), "End must follow start")).optional(),

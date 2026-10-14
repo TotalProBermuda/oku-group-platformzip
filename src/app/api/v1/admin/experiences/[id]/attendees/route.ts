@@ -66,9 +66,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const actorId = (session?.user as { id?: string } | undefined)?.id;
     if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const claim = await claimAdmission({ ticketId, sessionId: ticket.sessionId, actorId, at: now });
+    const claim = await prisma.$transaction(async tx => {
+      const result = await claimAdmission({ ticketId, sessionId: ticket.sessionId, actorId, at: now }, tx);
+      if (result.count) await tx.experienceCheckin.create({ data: {
+        ticketId, sessionId: ticket.sessionId, checkedInById: actorId,
+        method: method === "QR" || method === "MANUAL" ? method : "ADMIN_OVERRIDE",
+      } });
+      return result;
+    });
     if (!claim.count) return NextResponse.json({ error: "Ticket cannot be checked in." }, { status: 409 });
-    await prisma.experienceCheckin.create({ data: { ticketId, sessionId: ticket.sessionId, checkedInById: actorId, method: method === "QR" || method === "MANUAL" ? method : "ADMIN_OVERRIDE" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Check-in unavailable" }, { status: 409 });
   }

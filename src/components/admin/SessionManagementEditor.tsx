@@ -67,7 +67,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   const [kind, setKind] = useState<"sessions" | "defaults">("sessions");
   const [selected, setSelected] = useState<string[]>([]);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
-  const [referralEdits, setReferralEdits] = useState<Record<string, "ACTIVE" | "PAUSED" | "">>({});
+  const [referralEdits, setReferralEdits] = useState<Record<string, "DRAFT" | "ACTIVE" | "PAUSED" | "RETIRED" | "">>({});
   const [schedules, setSchedules] = useState<Record<string, { startsAt: string; endsAt: string }>>({});
   const [template, setTemplate] = useState({ localStart: "18:00", durationMinutes: 180 });
   const [postponement, setPostponement] = useState<{ reason: string; treatment: "PRESERVE_ADMISSION" | "HOLD_PENDING_DATE" } | null>(null);
@@ -77,6 +77,13 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   const [success, setSuccess] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  // React may commit the preview after an animation-frame callback has fired.
+  // Open and focus only once the rendered preview and enabled button exist.
+  useEffect(() => {
+    if (!preview || busy || !dialogRef.current) return;
+    if (!dialogRef.current.open) dialogRef.current.showModal();
+    confirmRef.current?.focus();
+  }, [preview, busy]);
 
   async function load(preserveDraft = false) {
     setLoading(true); setLoadError("");
@@ -152,7 +159,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
     if (kind === "sessions" && selected.length === 0) { setError(tr("session_select_first", "Select at least one session.")); return; }
     const assignmentChanges = kind === "defaults" ? Object.entries(referralEdits)
       .filter(([assignmentId, status]) => status && data?.options.referrals.find((item) => item.id === assignmentId)?.status !== status)
-      .map(([assignmentId, status]) => ({ assignmentId, status: status as "ACTIVE" | "PAUSED" })) : [];
+      .map(([assignmentId, status]) => ({ assignmentId, status: status as "DRAFT" | "ACTIVE" | "PAUSED" | "RETIRED" })) : [];
     const scheduleValues: Record<string, { startsAt: string; endsAt: string }> = {};
     Object.entries(schedules).forEach(([id, value]) => {
       if (kind === "sessions" && selected.includes(id) && value.startsAt && value.endsAt) scheduleValues[id] = { startsAt: panamaDateTimeLocalIso(value.startsAt), endsAt: panamaDateTimeLocalIso(value.endsAt) };
@@ -170,10 +177,6 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
       const result = await response.json();
       if (!response.ok || !result?.ok) throw Object.assign(new Error(result?.error || tr("session_preview_failed", "Preview could not be created.")), { status: response.status });
       setPreview(result.data);
-       requestAnimationFrame(() => {
-         dialogRef.current?.showModal();
-         requestAnimationFrame(() => confirmRef.current?.focus());
-       });
     } catch (e) { setError(e instanceof Error ? e.message : tr("session_preview_failed", "Preview could not be created.")); }
     finally { setBusy(false); }
   }
@@ -268,11 +271,11 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
           </fieldset>}
           {kind === "defaults" && canManageRestricted && data.options.referrals.length > 0 && <fieldset style={{ ...cardStyle, margin: 0, minWidth: 0 }}>
             <legend style={{ fontWeight: 700 }}>{tr("session_referral_assignments", "Financial referral assignments")}</legend>
-            <p style={{ color: "#756a61", fontSize: 12, lineHeight: 1.5, margin: "0 0 8px" }}>{tr("session_referral_effects", "Status changes affect future bookings across this entire series. Existing historical booking economics are not changed. Commission rates, eligibility, scope, plans, and links cannot be changed here.")}</p>
+            <p style={{ color: "#756a61", fontSize: 12, lineHeight: 1.5, margin: "0 0 8px" }}>{tr("session_referral_effects", "Only canonical assignment statuses—Draft, Active, Paused, and Retired—are available. Status changes affect future bookings across this entire series; historical booking economics are unchanged. Commission rates, eligibility, scope, plans, and links cannot be changed here.")}</p>
             <div style={{ display: "grid", gap: 8 }}>
               {data.options.referrals.map((item) => {
                 const isSeriesAssignment = item.scopeType === "SERIES" && item.scopeId === seriesId;
-                const editable = isSeriesAssignment && (item.status === "ACTIVE" || item.status === "PAUSED");
+                const editable = isSeriesAssignment && ["DRAFT", "ACTIVE", "PAUSED", "RETIRED"].includes(item.status);
                 const actorLabel = item.actorName || `${tr("session_referral_actor", "Referral actor")} ${item.id}`;
                 return <div key={item.id} style={{ ...cardStyle, minWidth: 0, padding: 10 }}>
                   <strong>{actorLabel}</strong>
@@ -284,17 +287,19 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
                   </p>
                   {editable
                     ? <label style={{ display: "block", fontSize: 12, fontWeight: 600 }}>{tr("session_referral_assignment_change", "Assignment status")}
-                      <select aria-label={`${actorLabel} ${tr("session_referral_assignment_change", "Assignment status")}`} value={referralEdits[item.id] ?? ""} onChange={(event) => setReferralEdits((previous) => ({ ...previous, [item.id]: event.target.value as "ACTIVE" | "PAUSED" | "" }))} style={{ ...textStyle, marginTop: 4 }}>
+                      <select aria-label={`${actorLabel} ${tr("session_referral_assignment_change", "Assignment status")}`} value={referralEdits[item.id] ?? ""} onChange={(event) => setReferralEdits((previous) => ({ ...previous, [item.id]: event.target.value as "DRAFT" | "ACTIVE" | "PAUSED" | "RETIRED" | "" }))} style={{ ...textStyle, marginTop: 4 }}>
                         <option value="">{tr("session_referral_unchanged", "Unchanged")}</option>
+                        <option value="DRAFT">{tr("session_referral_draft", "Draft")}</option>
                         <option value="ACTIVE">{tr("session_referral_active", "Active")}</option>
                         <option value="PAUSED">{tr("session_referral_paused", "Paused")}</option>
+                        <option value="RETIRED">{tr("session_referral_retired", "Retired")}</option>
                       </select>
                     </label>
                     : <p style={{ margin: 0, fontSize: 12, color: "#756a61" }}>{isSeriesAssignment ? tr("session_referral_read_only_status", "This assignment status is read-only.") : tr("session_referral_scope_read_only", "This referral scope is read-only here.")}</p>}
                 </div>;
               })}
             </div>
-            {data.options.referrals.some((item) => !(item.scopeType === "SERIES" && item.scopeId === seriesId && (item.status === "ACTIVE" || item.status === "PAUSED"))) && <p style={{ margin: "8px 0 0" }}>
+            {data.options.referrals.some((item) => !(item.scopeType === "SERIES" && item.scopeId === seriesId && ["DRAFT", "ACTIVE", "PAUSED", "RETIRED"].includes(item.status))) && <p style={{ margin: "8px 0 0" }}>
               <Link href="/admin/referrals" style={{ color: "#8c412f" }}>{tr("session_referrers_link", "Manage referrers")}</Link>
             </p>}
           </fieldset>}
