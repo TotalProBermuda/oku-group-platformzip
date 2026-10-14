@@ -28,6 +28,7 @@ export const createSessionInputSchema = z
     description: optionalContent(5000),
     flyerImageUrl: safeImageUrl,
     ticketPrices: sessionTicketPriceInputSchema.optional(),
+    useSeriesDefaults: z.boolean().optional().default(false),
     startsAt: z.coerce.date({ invalid_type_error: "Choose a valid start date and time." }),
     endsAt: z.coerce.date({ invalid_type_error: "Choose a valid end date and time." }),
     capacity: z.coerce

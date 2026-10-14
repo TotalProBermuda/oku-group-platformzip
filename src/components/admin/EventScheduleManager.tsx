@@ -1,11 +1,13 @@
 "use client";
 import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
+import SessionManagementEditor from "@/components/admin/SessionManagementEditor";
 
 import { FormEvent, useMemo, useState } from "react";
 import MediaUpload from "@/components/ui/MediaUpload";
 import EventArtwork from "@/components/ui/EventArtwork";
 import { sessionArtworkCandidates } from "@/lib/eventArtwork";
 import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
+import { useTranslation } from "@/components/i18n/LocaleProvider";
 
 type SessionRow = {
   id: string;
@@ -39,6 +41,7 @@ type FormState = {
   occupancyScope: "NONE" | "SPACE" | "VENUE";
   setupMinutes: string;
   resetMinutes: string;
+  useSeriesDefaults: boolean;
 };
 
 function localInput(date: Date) {
@@ -65,6 +68,7 @@ function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
     occupancyScope: hasSpace ? "SPACE" : "NONE",
     setupMinutes: "0",
     resetMinutes: "0",
+    useSeriesDefaults: false,
   };
 }
 
@@ -111,6 +115,7 @@ export default function EventScheduleManager({
   onCreated: () => Promise<void> | void;
   canManageSessionContent?: boolean;
 }) {
+  const t = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(() => initialForm(defaultCapacity, hasPhysicalSpace));
   const [submitting, setSubmitting] = useState(false);
@@ -165,6 +170,7 @@ export default function EventScheduleManager({
           occupancyScope: form.occupancyScope,
           setupMinutes: form.setupMinutes,
           resetMinutes: form.resetMinutes,
+          ...(form.useSeriesDefaults ? { useSeriesDefaults: true } : {}),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -190,6 +196,7 @@ export default function EventScheduleManager({
 
   return (
     <section style={{ borderTop: "1px solid #e5e0d8", marginTop: 28, paddingTop: 28 }}>
+      <SessionManagementEditor seriesId={seriesId} onSaved={onCreated} canManageRestricted={canManageSessionContent} />
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
           <h3 style={{ color: "#1a1614", fontSize: 18, margin: "0 0 5px" }}>Event sessions</h3>
@@ -267,6 +274,10 @@ export default function EventScheduleManager({
               </label>)}
             </div>
           </div> : null}
+          <label style={{ color: "#534942", display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, lineHeight: 1.45, marginTop: 14 }}>
+            <input type="checkbox" checked={form.useSeriesDefaults} onChange={(event) => setForm((current) => ({ ...current, useSeriesDefaults: event.target.checked }))} />
+            <span><strong>{t("admin", "sessionCreateInheritDefaults")}</strong><br /><span style={{ color: "#7c7168" }}>{t("admin", "sessionCreateInheritDefaultsHelp")}</span></span>
+          </label>
           <p style={{ color: "#7c7168", fontSize: 12, lineHeight: 1.5, margin: "14px 0 0" }}>
             Dining coverage creates a linked draft block. Existing reservations are flagged for review and are never cancelled automatically.
           </p>

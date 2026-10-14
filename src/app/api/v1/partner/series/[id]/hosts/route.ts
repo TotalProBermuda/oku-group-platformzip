@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { legacySeriesMutation } from "@/server/series/legacySessionGuard";
 import { requirePartnerForSeries, PartnerAuthError } from "@/lib/partnerAuth";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     });
     return NextResponse.json({ ok: true, hosts });
   } catch (e: any) {
+    if (e.status === 409) return NextResponse.json({ error: e.message }, { status: 409 });
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/hosts] GET", e);
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    const host = await prisma.seriesHost.upsert({
+    const host = await legacySeriesMutation(seriesId, tx => tx.seriesHost.upsert({
       where: { seriesId_entityId: { seriesId, entityId: entityId! } },
       create: {
         seriesId,
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           },
         },
       },
-    });
+    }));
 
     return NextResponse.json({ ok: true, host }, { status: 201 });
   } catch (e: any) {

@@ -7,7 +7,7 @@ vi.mock("@/server/series/publicationLifecycle", () => ({
   assertSeriesReadyForPublication: vi.fn(), syncSeriesOccupanciesForStatus: vi.fn(), SeriesPublicationError: class extends Error {},
 }));
 const db = vi.hoisted(() => {
-  const tx = { series: { update: vi.fn() }, auditLog: { create: vi.fn() } };
+  const tx = { $queryRaw: vi.fn(), series: { update: vi.fn(), findUnique: vi.fn().mockResolvedValue(null) }, auditLog: { create: vi.fn() } };
   return { tx, prisma: { series: { findUnique: vi.fn() }, $transaction: vi.fn((fn: (client: typeof tx) => unknown) => fn(tx)) } };
 });
 vi.mock("@/lib/prisma", () => ({ prisma: db.prisma }));

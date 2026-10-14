@@ -1,0 +1,17 @@
+
+Running 12 tests using 1 worker
+
+  ✓   1 [desktop] › tests/browser/session-management.spec.ts:140:3 › session management fixture workflow › selects a session, edits one locale, and previews exact old/new values without contacts (8.6s)
+  ✓   2 [desktop] › tests/browser/session-management.spec.ts:162:3 › session management fixture workflow › shows defaults preview diffs even when a new series has zero affected sessions (4.2s)
+  ✓   3 [desktop] › tests/browser/session-management.spec.ts:178:3 › session management fixture workflow › a 409 preserves the selected session and locale draft for re-preview (2.5s)
+  ✓   4 [desktop] › tests/browser/session-management.spec.ts:194:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview (2.3s)
+  ✓   5 [desktop] › tests/browser/session-management.spec.ts:207:3 › session management fixture workflow › new session defaults checkbox is false by default and only sends true when opted in (4.5s)
+  ✓   6 [desktop] › tests/browser/session-management.spec.ts:224:3 › session management fixture workflow › stacks within a 375px viewport and preserves existing create-session flow (5.0s)
+  ✓   7 [mobile] › tests/browser/session-management.spec.ts:140:3 › session management fixture workflow › selects a session, edits one locale, and previews exact old/new values without contacts (4.0s)
+  ✓   8 [mobile] › tests/browser/session-management.spec.ts:162:3 › session management fixture workflow › shows defaults preview diffs even when a new series has zero affected sessions (3.9s)
+  ✓   9 [mobile] › tests/browser/session-management.spec.ts:178:3 › session management fixture workflow › a 409 preserves the selected session and locale draft for re-preview (4.2s)
+  ✓  10 [mobile] › tests/browser/session-management.spec.ts:194:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview (4.0s)
+  ✓  11 [mobile] › tests/browser/session-management.spec.ts:207:3 › session management fixture workflow › new session defaults checkbox is false by default and only sends true when opted in (2.4s)
+  ✓  12 [mobile] › tests/browser/session-management.spec.ts:224:3 › session management fixture workflow › stacks within a 375px viewport and preserves existing create-session flow (5.5s)
+
+  12 passed (1.2m)

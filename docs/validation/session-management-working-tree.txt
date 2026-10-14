@@ -1,0 +1,81 @@
+ M .agents/memory/MEMORY.md
+ M prisma/schema.prisma
+ M src/app/[locale]/experiences/[slug]/page.tsx
+ M src/app/api/v1/admin/experiences/[id]/attendees/route.ts
+ M src/app/api/v1/admin/experiences/[id]/route.ts
+ M src/app/api/v1/admin/experiences/[id]/ticket-types/[ttId]/route.ts
+ M src/app/api/v1/admin/profiles/[id]/series-assignments/route.ts
+ M src/app/api/v1/admin/series/[id]/hosts/[hostId]/route.ts
+ M src/app/api/v1/admin/series/[id]/hosts/route.ts
+ M src/app/api/v1/admin/series/[id]/sessions/route.ts
+ M src/app/api/v1/admin/series/[id]/sponsors/[aid]/route.ts
+ M src/app/api/v1/admin/series/[id]/sponsors/route.ts
+ M src/app/api/v1/admin/sessions/[id]/hosts/[hostId]/route.ts
+ M src/app/api/v1/admin/sessions/[id]/hosts/route.ts
+ M src/app/api/v1/admin/sessions/[id]/inherit-sponsors/route.ts
+ M src/app/api/v1/admin/sessions/[id]/override-hosts/route.ts
+ M src/app/api/v1/admin/sessions/[id]/route.ts
+ M src/app/api/v1/admin/sessions/[id]/schedule/route.ts
+ M src/app/api/v1/admin/sessions/[id]/sponsors/[aid]/route.ts
+ M src/app/api/v1/admin/sessions/[id]/sponsors/route.ts
+ M src/app/api/v1/admin/tickets/issue/route.ts
+ M src/app/api/v1/checkout/confirm/route.ts
+ M src/app/api/v1/checkout/demo/route.ts
+ M src/app/api/v1/checkout/intent/route.ts
+ M src/app/api/v1/checkout/quote/route.ts
+ M src/app/api/v1/experiences/route.ts
+ M src/app/api/v1/host/gift-bag/[ticketId]/route.ts
+ M src/app/api/v1/host/reservation-block/[id]/arrive/route.ts
+ M src/app/api/v1/host/tickets/[id]/checkin/route.ts
+ M src/app/api/v1/orders/route.ts
+ M src/app/api/v1/partner/series/[id]/hosts/[hostId]/route.ts
+ M src/app/api/v1/partner/series/[id]/hosts/route.ts
+ M src/app/api/v1/series/route.ts
+ M src/app/api/v1/sessions/route.ts
+ M src/app/api/v1/sponsors/resolve/route.ts
+ M src/components/admin/EventScheduleManager.tsx
+ M src/components/admin/EventSponsorManager.tsx
+ M src/components/admin/SeriesHostManager.tsx
+ M src/components/admin/SeriesSponsorManager.tsx
+ M src/components/experiences/ExperienceSessionsView.tsx
+ M src/config/translatableFields.ts
+ M src/i18n/translations/en/admin.json
+ M src/i18n/translations/es/admin.json
+ M src/i18n/translations/pt/admin.json
+ M src/lib/eventArtwork.ts
+ M src/server/checkin/checkInService.ts
+ M src/server/commerce/capacity.ts
+ M src/server/commerce/catalogPolicy.ts
+ M src/server/commerce/checkoutHold.ts
+ M src/server/commerce/guestCheckout.ts
+ M src/server/commerce/ticketIssuance.ts
+ M src/server/series/createSessionInput.ts
+ M tests/server/commerce/checkoutAccountBoundary.test.ts
+ M tests/server/commerce/checkoutHold.test.ts
+ M tests/server/commerce/ticketCheckin.test.ts
+ M tests/server/series/createSessionRoute.test.ts
+ M tests/server/series/publicArtworkMapping.test.ts
+ M tests/server/series/seriesArtworkEditRoute.test.ts
+ M tests/server/series/sessionContentRoute.test.ts
+ M tests/server/series/sessionScheduleRoute.test.ts
+?? .agents/memory/session-change-policy-boundaries.md
+?? docs/dynamic-session-management-audit.md
+?? docs/dynamic-session-management-handoff.md
+?? docs/validation/
+?? prisma/session-management-additive.sql
+?? src/app/api/v1/admin/series/[id]/session-management/
+?? src/components/admin/SessionManagementEditor.tsx
+?? src/components/admin/SessionManagementNotice.tsx
+?? src/server/checkin/claimAdmission.ts
+?? src/server/commerce/sessionInventory.ts
+?? src/server/commerce/sessionProducts.ts
+?? src/server/series/effectiveAssignments.ts
+?? src/server/series/legacySessionGuard.ts
+?? src/server/series/localizeSessions.ts
+?? src/server/series/postponementNotices.ts
+?? src/server/series/sessionFields.ts
+?? src/server/series/sessionManagement.ts
+?? src/server/series/sessionState.ts
+?? tests/browser/session-management.spec.ts
+?? tests/components/session-management.test.tsx
+?? tests/server/series/sessionManagement.database.test.ts

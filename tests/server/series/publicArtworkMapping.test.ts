@@ -18,11 +18,11 @@ beforeEach(() => {
 describe("public artwork data mapping remains backward compatible", () => {
   it.each(["en", "es", "pt"])("series API retains all artwork and legacy fields in %s", async locale => {
     const response = await seriesGET(new Request(`http://localhost/api/v1/series?locale=${locale}`));
-    expect((await response.json()).data[0]).toEqual(series);
+    expect((await response.json()).data[0]).toMatchObject(series);
   });
   it("experience detail/list API carries series and session localized fields without remapping legacy", async () => {
     const response = await experiencesGET(new NextRequest("http://localhost/api/v1/experiences?slug=example"));
-    expect((await response.json()).series[0]).toEqual(series);
+    expect((await response.json()).series[0]).toMatchObject(series);
     expect(db.series.findMany).toHaveBeenCalledWith(expect.objectContaining({ include: expect.objectContaining({ sessions: expect.any(Object) }) }));
   });
   it("calendar API explicitly selects all six localized columns", async () => {

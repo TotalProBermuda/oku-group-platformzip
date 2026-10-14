@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { localizeSessions } from "@/server/series/localizeSessions";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -22,6 +23,8 @@ export async function GET(req: NextRequest) {
     select: {
       id: true,
       title: true,
+      description: true,
+      fieldModes: true,
       subtitle: true,
       flyerImageUrl: true,
       flyerImageUrlEn: true,
@@ -37,6 +40,9 @@ export async function GET(req: NextRequest) {
           id: true,
           slug: true,
           title: true,
+          subtitle: true,
+          description: true,
+          sessionDefaults: true,
           venue: true,
           heroImageUrl: true,
           heroImageUrlEn: true,
@@ -47,5 +53,6 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ sessions });
+  const localized = await Promise.all(sessions.map(async s => (await localizeSessions(s.series, [s], searchParams.get("locale") ?? "en"))[0]));
+  return NextResponse.json({ sessions: localized });
 }

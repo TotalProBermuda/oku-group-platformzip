@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       const tt = series.ticketTypes.find((t) => t.id === item.ticketTypeId);
       if (!tt) return NextResponse.json({ error: `Ticket type ${item.ticketTypeId} not found` }, { status: 400 });
       if (tt.ticketStatus !== "ACTIVE") return NextResponse.json({ error: "This ticket is not available." }, { status: 409 });
+      if (!sessionProductEnabled(sess, series, tt.id)) return NextResponse.json({ error: "This ticket is not available for this session." }, { status: 409 });
       if ((tt.saleStartsAt && now < tt.saleStartsAt) || (tt.saleEndsAt && now > tt.saleEndsAt)) {
         return NextResponse.json({ error: "This ticket is not currently on sale." }, { status: 409 });
       }

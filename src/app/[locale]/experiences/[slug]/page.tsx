@@ -19,8 +19,8 @@ import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
 
-async function getSeries(slug: string) {
-  const res = await fetch(`${BASE}/api/v1/experiences?slug=${slug}`, { cache: "no-store" });
+async function getSeries(slug: string, locale = "en") {
+  const res = await fetch(`${BASE}/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${encodeURIComponent(locale)}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
   return data.series?.[0] ?? null;
@@ -44,7 +44,7 @@ interface Props { params: Promise<{ locale: string; slug: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
-  const series = await getSeries(slug);
+  const series = await getSeries(slug, safeLocale);
   if (!series) return {};
 
   const content = getSeriesContent(series.slug, safeLocale);
@@ -77,7 +77,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
-    getSeries(slug),
+    getSeries(slug, safeLocale),
     getAvailability(slug),
     getServerSession(authOptions),
     getTranslations(safeLocale, ["common"]),

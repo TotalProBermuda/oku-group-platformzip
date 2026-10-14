@@ -4,9 +4,10 @@ import { NextRequest } from "next/server";
 const auth = vi.hoisted(() => ({ requireSession: vi.fn() }));
 const db = vi.hoisted(() => {
   const tx = {
+    $queryRaw: vi.fn(),
     session: { findUnique: vi.fn(), updateMany: vi.fn() },
-    ticket: { count: vi.fn() },
-    order: { count: vi.fn() },
+    ticket: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    order: { count: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     eventSpaceOccupancy: { findMany: vi.fn(), update: vi.fn() },
     eventReservationConflict: { count: vi.fn() },
     auditLog: { create: vi.fn() },

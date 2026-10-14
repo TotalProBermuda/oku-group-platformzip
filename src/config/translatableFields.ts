@@ -18,8 +18,11 @@ export const TRANSLATABLE_FIELDS = {
   ],
   EventSession: [
     "title",
+    "subtitle",
+    "description",
     "notes",
   ],
+  SeriesSessionDefaults: ["title", "subtitle", "description"],
   Venue: [
     "name",
     "shortDescription",

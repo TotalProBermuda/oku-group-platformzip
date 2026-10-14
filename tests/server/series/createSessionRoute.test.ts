@@ -8,6 +8,7 @@ vi.mock("@/server/series/publicationLifecycle", () => ({ lockOccupancySpaces: oc
 
 const dbMock = vi.hoisted(() => {
   const tx = {
+    $queryRaw: vi.fn(),
     session: { create: vi.fn() },
     eventSpaceOccupancy: { create: vi.fn() },
     user: { findMany: vi.fn() },
@@ -36,7 +37,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionMock.requireSession.mockResolvedValue({ userId: "fb-director-1", roles: ["FB_DIRECTOR"] });
   dbMock.prisma.series.findUnique.mockResolvedValue({ id: "series-1", venueId: "venue-1", spaceId: "space-1", status: "DRAFT", ticketTypes: [{ id: "ticket-1" }] });
-  dbMock.tx.session.create.mockResolvedValue({ id: "event-1", seriesId: "series-1", ...validBody });
+  dbMock.tx.session.create.mockResolvedValue({ id: "event-1", seriesId: "series-1", ...validBody, startsAt: new Date(validBody.startsAt), endsAt: new Date(validBody.endsAt) });
   dbMock.tx.auditLog.create.mockResolvedValue({ id: "audit-1" });
   dbMock.tx.eventSpaceOccupancy.create.mockResolvedValue({ id: "occupancy-1", venueId: "venue-1", scope: "SPACE", spaceId: "space-1" });
   dbMock.tx.user.findMany.mockResolvedValue([]);
