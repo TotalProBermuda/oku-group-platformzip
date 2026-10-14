@@ -47,11 +47,16 @@ const managementFixture = {
     entities: [{ id: "entity-oku", displayName: "OKU fixture" }],
     profiles: [{ id: "profile-fixture", displayName: "Fixture host" }],
     sponsorTiers: [{ id: "tier-fixture", label: "Partner" }],
-    referrals: [{ id: "referral-fixture", scopeType: "SERIES", scopeId: SERIES_ID, isCommissionEligible: true }],
+    referrals: [
+      { id: "referral-fixture", scopeType: "SERIES", scopeId: SERIES_ID, isCommissionEligible: true, status: "ACTIVE", isActive: true, actorName: "María Velasquez", actorStatus: "ACTIVE" },
+      { id: "referral-draft", scopeType: "SERIES", scopeId: SERIES_ID, isCommissionEligible: true, status: "DRAFT", isActive: false, actorName: "Draft referral", actorStatus: "ACTIVE" },
+      { id: "referral-global", scopeType: "GLOBAL", scopeId: "global", isCommissionEligible: false, status: "ACTIVE", isActive: true, actorName: "Global referral", actorStatus: "ACTIVE" },
+      { id: "referral-venue", scopeType: "VENUE", scopeId: "fixture-venue", isCommissionEligible: true, status: "PAUSED", isActive: false, actorName: "Venue referral", actorStatus: "PAUSED" },
+    ],
   },
 };
 
-async function addFixtureAuth(context: BrowserContext, baseURL?: string) {
+async function addFixtureAuth(context: BrowserContext, baseURL?: string, roles = ["SUPERADMIN"]) {
   const origin = new URL(baseURL ?? "http://localhost:5000");
   const secret = process.env.NEXTAUTH_SECRET ?? "replace-me";
   const token = await encode({
@@ -61,7 +66,7 @@ async function addFixtureAuth(context: BrowserContext, baseURL?: string) {
     token: {
       sub: "fixture-superadmin",
       userId: "fixture-superadmin",
-      roles: ["SUPERADMIN"],
+      roles,
       name: "Fixture Administrator",
       email: "fixture-admin@example.test",
     },
@@ -72,7 +77,7 @@ async function addFixtureAuth(context: BrowserContext, baseURL?: string) {
   }]);
 }
 
-async function installApiFixtures(page: Page, patchStatuses: number[] = []) {
+async function installApiFixtures(page: Page, patchStatuses: number[] = [], roles = ["SUPERADMIN"]) {
   const previewRequests: unknown[] = [];
   const committed: unknown[] = [];
   const createRequests: Array<Record<string, unknown>> = [];
@@ -82,7 +87,7 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = []) {
     const method = route.request().method();
     await route.fulfill({ status: method === "GET" || method === "HEAD" ? 404 : 501, contentType: "application/json", body: JSON.stringify({ ok: false, error: "Unstubbed fixture request" }) });
   });
-  await page.route("**/api/auth/session", (route) => route.fulfill({ json: { user: { id: "fixture-superadmin", name: "Fixture Administrator", email: "fixture-admin@example.test", roles: ["SUPERADMIN"] }, expires: "2099-01-01T00:00:00.000Z" } }));
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: { user: { id: "fixture-superadmin", name: "Fixture Administrator", email: "fixture-admin@example.test", roles }, expires: "2099-01-01T00:00:00.000Z" } }));
   await page.route("**/api/v1/admin/experiences/" + SERIES_ID, (route) => route.fulfill({ json: { series: {
     id: SERIES_ID, title: "Fixture series", slug: SERIES_ID, status: "DRAFT", startsAt: start, endsAt: end, capacityTotal: 30,
     venueId: "fixture-venue", spaceId: null, ticketTypes: [{ id: "fixture-ticket", name: "General", priceCents: 4500 }],
@@ -100,7 +105,7 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = []) {
     const method = route.request().method();
     if (method === "GET") return route.fulfill({ json: { ok: true, data: managementFixture } });
     if (method === "POST") {
-      const body = route.request().postDataJSON() as { kind: string; patch: Record<string, { mode: string; value?: unknown }> };
+      const body = route.request().postDataJSON() as { kind: string; patch: Record<string, { mode: string; value?: unknown }>; assignmentChanges?: Array<{ assignmentId: string; status: "ACTIVE" | "PAUSED" }> };
       previewRequests.push(body);
       const target = sessions[0];
       const changes = Object.entries(body.patch).map(([field, change]) => ({
@@ -108,7 +113,15 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = []) {
         before: (target.fields as Record<string, ReturnType<typeof fixtureEffective>>)[field] ?? fixtureEffective(null),
         after: fixtureEffective(change.mode === "override" ? change.value : change.mode === "clear" ? null : "inherited fixture value", change.mode === "override" ? "override" : "series", change.mode as "inherit" | "override" | "clear"),
       }));
-      const defaults = body.kind === "defaults" ? changes.map((change) => ({ ...change })) : [];
+       const assignmentDiffs = (body.assignmentChanges ?? []).map(({ assignmentId, status }) => {
+         const assignment = managementFixture.options.referrals.find((item) => item.id === assignmentId)!;
+         return {
+           field: `referral.${assignmentId}.status`,
+           before: fixtureEffective(assignment.status, "series", "inherit"),
+           after: fixtureEffective(status, "series", "override"),
+         };
+       });
+       const defaults = body.kind === "defaults" ? [...changes, ...assignmentDiffs] : [];
       const targets = body.kind === "defaults" ? [] : [{
         id: target.id, title: target.title, inventory: target.inventory, changes, warnings: [], blocked: [],
         noticeCounts: { queued: 2, missingContacts: 1, locales: { en: 1, es: 1, pt: 0 } },
@@ -128,15 +141,89 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = []) {
   return { previewRequests, committed, createRequests };
 }
 
-async function openDatesTab(page: Page, context: BrowserContext, baseURL?: string, patchStatuses: number[] = []) {
-  await addFixtureAuth(context, baseURL);
-  const fixtures = await installApiFixtures(page, patchStatuses);
+async function openDatesTab(page: Page, context: BrowserContext, baseURL?: string, patchStatuses: number[] = [], roles = ["SUPERADMIN"]) {
+  await addFixtureAuth(context, baseURL, roles);
+  const fixtures = await installApiFixtures(page, patchStatuses, roles);
   await page.goto(`/admin/experiences/${SERIES_ID}?tab=dates`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Session management" })).toBeVisible();
   return fixtures;
 }
 
 test.describe("session management fixture workflow", () => {
+  test("edits a SERIES referral lifecycle through defaults preview/apply without overflowing at 375px", async ({ baseURL, context, page }) => {
+    page.setDefaultTimeout(10000);
+    await page.setViewportSize({ width: 375, height: 800 });
+    const { previewRequests, committed } = await openDatesTab(page, context, baseURL, [409, 200]);
+    await page.getByRole("checkbox", { name: "Select session Fixture evening A" }).check();
+    await page.getByLabel("This is a deliberate postponement").check();
+    await page.getByLabel("Reason for postponement").fill("Fixture pending-date treatment");
+    await page.getByLabel("Admission treatment").selectOption("HOLD_PENDING_DATE");
+    await page.getByLabel("Change scope").selectOption("defaults");
+    const editor = page.getByRole("region", { name: "Session management" });
+    const dimensions = await editor.evaluate((element) => ({ width: element.clientWidth, scrollWidth: element.scrollWidth }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width + 2);
+
+    await expect(page.getByLabel("María Velasquez Assignment status")).toBeVisible();
+    await expect(page.getByLabel("Draft referral Assignment status")).toHaveCount(0);
+    await expect(page.getByText("Global referral")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Manage referrers" })).toHaveAttribute("href", "/admin/referrals");
+    await page.getByLabel("María Velasquez Assignment status").selectOption("PAUSED");
+    await page.getByRole("button", { name: "Preview changes" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Referral assignment · María Velasquez · Status");
+    await expect(dialog).toContainText("ACTIVE");
+    await expect(dialog).toContainText("PAUSED");
+    expect(previewRequests).toHaveLength(1);
+    expect(previewRequests[0]).toEqual({
+      kind: "defaults",
+      sessionIds: [],
+      patch: {},
+      assignmentChanges: [{ assignmentId: "referral-fixture", status: "PAUSED" }],
+    });
+    expect(previewRequests[0]).not.toHaveProperty("postponement");
+
+    await dialog.getByRole("button", { name: "Confirm and apply" }).click();
+    await expect(page.getByText("The preview is stale.", { exact: false })).toBeVisible();
+    await expect(page.getByLabel("María Velasquez Assignment status")).toHaveValue("PAUSED");
+    await page.getByRole("button", { name: "Preview changes" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Referral assignment · María Velasquez · Status");
+    expect(previewRequests).toHaveLength(2);
+    expect(previewRequests[1]).toEqual(previewRequests[0]);
+    await page.getByRole("dialog").getByRole("button", { name: "Confirm and apply" }).click();
+    await expect(page.getByRole("status")).toContainText("Session changes saved.");
+    expect(committed).toEqual([
+      { previewId: "fixture-preview", requestId: "fixture-request" },
+      { previewId: "fixture-preview", requestId: "fixture-request" },
+    ]);
+  });
+
+  test("previews a date-only session change with an empty patch", async ({ baseURL, context, page }) => {
+    const { previewRequests } = await openDatesTab(page, context, baseURL);
+    await page.getByRole("checkbox", { name: "Select session Fixture evening A" }).check();
+    await page.getByLabel("Starts at").fill("2027-05-16T18:00");
+    await page.getByLabel("Ends at").fill("2027-05-16T21:00");
+    await page.getByRole("button", { name: "Preview changes" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+
+    expect(previewRequests).toHaveLength(1);
+    expect(previewRequests[0]).toMatchObject({
+      kind: "sessions",
+      sessionIds: ["fixture-session-a"],
+      patch: {},
+      schedules: { "fixture-session-a": { startsAt: expect.any(String), endsAt: expect.any(String) } },
+    });
+    expect(previewRequests[0]).not.toHaveProperty("postponement");
+  });
+
+  test("FB_DIRECTOR fixture has no referral lifecycle controls", async ({ baseURL, context, page }) => {
+    await openDatesTab(page, context, baseURL, [], ["FB_DIRECTOR"]);
+    await page.getByLabel("Change scope").selectOption("defaults");
+    await expect(page.getByText("Financial referral assignments")).toHaveCount(0);
+    await expect(page.getByLabel("María Velasquez Assignment status")).toHaveCount(0);
+  });
+
   test("selects a session, edits one locale, and previews exact old/new values without contacts", async ({ baseURL, context, page }) => {
     const { previewRequests } = await openDatesTab(page, context, baseURL);
     await page.getByRole("checkbox", { name: "Select session Fixture evening A" }).check();

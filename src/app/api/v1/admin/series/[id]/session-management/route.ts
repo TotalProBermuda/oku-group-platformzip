@@ -32,10 +32,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         tx.entity.findMany({ select: { id: true, displayName: true }, orderBy: { displayName: "asc" } }),
         tx.profile.findMany({ where: { status: "ACTIVE" }, select: { id: true, displayName: true }, orderBy: { displayName: "asc" } }),
         tx.sponsorTier.findMany({ where: { isActive: true }, select: { id: true, label: true }, orderBy: { displayOrder: "asc" } }),
-        auth.roles.includes("SUPERADMIN") ? tx.referralAssignment.findMany({ where: { isActive: true, OR: [
+        auth.roles.includes("SUPERADMIN") ? tx.referralAssignment.findMany({ where: { OR: [
           { scopeType: "GLOBAL" }, { scopeType: "SERIES", scopeId: id },
           ...(state.series.venueId ? [{ scopeType: "VENUE" as const, scopeId: state.series.venueId }] : []),
-        ] }, select: { id: true, scopeType: true, scopeId: true, isCommissionEligible: true } }) : Promise.resolve([]),
+        ] }, select: { id: true, scopeType: true, scopeId: true, isCommissionEligible: true, status: true, isActive: true, referralActor: { select: { displayName: true, status: true } } } }) : Promise.resolve([]),
       ]);
       return {
         fields, defaults: Object.fromEntries(fields.map(k => [k, defaultField(state, k)])),
@@ -43,7 +43,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           id: s.id, title: s.title ?? state.series.title, startsAt: s.startsAt, endsAt: s.endsAt, status: s.status,
           inventory: inventory(s), fields: Object.fromEntries(fields.map(k => [k, effectiveField(state, s, k)])),
         })),
-        options: { tickets: state.series.ticketTypes.map(t => ({ id: t.id, name: t.name })), entities, profiles, sponsorTiers, referrals },
+        options: { tickets: state.series.ticketTypes.map(t => ({ id: t.id, name: t.name })), entities, profiles, sponsorTiers,
+          referrals: referrals.map(({ referralActor, ...row }) => ({ ...row, actorName: referralActor.displayName, actorStatus: referralActor.status })) },
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
     return NextResponse.json({ ok: true, data });

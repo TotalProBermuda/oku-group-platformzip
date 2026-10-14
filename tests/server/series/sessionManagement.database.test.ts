@@ -22,6 +22,7 @@ import { localizeSessions } from "@/server/series/localizeSessions";
 import { ticketRows } from "@/server/commerce/ticketIssuance";
 import { POST as issueComp } from "@/app/api/v1/admin/tickets/issue/route";
 import { expireCheckoutHoldsForSession, CHECKOUT_HOLD_EVENT } from "@/server/commerce/checkoutHold";
+import { GET as managementGET } from "@/app/api/v1/admin/series/[id]/session-management/route";
 
 const suite = process.env.RUN_SESSION_MANAGEMENT_DB_TESTS === "1" ? describe : describe.skip;
 suite("dynamic sessions — isolated PostgreSQL transactions", () => {
@@ -59,6 +60,116 @@ suite("dynamic sessions — isolated PostgreSQL transactions", () => {
     await db.session.update({ where: { id: f.sessions[index].id }, data: { soldCount: 1 } });
     return order;
   }
+  async function financialFixture(f: Awaited<ReturnType<typeof fixture>>) {
+    const actor = await db.referralActor.create({ data: { actorType: "OTHER", displayName: "Fixture financial actor" } });
+    const assignment = await db.referralAssignment.create({ data: {
+      referralActorId: actor.id, scopeType: "SERIES", scopeId: f.series.id,
+      isCommissionEligible: true, compensationMode: "PERCENT_OF_TRANSACTION", rateBps: 700,
+      commissionPlanId: "fixture-existing-plan", status: "ACTIVE", isActive: true,
+    } });
+    const link = await db.referralLink.create({ data: { referralActorId: actor.id, referralAssignmentId: assignment.id, code: randomUUID() } });
+    const input = { kind: "defaults" as const, sessionIds: [], patch: {}, assignmentChanges: [{ assignmentId: assignment.id, status: "PAUSED" as const }] };
+    return { actor, assignment, link, input };
+  }
+  it("previews/applies existing series financial lifecycle across all occurrences without changing economics or purchased rights", async () => {
+    const f = await fixture(), a = await financialFixture(f), order = await paid(f);
+    const beforeOrder = await db.order.findUniqueOrThrow({ where: { id: order.id }, include: { lineItems: true, tickets: true } });
+    const beforeSessions = await db.session.findMany({ where: { seriesId: f.series.id }, orderBy: { id: "asc" } });
+    const p = await change(f, a.input);
+    expect(p.targets.map(t => t.id).sort()).toEqual(f.sessions.map(s => s.id).sort());
+    expect(p.defaults[0]).toMatchObject({ field: `referral.${a.assignment.id}.status`, before: { value: { status: "ACTIVE", isActive: true } }, after: { value: { status: "PAUSED", isActive: false } } });
+    const changed = await db.referralAssignment.findUniqueOrThrow({ where: { id: a.assignment.id } });
+    expect(changed).toMatchObject({ ...a.assignment, status: "PAUSED", isActive: false, updatedAt: expect.any(Date) });
+    expect(await db.referralLink.findUniqueOrThrow({ where: { id: a.link.id } })).toEqual(a.link);
+    expect(await db.order.findUniqueOrThrow({ where: { id: order.id }, include: { lineItems: true, tickets: true } })).toEqual(beforeOrder);
+    expect(await db.session.findMany({ where: { seriesId: f.series.id }, orderBy: { id: "asc" } })).toEqual(beforeSessions);
+    expect((await db.series.findUniqueOrThrow({ where: { id: f.series.id } })).sessionDefaults).toBeNull();
+    expect(await db.sessionAttendeeNotice.count({ where: { changeId: p.previewId } })).toBe(0);
+    const result = await applySessionManagement(f.series.id, f.user.id, roles, p.previewId, p.requestId);
+    expect(result).toMatchObject({ changeId: p.previewId, noticeCount: 0 });
+    expect(await db.auditLog.count({ where: { action: "referrer.assignment.status.changed", metadata: { path: ["changeId"], equals: p.previewId } } })).toBe(1);
+  });
+  it("does not expand financial authorization, including retries after a role is removed", async () => {
+    const f = await fixture(), a = await financialFixture(f);
+    await expect(previewSessionManagement(f.series.id, f.user.id, ["FB_DIRECTOR"], a.input)).rejects.toMatchObject({ status: 403 });
+    const p = await previewSessionManagement(f.series.id, f.user.id, roles, a.input);
+    await expect(applySessionManagement(f.series.id, f.user.id, ["FB_DIRECTOR"], p.previewId, p.requestId)).rejects.toMatchObject({ status: 403 });
+    await applySessionManagement(f.series.id, f.user.id, roles, p.previewId, p.requestId);
+    await expect(applySessionManagement(f.series.id, f.user.id, ["FB_DIRECTOR"], p.previewId, p.requestId)).rejects.toMatchObject({ status: 403 });
+  });
+  it("rejects session financial scope, economic payloads and cross-series/global/venue/campaign assignment changes", async () => {
+    const f = await fixture(), a = await financialFixture(f);
+    await expect(previewSessionManagement(f.series.id, f.user.id, roles, { ...a.input, kind: "sessions", sessionIds: [f.sessions[0].id] })).rejects.toThrow();
+    await expect(previewSessionManagement(f.series.id, f.user.id, roles, { ...a.input, assignmentChanges: [{ assignmentId: a.assignment.id, status: "PAUSED", rateBps: 9999 }] })).rejects.toThrow();
+    for (const scopeType of ["GLOBAL", "VENUE", "CAMPAIGN", "SERIES"] as const) {
+      const foreign = await db.referralAssignment.create({ data: { referralActorId: a.actor.id, scopeType, scopeId: scopeType === "GLOBAL" ? null : `foreign-${randomUUID()}` } });
+      await expect(previewSessionManagement(f.series.id, f.user.id, roles, { ...a.input, assignmentChanges: [{ assignmentId: foreign.id, status: "PAUSED" }] })).rejects.toMatchObject({ status: 400 });
+    }
+  });
+  it("rejects financial previews after terms, scope, lifecycle, actor status or eligibility drift", async () => {
+    const f = await fixture(), a = await financialFixture(f);
+    for (const mutation of [
+      () => db.referralAssignment.update({ where: { id: a.assignment.id }, data: { rateBps: 800 } }),
+      () => db.referralAssignment.update({ where: { id: a.assignment.id }, data: { scopeId: "fixture-other-series" } }),
+      () => db.referralAssignment.update({ where: { id: a.assignment.id }, data: { status: "PAUSED", isActive: false } }),
+      () => db.referralActor.update({ where: { id: a.actor.id }, data: { status: "SUSPENDED" } }),
+      () => db.referralActor.update({ where: { id: a.actor.id }, data: { commissionEligible: true } }),
+    ]) {
+      await db.referralAssignment.update({ where: { id: a.assignment.id }, data: { scopeId: f.series.id, rateBps: 700, status: "ACTIVE", isActive: true } });
+      await db.referralActor.update({ where: { id: a.actor.id }, data: { status: "ACTIVE", commissionEligible: false } });
+      const p = await previewSessionManagement(f.series.id, f.user.id, roles, a.input);
+      await mutation();
+      await expect(applySessionManagement(f.series.id, f.user.id, roles, p.previewId, p.requestId)).rejects.toMatchObject({ status: 409 });
+    }
+  });
+  it("blocks draft/retired assignment lifecycle changes and activation of inactive actors", async () => {
+    const f = await fixture(), a = await financialFixture(f);
+    for (const status of ["DRAFT", "RETIRED"] as const) {
+      await db.referralAssignment.update({ where: { id: a.assignment.id }, data: { status } });
+      await expect(previewSessionManagement(f.series.id, f.user.id, roles, a.input)).rejects.toMatchObject({ status: 409 });
+    }
+    await db.referralAssignment.update({ where: { id: a.assignment.id }, data: { status: "PAUSED", isActive: false } });
+    await db.referralActor.update({ where: { id: a.actor.id }, data: { status: "SUSPENDED" } });
+    await expect(previewSessionManagement(f.series.id, f.user.id, roles, { ...a.input, assignmentChanges: [{ assignmentId: a.assignment.id, status: "ACTIVE" }] })).rejects.toMatchObject({ status: 409 });
+  });
+  it("rolls back financial lifecycle and operational edits together if the transactional financial audit fails", async () => {
+    const f = await fixture(), a = await financialFixture(f);
+    const p = await previewSessionManagement(f.series.id, f.user.id, roles, { ...a.input, patch: { "content.title.en": { mode: "override", value: "Atomic title" } } });
+    await db.$executeRawUnsafe(`ALTER TABLE "AuditLog" ADD CONSTRAINT fixture_financial_audit_failure CHECK (action <> 'referrer.assignment.status.changed') NOT VALID`);
+    try {
+      await expect(applySessionManagement(f.series.id, f.user.id, roles, p.previewId, p.requestId)).rejects.toThrow();
+      expect((await db.referralAssignment.findUniqueOrThrow({ where: { id: a.assignment.id } })).status).toBe("ACTIVE");
+      expect((await db.session.findUniqueOrThrow({ where: { id: f.sessions[0].id } })).title).toBeNull();
+      expect((await db.series.findUniqueOrThrow({ where: { id: f.series.id } })).sessionDefaults).toBeNull();
+      expect((await db.sessionManagementChange.findUniqueOrThrow({ where: { id: p.previewId } })).state).toBe("PREVIEW");
+    } finally { await db.$executeRawUnsafe(`ALTER TABLE "AuditLog" DROP CONSTRAINT fixture_financial_audit_failure`); }
+  });
+  it("supports financial-only edits for an empty series and terminal occurrences without modifying occurrence state", async () => {
+    const f = await fixture(), a = await financialFixture(f);
+    await db.session.update({ where: { id: f.sessions[0].id }, data: { status: "CANCELLED" } });
+    await change(f, a.input);
+    expect((await db.session.findUniqueOrThrow({ where: { id: f.sessions[0].id } })).status).toBe("CANCELLED");
+    await db.session.deleteMany({ where: { seriesId: f.series.id } });
+    const p = await change(f, { ...a.input, assignmentChanges: [{ assignmentId: a.assignment.id, status: "ACTIVE" }] });
+    expect(p.targets).toHaveLength(0);
+    expect(p.defaults).toHaveLength(1);
+    expect((await db.referralAssignment.findUniqueOrThrow({ where: { id: a.assignment.id } })).isActive).toBe(true);
+  });
+  it("returns inactive financial options only to SUPERADMIN, with no attendee or actor contact details", async () => {
+    const f = await fixture(), a = await financialFixture(f);
+    await db.referralAssignment.update({ where: { id: a.assignment.id }, data: { status: "PAUSED", isActive: false } });
+    auth.roles = ["SUPERADMIN"];
+    const context = { params: Promise.resolve({ id: f.series.id }) };
+    const owner = await managementGET(new Request("http://fixture.invalid/management"), context);
+    const data = (await owner.json()).data;
+    expect(data.options.referrals).toContainEqual(expect.objectContaining({ id: a.assignment.id, status: "PAUSED", actorName: a.actor.displayName }));
+    expect(data.options.referrals[0]).not.toHaveProperty("email");
+    try {
+      auth.roles = ["FB_DIRECTOR"];
+      const operations = await managementGET(new Request("http://fixture.invalid/management"), context);
+      expect((await operations.json()).data.options.referrals).toEqual([]);
+    } finally { auth.roles = ["SUPERADMIN"]; }
+  });
   it("edits one locale and host role without overwriting unrelated content or roster", async () => {
     const f = await fixture();
     const primary = await db.entity.create({ data: { displayName: "Primary fixture" } }), cohost = await db.entity.create({ data: { displayName: "Co fixture" } });

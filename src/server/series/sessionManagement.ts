@@ -6,6 +6,7 @@ import { defaultField, digest, effectiveField, fieldKeys, inventory, loadSession
 import { noticePayload, postponementRecipients, recipientKey } from "./postponementNotices";
 import { lockOccupancySpaces } from "./publicationLifecycle";
 import { createReservationConflictRecords } from "@/server/events/eventOccupancyService";
+import { applyFinancialAssignments, financialDiffs } from "./sessionFinancialAssignments";
 
 export class SessionManagementError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -18,7 +19,7 @@ export type SessionTarget = {
   noticeCounts: ReturnType<typeof postponementRecipients>["counts"];
 };
 function assertFieldPermissions(input: ManagementInput, roles: readonly string[]) {
-  if (!roles.includes("SUPERADMIN") && Object.keys(input.patch).some(k => fieldDefinition(k)?.restricted))
+  if (!roles.includes("SUPERADMIN") && (input.assignmentChanges?.length || Object.keys(input.patch).some(k => fieldDefinition(k)?.restricted)))
     throw new SessionManagementError(403, "Only a superadmin can change artwork, products, ticket rights or profile assignments.");
 }
 export async function validateIdentities(tx: Prisma.TransactionClient, state: State, input: ManagementInput) {
@@ -83,6 +84,7 @@ export function buildManagementPlan(state: State, input: ManagementInput) {
     ? { ...state, series: { ...state.series, sessionDefaults: json(patchModes(state.series.sessionDefaults, input.patch)) as Prisma.JsonValue } }
     : state;
   const targets: SessionTarget[] = [];
+  const financial = financialDiffs(state.series.id, state.financialAssignments ?? [], input);
   const nextSessions = new Map<string, ManagedSession>();
   for (const current of state.sessions) {
     const nextModes = input.kind === "sessions" ? patchModes(normalizedModes(state, current), input.patch) : normalizedModes(state, current);
@@ -117,7 +119,15 @@ export function buildManagementPlan(state: State, input: ManagementInput) {
     });
     const hold = input.postponement?.treatment === "HOLD_PENDING_DATE";
     const isTarget = changes.length > 0 || (input.kind === "sessions" && Boolean(input.postponement));
+    if (!isTarget && financial.length) {
+      targets.push({ id: current.id, title: current.title ?? state.series.title, inventory: inventory(current), changes: [...financial],
+        warnings: ["SERIES financial assignment lifecycle affects future bookings across this entire series; commission terms and historical purchases/earnings are unchanged."],
+        blocked: [], noticeCounts: { queued: 0, missingContacts: 0, locales: { en: 0, es: 0, pt: 0 } } });
+      nextSessions.set(current.id, current);
+      continue;
+    }
     if (!isTarget) continue;
+    changes.push(...financial);
     const inv = inventory(current), blocked: string[] = [], warnings: string[] = [];
     const capacity = Number(effectiveField(nextState, next, "capacity").value);
     if (capacity < inv.minimum) blocked.push(`Capacity cannot be below ${inv.minimum} committed or held seats.`);
@@ -173,8 +183,9 @@ export function buildManagementPlan(state: State, input: ManagementInput) {
     warnings: [
       "Recipient fallback: ticket attendee email, then a buyer with purchased lines; no-contact comps are skipped. Recorded checkout locale is used, otherwise English. One held notice per accepted change and normalized email covers all affected occurrences; conflicting locales use the first stable session/ticket match.",
       ...(input.kind === "defaults" ? ["All affected inheritors are listed separately. Overrides are never silently included."] : []),
+      ...(financial.length ? ["SERIES financial assignments affect every occurrence shown, not a session-only override. GLOBAL/VENUE/CAMPAIGN assignments remain in their canonical scope administration. No commission terms, eligibility, links, order attribution or earned amounts change."] : []),
     ],
-    defaults: input.kind === "defaults" ? Object.keys(input.patch).map(field => ({ field, before: defaultField(state, field), after: defaultField(nextState, field) })) : [],
+    defaults: input.kind === "defaults" ? [...Object.keys(input.patch).map(field => ({ field, before: defaultField(state, field), after: defaultField(nextState, field) })), ...financial] : [],
   };
 }
 
@@ -182,7 +193,7 @@ export async function previewSessionManagement(seriesId: string, actorId: string
   const input = managementInputSchema.parse(raw);
   assertFieldPermissions(input, roles);
   return prisma.$transaction(async tx => {
-    const state = await loadSessionState(tx, seriesId, input.kind === "sessions" ? input.sessionIds : undefined);
+    const state = await loadSessionState(tx, seriesId, input.kind === "sessions" ? input.sessionIds : undefined, Boolean(input.assignmentChanges?.length));
     await validateIdentities(tx, state, input);
     const plan = buildManagementPlan(state, input);
     await validateEffectiveAssignments(tx, state, plan.targets);
@@ -281,29 +292,30 @@ export async function applySessionManagement(seriesId: string, actorId: string, 
     await tx.$queryRaw`SELECT "id" FROM "Series" WHERE "id" = ${seriesId} FOR UPDATE`;
     const record = await tx.sessionManagementChange.findUnique({ where: { id: previewId } });
     if (!record || record.seriesId !== seriesId || record.actorId !== actorId || record.requestId !== requestId) throw new SessionManagementError(404, "Preview not found for this request.");
-    if (record.state === "APPLIED") return record.result;
-    if (record.expiresAt < new Date()) throw new SessionManagementError(409, "Preview expired. Preview again; your draft has not been applied.");
     const input = managementInputSchema.parse(record.payload);
     assertFieldPermissions(input, roles);
+    if (record.state === "APPLIED") return record.result;
+    if (record.expiresAt < new Date()) throw new SessionManagementError(409, "Preview expired. Preview again; your draft has not been applied.");
     const ids = input.kind === "sessions" ? input.sessionIds : undefined;
     // A fixed lock order is shared by edits and inventory operations.
     await tx.$queryRaw`SELECT "id" FROM "Session" WHERE "seriesId" = ${seriesId} ORDER BY "id" FOR UPDATE`;
-    const state = await loadSessionState(tx, seriesId, ids);
+    const state = await loadSessionState(tx, seriesId, ids, Boolean(input.assignmentChanges?.length));
     if (digest(state) !== record.snapshotHash) throw new SessionManagementError(409, "Session, catalogue, assignment or inventory changed. Preview again before saving.");
     await validateIdentities(tx, state, input);
     const plan = buildManagementPlan(state, input);
     await validateEffectiveAssignments(tx, state, plan.targets);
     if (plan.blocked.length) throw new SessionManagementError(409, plan.blocked.join(" "));
-    if (input.kind === "defaults") {
+    if (input.kind === "defaults" && Object.keys(input.patch).length) {
       await tx.series.update({ where: { id: seriesId }, data: { sessionDefaults: json(plan.nextState.series.sessionDefaults) } });
       await writeDefaultTranslations(tx, plan.nextState, Object.keys(input.patch));
     }
     let noticeCount = 0;
     for (const target of plan.targets) {
       const current = state.sessions.find(s => s.id === target.id)!, next = plan.nextSessions.get(target.id)!;
-      const keys = target.changes.map(c => c.field);
-      await materializeSession(tx, plan.nextState, current, next, keys);
+      const keys = target.changes.map(c => c.field).filter(k => !k.startsWith("referral."));
+      if (keys.length || input.postponement) await materializeSession(tx, plan.nextState, current, next, keys);
     }
+    await applyFinancialAssignments(tx, seriesId, actorId, record.id, state.financialAssignments ?? [], input);
     for (const delivery of plan.deliveries) {
       await tx.sessionAttendeeNotice.create({ data: {
         changeId: record.id, sessionId: delivery.sessionId, recipientKey: recipientKey(delivery.email), recipientEmail: delivery.email, locale: delivery.locale,

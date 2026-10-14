@@ -60,6 +60,9 @@ export const managementInputSchema = z.object({
   kind: z.enum(["sessions", "defaults"]),
   sessionIds: z.array(id).max(50).refine(v => new Set(v).size === v.length, "Duplicate session selection"),
   patch: fieldPatchSchema,
+  assignmentChanges: z.array(z.object({
+    assignmentId: id, status: z.enum(["ACTIVE", "PAUSED"]),
+  }).strict()).max(50).refine(rows => new Set(rows.map(r => r.assignmentId)).size === rows.length, "Duplicate financial assignment").optional(),
   schedules: z.record(id, z.object({ startsAt: z.string().datetime(), endsAt: z.string().datetime() }).strict()
     .refine(v => new Date(v.endsAt) > new Date(v.startsAt), "End must follow start")).optional(),
   postponement: z.object({
@@ -67,7 +70,9 @@ export const managementInputSchema = z.object({
     treatment: z.enum(["PRESERVE_ADMISSION", "HOLD_PENDING_DATE"]),
   }).strict().optional(),
 }).strict().superRefine((v, ctx) => {
-  if (!Object.keys(v.patch).length && !v.schedules && !v.postponement) ctx.addIssue({ code: "custom", message: "Choose a change" });
+  if (!Object.keys(v.patch).length && !v.schedules && !v.postponement && !v.assignmentChanges?.length) ctx.addIssue({ code: "custom", message: "Choose a change" });
+  if (v.assignmentChanges?.length && v.kind !== "defaults")
+    ctx.addIssue({ code: "custom", message: "Financial assignments affect the whole series, not selected sessions. No SESSION financial scope exists." });
   if (v.kind === "sessions" && !v.sessionIds.length) ctx.addIssue({ code: "custom", path: ["sessionIds"], message: "Explicit session selection required" });
   if (v.kind === "defaults" && (v.sessionIds.length || v.schedules)) ctx.addIssue({ code: "custom", message: "Defaults target inheritors separately, not a selected occurrence date" });
   for (const key of Object.keys(v.schedules ?? {})) if (!v.sessionIds.includes(key)) ctx.addIssue({ code: "custom", message: "Schedule references an unselected session" });

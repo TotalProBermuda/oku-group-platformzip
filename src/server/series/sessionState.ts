@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { hostRoles, locales, profileRoles, resolveField, modes, type EffectiveField } from "./sessionFields";
 import { panamaDateTimeLocalInput } from "@/lib/panamaDateTime";
+import { financialInclude, type FinancialAssignment } from "./sessionFinancialAssignments";
 
 export const sessionInclude = {
   reservationBlocks: { orderBy: { id: "asc" as const }, include: { arrivals: true } },
@@ -24,7 +25,7 @@ export type ManagedSession = Prisma.SessionGetPayload<{ include: typeof sessionI
 export type ManagedSeries = Prisma.SeriesGetPayload<{ include: typeof seriesInclude }>;
 export type Translation = Prisma.ContentTranslationGetPayload<{}>;
 export type Sponsor = Prisma.SponsorAssignmentGetPayload<{}>;
-export type State = { series: ManagedSeries; sessions: ManagedSession[]; translations: Translation[]; sponsors: Sponsor[] };
+export type State = { series: ManagedSeries; sessions: ManagedSession[]; translations: Translation[]; sponsors: Sponsor[]; financialAssignments?: FinancialAssignment[] };
 
 export function digest(value: unknown): string {
   const canonical = (v: unknown): unknown => {
@@ -37,7 +38,7 @@ export function digest(value: unknown): string {
 }
 export function textHash(value: string) { return createHash("sha256").update(value).digest("hex"); }
 
-export async function loadSessionState(tx: Prisma.TransactionClient, seriesId: string, ids?: string[]): Promise<State> {
+export async function loadSessionState(tx: Prisma.TransactionClient, seriesId: string, ids?: string[], withFinancial = false): Promise<State> {
   const series = await tx.series.findUnique({ where: { id: seriesId }, include: seriesInclude });
   if (!series) throw Object.assign(new Error("Series not found"), { status: 404 });
   const sessions = await tx.session.findMany({
@@ -50,7 +51,10 @@ export async function loadSessionState(tx: Prisma.TransactionClient, seriesId: s
     tx.contentTranslation.findMany({ where: { OR: [{ entityType: "Series", entityId: seriesId }, { entityType: "EventSession", entityId: { in: sessions.map(s => s.id) } }] }, orderBy: { id: "asc" } }),
     tx.sponsorAssignment.findMany({ where: { OR: [{ scopeType: "SERIES", scopeId: seriesId }, { scopeType: "EVENT", scopeId: { in: sessions.map(s => s.id) } }] }, orderBy: { id: "asc" } }),
   ]);
-  return { series, sessions, translations, sponsors };
+  const financialAssignments = withFinancial ? await tx.referralAssignment.findMany({
+    where: { scopeType: "SERIES", scopeId: seriesId }, include: financialInclude, orderBy: { id: "asc" },
+  }) : undefined;
+  return { series, sessions, translations, sponsors, ...(financialAssignments ? { financialAssignments } : {}) };
 }
 
 export function fieldKeys(state: State): string[] {

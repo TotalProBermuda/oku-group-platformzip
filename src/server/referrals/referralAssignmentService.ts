@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ReferralScopeType, ReferralCompensationMode } from "@prisma/client";
+import { ReferralScopeType, ReferralCompensationMode, type ReferralAssignmentStatus, type Prisma } from "@prisma/client";
 
 export interface CreateAssignmentInput {
   referralActorId: string;
@@ -104,6 +104,12 @@ export async function deactivateAssignment(id: string) {
     where: { id },
     data: { isActive: false },
   });
+}
+
+/** Canonical lifecycle projection shared by admin status changes and session preview/apply.
+ * Deliberately does not accept commission terms, scope, identity or link fields. */
+export async function setAssignmentLifecycle(id: string, status: ReferralAssignmentStatus, db: Prisma.TransactionClient = prisma) {
+  return db.referralAssignment.update({ where: { id }, data: { status, isActive: status === "ACTIVE" } });
 }
 
 /**

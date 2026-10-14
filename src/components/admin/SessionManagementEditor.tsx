@@ -17,7 +17,7 @@ type Options = {
   entities: { id: string; displayName: string }[];
   profiles: { id: string; displayName: string }[];
   sponsorTiers: { id: string; label: string }[];
-  referrals: { id: string; scopeType: string; scopeId: string; isCommissionEligible: boolean }[];
+  referrals: { id: string; scopeType: string; scopeId: string; isCommissionEligible: boolean; status: string; isActive: boolean; actorName: string; actorStatus: string }[];
 };
 type Payload = { fields: string[]; sessions: Session[]; defaults: Record<string, Effective>; options: Options };
 type Edit = { mode: Mode; value: unknown };
@@ -38,7 +38,7 @@ const locales = ["en", "es", "pt"];
 const textStyle: React.CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #d9d0c7", borderRadius: 7, padding: "9px 10px", background: "#fffefa", color: "#27211d", font: "inherit" };
 const cardStyle: React.CSSProperties = { border: "1px solid #e7ddd2", background: "#fffdfa", borderRadius: 10, padding: 14 };
 const nice = (key: string) => key.replaceAll(".", " · ").replaceAll(/([A-Z])/g, " $1").replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
-function fieldLabel(key: string, tr: (key: string, fallback: string) => string) {
+function fieldLabel(key: string, tr: (key: string, fallback: string) => string, referrals: Options["referrals"] = []) {
   if (key === "capacity") return tr("session_field_capacity", "Capacity");
   if (key === "schedule") return tr("session_field_schedule", "Schedule template");
   if (key === "giftBagEnabled") return tr("session_field_gift_bag", "Gift bag");
@@ -50,6 +50,10 @@ function fieldLabel(key: string, tr: (key: string, fallback: string) => string) 
   if (parts[0] === "artwork" && parts.length === 2) return `${tr("session_field_artwork", "Artwork")} · ${parts[1].toUpperCase()}`;
   if (parts[0] === "ticket" && parts.length === 3) return `${tr("session_field_ticket", "Ticket")} ${parts[1]} · ${parts[2] === "price" ? tr("session_field_price", "Price") : tr("session_field_enabled", "Enabled")}`;
   if ((parts[0] === "hosts" || parts[0] === "profiles") && parts.length === 2) return tr(`session_role_${parts[1].toLowerCase()}`, nice(parts[1]));
+  if (parts[0] === "referral" && parts.length === 3 && parts[2] === "status") {
+    const item = referrals.find((referral) => referral.id === parts[1]);
+    return `${tr("session_referral_assignment", "Referral assignment")}${item ? ` · ${item.actorName || item.id}` : ` · ${parts[1]}`} · ${tr("session_status", "Status")}`;
+  }
   return nice(key);
 }
 const valueText = (value: unknown) => value === null || value === undefined ? "—" : typeof value === "string" ? value : JSON.stringify(value);
@@ -63,6 +67,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   const [kind, setKind] = useState<"sessions" | "defaults">("sessions");
   const [selected, setSelected] = useState<string[]>([]);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
+  const [referralEdits, setReferralEdits] = useState<Record<string, "ACTIVE" | "PAUSED" | "">>({});
   const [schedules, setSchedules] = useState<Record<string, { startsAt: string; endsAt: string }>>({});
   const [template, setTemplate] = useState({ localStart: "18:00", durationMinutes: 180 });
   const [postponement, setPostponement] = useState<{ reason: string; treatment: "PRESERVE_ADMISSION" | "HOLD_PENDING_DATE" } | null>(null);
@@ -80,7 +85,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
       const body = await response.json();
       if (!response.ok || !body?.ok) throw new Error(body?.error || tr("session_management_load_failed", "Could not load session management."));
       setData(body.data);
-      if (!preserveDraft) { setSelected([]); setEdits({}); setSchedules({}); }
+      if (!preserveDraft) { setSelected([]); setEdits({}); setReferralEdits({}); setSchedules({}); }
     } catch (e) { setLoadError(e instanceof Error ? e.message : tr("session_management_load_failed", "Could not load session management.")); }
     finally { setLoading(false); }
   }
@@ -99,7 +104,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
     const edit = edits[key];
     return <label style={{ display: "block", marginTop: 8, fontSize: 12, fontWeight: 600 }}>
       {tr("session_edit_action", "Change")}
-      <select aria-label={`${fieldLabel(key, tr)} ${tr("session_edit_action", "Change")}`} value={edit?.mode ?? ""} onChange={(e) => {
+      <select aria-label={`${fieldLabel(key, tr, data?.options.referrals)} ${tr("session_edit_action", "Change")}`} value={edit?.mode ?? ""} onChange={(e) => {
         const mode = e.target.value as Mode | "";
         if (!mode) setEdits((prev) => { const next = { ...prev }; delete next[key]; return next; });
         else setEdit(key, { mode, value: edit?.value ?? "" });
@@ -129,38 +134,46 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
     if (/\.price$/.test(key)) return <label>{tr("session_price_cents", "Price (cents)")}<input type="number" min="0" value={String(currentValue ?? "")} onChange={(e) => update(Number(e.target.value))} style={textStyle} /></label>;
     if (key.startsWith("hosts.") || key.startsWith("profiles.")) {
       const options = key.startsWith("hosts.") ? data?.options.entities ?? [] : data?.options.profiles ?? [];
-      return <label>{fieldLabel(key, tr)}<select multiple value={Array.isArray(currentValue) ? currentValue.map(String) : []} onChange={(e) => update(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...textStyle, minHeight: 90 }}>
+      return <label>{fieldLabel(key, tr, data?.options.referrals)}<select multiple value={Array.isArray(currentValue) ? currentValue.map(String) : []} onChange={(e) => update(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...textStyle, minHeight: 90 }}>
         {options.map((option) => <option key={option.id} value={option.id}>{option.displayName}</option>)}
       </select><small>{tr("session_multi_select_hint", "Use Ctrl or Command to select multiple.")}</small></label>;
     }
     if (key === "sponsors") return <SponsorEditor value={Array.isArray(currentValue) ? currentValue : []} data={data} onChange={update} t={tr} />;
     if (key.startsWith("content.")) return key.includes("description")
-      ? <textarea aria-label={fieldLabel(key, tr)} rows={3} maxLength={5000} value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />
-      : <input aria-label={fieldLabel(key, tr)} maxLength={key.includes("subtitle") ? 240 : 160} value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />;
-    if (key.startsWith("artwork.")) return <input aria-label={fieldLabel(key, tr)} type="url" inputMode="url" value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />;
-    return <textarea aria-label={fieldLabel(key, tr)} rows={2} value={typeof currentValue === "string" ? currentValue : JSON.stringify(currentValue ?? "")} onChange={(e) => { try { update(JSON.parse(e.target.value)); } catch { update(e.target.value); } }} style={textStyle} />;
+      ? <textarea aria-label={fieldLabel(key, tr, data?.options.referrals)} rows={3} maxLength={5000} value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />
+      : <input aria-label={fieldLabel(key, tr, data?.options.referrals)} maxLength={key.includes("subtitle") ? 240 : 160} value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />;
+    if (key.startsWith("artwork.")) return <input aria-label={fieldLabel(key, tr, data?.options.referrals)} type="url" inputMode="url" value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />;
+    return <textarea aria-label={fieldLabel(key, tr, data?.options.referrals)} rows={2} value={typeof currentValue === "string" ? currentValue : JSON.stringify(currentValue ?? "")} onChange={(e) => { try { update(JSON.parse(e.target.value)); } catch { update(e.target.value); } }} style={textStyle} />;
   }
 
   function toggleAll() { setSelected(selectionState === "all" ? [] : sessions.map((s) => s.id)); }
   async function makePreview() {
     setError(""); setSuccess("");
     if (kind === "sessions" && selected.length === 0) { setError(tr("session_select_first", "Select at least one session.")); return; }
-    if (!Object.keys(edits).length) { setError(tr("session_choose_change", "Choose at least one field change.")); return; }
+    const assignmentChanges = kind === "defaults" ? Object.entries(referralEdits)
+      .filter(([assignmentId, status]) => status && data?.options.referrals.find((item) => item.id === assignmentId)?.status !== status)
+      .map(([assignmentId, status]) => ({ assignmentId, status: status as "ACTIVE" | "PAUSED" })) : [];
+    const scheduleValues: Record<string, { startsAt: string; endsAt: string }> = {};
+    Object.entries(schedules).forEach(([id, value]) => {
+      if (kind === "sessions" && selected.includes(id) && value.startsAt && value.endsAt) scheduleValues[id] = { startsAt: panamaDateTimeLocalIso(value.startsAt), endsAt: panamaDateTimeLocalIso(value.endsAt) };
+    });
+    const validPostponement = kind === "sessions" && postponement && postponement.reason.trim().length > 0 && ["PRESERVE_ADMISSION", "HOLD_PENDING_DATE"].includes(postponement.treatment);
+    if (!Object.keys(edits).length && assignmentChanges.length === 0 && Object.keys(scheduleValues).length === 0 && !validPostponement) { setError(tr("session_choose_change", "Choose at least one field change.")); return; }
     setBusy(true);
     try {
       const patch = Object.fromEntries(Object.entries(edits).map(([key, edit]) => [key, edit.mode === "override" ? { mode: edit.mode, value: key === "schedule" ? { ...template, ...(edit.value as object) } : edit.value } : { mode: edit.mode }]));
-      const scheduleValues: Record<string, { startsAt: string; endsAt: string }> = {};
-      Object.entries(schedules).forEach(([id, value]) => {
-        if (selected.includes(id) && value.startsAt && value.endsAt) scheduleValues[id] = { startsAt: panamaDateTimeLocalIso(value.startsAt), endsAt: panamaDateTimeLocalIso(value.endsAt) };
-      });
-      const body: Record<string, unknown> = { kind, sessionIds: kind === "sessions" ? selected : [], patch };
+       const body: Record<string, unknown> = { kind, sessionIds: kind === "sessions" ? selected : [], patch };
+       if (kind === "defaults" && assignmentChanges.length) body.assignmentChanges = assignmentChanges;
       if (kind === "sessions" && Object.keys(scheduleValues).length) body.schedules = scheduleValues;
-      if (postponement) body.postponement = postponement;
+      if (kind === "sessions" && postponement) body.postponement = postponement;
       const response = await fetch(`/api/v1/admin/series/${seriesId}/session-management`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok || !result?.ok) throw Object.assign(new Error(result?.error || tr("session_preview_failed", "Preview could not be created.")), { status: response.status });
       setPreview(result.data);
-      requestAnimationFrame(() => { dialogRef.current?.showModal(); confirmRef.current?.focus(); });
+       requestAnimationFrame(() => {
+         dialogRef.current?.showModal();
+         requestAnimationFrame(() => confirmRef.current?.focus());
+       });
     } catch (e) { setError(e instanceof Error ? e.message : tr("session_preview_failed", "Preview could not be created.")); }
     finally { setBusy(false); }
   }
@@ -175,7 +188,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
         else throw new Error(result?.error || tr("session_save_failed", "Could not apply changes."));
         return;
       }
-      setPreview(null); dialogRef.current?.close(); setEdits({}); setSchedules({}); setSelected([]); setSuccess(tr("session_saved", "Session changes saved.")); await onSaved(); await load();
+      setPreview(null); dialogRef.current?.close(); setEdits({}); setReferralEdits({}); setSchedules({}); setSelected([]); setSuccess(tr("session_saved", "Session changes saved.")); await onSaved(); await load();
     } catch (e) { setError(e instanceof Error ? e.message : tr("session_save_failed", "Could not apply changes.")); }
     finally { setBusy(false); }
   }
@@ -214,7 +227,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
             <p style={{ fontSize: 13, color: "#756a61", margin: "5px 0" }}>{tr("session_defaults_explainer", "Defaults are separate from occurrence edits. The server preview identifies each session that currently inherits these values.")}</p>
             <ul style={{ margin: 0, paddingLeft: 20 }}>{Object.keys(edits).map((key) => {
               const inheritors = sessions.filter((session) => session.fields[key]?.mode === "inherit");
-              return <li key={key}><strong>{fieldLabel(key, tr)}:</strong> {inheritors.length
+              return <li key={key}><strong>{fieldLabel(key, tr, data.options.referrals)}:</strong> {inheritors.length
                 ? inheritors.map((session) => session.title || session.id).join(", ")
                 : tr("session_none_inheriting", "No current sessions inherit this field.")}</li>;
             })}</ul>
@@ -224,9 +237,13 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
             {visibleFields.map((key) => {
               const field = kind === "defaults" ? data.defaults[key] : selectedSessions[0]?.fields[key];
               const values = selectedSessions.map((session) => session.fields[key]?.value);
-              const mixed = kind === "sessions" && selectedSessions.length > 1 && values.some((value) => JSON.stringify(value) !== JSON.stringify(values[0]));
+              const mixed = kind === "sessions" && selectedSessions.length > 1 && selectedSessions.some((session) => {
+                const current = session.fields[key];
+                const first = selectedSessions[0]?.fields[key];
+                return JSON.stringify(current?.value) !== JSON.stringify(first?.value) || current?.source !== first?.source || current?.mode !== first?.mode;
+              });
               return <div key={key} style={{ ...cardStyle, marginBottom: 8 }}>
-                <strong>{fieldLabel(key, tr)}</strong>
+                <strong>{fieldLabel(key, tr, data.options.referrals)}</strong>
                 <p style={{ color: "#746960", fontSize: 12, margin: "4px 0" }}>{mixed ? tr("session_mixed_values", "Mixed effective values across selection") : `${tr("effective", "Effective")}: ${valueText(kind === "defaults" ? field?.value : values[0])}`} · {tr("source", "Source")}: {mixed ? tr("mixed", "mixed") : field?.source ?? "—"}</p>
                 {modeControl(key)}{editor(key)}
               </div>;
@@ -249,11 +266,38 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
               <label>{tr("session_admission_treatment", "Admission treatment")}<select value={postponement.treatment} onChange={(e) => setPostponement({ ...postponement, treatment: e.target.value as typeof postponement.treatment })} style={textStyle}><option value="PRESERVE_ADMISSION">{tr("session_preserve_admission", "Preserve admission")}</option><option value="HOLD_PENDING_DATE">{tr("session_hold_admission", "Hold pending a new date")}</option></select></label>
             </>}
           </fieldset>}
-          {canManageRestricted && data.options.referrals.length > 0 && <aside style={{ ...cardStyle, background: "#f7f2eb" }}>
-            <strong>{tr("session_referral_scopes", "Existing referral scopes")}</strong>
-            <ul style={{ margin: "8px 0", paddingLeft: 20 }}>{data.options.referrals.map((item) => <li key={item.id}>{item.scopeType} · {item.scopeId} · {item.isCommissionEligible ? tr("commission_eligible", "Commission eligible") : tr("not_commission_eligible", "Not commission eligible")}</li>)}</ul>
-            <Link href="/admin/referrals" style={{ color: "#8c412f" }}>{tr("session_referrers_link", "Manage referrers")}</Link>
-          </aside>}
+          {kind === "defaults" && canManageRestricted && data.options.referrals.length > 0 && <fieldset style={{ ...cardStyle, margin: 0, minWidth: 0 }}>
+            <legend style={{ fontWeight: 700 }}>{tr("session_referral_assignments", "Financial referral assignments")}</legend>
+            <p style={{ color: "#756a61", fontSize: 12, lineHeight: 1.5, margin: "0 0 8px" }}>{tr("session_referral_effects", "Status changes affect future bookings across this entire series. Existing historical booking economics are not changed. Commission rates, eligibility, scope, plans, and links cannot be changed here.")}</p>
+            <div style={{ display: "grid", gap: 8 }}>
+              {data.options.referrals.map((item) => {
+                const isSeriesAssignment = item.scopeType === "SERIES" && item.scopeId === seriesId;
+                const editable = isSeriesAssignment && (item.status === "ACTIVE" || item.status === "PAUSED");
+                const actorLabel = item.actorName || `${tr("session_referral_actor", "Referral actor")} ${item.id}`;
+                return <div key={item.id} style={{ ...cardStyle, minWidth: 0, padding: 10 }}>
+                  <strong>{actorLabel}</strong>
+                  <p style={{ color: "#756a61", fontSize: 12, margin: "3px 0 8px", overflowWrap: "anywhere" }}>
+                    {item.scopeType === "SERIES" ? tr("session_referral_series_scope", "This series") : item.scopeType === "GLOBAL" ? tr("session_referral_global_scope", "Global") : item.scopeType === "VENUE" ? tr("session_referral_venue_scope", "Venue") : item.scopeType}
+                    {" · "}{tr("session_status", "Status")}: {item.status}
+                    {" · "}{tr("session_referral_actor_status", "Actor")}: {item.actorStatus}
+                    {" · "}{item.isCommissionEligible ? tr("commission_eligible", "Commission eligible") : tr("not_commission_eligible", "Not commission eligible")}
+                  </p>
+                  {editable
+                    ? <label style={{ display: "block", fontSize: 12, fontWeight: 600 }}>{tr("session_referral_assignment_change", "Assignment status")}
+                      <select aria-label={`${actorLabel} ${tr("session_referral_assignment_change", "Assignment status")}`} value={referralEdits[item.id] ?? ""} onChange={(event) => setReferralEdits((previous) => ({ ...previous, [item.id]: event.target.value as "ACTIVE" | "PAUSED" | "" }))} style={{ ...textStyle, marginTop: 4 }}>
+                        <option value="">{tr("session_referral_unchanged", "Unchanged")}</option>
+                        <option value="ACTIVE">{tr("session_referral_active", "Active")}</option>
+                        <option value="PAUSED">{tr("session_referral_paused", "Paused")}</option>
+                      </select>
+                    </label>
+                    : <p style={{ margin: 0, fontSize: 12, color: "#756a61" }}>{isSeriesAssignment ? tr("session_referral_read_only_status", "This assignment status is read-only.") : tr("session_referral_scope_read_only", "This referral scope is read-only here.")}</p>}
+                </div>;
+              })}
+            </div>
+            {data.options.referrals.some((item) => !(item.scopeType === "SERIES" && item.scopeId === seriesId && (item.status === "ACTIVE" || item.status === "PAUSED"))) && <p style={{ margin: "8px 0 0" }}>
+              <Link href="/admin/referrals" style={{ color: "#8c412f" }}>{tr("session_referrers_link", "Manage referrers")}</Link>
+            </p>}
+          </fieldset>}
           {defaultsAffected.length > 0 && <p style={{ color: "#735a43", fontSize: 12 }}>{tr("session_defaults_change_note", "Defaults changes affect sessions inheriting each selected field; the preview lists exact targets.")}</p>}
           <button type="button" className="btn btn-primary" onClick={() => void makePreview()} disabled={busy}>{busy ? tr("session_preparing_preview", "Preparing preview…") : tr("session_preview_changes", "Preview changes")}</button>
         </div>
@@ -266,13 +310,13 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
         <section aria-labelledby="session-default-diffs-title" style={{ ...cardStyle, marginBottom: 12 }}>
           <strong id="session-default-diffs-title">{tr("session_preview_defaults", "Series default changes")}</strong>
           {preview.defaults?.length
-            ? <ul>{preview.defaults.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr)}</strong>: {valueText(change.before.value)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
+            ? <ul>{preview.defaults.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr, data?.options.referrals)}</strong>: {valueText(change.before.value)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
             : <p style={{ margin: "5px 0 0" }}>{tr("session_preview_no_defaults", "No series default changes in this preview.")}</p>}
         </section>
         <ul>{preview.targets.map((target) => <li key={target.id} style={{ marginBottom: 14 }}>
           <strong>{target.title}</strong>
           <p>{tr("inventory", "Inventory")}: sold {target.inventory.sold}, held {target.inventory.held}, issued {target.inventory.issued}, minimum {target.inventory.minimum}</p>
-          <ul>{target.changes.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr)}</strong>: {valueText(change.before.value)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
+          <ul>{target.changes.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr, data?.options.referrals)}</strong>: {valueText(change.before.value)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
           {target.warnings.map((warning, i) => <p key={`w${i}`} role="note">Warning: {warning}</p>)}{target.blocked.map((block, i) => <p key={`b${i}`} role="alert">Blocked: {block}</p>)}
           <p>{tr("notice_recipients", "Notice recipients")}: {target.noticeCounts.queued} {tr("queued", "queued")}; {target.noticeCounts.missingContacts} {tr("missing_contacts", "missing contacts")}; EN {target.noticeCounts.locales.en} / ES {target.noticeCounts.locales.es} / PT {target.noticeCounts.locales.pt}. {tr("no_contacts_shown", "No attendee contact details are shown.")}</p>
         </li>)}</ul>
