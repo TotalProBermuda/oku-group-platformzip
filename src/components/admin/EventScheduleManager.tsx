@@ -119,6 +119,9 @@ export default function EventScheduleManager({
   const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "", flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "" });
   const [editTicketPrices, setEditTicketPrices] = useState<Record<string, string>>({});
   const [savingContent, setSavingContent] = useState(false);
+    const [editingScheduleSessionId, setEditingScheduleSessionId] = useState<string | null>(null);
+    const [editSchedule, setEditSchedule] = useState({ startsAt: "", endsAt: "", capacity: "" });
+    const [savingSchedule, setSavingSchedule] = useState(false);
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()),
@@ -348,6 +351,48 @@ export default function EventScheduleManager({
           </div>
         ))}
       </div>
+    {canManageSessionContent && (
+      <div style={{ borderTop: "1px solid #e8e0d8", marginTop: 24, paddingTop: 20 }}>
+        <h3 style={{ color: "#1a1614", fontSize: 18, margin: "0 0 6px" }}>Session schedule &amp; capacity</h3>
+        <p style={{ color: "#7c7168", fontSize: 13, lineHeight: 1.5, margin: "0 0 14px" }}>Each session has its own Panama-local time and seat limit. Capacity cannot be reduced below seats sold or issued. Time changes for sessions with ticket or checkout history require the postponement process.</p>
+        <div style={{ display: "grid", gap: 12 }}>
+          {sortedSessions.map((session) => (
+            <div key={"schedule-" + session.id} style={{ border: "1px solid #e8e0d8", borderRadius: 12, padding: 14 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div><strong>{session.title || "Event session"}</strong><div style={{ color: "#7c7168", fontSize: 13, marginTop: 4 }}>{new Date(session.startsAt).toLocaleString()} · Capacity {session.capacity}</div></div>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+                  if (editingScheduleSessionId === session.id) { setEditingScheduleSessionId(null); return; }
+                  setEditSchedule({ startsAt: localInput(new Date(session.startsAt)), endsAt: localInput(new Date(session.endsAt)), capacity: String(session.capacity) });
+                  setEditingScheduleSessionId(session.id);
+                }}>{editingScheduleSessionId === session.id ? "Close schedule editor" : "Edit schedule & capacity"}</button>
+              </div>
+              {editingScheduleSessionId === session.id && (
+                <form onSubmit={async (event) => {
+                  event.preventDefault(); setSavingSchedule(true); setNotice("");
+                  try {
+                    const response = await fetch("/api/v1/admin/sessions/" + session.id + "/schedule", {
+                      method: "PATCH", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ startsAt: panamaDateTimeLocalIso(editSchedule.startsAt), endsAt: panamaDateTimeLocalIso(editSchedule.endsAt), capacity: Number(editSchedule.capacity) }),
+                    });
+                    const payload = await response.json().catch(() => null);
+                    if (!response.ok) throw new Error(payload?.error ?? "Unable to save session schedule.");
+                    setEditingScheduleSessionId(null);
+                    setNotice(payload?.reservationConflictCount ? "Schedule saved; review the new host reservation conflict(s)." : "Session schedule saved.");
+                    await onCreated();
+                  } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to save session schedule."); }
+                  finally { setSavingSchedule(false); }
+                }} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginTop: 14 }}>
+                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>STARTS (PANAMA TIME)<input required type="datetime-local" value={editSchedule.startsAt} onChange={(event) => setEditSchedule((current) => ({ ...current, startsAt: event.target.value }))} style={inputStyle} /></label>
+                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>ENDS (PANAMA TIME)<input required type="datetime-local" min={editSchedule.startsAt} value={editSchedule.endsAt} onChange={(event) => setEditSchedule((current) => ({ ...current, endsAt: event.target.value }))} style={inputStyle} /></label>
+                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>CAPACITY<input required type="number" min="1" max="100000" step="1" value={editSchedule.capacity} onChange={(event) => setEditSchedule((current) => ({ ...current, capacity: event.target.value }))} style={inputStyle} /></label>
+                  <div style={{ display: "flex", alignItems: "end" }}><button type="submit" className="btn btn-primary" disabled={savingSchedule}>{savingSchedule ? "Saving…" : "Save schedule & capacity"}</button></div>
+                </form>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
     </section>
   );
 }
