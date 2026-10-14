@@ -22,11 +22,15 @@ function QRCard({ link }: { link: LinkData }) {
   </div>;
 }
 
+export function partnerIdFromSearch(search: string): string | null {
+  return new URLSearchParams(search).get("partnerId");
+}
+
 export default function PartnerSupportPage() {
   const [partners, setPartners] = useState<Partner[]>([]); const [detail, setDetail] = useState<Detail | null>(null); const [message, setMessage] = useState(""); const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [role, setRole] = useState("TEAM_SELLER"); const [partnerName, setPartnerName] = useState(""); const [partnerEmail, setPartnerEmail] = useState(""); const [busy, setBusy] = useState(""); const [query, setQuery] = useState(""); const [statusFilter, setStatusFilter] = useState("ALL"); const [sort, setSort] = useState("NAME_ASC"); const [page, setPage] = useState(1);
   const loadPartners = async () => { const r = await fetch("/api/v1/admin/partner-support"); const d = await r.json(); if (!r.ok) setMessage(d.error ?? "Unable to load partners"); else { setPartners(d.partners ?? []); setMessage(""); } };
   useEffect(() => {
-    const partnerId = new URLSearchParams(window.location.search).get("partnerId");
+    const partnerId = partnerIdFromSearch(window.location.search);
     void (async () => {
       await loadPartners();
       if (partnerId) await open(partnerId);

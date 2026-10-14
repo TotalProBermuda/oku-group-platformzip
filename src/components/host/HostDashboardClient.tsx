@@ -92,6 +92,7 @@ type MeData = {
   user: { id: string; name: string; email: string; roles: string[] };
   hostProfile: HostProfile | null;
   todayReservations: Reservation[];
+  upcomingReservations?: Reservation[];
   // 7-day window of COMPLETED reservations at the venue, server-driven
   // by /api/v1/host/me. Used by the "Closed" tab + stat chip so closed
   // tables drop off the active queue immediately but stay reachable for
@@ -1239,7 +1240,7 @@ export default function HostDashboardClient() {
     </div>
   );
 
-  const { user, hostProfile, todayReservations, chatSessions, commissions } = data;
+  const { user, hostProfile, todayReservations, upcomingReservations = [], chatSessions, commissions } = data;
   const closedReservations = data.closedReservations ?? [];
   const hostUserNameById = data.hostUserNameById ?? {};
   const roles = user.roles;
@@ -1275,7 +1276,9 @@ export default function HostDashboardClient() {
   // Filtered reservations. CLOSED is special: it pulls from the 7-day
   // closedReservations payload rather than today's queue, so older
   // closed tables remain reachable for a week without polluting Active.
-  const filteredReservations = filterStatus === "CLOSED"
+  const filteredReservations = filterStatus === "UPCOMING"
+    ? upcomingReservations
+    : filterStatus === "CLOSED"
     ? closedReservations
     : filterStatus === "all"
     ? todayReservations.filter((r) => !["COMPLETED", "CANCELLED"].includes(r.status))
@@ -1286,11 +1289,11 @@ export default function HostDashboardClient() {
   // Today's same-day finished/cancelled rows shown beneath the active
   // queue. Hidden when CLOSED filter is active because the closed list
   // already shows that data (and more, going back 7 days).
-  const doneReservations = filterStatus === "CLOSED"
+  const doneReservations = filterStatus === "CLOSED" || filterStatus === "UPCOMING"
     ? []
     : todayReservations.filter((r) => ["COMPLETED", "CANCELLED"].includes(r.status));
 
-  const STATUS_FILTERS = ["all", "PENDING", "CONFIRMED", "ARRIVED", "SEATED", "CLOSED"];
+  const STATUS_FILTERS = ["all", "UPCOMING", "PENDING", "CONFIRMED", "ARRIVED", "SEATED", "CLOSED"];
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d0f", color: "white" }}>
@@ -1478,12 +1481,16 @@ export default function HostDashboardClient() {
                 // CLOSED uses the COMPLETED meta swatch (grey) since both
                 // signal "table done" — just sourced from a longer window.
                 const meta = f === "CLOSED" ? STATUS_META["COMPLETED"] : STATUS_META[f];
-                const count = f === "all"
+                const count = f === "UPCOMING"
+                  ? upcomingReservations.length
+                  : f === "all"
                   ? todayReservations.filter((r) => !["COMPLETED","CANCELLED"].includes(r.status)).length
                   : f === "CLOSED"
                   ? closedCount
                   : todayReservations.filter((r) => r.status === f).length;
-                const label = f === "all"
+                const label = f === "UPCOMING"
+                  ? t("host", "filters.upcoming")
+                  : f === "all"
                   ? t("host", "filters.all")
                   : f === "CLOSED"
                   ? "Closed"

@@ -48,7 +48,7 @@ export async function reserveCatalogCapacityOrThrow(input: {
 
     // Compare-and-swap prevents two carts from both consuming the same seats.
     const updatedSession = await tx.session.updateMany({
-      where: { id: session.id, soldCount: session.soldCount, status: "SCHEDULED" },
+        where: { id: session.id, soldCount: session.soldCount, status: "SCHEDULED", capacity: { gte: session.soldCount + ticketQty } },
       data: { soldCount: { increment: ticketQty } },
     });
     if (updatedSession.count !== 1) throw new Error("Capacity changed; please try again");
