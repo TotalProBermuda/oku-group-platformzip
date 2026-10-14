@@ -60,7 +60,8 @@
     "confirmed": "Confirmed",
     "acknowledged": "Host aware",
     "arrived": "Arrived",
-    "seated": "Seated"
+    "seated": "Seated",
+    "upcoming": "Upcoming"
   },
   "card": {
     "occasion": "Occasion",
