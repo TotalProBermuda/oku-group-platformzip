@@ -1203,6 +1203,7 @@ model FounderMembershipApplication {
 
 model Series {
   id          String         @id @default(cuid())
+  sessionDefaults Json?
   slug        String         @unique
   title       String
   subtitle    String?
@@ -1340,6 +1341,7 @@ model ExperienceInfluencer {
 
 model Session {
   id                     String        @id @default(cuid())
+  fieldModes             Json?
   seriesId               String
   title                  String?
   subtitle               String?
@@ -1431,6 +1433,40 @@ model SessionTicketPrice {
   @@index([ticketTypeId])
 }
 
+// Durable previews and accepted mutations; history is never cascade-deleted.
+model SessionManagementChange {
+  id String @id @default(cuid())
+  requestId String @unique
+  actorId String
+  seriesId String
+  state String @default("PREVIEW")
+  payload Json
+  snapshotHash String
+  preview Json
+  result Json?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  appliedAt DateTime?
+  notices SessionAttendeeNotice[]
+  @@index([seriesId, createdAt])
+}
+
+// Intentionally HELD only: no worker, sending handler or release endpoint.
+model SessionAttendeeNotice {
+  id String @id @default(cuid())
+  changeId String
+  sessionId String
+  recipientKey String
+  recipientEmail String
+  locale String
+  state String @default("HELD")
+  payload Json
+  createdAt DateTime @default(now())
+  change SessionManagementChange @relation(fields: [changeId], references: [id])
+  @@unique([changeId, recipientKey])
+  @@index([state, createdAt])
+}
+
 model TicketPricingRule {
   id            String          @id @default(cuid())
   ticketTypeId  String
@@ -1468,6 +1504,8 @@ model ExperienceAddon {
 
 model Order {
   id        String      @id @default(cuid())
+  entitlementSnapshot Json?
+  checkoutLocale String?
   userId    String
   seriesId  String
   sessionId String
@@ -1584,6 +1622,7 @@ model OrderNote {
 
 model Ticket {
   id                String       @id @default(cuid())
+  entitlementSnapshot Json?
   orderId           String
   userId            String
   sessionId         String

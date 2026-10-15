@@ -5,6 +5,7 @@ import Link from "next/link";
 import AddToCalendar from "@/components/ui/AddToCalendar";
 import EventArtwork from "@/components/ui/EventArtwork";
 import { sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
+import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
 type Session = SessionArtwork & {
   id: string; title: string | null; subtitle?: string | null; description?: string | null;
@@ -62,10 +63,10 @@ export default function ExperienceSessionsView({
     : sessions;
 
   function renderSession(session: Session) {
-    const title = session.title || seriesTitle;
+    const title = session.title ?? seriesTitle;
     const artwork = sessionArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
-    const description = session.description || seriesDescription;
-    const prices = ticketTypes.map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
+    const description = session.description ?? seriesDescription;
+    const prices = ticketTypes.filter(ticket => sessionProductEnabled(session, seriesArtwork ?? {}, ticket.id)).map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
     const fromPrice = prices.length ? Math.min(...prices) : null;
     return (
       <article key={session.id} style={{ ...cardStyle, overflow: "hidden" }}>

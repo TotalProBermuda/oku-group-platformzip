@@ -1,4 +1,5 @@
 "use client";
+import SessionManagementNotice from "./SessionManagementNotice";
 
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
@@ -139,6 +140,8 @@ export default function EventSponsorManager({ sessionId }: Props) {
 
   return (
     <div>
+      <SessionManagementNotice />
+      <fieldset disabled style={{ border: 0, padding: 0, margin: 0 }}>
       {/* Inherit toggle */}
       <div style={{ background: inherits ? "#f0fdf4" : "#fafaf9", border: `1px solid ${inherits ? "#bbf7d0" : "#e5e0d8"}`, borderRadius: 12, padding: "16px 20px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
@@ -291,6 +294,7 @@ export default function EventSponsorManager({ sessionId }: Props) {
           ))}
         </div>
       )}
+      </fieldset>
     </div>
   );
 }

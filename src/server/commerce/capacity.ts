@@ -1,22 +1,28 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import { lockSessionInventory, safeInventoryFloor } from "./sessionInventory";
+import { sessionProductEnabled } from "./sessionProducts";
 
 /**
  * Transaction-safe capacity reservation.
  * Uses atomic update on Session.soldCount within a DB transaction.
  */
 export async function reserveCapacityOrThrow(sessionId: string, qty: number) {
+  if (!Number.isSafeInteger(qty) || qty < 1) throw new Error("Ticket quantity must be a positive integer");
   return prisma.$transaction(async (tx) => {
+    await lockSessionInventory(tx, sessionId);
     const session = await tx.session.findUnique({ where: { id: sessionId } });
     if (!session) throw new Error("Session not found");
     if (session.status !== "SCHEDULED") throw new Error("Session not available");
 
-    const remaining = session.capacity - session.soldCount;
+    const floor = await safeInventoryFloor(tx, sessionId, session.soldCount);
+    const remaining = session.capacity - floor;
     if (qty > remaining) throw new Error("Not enough seats remaining");
 
     // Atomic increment
     const updated = await tx.session.update({
       where: { id: sessionId },
-      data: { soldCount: { increment: qty } },
+      data: { soldCount: floor + qty },
     });
 
     // Mark sold out if needed
@@ -36,26 +42,42 @@ export async function reserveCatalogCapacityOrThrow(input: {
   ticketItems: Array<{ id: string; qty: number }>;
   addonItems: Array<{ id: string; qty: number }>;
 }) {
+  return prisma.$transaction(tx => reserveCatalogCapacityInTransaction(tx, input));
+}
+
+export async function reserveCatalogCapacityInTransaction(tx: Prisma.TransactionClient, input: {
+  sessionId: string;
+  ticketItems: Array<{ id: string; qty: number }>;
+  addonItems: Array<{ id: string; qty: number }>;
+}) {
   const ticketQty = input.ticketItems.reduce((sum, item) => sum + item.qty, 0);
-  return prisma.$transaction(async (tx) => {
+    await lockSessionInventory(tx, input.sessionId);
+    for (const id of [...new Set(input.ticketItems.map(i => i.id))].sort())
+      await tx.$queryRaw`SELECT "id" FROM "TicketType" WHERE "id" = ${id} FOR UPDATE`;
     const session = await tx.session.findUnique({ where: { id: input.sessionId } });
     if (!session || session.status !== "SCHEDULED") throw new Error("Session not available");
+    const series = await tx.series.findUnique({ where: { id: session.seriesId } });
+    if (!series || series.status !== "PUBLISHED") throw new Error("Experience not available");
     const now = new Date();
     if (session.endsAt <= now || (!session.allowLateSales && session.startsAt <= now)) {
       throw new Error("Ticket sales have closed for this session");
     }
-    if (ticketQty > session.capacity - session.soldCount) throw new Error("Not enough seats remaining");
+    if (input.ticketItems.some(i => !Number.isSafeInteger(i.qty) || i.qty < 1) || input.addonItems.some(i => !Number.isSafeInteger(i.qty) || i.qty < 1))
+      throw new Error("Invalid inventory quantity");
+    const floor = await safeInventoryFloor(tx, session.id, session.soldCount);
+    if (ticketQty > session.capacity - floor) throw new Error("Not enough seats remaining");
 
     // Compare-and-swap prevents two carts from both consuming the same seats.
     const updatedSession = await tx.session.updateMany({
-        where: { id: session.id, soldCount: session.soldCount, status: "SCHEDULED", capacity: { gte: session.soldCount + ticketQty } },
-      data: { soldCount: { increment: ticketQty } },
+        where: { id: session.id, soldCount: session.soldCount, status: "SCHEDULED", capacity: { gte: floor + ticketQty } },
+      data: { soldCount: floor + ticketQty },
     });
     if (updatedSession.count !== 1) throw new Error("Capacity changed; please try again");
 
     for (const item of input.ticketItems) {
       const ticket = await tx.ticketType.findUnique({ where: { id: item.id } });
       if (!ticket) throw new Error("Invalid ticket type");
+      if (ticket.seriesId !== session.seriesId || ticket.ticketStatus !== "ACTIVE" || !sessionProductEnabled(session, series, ticket.id)) throw new Error("Ticket not available for this session");
       if (ticket.typeCapacity !== null && item.qty > ticket.typeCapacity - ticket.soldCount) {
         throw new Error(`${ticket.name} is sold out`);
       }
@@ -71,6 +93,7 @@ export async function reserveCatalogCapacityOrThrow(input: {
     for (const item of input.addonItems) {
       const addon = await tx.experienceAddon.findUnique({ where: { id: item.id } });
       if (!addon) throw new Error("Invalid add-on");
+      if (addon.seriesId !== session.seriesId || !addon.isActive) throw new Error("Add-on not available");
       if (addon.capacity !== null && item.qty > addon.capacity - addon.soldCount) {
         throw new Error(`${addon.name} is sold out`);
       }
@@ -83,11 +106,11 @@ export async function reserveCatalogCapacityOrThrow(input: {
       }
     }
 
-    const finalSold = session.soldCount + ticketQty;
+    const finalSold = floor + ticketQty;
     if (finalSold >= session.capacity) {
       await tx.session.update({ where: { id: session.id }, data: { status: "SOLD_OUT" } });
     }
-  });
+    return session;
 }
 
 /**
@@ -101,8 +124,15 @@ export async function releaseCatalogCapacity(input: {
   ticketItems: Array<{ id: string; qty: number }>;
   addonItems: Array<{ id: string; qty: number }>;
 }) {
+  return prisma.$transaction(tx => releaseCatalogCapacityInTransaction(tx, input));
+}
+export async function releaseCatalogCapacityInTransaction(tx: Prisma.TransactionClient, input: {
+  sessionId: string;
+  ticketItems: Array<{ id: string; qty: number }>;
+  addonItems: Array<{ id: string; qty: number }>;
+}) {
   const ticketQty = input.ticketItems.reduce((sum, item) => sum + item.qty, 0);
-  return prisma.$transaction(async (tx) => {
+    await lockSessionInventory(tx, input.sessionId);
     const session = await tx.session.findUnique({ where: { id: input.sessionId } });
     if (!session) return;
 
@@ -131,7 +161,6 @@ export async function releaseCatalogCapacity(input: {
     if (refreshed?.status === "SOLD_OUT" && refreshed.soldCount < refreshed.capacity) {
       await tx.session.update({ where: { id: session.id }, data: { status: "SCHEDULED" } });
     }
-  });
 }
 
 /**
@@ -139,6 +168,7 @@ export async function releaseCatalogCapacity(input: {
  */
 export async function releaseCapacity(sessionId: string, qty: number) {
   return prisma.$transaction(async (tx) => {
+    await lockSessionInventory(tx, sessionId);
     const session = await tx.session.findUnique({ where: { id: sessionId } });
     if (!session) return;
     const nextSold = Math.max(0, session.soldCount - qty);

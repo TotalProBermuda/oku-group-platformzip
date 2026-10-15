@@ -1,0 +1,74 @@
+
+Running 20 tests using 1 worker
+
+  ✘   1 [desktop] › tests/browser/session-management.spec.ts:162:3 › session management fixture workflow › edits a SERIES referral lifecycle through defaults preview/apply without overflowing at 375px (14.9s)
+  ✓   2 [desktop] › tests/browser/session-management.spec.ts:211:3 › session management fixture workflow › activates a draft SERIES assignment then retires it through preview/apply (5.3s)
+  ✓   3 [desktop] › tests/browser/session-management.spec.ts:249:3 › session management fixture workflow › previews a date-only session change with an empty patch (5.2s)
+  ✓   4 [desktop] › tests/browser/session-management.spec.ts:267:3 › session management fixture workflow › FB_DIRECTOR fixture has no referral lifecycle controls (2.9s)
+  ✓   5 [desktop] › tests/browser/session-management.spec.ts:274:3 › session management fixture workflow › selects a session, edits one locale, and previews exact old/new values without contacts (4.2s)
+  ✓   6 [desktop] › tests/browser/session-management.spec.ts:296:3 › session management fixture workflow › shows defaults preview diffs even when a new series has zero affected sessions (6.5s)
+  ✓   7 [desktop] › tests/browser/session-management.spec.ts:312:3 › session management fixture workflow › a 409 preserves the selected session and locale draft for re-preview (5.6s)
+  ✓   8 [desktop] › tests/browser/session-management.spec.ts:328:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview (4.6s)
+  ✓   9 [desktop] › tests/browser/session-management.spec.ts:341:3 › session management fixture workflow › new session defaults checkbox is false by default and only sends true when opted in (3.3s)
+  ✓  10 [desktop] › tests/browser/session-management.spec.ts:358:3 › session management fixture workflow › stacks within a 375px viewport and preserves existing create-session flow (7.6s)
+  ✓  11 [mobile] › tests/browser/session-management.spec.ts:162:3 › session management fixture workflow › edits a SERIES referral lifecycle through defaults preview/apply without overflowing at 375px (7.4s)
+  ✓  12 [mobile] › tests/browser/session-management.spec.ts:211:3 › session management fixture workflow › activates a draft SERIES assignment then retires it through preview/apply (8.0s)
+  ✓  13 [mobile] › tests/browser/session-management.spec.ts:249:3 › session management fixture workflow › previews a date-only session change with an empty patch (7.9s)
+  ✘  14 [mobile] › tests/browser/session-management.spec.ts:267:3 › session management fixture workflow › FB_DIRECTOR fixture has no referral lifecycle controls (8.6s)
+  ✓  15 [mobile] › tests/browser/session-management.spec.ts:274:3 › session management fixture workflow › selects a session, edits one locale, and previews exact old/new values without contacts (9.1s)
+  ✓  16 [mobile] › tests/browser/session-management.spec.ts:296:3 › session management fixture workflow › shows defaults preview diffs even when a new series has zero affected sessions (5.6s)
+  ✓  17 [mobile] › tests/browser/session-management.spec.ts:312:3 › session management fixture workflow › a 409 preserves the selected session and locale draft for re-preview (5.2s)
+  ✓  18 [mobile] › tests/browser/session-management.spec.ts:328:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview (4.6s)
+  ✓  19 [mobile] › tests/browser/session-management.spec.ts:341:3 › session management fixture workflow › new session defaults checkbox is false by default and only sends true when opted in (2.6s)
+  ✓  20 [mobile] › tests/browser/session-management.spec.ts:358:3 › session management fixture workflow › stacks within a 375px viewport and preserves existing create-session flow (2.5s)
+
+
+  1) [desktop] › tests/browser/session-management.spec.ts:162:3 › session management fixture workflow › edits a SERIES referral lifecycle through defaults preview/apply without overflowing at 375px 
+
+    TimeoutError: page.goto: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - navigating to "http://localhost:5000/admin/experiences/session-management-fixture?tab=dates", waiting until "domcontentloaded"[22m
+
+
+      154 |   await addFixtureAuth(context, baseURL, roles);
+      155 |   const fixtures = await installApiFixtures(page, patchStatuses, roles);
+    > 156 |   await page.goto(`/admin/experiences/${SERIES_ID}?tab=dates`, { waitUntil: "domcontentloaded" });
+          |              ^
+      157 |   await expect(page.getByRole("heading", { name: "Session management" })).toBeVisible();
+      158 |   return fixtures;
+      159 | }
+        at openDatesTab (/home/runner/workspace/tests/browser/session-management.spec.ts:156:14)
+        at /home/runner/workspace/tests/browser/session-management.spec.ts:165:44
+
+    Error Context: test-results/session-management-session-f2189-ithout-overflowing-at-375px-desktop/error-context.md
+
+  2) [mobile] › tests/browser/session-management.spec.ts:267:3 › session management fixture workflow › FB_DIRECTOR fixture has no referral lifecycle controls 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByRole('heading', { name: 'Session management' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('heading', { name: 'Session management' })[22m
+
+
+      155 |   const fixtures = await installApiFixtures(page, patchStatuses, roles);
+      156 |   await page.goto(`/admin/experiences/${SERIES_ID}?tab=dates`, { waitUntil: "domcontentloaded" });
+    > 157 |   await expect(page.getByRole("heading", { name: "Session management" })).toBeVisible();
+          |                                                                           ^
+      158 |   return fixtures;
+      159 | }
+      160 |
+        at openDatesTab (/home/runner/workspace/tests/browser/session-management.spec.ts:157:75)
+        at /home/runner/workspace/tests/browser/session-management.spec.ts:268:5
+
+    Error Context: test-results/session-management-session-98e70-referral-lifecycle-controls-mobile/error-context.md
+
+  2 failed
+    [desktop] › tests/browser/session-management.spec.ts:162:3 › session management fixture workflow › edits a SERIES referral lifecycle through defaults preview/apply without overflowing at 375px 
+    [mobile] › tests/browser/session-management.spec.ts:267:3 › session management fixture workflow › FB_DIRECTOR fixture has no referral lifecycle controls 
+  18 passed (2.7m)

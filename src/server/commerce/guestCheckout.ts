@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { CHECKOUT_HOLD_MS } from "@/server/commerce/checkoutHold";
+import type { Prisma } from "@prisma/client";
 
 const GUEST_CHECKOUT_EVENT = "guest-checkout-credential";
 const TTL_MS = CHECKOUT_HOLD_MS;
@@ -13,10 +14,10 @@ function digest(value: string) {
  * A guest token is intentionally scoped to one pending order. It is never
  * stored in plaintext and does not create a browser-wide authenticated session.
  */
-export async function createGuestCheckoutCredential(orderId: string) {
+export async function createGuestCheckoutCredential(orderId: string, db: Prisma.TransactionClient = prisma) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + TTL_MS);
-  await prisma.orderEvent.create({
+  await db.orderEvent.create({
     data: {
       orderId,
       eventType: "OTHER",

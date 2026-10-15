@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
-vi.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: vi.fn(), upsert: vi.fn() } } }));
+vi.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: vi.fn(), upsert: vi.fn() }, $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn({ $queryRaw: vi.fn() })) } }));
+vi.mock("@/server/commerce/sessionInventory", () => ({ lockSessionInventory: vi.fn() }));
 vi.mock("@/server/auth/session", () => ({ getOptionalSession: vi.fn() }));
 vi.mock("@/server/commerce/capacity", () => ({ reserveCatalogCapacityOrThrow: vi.fn() }));
 vi.mock("@/server/events/eventReferrerService", () => ({ getEventReferrerByCode: vi.fn() }));
