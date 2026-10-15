@@ -103,7 +103,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   const visibleFields = useMemo(() => (data?.fields ?? []).filter((key) => !key.startsWith("content.") && !key.startsWith("artwork.") && (canManageRestricted || !(
     key.startsWith("artwork.") || key.startsWith("ticket.") || ["giftBagEnabled", "streetsideEnabled", "allowLateSales"].includes(key) ||
     key.startsWith("profiles.")
-  )), [data, canManageRestricted]);
+  ))), [data, canManageRestricted]);
   const selectionState = selected.length === 0 ? "none" : selected.length === sessions.length ? "all" : "mixed";
   const triRef = (node: HTMLInputElement | null) => { if (node) node.indeterminate = selectionState === "mixed"; };
   const selectedSessions = sessions.filter((session) => selected.includes(session.id));
@@ -208,7 +208,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
       if (!response.ok || !result?.ok) throw Object.assign(new Error(result?.error || tr("session_preview_failed", "Preview could not be created.")), { status: response.status });
       const nextPreview = result.data as Preview;
       const contentOnly = Object.keys(edits).length > 0 &&
-        Object.keys(edits).every((key) => key.startsWith("content.") || key.startsWith("artwork.")) &&
+        Object.keys(edits).every((key) => (key.startsWith("content.") || key.startsWith("artwork.")) && edits[key]?.mode === "override") &&
         Object.keys(scheduleValues).length === 0 && assignmentChanges.length === 0 && !validPostponement &&
         nextPreview.blocked.length === 0 && nextPreview.warnings.length === 0 &&
         nextPreview.targets.every((target) => target.blocked.length === 0 && target.warnings.length === 0);
