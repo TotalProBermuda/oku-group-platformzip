@@ -1322,5 +1322,7 @@
   "applying": "Aplicando…",
   "cancel": "Cancelar",
   "sessionCreateInheritDefaults": "Herdar padrões de sessão da série",
-  "sessionCreateInheritDefaultsHelp": "Use os padrões da série para conteúdo e configurações. As datas explícitas de início e término continuam sendo as datas desta sessão."
+  "sessionCreateInheritDefaultsHelp": "Use os padrões da série para conteúdo e configurações. As datas explícitas de início e término continuam sendo as datas desta sessão.",
+  "session_price_dollars": "Dólares",
+  "session_price_cents": "Centavos"
 }

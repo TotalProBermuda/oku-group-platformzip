@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 import MediaUpload from "@/components/ui/MediaUpload";
+import CurrencyAmountInput from "@/components/admin/CurrencyAmountInput";
 
 type Mode = "inherit" | "override" | "clear";
 type Effective = { value: unknown; source: string; mode: Mode };
@@ -58,7 +59,11 @@ function fieldLabel(key: string, tr: (key: string, fallback: string) => string, 
   }
   return nice(key);
 }
-const valueText = (value: unknown) => value === null || value === undefined ? "—" : typeof value === "string" ? value : JSON.stringify(value);
+const valueText = (value: unknown, key?: string) => {
+  if (value === null || value === undefined) return "—";
+  if (key?.startsWith("ticket.") && key.endsWith(".price") && typeof value === "number") return "$" + (Math.max(0, value) / 100).toFixed(2);
+  return typeof value === "string" ? value : JSON.stringify(value);
+};
 
 export default function SessionManagementEditor({ seriesId, onSaved, canManageRestricted }: { seriesId: string; onSaved: () => Promise<void> | void; canManageRestricted: boolean }) {
   const t = useTranslation();
@@ -169,7 +174,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
     }
     if (key === "capacity") return <label>{tr("session_capacity", "Capacity")}<input type="number" min="1" max="100000" value={String(currentValue ?? "")} onChange={(e) => update(Number(e.target.value))} style={textStyle} /></label>;
     if (["giftBagEnabled", "streetsideEnabled", "allowLateSales"].includes(key) || key.endsWith(".enabled")) return <label><input type="checkbox" checked={Boolean(currentValue)} onChange={(e) => update(e.target.checked)} /> {tr("session_enabled", "Enabled")}</label>;
-    if (/\.price$/.test(key)) return <label>{tr("session_price_cents", "Price (cents)")}<input type="number" min="0" value={String(currentValue ?? "")} onChange={(e) => update(Number(e.target.value))} style={textStyle} /></label>;
+    if (/\.price$/.test(key)) return <CurrencyAmountInput label={tr("session_field_price", "Ticket price")} dollarsLabel={tr("session_price_dollars", "Dollars")} centsLabel={tr("session_price_cents", "Cents")} value={Number(currentValue ?? 0)} onChange={update} />;
     if (key.startsWith("hosts.") || key.startsWith("profiles.")) {
       const options = key.startsWith("hosts.") ? data?.options.entities ?? [] : data?.options.profiles ?? [];
       return <label>{fieldLabel(key, tr, data?.options.referrals)}<select multiple value={Array.isArray(currentValue) ? currentValue.map(String) : []} onChange={(e) => update(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...textStyle, minHeight: 90 }}>
@@ -338,7 +343,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
               });
               return <div key={key} style={{ ...cardStyle, marginBottom: 8 }}>
                 <strong>{fieldLabel(key, tr, data.options.referrals)}</strong>
-                <p style={{ color: "#746960", fontSize: 12, margin: "4px 0" }}>{mixed ? tr("session_mixed_values", "Mixed effective values across selection") : tr("effective", "Effective") + ": " + valueText(kind === "defaults" ? field?.value : values[0])} · {tr("source", "Source")}: {mixed ? tr("mixed", "mixed") : field?.source ?? "—"}</p>
+                <p style={{ color: "#746960", fontSize: 12, margin: "4px 0" }}>{mixed ? tr("session_mixed_values", "Mixed effective values across selection") : tr("effective", "Effective") + ": " + valueText(kind === "defaults" ? field?.value : values[0], key)} · {tr("source", "Source")}: {mixed ? tr("mixed", "mixed") : field?.source ?? "—"}</p>
                 {modeControl(key)}{editor(key)}
               </div>;
             })}
@@ -411,13 +416,13 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
         <section aria-labelledby="session-default-diffs-title" style={{ ...cardStyle, marginBottom: 12 }}>
           <strong id="session-default-diffs-title">{tr("session_preview_defaults", "Series default changes")}</strong>
           {preview.defaults?.length
-            ? <ul>{preview.defaults.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr, data?.options.referrals)}</strong>: {valueText(change.before.value)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
+            ? <ul>{preview.defaults.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr, data?.options.referrals)}</strong>: {valueText(change.before.value, change.field)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value, change.field)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
             : <p style={{ margin: "5px 0 0" }}>{tr("session_preview_no_defaults", "No series default changes in this preview.")}</p>}
         </section>
         <ul>{preview.targets.map((target) => <li key={target.id} style={{ marginBottom: 14 }}>
           <strong>{target.title}</strong>
           <p>{tr("inventory", "Inventory")}: sold {target.inventory.sold}, held {target.inventory.held}, issued {target.inventory.issued}, minimum {target.inventory.minimum}</p>
-          <ul>{target.changes.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr, data?.options.referrals)}</strong>: {valueText(change.before.value)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
+          <ul>{target.changes.map((change, index) => <li key={`${change.field}-${index}`}><strong>{fieldLabel(change.field, tr, data?.options.referrals)}</strong>: {valueText(change.before.value, change.field)} [{change.before.source}/{change.before.mode}] → {valueText(change.after.value, change.field)} [{change.after.source}/{change.after.mode}]</li>)}</ul>
           {target.warnings.map((warning, i) => <p key={`w${i}`} role="note">Warning: {warning}</p>)}{target.blocked.map((block, i) => <p key={`b${i}`} role="alert">Blocked: {block}</p>)}
           <p>{tr("notice_recipients", "Notice recipients")}: {target.noticeCounts.queued} {tr("queued", "queued")}; {target.noticeCounts.missingContacts} {tr("missing_contacts", "missing contacts")}; EN {target.noticeCounts.locales.en} / ES {target.noticeCounts.locales.es} / PT {target.noticeCounts.locales.pt}. {tr("no_contacts_shown", "No attendee contact details are shown.")}</p>
         </li>)}</ul>

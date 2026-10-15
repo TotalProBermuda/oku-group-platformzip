@@ -1322,5 +1322,7 @@
   "applying": "Aplicando…",
   "cancel": "Cancelar",
   "sessionCreateInheritDefaults": "Heredar valores predeterminados de sesión de la serie",
-  "sessionCreateInheritDefaultsHelp": "Usa los valores predeterminados de la serie para el contenido y la configuración. Las fechas explícitas de inicio y fin siguen siendo las fechas de esta sesión."
+  "sessionCreateInheritDefaultsHelp": "Usa los valores predeterminados de la serie para el contenido y la configuración. Las fechas explícitas de inicio y fin siguen siendo las fechas de esta sesión.",
+  "session_price_dollars": "Dólares",
+  "session_price_cents": "Centavos"
 }
