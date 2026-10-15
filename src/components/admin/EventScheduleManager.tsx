@@ -120,10 +120,6 @@ export default function EventScheduleManager({
   const [form, setForm] = useState<FormState>(() => initialForm(defaultCapacity, hasPhysicalSpace));
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "", flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "" });
-  const [editTicketPrices, setEditTicketPrices] = useState<Record<string, string>>({});
-  const [savingContent, setSavingContent] = useState(false);
     const [editingScheduleSessionId, setEditingScheduleSessionId] = useState<string | null>(null);
     const [editSchedule, setEditSchedule] = useState({ startsAt: "", endsAt: "", capacity: "" });
     const [savingSchedule, setSavingSchedule] = useState(false);
@@ -319,46 +315,10 @@ export default function EventScheduleManager({
                     } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to update cutoff"); }
                   }} /> Allow sales after start, until event ends
                 </label>
-                {canManageSessionContent && <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => {
-                  setNotice("");
-                  setEditingSessionId(editingSessionId === session.id ? null : session.id);
-                  setEditContent({ title: session.title ?? "", subtitle: session.subtitle ?? "", description: session.description ?? "", flyerImageUrl: session.flyerImageUrl ?? "", flyerImageUrlEn: session.flyerImageUrlEn ?? "", flyerImageUrlEs: session.flyerImageUrlEs ?? "", flyerImageUrlPt: session.flyerImageUrlPt ?? "" });
-                  setEditTicketPrices(Object.fromEntries((session.ticketPrices ?? []).map((price) => [price.ticketTypeId, (price.priceCents / 100).toFixed(2)])));
-                }}>{editingSessionId === session.id ? "Close content editor" : "Edit session content"}</button>}
+
               </div>
             </div>
-            {editingSessionId === session.id && canManageSessionContent && (
-              <div style={{ borderTop: "1px solid #eee7df", marginTop: 14, paddingTop: 14 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
-                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>Session title<input maxLength={160} value={editContent.title} onChange={(e) => setEditContent((current) => ({ ...current, title: e.target.value }))} style={inputStyle} /></label>
-                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>Theme / subtitle<input maxLength={240} value={editContent.subtitle} onChange={(e) => setEditContent((current) => ({ ...current, subtitle: e.target.value }))} style={inputStyle} /></label>
-                </div>
-                <label style={{ color: "#534942", display: "block", fontSize: 12, fontWeight: 700, marginTop: 12, textTransform: "uppercase" }}>Session description<textarea rows={3} maxLength={5000} value={editContent.description} onChange={(e) => setEditContent((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} /></label>
-                <MediaUpload value={editContent.flyerImageUrl} onChange={(url) => setEditContent((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
-                <LocalizedArtworkEditor kind="session" value={editContent} onChange={(field, url) => setEditContent(current => ({ ...current, [field]: url }))} />
-                {ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
-                  <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
-                  <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave blank to inherit the series price. Paid orders are not repriced.</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-                    {ticketTypes.map((ticket) => <label key={ticket.id} style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>{ticket.name} · base ${(ticket.priceCents / 100).toFixed(2)}
-                      <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="Use series price" value={editTicketPrices[ticket.id] ?? ""} onChange={(event) => setEditTicketPrices((current) => ({ ...current, [ticket.id]: event.target.value }))} style={inputStyle} />
-                    </label>)}
-                  </div>
-                </div> : null}
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-                  <button type="button" className="btn btn-primary" disabled={savingContent} onClick={async () => {
-                    setSavingContent(true); setNotice("");
-                    try {
-                      const response = await fetch(`/api/v1/admin/sessions/${session.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...editContent, ticketPrices: Object.entries(editTicketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })) }) });
-                      const payload = await response.json().catch(() => null);
-                      if (!response.ok) throw new Error(payload?.error ?? "Unable to save session content.");
-                      setEditingSessionId(null); setNotice("Session content saved."); await onCreated();
-                    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to save session content."); }
-                    finally { setSavingContent(false); }
-                  }}>{savingContent ? "Saving…" : "Save session content"}</button>
-                </div>
-              </div>
-            )}
+
           </div>
         ))}
       </div>
