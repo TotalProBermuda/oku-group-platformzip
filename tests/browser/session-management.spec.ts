@@ -154,6 +154,8 @@ async function openDatesTab(page: Page, context: BrowserContext, baseURL?: strin
   await addFixtureAuth(context, baseURL, roles);
   const fixtures = await installApiFixtures(page, patchStatuses, roles);
   await page.goto(`/admin/experiences/${SERIES_ID}?tab=dates`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Event dates" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Advanced series tools", exact: true }).click();
   // A cold Next dev compilation may finish the shell before hydrating the editor.
   await expect(page.getByRole("heading", { name: "Session management" })).toBeVisible({ timeout: 20_000 });
   return fixtures;
@@ -165,6 +167,7 @@ test.describe("session management fixture workflow", () => {
     await page.setViewportSize({ width: 375, height: 800 });
     const { previewRequests, committed } = await openDatesTab(page, context, baseURL, [409, 200]);
     await page.getByRole("checkbox", { name: "Select session Fixture evening A" }).check();
+    await page.getByLabel("Starts at", { exact: true }).fill("2027-05-17T18:00");
     await page.getByLabel("This is a deliberate postponement").check();
     await page.getByLabel("Reason for postponement").fill("Fixture pending-date treatment");
     await page.getByLabel("Admission treatment").selectOption("HOLD_PENDING_DATE");

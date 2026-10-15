@@ -41,6 +41,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         fields, defaults: Object.fromEntries(fields.map(k => [k, defaultField(state, k)])),
         sessions: state.sessions.map(s => ({
           id: s.id, title: s.title ?? state.series.title, startsAt: s.startsAt, endsAt: s.endsAt, status: s.status,
+          hasTicketHistory: s.soldCount > 0 || s.tickets.length > 0 || s.Order.length > 0,
           inventory: inventory(s), fields: Object.fromEntries(fields.map(k => [k, effectiveField(state, s, k)])),
         })),
         options: { tickets: state.series.ticketTypes.map(t => ({ id: t.id, name: t.name })), entities, profiles, sponsorTiers,

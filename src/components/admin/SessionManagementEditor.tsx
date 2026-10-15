@@ -11,6 +11,7 @@ type Effective = { value: unknown; source: string; mode: Mode };
 type Session = {
   id: string; title: string; startsAt: string; endsAt: string; status: string;
   inventory: { sold: number; held: number; issued: number; minimum: number };
+  hasTicketHistory?: boolean;
   fields: Record<string, Effective>;
 };
 type Options = {
@@ -351,7 +352,12 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
               <label>{tr("ends_at", "Ends at")}<input type="datetime-local" min={schedules[session.id]?.startsAt} value={schedules[session.id]?.endsAt ?? panamaDateTimeLocalInput(new Date(session.endsAt))} onChange={(e) => setSchedules((prev) => ({ ...prev, [session.id]: { startsAt: prev[session.id]?.startsAt ?? panamaDateTimeLocalInput(new Date(session.startsAt)), endsAt: e.target.value } }))} style={textStyle} /></label>
             </div>)}
           </fieldset>}
-          {selectedSessions.some((s) => s.inventory.sold + s.inventory.held + s.inventory.issued > 0) && <fieldset style={{ ...cardStyle, borderColor: "#d6b891" }}>
+          {selectedSessions.some((s) => {
+            const change = schedules[s.id];
+            const hasHistory = s.hasTicketHistory ?? (s.inventory.sold + s.inventory.held + s.inventory.issued > 0);
+            return hasHistory && Boolean(change) &&
+              (change!.startsAt !== panamaDateTimeLocalInput(new Date(s.startsAt)) || change!.endsAt !== panamaDateTimeLocalInput(new Date(s.endsAt)));
+          }) && <fieldset style={{ ...cardStyle, borderColor: "#d6b891" }}>
             <legend style={{ fontWeight: 700 }}>{tr("session_postponement", "Postponement controls")}</legend>
             <label style={{ display: "flex", gap: 8, alignItems: "start" }}><input type="checkbox" checked={Boolean(postponement)} onChange={(e) => setPostponement(e.target.checked ? { reason: "", treatment: "PRESERVE_ADMISSION" } : null)} /> {tr("session_postponement_enable", "This is a deliberate postponement")}</label>
             {postponement && <>
@@ -394,7 +400,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
             </p>}
           </fieldset>}
           {defaultsAffected.length > 0 && <p style={{ color: "#735a43", fontSize: 12 }}>{tr("session_defaults_change_note", "Defaults changes affect sessions inheriting each selected field; the preview lists exact targets.")}</p>}
-          <button type="button" className="btn btn-primary" onClick={() => void makePreview()} disabled={busy}>{busy ? tr("session_preparing_preview", "Preparing preview…") : tr("session_save_changes", "Save changes")}</button>
+          <button type="button" className="btn btn-primary" onClick={() => void makePreview()} disabled={busy}>{busy ? tr("session_preparing_preview", "Preparing preview…") : tr("session_preview_changes", "Preview changes")}</button>
         </div>
       </> : null}
     <dialog ref={dialogRef} aria-labelledby="session-preview-title" onClose={() => setPreview(null)} style={{ width: "min(720px, calc(100% - 24px))", maxHeight: "85dvh", overflow: "auto", border: "1px solid #d7c7b7", borderRadius: 12, padding: 18, color: "#27211d" }}>
