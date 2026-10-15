@@ -260,8 +260,8 @@ export default function AdminExperienceEditPage() {
       {success && <div style={{ background: "#dcfce7", borderBottom: "1px solid #bbf7d0", padding: "12px 24px", fontSize: 14, color: "#16a34a", fontWeight: 500 }}>{success}</div>}
       {error   && <div style={{ background: "#fee2e2", borderBottom: "1px solid #fecaca", padding: "12px 24px", fontSize: 14, color: "#dc2626", fontWeight: 500 }}>{error}</div>}
 
-      <div style={{ display: "flex" }}>
-        <div style={{ width: 200, borderRight: "1px solid #e5e0d8", minHeight: "calc(100vh - 120px)", background: "#fafaf9", padding: "20px 0", flexShrink: 0 }}>
+      <div className="experience-layout" style={{ display: "flex" }}>
+        <div className="experience-tabs" style={{ width: 200, borderRight: "1px solid #e5e0d8", minHeight: "calc(100vh - 120px)", background: "#fafaf9", padding: "20px 0", flexShrink: 0 }}>
           {SECTION_TABS.map((s) => (
             <button key={s.id} onClick={() => setTab(s.id)}
               style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 20px", background: tab === s.id ? "white" : "transparent", color: tab === s.id ? "#c41e3a" : "#6b7280", fontSize: 14, fontWeight: tab === s.id ? 600 : 400, cursor: "pointer", border: "none", borderLeft: tab === s.id ? "2px solid #c41e3a" : "2px solid transparent" }}>
@@ -270,7 +270,7 @@ export default function AdminExperienceEditPage() {
           ))}
         </div>
 
-        <div style={{ flex: 1, padding: analyticsTab ? "0" : "32px", maxWidth: analyticsTab ? "none" : 720 }}>
+        <div className="experience-content" style={{ flex: 1, minWidth: 0, padding: analyticsTab ? "0" : "32px", maxWidth: analyticsTab ? "none" : 720 }}>
           {tab === "basics" && (
             <div>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, marginBottom: 24, color: "#1a1614" }}>{t("admin", "basic_info") ?? "Basic Information"}</h2>
@@ -593,6 +593,14 @@ export default function AdminExperienceEditPage() {
           )}
         </div>
       </div>
+      <style jsx>{`
+        @media (max-width: 767px) {
+          .experience-layout { flex-direction: column; }
+          .experience-tabs { width: 100% !important; min-height: 0 !important; box-sizing: border-box; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0 !important; padding: 8px !important; }
+          .experience-tabs :global(button) { padding: 9px 10px !important; overflow-wrap: anywhere; }
+          .experience-content { padding: 16px !important; box-sizing: border-box; }
+        }
+      `}</style>
     </div>
   );
 }
