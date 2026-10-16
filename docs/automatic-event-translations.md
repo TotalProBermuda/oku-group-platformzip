@@ -142,11 +142,16 @@ After review/merge, perform these steps in order:
 
 1. Reconcile/pull merged main while retaining unrelated local changes. Install
    the merged lockfile and build normally.
-2. Resolve DEEPL_AUTH_KEY in Publishing: the user observed **1 secret out of sync /
-   project editor secret missing from this environment**. Secret-presence metadata
-   and the editor-only Hello world smoke test do NOT prove the published environment
-   has the key. Review/synchronize the secret through the secure Publishing flow
-   as a separately approved release step; never print its value. Confirm the existing auth
+2. **Publishing configuration update (2026-10-16, user-reported):** the user clicked
+   Add secret for DEEPL_AUTH_KEY in Publishing > Production app secrets. The
+   out-of-sync section disappeared and the key is now listed masked among deployment
+   secrets. This resolves the previously reported Publishing configuration warning;
+   it does **not** verify the key is active in the running production app.
+   **No republish has occurred.** Editor presence metadata and the earlier editor-only
+   Hello world smoke test are also not proof of running-production availability.
+   Keep runtime verification pending until a separately approved publish, then
+   verify safely without exposing credentials or translating live customer data.
+   Confirm the existing auth
    secret is available to a clean production build/runtime: NEXTAUTH_SECRET takes
    precedence over the AUTH_SECRET alias. No remapping or rotation is required.
    Never substitute the disposable test credential.
