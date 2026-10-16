@@ -205,7 +205,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
         .events-month-cards { display: grid; gap: 12px; }
         .events-session-card { min-width: 0; }
         @media (max-width: 767px) {
-          .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "calendar" "month"; gap: 16px; }
+          .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "month" "calendar"; gap: 16px; }
           .events-month-column { padding: 16px; }
           .events-month-title { font-size: 22px; }
         }
