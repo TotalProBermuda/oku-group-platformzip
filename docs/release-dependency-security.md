@@ -167,3 +167,38 @@ as observed in the production read replica. No production DDL was executed.
 This dependency PR does not modify application/event content, translation/auth
 implementation, deployment configuration or schema. Wine Down sessions remain
 entirely outside this change.
+
+## Lockfile portability review correction
+
+The original security commit introduced 96 tarball `resolved` URLs pointing to
+the workspace-internal package proxy. Those locations are now normalized to
+`https://registry.npmjs.org/`, including scoped packages and the tinyglobby alias.
+An exact byte comparison against the original security commit confirms that
+**only those 96 URL prefixes changed in the lockfile**: all package versions,
+integrity hashes, dependency relationships and other bytes are preserved.
+
+A regression test now checks that every committed tarball locator uses the
+public HTTPS npm registry without embedded credentials.
+
+Re-verification after this correction:
+
+- Fresh isolated frozen installation:
+  `npm ci --ignore-scripts --no-audit --no-fund --include=dev --include=optional --include=peer`
+  — **passed**, and the normalized lockfile remained byte-for-byte unchanged.
+- `npm audit --include=dev --include=optional --include=peer --json`
+  — **exit 0, zero findings at every severity**.
+- Prisma generation against a nonexistent loopback fixture URL — **passed**;
+  no database connection or migration was performed.
+- The focused suite above, including the new portability test —
+  **216 passed, 34 database-dependent skipped; 23 files passed, 1 skipped**.
+- `git diff --check` — **passed**.
+
+This installation was verified inside Replit; a separate GitHub-hosted run is
+not claimed. No registry configuration or package-firewall policy was changed.
+The prior production build was not repeated for this URL-only lockfile change:
+its exact versions and integrity hashes remain unchanged.
+
+Current verification evidence:
+`/tmp/pr134-portability-install.log`, `/tmp/pr134-portability-audit.json`,
+`/tmp/pr134-portability-prisma.log`, `/tmp/pr134-portability-tests.log`.
+No merge, deployment or event-data modification accompanies this correction.

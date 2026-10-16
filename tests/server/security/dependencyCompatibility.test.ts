@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:http";
@@ -13,6 +13,21 @@ const fixtures: string[] = [];
 afterEach(() => fixtures.splice(0).forEach((path) => rmSync(path, { recursive: true, force: true })));
 
 describe("release dependency compatibility", () => {
+  it("keeps committed tarball URLs portable through the public HTTPS npm registry", () => {
+    const lock = JSON.parse(readFileSync(resolve("package-lock.json"), "utf8")) as {
+      packages: Record<string, { resolved?: string }>;
+    };
+    const tarballs = Object.entries(lock.packages).filter(([, pkg]) => pkg.resolved);
+    expect(tarballs.length).toBeGreaterThan(0);
+    for (const [packagePath, pkg] of tarballs) {
+      const url = new URL(pkg.resolved!);
+      expect(url.protocol, packagePath).toBe("https:");
+      expect(url.hostname, packagePath).toBe("registry.npmjs.org");
+      expect(url.username, packagePath).toBe("");
+      expect(url.password, packagePath).toBe("");
+    }
+  });
+
   it("replaces the vulnerable implementation, not just its package name", () => {
     const replacement = pluginRequire("fast-glob/package.json");
     expect(replacement.name).toBe("tinyglobby");

@@ -24,3 +24,22 @@ changed, even though its dependency graph labels the package overridden.
 
 **How to apply:** Require a clean frozen installation, actual consumer tests
 and the final all-scope audit before calling an override effective.
+
+Committed release lockfiles must use public HTTPS npm registry tarball URLs,
+not workspace-only package proxy endpoints.
+
+**Why:** Internal registry hostnames cannot be resolved by GitHub CI or clean
+installations outside Replit.
+
+**How to apply:** Inspect newly resolved entries after dependency operations.
+Normalize only their location, preserving package versions, integrity hashes
+and dependency graph; then verify frozen installation and the all-scope audit.
+
+Keep Wine Down event-data edits out of dependency, translation infrastructure
+and release-preparation work.
+
+**Why:** The user manages its live sessions separately and repeatedly required
+that release work leave event data untouched.
+
+**How to apply:** Use isolated fixtures for validation. Do not change live
+sessions unless the user separately authorizes event-content work.
