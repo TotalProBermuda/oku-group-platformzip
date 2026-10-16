@@ -1322,5 +1322,7 @@
   "applying": "Applying…",
   "cancel": "Cancel",
   "sessionCreateInheritDefaults": "Inherit series session defaults",
-  "sessionCreateInheritDefaultsHelp": "Use the series defaults for session content and settings. The event’s explicit start and end dates remain occurrence dates."
+  "sessionCreateInheritDefaultsHelp": "Use the series defaults for session content and settings. The event’s explicit start and end dates remain occurrence dates.",
+  "session_price_dollars": "Dollars",
+  "session_price_cents": "Cents"
 }
