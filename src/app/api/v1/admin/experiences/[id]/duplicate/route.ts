@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -72,7 +73,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // overrides can be remapped without ever pointing at the original series.
   const copiedTicketTypeIds = new Map(original.ticketTypes.map((ticket) => [ticket.id, randomUUID()]));
 
-  const newSeries = await prisma.series.create({
+  const newSeries = await prisma.$transaction(async tx => {
+  const created = await tx.series.create({
     data: {
       title: newTitle,
       subtitle: original.subtitle,
@@ -178,13 +180,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   });
 
-  await prisma.auditLog.create({
+  await syncTranslations(tx, "Series", created.id, created);
+  const [tickets, dates] = await Promise.all([
+    tx.ticketType.findMany({ where: { seriesId: created.id } }),
+    tx.session.findMany({ where: { seriesId: created.id } }),
+  ]);
+  for (const ticket of tickets) await syncTranslations(tx, "TicketType", ticket.id, ticket);
+  for (const date of dates) await syncTranslations(tx, "EventSession", date.id, { title: date.title, subtitle: date.subtitle, description: date.description });
+  await tx.auditLog.create({
     data: {
       actorId: (session as { user: { id: string } }).user.id,
       action: "EXPERIENCE_DUPLICATED",
-      metadata: { originalId: id, newId: newSeries.id },
+      metadata: { originalId: id, newId: created.id },
     },
   });
 
+  return created;
+  });
   return NextResponse.json({ series: newSeries });
 }

@@ -8,6 +8,7 @@ vi.mock("@/server/series/publicationLifecycle", () => ({ lockOccupancySpaces: oc
 
 const dbMock = vi.hoisted(() => {
   const tx = {
+    contentTranslation: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
     $queryRaw: vi.fn(),
     session: { create: vi.fn() },
     eventSpaceOccupancy: { create: vi.fn() },

@@ -275,65 +275,51 @@ test.describe("session management fixture workflow", () => {
     await expect(page.getByLabel("María Velasquez Assignment status")).toHaveCount(0);
   });
 
-  test("selects a session, edits one locale, and previews exact old/new values without contacts", async ({ baseURL, context, page }) => {
-    const { previewRequests } = await openDatesTab(page, context, baseURL);
+  test("selects a session and saves English once through the existing content-only preview/apply path", async ({ baseURL, context, page }) => {
+    const { previewRequests, committed } = await openDatesTab(page, context, baseURL);
     await page.getByRole("checkbox", { name: "Select session Fixture evening A" }).check();
-    const localeMode = page.getByLabel("Title · ES Change");
-    await expect(localeMode.locator("option")).toHaveText(["Untouched", "Inherit", "Override", "Clear"]);
-    await localeMode.selectOption("override");
-    await page.getByRole("textbox", { name: "Title · ES" }).fill("Noche revisada");
+    const title = page.getByRole("region", { name: "English content & localized artwork" }).getByRole("textbox", { name: "Title", exact: true });
+    await title.fill("");
+    await expect(title).toHaveValue("");
+    await title.fill("Updated English title");
     await page.getByRole("button", { name: "Preview changes" }).click();
-
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByRole("dialog")).toContainText("Título anterior");
-    await expect(page.getByRole("dialog")).toContainText("Noche revisada");
-    await expect(page.getByRole("dialog")).toContainText("override");
-    await expect(page.getByRole("dialog")).toContainText("No attendee contact details are shown.");
+    await expect.poll(() => committed.length).toBe(1);
     expect(previewRequests).toHaveLength(1);
     expect(previewRequests[0]).toMatchObject({
       kind: "sessions", sessionIds: ["fixture-session-a"],
-      patch: { "content.title.es": { mode: "override", value: "Noche revisada" } },
+      patch: { "content.title.en": { mode: "override", value: "Updated English title" } },
     });
-    expect(Object.keys((previewRequests[0] as any).patch)).toEqual(["content.title.es"]);
+    expect(Object.keys((previewRequests[0] as any).patch)).toEqual(["content.title.en"]);
   });
 
-  test("shows defaults preview diffs even when a new series has zero affected sessions", async ({ baseURL, context, page }) => {
-    await openDatesTab(page, context, baseURL);
+  test("saves English defaults when there are zero affected sessions", async ({ baseURL, context, page }) => {
+    const { previewRequests, committed } = await openDatesTab(page, context, baseURL);
     await page.getByLabel("Change scope").selectOption("defaults");
-    const mode = page.getByLabel("Title · EN Change");
-    await mode.selectOption("override");
-    await page.getByRole("textbox", { name: "Title · EN" }).fill("Series-wide title");
+    await page.getByRole("region", { name: "English content & localized artwork" }).getByRole("textbox", { name: "Title", exact: true }).fill("Series-wide title");
     await expect(page.getByText("Fixture evening A, Fixture evening B")).toBeVisible();
     await page.getByRole("button", { name: "Preview changes" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toContainText("0 target sessions");
-    await expect(dialog.getByText("Series default changes")).toBeVisible();
-    await expect(dialog).toContainText("English title");
-    await expect(dialog).toContainText("Series-wide title");
-    await expect(dialog).toContainText("Title · EN");
+    await expect.poll(() => committed.length).toBe(1);
+    expect(previewRequests[0]).toMatchObject({ kind: "defaults", sessionIds: [], patch: { "content.title.en": { mode: "override", value: "Series-wide title" } } });
   });
 
   test("a 409 preserves the selected session and locale draft for re-preview", async ({ baseURL, context, page }) => {
     const { previewRequests } = await openDatesTab(page, context, baseURL, [409]);
     await page.getByRole("checkbox", { name: "Select session Fixture evening A" }).check();
-    await page.getByLabel("Title · ES Change").selectOption("override");
-    await page.getByRole("textbox", { name: "Title · ES" }).fill("Draft survives conflict");
+    await page.getByRole("region", { name: "English content & localized artwork" }).getByRole("textbox", { name: "Title", exact: true }).fill("Draft survives conflict");
     await page.getByRole("button", { name: "Preview changes" }).click();
-    await page.getByRole("button", { name: "Confirm and apply" }).click();
     await expect(page.locator('[role="alert"]').filter({ hasText: "The preview is stale." })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "Select session Fixture evening A" })).toBeChecked();
-    await expect(page.getByLabel("Title · ES Change")).toHaveValue("override");
-    await expect(page.getByRole("textbox", { name: "Title · ES" })).toHaveValue("Draft survives conflict");
+    await expect(page.getByRole("region", { name: "English content & localized artwork" }).getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Draft survives conflict");
     await page.getByRole("button", { name: "Preview changes" }).click();
-    await expect(page.getByRole("dialog")).toContainText("Draft survives conflict");
-    expect(previewRequests).toHaveLength(2);
+    await expect.poll(() => previewRequests.length).toBe(2);
   });
 
   test("confirmation dialog receives focus and Enter applies the fixture preview", async ({ baseURL, context, page }) => {
     const { committed } = await openDatesTab(page, context, baseURL);
     await page.getByRole("checkbox", { name: "Select session Fixture evening A" }).check();
-    await page.getByLabel("Title · ES Change").selectOption("override");
-    await page.getByRole("textbox", { name: "Title · ES" }).fill("Keyboard-confirmed value");
+    // Content-only saves intentionally auto-apply; use a capacity edit to test the confirmation dialog.
+    await page.getByLabel("Capacity Change").selectOption("override");
+    await page.getByRole("spinbutton", { name: "Capacity", exact: true }).fill("26");
     await page.getByRole("button", { name: "Preview changes" }).click();
     const confirm = page.getByRole("button", { name: "Confirm and apply" });
     await expect(confirm).toBeFocused();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { createSeriesInputSchema } from "@/server/series/createSeriesInput";
@@ -103,6 +104,7 @@ export async function POST(req: Request) {
           metadata: { seriesId: created.id, slug: created.slug },
         },
       });
+      await syncTranslations(tx, "Series", created.id, created);
       return created;
     });
     return NextResponse.json({ ok: true, data: series }, { status: 201 });

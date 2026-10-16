@@ -8,6 +8,7 @@ import { BILLING_COUNTRIES } from "@/lib/billingCountries";
 import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
 import { createCheckoutContinuation, isConfirmedCheckout, isVerificationReturn } from "@/lib/checkoutContinuation";
 import { PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
@@ -34,6 +35,7 @@ function safePaymentFailureMessage(environment: unknown, code: unknown) {
 }
 
 export default function CheckoutPage() {
+  const locale = useLocale();
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -107,7 +109,7 @@ export default function CheckoutPage() {
   }, [payerChallengeComplete, payerChallenge, paying, done, paymentDeclined, paymentUnderReview]);
 
   useEffect(() => {
-    fetch(`/api/v1/experiences?slug=${slug}`)
+    fetch(`/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${locale}`)
       .then((r) => r.json())
       .then((d) => {
         const s = d.series?.[0];
@@ -118,7 +120,7 @@ export default function CheckoutPage() {
         else if (s?.sessions?.[0]) setSession(s.sessions[0].id);
       })
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, locale]);
 
   useEffect(() => {
     if (!flexConfig) return;
@@ -191,7 +193,7 @@ export default function CheckoutPage() {
       const intentResponse = await fetch("/api/v1/checkout/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: quote.sessionId, expectedTotalCents: quote.totalCents, items: checkoutItems, guest: { ...guest, phone: guest.phone.trim() || undefined, locale: "en" } }),
+        body: JSON.stringify({ sessionId: quote.sessionId, expectedTotalCents: quote.totalCents, items: checkoutItems, guest: { ...guest, phone: guest.phone.trim() || undefined, locale } }),
       });
       const intentData = await intentResponse.json();
       if (!intentResponse.ok) throw new Error(intentData.message ?? intentData.error ?? "Unable to create payment order.");

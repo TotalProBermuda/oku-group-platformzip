@@ -360,11 +360,9 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
           </aside>
           <section className="sc-section">
             <h4>Details</h4>
-            <div className="sc-locales" role="tablist" aria-label="Language">
-              {locales.map((item) => <button key={item} type="button" role="tab" aria-selected={locale === item} onClick={() => setLocale(item)}>{item.toUpperCase()}</button>)}
-            </div>
+             <p className="sc-value">Enter text once in English. Spanish and Portuguese are generated automatically after saving; guests see English while translations are pending.</p>
             {(["title", "subtitle", "description"] as const).map((name) => {
-              const key = fieldKey(`content.${name}`, locale);
+               const key = fieldKey(`content.${name}`, "en");
               const val = effective(key);
               return <label className="sc-field" key={key}>{labels[`content.${name}`]}
                 {name === "description" ? <textarea rows={4} maxLength={5000} value={String(val ?? "")} onChange={(event) => setEdit(key, event.target.value)} /> : <input maxLength={name === "subtitle" ? 240 : 160} value={String(val ?? "")} onChange={(event) => setEdit(key, event.target.value)} />}
@@ -402,6 +400,9 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
           </section>
           <section className="sc-section">
             <h4>Artwork</h4>
+             <div className="sc-locales" role="tablist" aria-label="Artwork language">
+               {locales.map((item) => <button key={item} type="button" role="tab" aria-selected={locale === item} onClick={() => setLocale(item)}>{item.toUpperCase()}</button>)}
+             </div>
             {locales.map((item) => {
               const key = `artwork.${item}`;
               const value = String(effective(key) ?? "");
@@ -414,7 +415,7 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
                 <div className="sc-value"><span>{sourceLabel(key)}</span>{resetControl(key)}</div>
               </div>;
             })}
-            <p className="sc-value">English, Spanish, and Portuguese flyers are edited independently. No automatic translation is applied.</p>
+             <p className="sc-value">Flyer files remain independent for English, Spanish and Portuguese. Artwork is never sent for text translation.</p>
           </section>
           <section className="sc-section">
             <h4>Hosts</h4>

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type HostRole, type SeriesAssignmentRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { applyScheduleTemplate, fieldDefinition, hostRoles, managementInputSchema, modes, patchModes, profileRoles, sponsorValue, type EffectiveField, type FieldModes, type ManagementInput } from "./sessionFields";
 import { defaultField, digest, effectiveField, fieldKeys, inventory, loadSessionState, textHash, type ManagedSession, type State } from "./sessionState";
 import { noticePayload, postponementRecipients, recipientKey } from "./postponementNotices";
@@ -95,7 +96,12 @@ export function buildManagementPlan(state: State, input: ManagementInput) {
       const before = effectiveField(state, current, key);
       // Defaults never enroll an override, even if its value happens to match.
       if (input.kind === "defaults" && before.mode !== "inherit") continue;
-      const after = effectiveField(nextState, next, key);
+      // Retain legacy API preview/apply compatibility; new editors author English only.
+      const edit = input.patch[key];
+      const legacyLocale = key.startsWith("content.") && !key.endsWith(".en");
+      const after: EffectiveField = legacyLocale && edit.mode !== "inherit"
+        ? { value: edit.mode === "clear" ? null : edit.value, mode: edit.mode, source: edit.mode === "clear" ? "clear" : "override" }
+        : effectiveField(nextState, next, key);
       if (digest(before) !== digest(after)) changes.push({ field: key, before, after });
     }
     const scheduled = input.schedules?.[current.id];
@@ -219,10 +225,11 @@ async function writeDefaultTranslations(tx: Prisma.TransactionClient, state: Sta
     const [, field, locale] = key.split(".");
     const source = String(defaultField(state, `content.${field}.en`).value ?? "");
     if (locale === "en") {
-      await tx.contentTranslation.updateMany({ where: { entityType: "SeriesSessionDefaults", entityId: state.series.id, fieldName: field, provider: { not: "manual-session-management" } }, data: { status: "STALE" } });
+      await syncTranslations(tx, "SeriesSessionDefaults", state.series.id, { [field]: source });
       continue;
     }
-    const value = defaultField(state, key).value;
+    const edit = modes(state.series.sessionDefaults)[key];
+    const value = edit?.mode === "override" ? edit.value : edit?.mode === "clear" ? null : defaultField(state, key).value;
     const data = { sourceLocale: "en", sourceText: source, sourceTextHash: textHash(source), translatedText: typeof value === "string" ? value : "", status: "COMPLETED" as const, provider: "manual-session-management" };
     await tx.contentTranslation.upsert({
       where: { entityType_entityId_fieldName_targetLocale: { entityType: "SeriesSessionDefaults", entityId: state.series.id, fieldName: field, targetLocale: locale } },
@@ -240,9 +247,12 @@ export async function materializeSession(tx: Prisma.TransactionClient, state: St
     if (kind === "artwork") Object.assign(data, { [`flyerImageUrl${name === "en" ? "En" : name === "es" ? "Es" : "Pt"}`]: value });
     if (kind === "content" && locale === "en") {
       Object.assign(data, { [name]: value });
-      await tx.contentTranslation.updateMany({ where: { entityType: "EventSession", entityId: next.id, fieldName: name, provider: { not: "manual-session-management" } }, data: { status: "STALE" } });
+      await syncTranslations(tx, "EventSession", next.id, { [name]: modes(next.fieldModes)[key]?.mode === "inherit" ? null : value ?? null });
     }
-    if (kind === "content" && locale !== "en") await writeTranslation(tx, next.id, name, locale, value, String(effectiveField(state, next, `content.${name}.en`).value ?? ""));
+    if (kind === "content" && locale !== "en") {
+      const mode = modes(next.fieldModes)[key];
+      await writeTranslation(tx, next.id, name, locale, mode?.mode === "override" ? mode.value : mode?.mode === "clear" ? null : value, String(effectiveField(state, next, `content.${name}.en`).value ?? ""));
+    }
     if (kind === "ticket" && locale === "price") {
       await tx.sessionTicketPrice.upsert({ where: { sessionId_ticketTypeId: { sessionId: next.id, ticketTypeId: name } }, create: { sessionId: next.id, ticketTypeId: name, priceCents: Number(value) }, update: { priceCents: Number(value) } });
     }

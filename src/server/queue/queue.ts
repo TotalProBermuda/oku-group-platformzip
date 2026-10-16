@@ -213,21 +213,6 @@ export async function enqueueTranslations(params: {
   sourceText: string;
   targetLocales?: string[];
 }): Promise<void> {
-  const { entityType, entityId, fieldName, sourceLocale, sourceText, targetLocales = ["es", "pt"] } = params;
-  if (!sourceText?.trim()) return;
-
-  // Same construction-time invariant as safeEnqueue — translationQueue is null
-  // iff REDIS_URL was unset at module load.
-  if (!translationQueue) {
-    console.log("[queue] Skipping translation enqueue — no REDIS_URL configured.");
-    return;
-  }
-
-  for (const targetLocale of targetLocales.filter((l) => l !== sourceLocale)) {
-    await translationQueue.add(
-      "translate_field",
-      { entityType, entityId, fieldName, sourceLocale, sourceText, targetLocale },
-      { attempts: 3, backoff: { type: "exponential", delay: 5000 } }
-    );
-  }
+  const { queueTranslations } = await import("@/server/i18n/contentTranslationService");
+  await queueTranslations(params as Parameters<typeof queueTranslations>[0]);
 }
