@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 
 const input = z.object({ name: z.string().trim().min(1).max(160), description: z.string().max(5000).nullable() }).strict();
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; addonId: string }> }) {
@@ -21,7 +22,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     await tx.auditLog.create({ data: { actorId: auth.userId, action: "EVENT_ADDON_CONTENT_UPDATED", metadata: { seriesId: id, addonId, fields: ["name", "description"] } } });
     return updated;
   });
-  return addon ? NextResponse.json({ addon }) : NextResponse.json({ error: "Not found" }, { status: 404 });
+  return addon ? finishEventSave(id, { addon }, req) : NextResponse.json({ error: "Not found" }, { status: 404 });
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 500;
     return NextResponse.json({ error: status === 401 ? "Unauthorized" : "Could not save add-on text." }, { status });

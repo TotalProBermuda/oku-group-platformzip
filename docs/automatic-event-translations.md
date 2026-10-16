@@ -1,5 +1,29 @@
 # Automatic event text translations
 
+## Shared auth secret policy
+
+Production startup follows the unchanged shell entrypoint -> Next.js chain on
+existing Autoscale hosting. Auth is resolved by the shared,
+dependency-free `src/lib/authSecret.ts` in Node auth options, demo-login cookie
+issuance, Edge middleware cookie decoding/audit signing, and Node audit signature
+verification. Middleware no longer maintains a separate resolver.
+
+The first nonempty value wins: `NEXTAUTH_SECRET`, then `AUTH_SECRET`. Empty strings
+are missing; secret bytes are never trimmed, rewritten, generated, or copied.
+If both names differ, NEXTAUTH_SECRET retains precedence to preserve existing
+sessions. If both are absent/empty, production throws rather than using a known
+fallback; the existing development/test fallback remains non-production only.
+This does not rotate or modify any stored secret or environment file.
+
+Readiness uses the same presence check, keeps the legacy `auth.nextauth_secret`
+gate/API boolean for compatibility, and returns no secret values. The Payments
+label shows both supported names. Rate-limit fingerprint/encryption key policy
+is separate and deliberately unchanged. DEEPL_AUTH_KEY remains independent.
+
+Regression tests cover Node-issued cookies decoded by Edge, Edge-signed denial
+audits verified by Node, precedence, empty/missing values, readiness, no resolver
+logging, and a production build using only an isolated AUTH_SECRET fixture.
+
 ## Authoring boundary and audited fields
 
 Staff enter the English source once. The session card and advanced/defaults editor
@@ -54,26 +78,50 @@ product IDs, purchase policy or historical order/ticket snapshots.
 - Artwork, permissions, publication/readiness rules, commercial protections and
   preview/apply idempotency remain separate and intact.
 
-## Provider, worker and failure behavior
+## Request-bound processing on Autoscale
 
 DEEPL_AUTH_KEY is the only translation credential. `:fx` selects DeepL Free;
 otherwise the adapter uses DeepL Pro. Source is EN, targets ES and PT-BR, and rich
-HTML uses DeepL's HTML handling. Requests have a 20-second timeout. Neither source
+HTML uses DeepL's HTML handling. Provider calls have a four-second timeout,
+composed with the authenticated request's ten-second processing deadline. Neither source
 text nor provider response bodies/credentials are written to queue payloads or
 translation logs. Stored failure codes are sanitized.
 
-The existing BullMQ worker runs a real translation drain and a recurring wake-up.
-Its independent 30-second database poll also runs when Redis is absent or fails;
-HTTP saves never wait for Redis/provider connectivity. Old queued source payloads
-are not replayed. A DB lease prevents concurrent claims. Retryable failures use
-exponential backoff (capped at one hour), with six attempts per source. Missing
-configuration is deferred without consuming attempts. Permanent provider errors
-stop after the bounded retry policy; failed rows remain inspectable and English
-remains available. Clearing a field completes an empty record without an API call.
+Every successful text save first commits English and durable translation records,
+then awaits at most four current-source translation claims in that same authenticated
+request. The response retains its original data envelope and adds `saved: true`
+plus `translation` metadata: `ready`, `pending`, or `retry`. Provider failure never
+rolls back saved English or masquerades as an all-language success.
 
-The BullMQ Worker service must be running for automatic processing; the web process
-only writes the durable outbox. DeepL must be configured before real translations
-can complete. Google OAuth credentials are never consulted.
+The scoped `/api/v1/admin/series/[id]/translations` endpoint uses the same
+`admin:experiences:write` permission. GET only reads metadata. POST awaits a bounded
+chunk; it cannot specify arbitrary entities or change source content. It applies
+an authenticated request rate limit without requiring Redis. Event scope includes
+the series, session defaults, sessions, ticket types and add-ons belonging to it.
+Public/visitor requests never perform or schedule translations.
+
+An open editor may await up to six sequential continuation POSTs after a save.
+Opening/reopening only reads persisted status; explicit Resume/Retry restarts work.
+Unmount/close aborts client continuation. Source, pending/failed status, attempt
+count, next attempt and expiring leases survive browser close or instance shutdown.
+There is no server interval, process-local queue, fire-and-forget processing,
+translation BullMQ consumer, supervisor, or continuously running worker prerequisite.
+Unrelated existing workers/jobs are not activated or otherwise changed.
+
+The conditional claim/completion uses the current source hash and lease, so older
+results cannot overwrite a newer English save and concurrent requests cannot
+translate the same current field/locale twice. Unchanged source does not reset or
+retranslate completed rows. Retryable failures persist exponential backoff and a
+six-attempt budget; a failure stops the current chunk and gates subsequent work
+until explicit Retry. Retry cannot bypass backoff or steal a live lease. Only
+explicit Retry can re-arm exhausted/permanent failures. Missing configuration
+does not consume attempts. Cleared fields complete without provider calls.
+
+HTML output must retain the same balanced, simple formatting-tag sequence as
+the source. Executable/unknown tags, attributes and provider-injected markup are
+rejected, not stored as completed. Unsupported rich markup remains English until
+the source is adjusted; safe basic paragraph/list/emphasis formatting is preserved.
+Google OAuth credentials are never consulted.
 
 ## Migration and operational limits
 
@@ -84,5 +132,70 @@ DDL. Additive DDL was applied to development only; apply/review the schema throu
 the project's normal production schema process before activating in production.
 Application startup does not run migrations. No publication was performed.
 
+## Reviewed release sequence — retain Autoscale
+
+Normal website startup/build commands are unchanged from main. The earlier
+supervisor and bundled continuous worker have been removed. **Retain existing
+Autoscale hosting. No Reserved VM, always-on process, or hosting change is required.**
+
+After review/merge, perform these steps in order:
+
+1. Reconcile/pull merged main while retaining unrelated local changes. Install
+   the merged lockfile and build normally.
+2. **Publishing configuration update (2026-10-16, user-reported):** the user clicked
+   Add secret for DEEPL_AUTH_KEY in Publishing > Production app secrets. The
+   out-of-sync section disappeared and the key is now listed masked among deployment
+   secrets. This resolves the previously reported Publishing configuration warning;
+   it does **not** verify the key is active in the running production app.
+   **No republish has occurred.** Editor presence metadata and the earlier editor-only
+   Hello world smoke test are also not proof of running-production availability.
+   Keep runtime verification pending until a separately approved publish, then
+   verify safely without exposing credentials or translating live customer data.
+   Confirm the existing auth
+   secret is available to a clean production build/runtime: NEXTAUTH_SECRET takes
+   precedence over the AUTH_SECRET alias. No remapping or rotation is required.
+   Never substitute the disposable test credential.
+3. Confirm the database target is development. Review the additive translation
+   migration and development schema/index parity; reconcile existing Prisma
+   migration history separately if necessary. Do not run the post-merge script
+   against an unidentified database.
+4. Inspect Replit's managed development-to-production schema diff. It must include
+   the four retry/lease columns and retry index, with no unintended drops or data
+   loss. Production schema synchronization belongs to reviewed Publish, not
+   `prisma migrate deploy` in application startup.
+5. Keep Autoscale unchanged. Only after separate approval, publish the reviewed
+   build with the reviewed schema/secret synchronization. Do not start the broader
+   `npm run worker` or any translation process for this feature.
+6. Confirm the website/auth health and that an authorized disposable event save
+   progresses from English fallback to ES/PT within bounded editor requests.
+   Verify provider-failure Retry and closing/reopening with pending work.
+   Review only status/error codes, never submitted content or credentials.
+
+This correction adds no migration or dependency change. Tests never connect to
+production. No customer text was sent to the provider during implementation.
+
 Tests use mocked DeepL/DB services or an explicitly isolated loopback PostgreSQL
 fixture. Browser fixtures deny unstubbed API calls and never mutate real events.
+
+## Verification of the request-bound correction
+
+- Focused translation, Series/Session, auth alias, route/RBAC and editor-status
+  suite: **208 passed; 34 database-fixture tests intentionally skipped**. No
+  database fixture or migration was run in this correction.
+- Playwright: **8 passed**, across desktop and 375px projects. Includes explicit
+  Resume after opening pending work, session editor layout, defaults/referral
+  preview/apply and create-session regression checks. API traffic is fixture-only.
+- Prisma validate passed. Isolated production build passed (exit 0), with an
+  unreachable loopback database, external network blocked and disposable auth
+  alias fixture; no production credentials or database were used.
+- Full TypeScript comparison against main
+  `8858a529a3bdba0b22edcfcfff48eaf2c0abf3f3`, using identical installed dependencies
+  and existing generated-route checks: baseline **254**, feature **253** errors,
+  **zero introduced**, one resolved. Both include 189 pre-existing sandbox errors.
+  Newly added route/source checks are included only in the feature run.
+  Typecheck is NOT globally green. The last baseline diagnostic is
+  `tests/server/rateLimit.test.ts:59 TS2540: Cannot assign to 'NODE_ENV' because it
+  is a read-only property.` The normal build's existing type-error policy is unchanged.
+- A public-login screenshot confirmed normal website startup. Signed-in editor
+  behavior was separately checked through Playwright's authenticated fixture
+  cookies; neither test method bypassed application authentication.

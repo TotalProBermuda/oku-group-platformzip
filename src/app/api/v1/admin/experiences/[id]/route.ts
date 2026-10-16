@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { assertSeriesReadyForPublication, SeriesPublicationError, syncSeriesOccupanciesForStatus } from "@/server/series/publicationLifecycle";
@@ -117,7 +118,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await tx.auditLog.create({ data: { actorId, action: "EXPERIENCE_UPDATED", metadata: { seriesId: id, fields: Object.keys(data) } } });
     return updated;
     });
-    return NextResponse.json({ series });
+    return finishEventSave(id, { series }, req);
   } catch (error) {
     if (error && typeof error === "object" && "status" in error && error.status === 409) return NextResponse.json({ error: error instanceof Error ? error.message : managedWriteMessage }, { status: 409 });
     if (error instanceof SeriesPublicationError) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { requirePermission } from "@/lib/rbac";
 import { requireSession } from "@/server/auth/session";
 import { createSessionInputSchema } from "@/server/series/createSessionInput";
@@ -142,7 +143,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
       return { event: created, occupancy, conflictCount };
     });
-    return NextResponse.json({ ok: true, data: result.event, occupancy: result.occupancy, conflictCount: result.conflictCount }, { status: 201 });
+    return finishEventSave(seriesId, { ok: true, data: result.event, occupancy: result.occupancy, conflictCount: result.conflictCount }, req, 201);
   } catch (error) {
     return failure(error);
   }

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // happen to use `requireAdminPermission` / `requireAdminRoles` directly.
 //
 // Authenticated by an HMAC-SHA256 signature of the raw body using
-// `NEXTAUTH_SECRET` so external callers cannot forge denial rows.
+// the shared resolved auth secret so external callers cannot forge denial rows.
 
 const SECRET = resolveAuthSecret();
 

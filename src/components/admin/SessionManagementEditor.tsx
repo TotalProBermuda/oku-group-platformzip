@@ -6,6 +6,8 @@ import { useTranslation } from "@/components/i18n/LocaleProvider";
 import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 import MediaUpload from "@/components/ui/MediaUpload";
 import CurrencyAmountInput from "@/components/admin/CurrencyAmountInput";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 type Mode = "inherit" | "override" | "clear";
 type Effective = { value: unknown; source: string; mode: Mode };
@@ -83,6 +85,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState("");
+  const translations = useSeriesTranslations(seriesId);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   // React may commit the preview after an animation-frame callback has fired.
@@ -213,7 +216,10 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
         else throw new Error(result?.error || tr("session_save_failed", "Could not apply changes."));
         return;
       }
-      setPreview(null); dialogRef.current?.close(); setEdits({}); setReferralEdits({}); setSchedules({}); setSelected([]); setSuccess(tr("session_saved", "Session changes saved.")); await onSaved(); await load();
+      const translation = await translations.onSave(result);
+      setPreview(null); dialogRef.current?.close(); setEdits({}); setReferralEdits({}); setSchedules({}); setSelected([]);
+      setSuccess(translation?.state === "ready" ? "Saved / translations ready." : translation?.state === "retry" ? "Saved / translation needs retry." : "Saved / translation pending.");
+      await onSaved(); await load();
     } catch (e) { setError(e instanceof Error ? e.message : tr("session_save_failed", "Could not apply changes.")); }
     finally { setBusy(false); }
   }
@@ -226,6 +232,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
       <p style={{ color: "#70665e", fontSize: 13, lineHeight: 1.55, margin: "6px 0 0" }}>{tr("session_management_intro", "Stage targeted changes, inspect their impact, then apply them. Untouched fields are never sent.")}</p>
     </div>
     <div aria-live="polite" role={error ? "alert" : "status"} style={{ color: error ? "#9d3028" : "#315a43", marginBottom: error || success ? 12 : 0 }}>{error || success}</div>
+    <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />
     {loading ? <div aria-label={tr("loading", "Loading")} style={{ display: "grid", gap: 8 }}><div style={{ height: 36, borderRadius: 7, background: "#f1ece6" }} /><div style={{ height: 64, borderRadius: 7, background: "#f1ece6" }} /></div>
       : loadError ? <div role="alert">{loadError} <button type="button" onClick={() => void load()} className="btn btn-ghost">{tr("retry", "Retry")}</button></div>
       : data ? <>

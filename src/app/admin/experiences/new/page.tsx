@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Building2, Globe2, MapPin, Sparkles, Users } from "lucide-react";
 import styles from "./page.module.css";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 type Venue = {
   id: string;
@@ -82,6 +83,7 @@ export default function NewExperiencePage() {
   const [optionsRequest, setOptionsRequest] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const submissionInFlight = useRef(false);
+  const translations = useSeriesTranslations(null, true);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,6 +217,7 @@ export default function NewExperiencePage() {
 
       const series = asRecord(payload.data);
       if (typeof series.id !== "string") throw new Error("The experience was created without an editor link.");
+      await translations.onSave(payload, series.id);
       const target = `/admin/experiences/${encodeURIComponent(series.id)}?tab=dates`;
       window.location.assign(target);
       unlockSubmission = false;

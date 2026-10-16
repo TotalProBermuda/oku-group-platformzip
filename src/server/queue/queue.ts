@@ -29,13 +29,10 @@ if (!hasRedis) {
 // internal blocking-mode (`bclient`) ioredis connections ignore lazyConnect
 // and start dialing redis://localhost:6379 the moment a Queue object exists,
 // which floods `next build`'s "Collecting page data" phase with ECONNREFUSED.
-// safeEnqueue() and enqueueTranslations() already have inline fallbacks for
-// the !REDIS_URL case, so the Queue references are unused in that path.
+// safeEnqueue() has an inline fallback; event translations are request-bound
+// and never construct a Redis queue.
 export const commerceQueue: Queue | null = hasRedis
   ? new Queue("commerce", redisConnection)
-  : null;
-export const translationQueue: Queue | null = hasRedis
-  ? new Queue("translation", redisConnection)
   : null;
 export const invuSyncQueue: Queue | null = hasRedis
   ? new Queue("invu-sync", redisConnection)
@@ -203,7 +200,8 @@ export async function safeEnqueue(
 }
 
 /**
- * Enqueues a translation job for a single entity field across all target locales.
+ * Legacy durable-record API. Does not enqueue, start a worker, or launch IO.
+ * Event authoring uses syncTranslations + authenticated request processing.
  */
 export async function enqueueTranslations(params: {
   entityType: string;

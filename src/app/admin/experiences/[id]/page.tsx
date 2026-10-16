@@ -19,6 +19,8 @@ import AddonTextEditor from "@/components/admin/AddonTextEditor";
 import EventTextNotice from "@/components/admin/EventTextNotice";
 import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
 import MediaUpload from "@/components/ui/MediaUpload";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 const SERIES_SOCIAL_FIELDS = [
   ["website", "Website"], ["instagram", "Instagram"], ["facebook", "Facebook"],
@@ -64,6 +66,7 @@ export default function AdminExperienceEditPage() {
   const [venues, setVenues] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
   const [hostOptions, setHostOptions] = useState<{ influencers: any[]; partners: any[] }>({ influencers: [], partners: [] });
+  const translations = useSeriesTranslations(id);
 
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
@@ -78,7 +81,8 @@ export default function AdminExperienceEditPage() {
     setSeries(data.series);
     setForm(data.series ?? {});
     setLoading(false);
-  }, [id]);
+    await translations.refresh();
+  }, [id, translations.refresh]);
 
   useEffect(() => { loadSeries(); }, [loadSeries]);
   useEffect(() => {
@@ -121,7 +125,11 @@ export default function AdminExperienceEditPage() {
       const issues = Array.isArray(data.issues) ? data.issues.map((issue: { message?: string }) => issue.message).filter(Boolean).join(" ") : "";
       setError(issues || data.error || t("admin", "save_failed") || "Save failed");
     }
-    else         { setSuccess(t("admin", "saved") ?? "Saved successfully"); setSeries(data.series); setForm(data.series); }
+    else {
+      const translation = await translations.onSave(data);
+      setSuccess(translation?.state === "ready" ? "Saved / translations ready." : translation?.state === "retry" ? "Saved / translation needs retry." : "Saved / translation pending.");
+      setSeries(data.series); setForm(data.series);
+    }
     setSaving(false);
   }
 
@@ -136,6 +144,7 @@ export default function AdminExperienceEditPage() {
     setDuplicating(false);
     if (res.ok && data.series?.id) {
       setShowDuplicateModal(false);
+      await translations.onSave(data, data.series.id);
       router.push(`/admin/experiences/${data.series.id}`);
     } else {
       setError(data.error ?? "Duplicate failed");
@@ -259,8 +268,11 @@ export default function AdminExperienceEditPage() {
         </div>
       </div>
 
-      {success && <div style={{ background: "#dcfce7", borderBottom: "1px solid #bbf7d0", padding: "12px 24px", fontSize: 14, color: "#16a34a", fontWeight: 500 }}>{success}</div>}
+      {success && <div role="status" aria-live="polite" style={{ background: "#dcfce7", borderBottom: "1px solid #bbf7d0", padding: "12px 24px", fontSize: 14, color: "#315a43", fontWeight: 500 }}>{success}</div>}
       {error   && <div style={{ background: "#fee2e2", borderBottom: "1px solid #fecaca", padding: "12px 24px", fontSize: 14, color: "#dc2626", fontWeight: 500 }}>{error}</div>}
+      <div className="page-container" style={{ paddingTop: 8 }}>
+        <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />
+      </div>
 
       <div className="experience-layout" style={{ display: "flex" }}>
         <div className="experience-tabs" style={{ width: 200, borderRight: "1px solid #e5e0d8", minHeight: "calc(100vh - 120px)", background: "#fafaf9", padding: "20px 0", flexShrink: 0 }}>

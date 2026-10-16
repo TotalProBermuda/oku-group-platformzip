@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { requireSession } from "@/server/auth/session";
 import { Prisma } from "@prisma/client";
 import { sessionTicketPriceInputSchema, updateSessionContentSchema } from "@/server/series/createSessionInput";
@@ -77,7 +78,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const updated = await tx.session.update({
       where: { id },
       data: update,
-      select: { id: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
+      select: { id: true, seriesId: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
       });
       if (ticketPriceOverrides) {
         await tx.sessionTicketPrice.deleteMany({ where: { sessionId: id } });
@@ -96,7 +97,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return updated;
     });
 
-    return NextResponse.json({ ok: true, data: session });
+    const { seriesId, ...data } = session;
+    return finishEventSave(seriesId, { ok: true, data }, req);
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
   }

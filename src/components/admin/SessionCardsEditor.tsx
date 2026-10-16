@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import MediaUpload from "@/components/ui/MediaUpload";
 import EventArtwork from "@/components/ui/EventArtwork";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 import { sessionArtworkCandidates } from "@/lib/eventArtwork";
 import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 
@@ -66,6 +68,7 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
   const [returnedPreview, setReturnedPreview] = useState<Preview | null>(null);
   const [retryPreview, setRetryPreview] = useState<Preview | null>(null);
   const [scheduleProtected, setScheduleProtected] = useState(false);
+  const translations = useSeriesTranslations(seriesId, Boolean(activeId));
   const openerRef = useRef<HTMLButtonElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const active = payload?.sessions.find((item) => item.id === activeId) ?? null;
@@ -233,7 +236,8 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
       throw new Error(result?.error || "Could not save this date.");
     }
     setRetryPreview(null);
-    setNotice("Changes saved for this date.");
+    const translation = await translations.onSave(result);
+    setNotice(translation?.state === "ready" ? "Saved / translations ready." : translation?.state === "retry" ? "Saved / translation needs retry." : "Saved / translation pending.");
     await onSaved();
     await load();
     closeEditor(true);
@@ -360,6 +364,7 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
           </aside>
           <section className="sc-section">
             <h4>Details</h4>
+            <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />
              <p className="sc-value">Enter text once in English. Spanish and Portuguese are generated automatically after saving; guests see English while translations are pending.</p>
             {(["title", "subtitle", "description"] as const).map((name) => {
                const key = fieldKey(`content.${name}`, "en");
