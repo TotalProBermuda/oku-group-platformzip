@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { requirePermission } from "@/lib/rbac";
 import { requireSession } from "@/server/auth/session";
 import { createSessionInputSchema } from "@/server/series/createSessionInput";
@@ -74,6 +75,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           status: "SCHEDULED",
         },
       });
+      await syncTranslations(tx, "EventSession", created.id, { title: created.title, subtitle: created.subtitle, description: created.description });
       if (body.data.useSeriesDefaults) {
         const state = await loadSessionState(tx, seriesId, [created.id]);
         const current = state.sessions[0];

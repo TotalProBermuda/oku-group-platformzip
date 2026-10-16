@@ -24,6 +24,8 @@ import { assertCheckoutCatalogPolicy } from "@/server/commerce/catalogPolicy";
 import { claimAdmission } from "@/server/checkin/claimAdmission";
 import { POST as createSession } from "@/app/api/v1/admin/series/[id]/sessions/route";
 import { localizeSessions } from "@/server/series/localizeSessions";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { drainTranslations } from "@/server/i18n/translationProcessor";
 import { ticketRows } from "@/server/commerce/ticketIssuance";
 import { POST as issueComp } from "@/app/api/v1/admin/tickets/issue/route";
 import { expireCheckoutHoldsForSession, CHECKOUT_HOLD_EVENT } from "@/server/commerce/checkoutHold";
@@ -51,6 +53,45 @@ suite("dynamic sessions — isolated PostgreSQL transactions", () => {
     } })));
     return { user, series, ticket, sessions };
   }
+  it("automatically translates English defaults and serves English while durable work is pending, without Redis", async () => {
+    const f = await fixture();
+    await change(f, { kind: "defaults", sessionIds: [], patch: { "content.description.en": { mode: "override", value: "English source details" } } });
+    const series = await db.series.findUniqueOrThrow({ where: { id: f.series.id } });
+    const sessions = await db.session.findMany({ where: { seriesId: f.series.id } });
+    expect((await localizeSessions(series, sessions, "es"))[0].description).toBe("English source details");
+    const records = await db.contentTranslation.findMany({ where: { entityType: "SeriesSessionDefaults", entityId: f.series.id, fieldName: "description" } });
+    expect(records).toHaveLength(2);
+    await drainTranslations({ translate: async (source, locale) => `${locale}:${source}` }, 1000);
+    expect((await localizeSessions(series, sessions, "es"))[0].description).toBe("es:English source details");
+    expect((await localizeSessions(series, sessions, "pt"))[0].description).toBe("pt:English source details");
+  });
+  it("source and translation invalidation roll back together", async () => {
+    const f = await fixture();
+    await expect(db.$transaction(async tx => {
+      await tx.series.update({ where: { id: f.series.id }, data: { title: "Uncommitted source" } });
+      await syncTranslations(tx, "Series", f.series.id, { title: "Uncommitted source" });
+      throw new Error("Rollback fixture");
+    })).rejects.toThrow("Rollback fixture");
+    expect((await db.series.findUniqueOrThrow({ where: { id: f.series.id } })).title).toBe("Series original");
+    expect(await db.contentTranslation.count({ where: { entityId: f.series.id } })).toBe(0);
+  });
+  it("an in-flight provider result cannot replace translations for newer English", async () => {
+    const f = await fixture();
+    await db.$transaction(tx => syncTranslations(tx, "EventSession", f.sessions[0].id, { title: "Before" }));
+    let changed = false;
+    await drainTranslations({ translate: async () => {
+      if (!changed) {
+        changed = true;
+        await db.$transaction(async tx => {
+          await tx.session.update({ where: { id: f.sessions[0].id }, data: { title: "After" } });
+          await syncTranslations(tx, "EventSession", f.sessions[0].id, { title: "After" });
+        });
+      }
+      return "Old result";
+    } }, 1000);
+    const records = await db.contentTranslation.findMany({ where: { entityId: f.sessions[0].id } });
+    expect(records.every(row => row.sourceText === "After" && row.translatedText !== "Old result")).toBe(true);
+  });
   async function change(f: Awaited<ReturnType<typeof fixture>>, input: unknown) {
     const p = await previewSessionManagement(f.series.id, f.user.id, roles, input);
     await applySessionManagement(f.series.id, f.user.id, roles, p.previewId, p.requestId);

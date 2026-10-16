@@ -15,6 +15,8 @@ import ReservationBlocksPanel from "@/components/admin/ReservationBlocksPanel";
 import SeriesMenusPanel from "@/components/admin/SeriesMenusPanel";
 import EventOccupancyPanel from "@/components/admin/EventOccupancyPanel";
 import EventScheduleManager from "@/components/admin/EventScheduleManager";
+import AddonTextEditor from "@/components/admin/AddonTextEditor";
+import EventTextNotice from "@/components/admin/EventTextNotice";
 import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
 import MediaUpload from "@/components/ui/MediaUpload";
 
@@ -273,6 +275,7 @@ export default function AdminExperienceEditPage() {
         <div className="experience-content" style={{ flex: 1, minWidth: 0, padding: analyticsTab ? "0" : "32px", maxWidth: analyticsTab ? "none" : 720 }}>
           {tab === "basics" && (
             <div>
+              <EventTextNotice />
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, marginBottom: 24, color: "#1a1614" }}>{t("admin", "basic_info") ?? "Basic Information"}</h2>
               {field("title", t("admin", "title") ?? "Title")}
               {field("subtitle", t("admin", "subtitle") ?? "Subtitle")}
@@ -449,18 +452,10 @@ export default function AdminExperienceEditPage() {
                 {tab === "tickets" ? (t("admin", "ticket_types") ?? "Ticket Types") : tab === "addons" ? (t("admin", "addons") ?? "Add-Ons") : tab === "influencers" ? (t("admin", "influencer_assignments") ?? "Influencer Assignments") : (t("admin", "attendees") ?? "Attendees")}
               </h2>
               {tab === "tickets" && (
-                <TicketTypeManager seriesId={id} />
+                <><EventTextNotice /><TicketTypeManager seriesId={id} /></>
               )}
               {tab === "addons" && (
-                <>
-                  {series.addons?.map((a: any) => (
-                    <div key={a.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
-                      <div style={{ fontWeight: 600, color: "#1a1614" }}>{a.name}</div>
-                      <div style={{ fontSize: 12, color: "#9ca3af" }}>${(a.priceCents / 100).toFixed(0)} · Cap: {a.capacity ?? "∞"}</div>
-                      {a.description && <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>{a.description}</div>}
-                    </div>
-                  ))}
-                </>
+                <AddonTextEditor seriesId={id} addons={series.addons ?? []} canEdit={isSuperAdmin} onSaved={loadSeries} />
               )}
               {tab === "influencers" && (
                 <SeriesInfluencerManager seriesId={id} />

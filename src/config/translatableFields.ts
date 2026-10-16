@@ -15,6 +15,9 @@ export const TRANSLATABLE_FIELDS = {
     "agenda",
     "faq",
     "hostNotes",
+    "countdownLabel",
+    "seoTitle",
+    "seoDescription",
   ],
   EventSession: [
     "title",
@@ -23,6 +26,8 @@ export const TRANSLATABLE_FIELDS = {
     "notes",
   ],
   SeriesSessionDefaults: ["title", "subtitle", "description"],
+  TicketType: ["name", "description"],
+  ExperienceAddon: ["name", "description"],
   Venue: [
     "name",
     "shortDescription",

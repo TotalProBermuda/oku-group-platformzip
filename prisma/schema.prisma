@@ -3897,6 +3897,10 @@ model ContentTranslation {
   translatedText String                   @db.Text
   status         ContentTranslationStatus @default(PENDING)
   provider       String?
+  attemptCount   Int                      @default(0)
+  nextAttemptAt  DateTime                 @default(now())
+  processingUntil DateTime?
+  lastErrorCode  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3906,6 +3910,7 @@ model ContentTranslation {
   @@index([status])
   @@index([targetLocale])
   @@index([entityType, targetLocale, status])
+  @@index([status, nextAttemptAt])
 }
 
 // ── CHECK-IN + ATTENDANCE SYSTEM ────────────────────────────────────────────

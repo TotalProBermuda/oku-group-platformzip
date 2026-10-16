@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { assertSeriesReadyForPublication, SeriesPublicationError, syncSeriesOccupanciesForStatus } from "@/server/series/publicationLifecycle";
@@ -108,6 +109,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const defaultFields = ["title", "subtitle", "description", "capacityTotal", "heroImageUrl", "heroImageUrlEn", "heroImageUrlEs", "heroImageUrlPt", "startsAt", "endsAt"];
       if (defaultFields.some(k => k in data) && await legacySeriesWriteBlocked(id, tx)) throw Object.assign(new Error(managedWriteMessage), { status: 409 });
       const updated = await tx.series.update({ where: { id }, data });
+      await syncTranslations(tx, "Series", id, updated);
       if (data.status === "PUBLISHED") await assertSeriesReadyForPublication(tx, id);
     if (data.status) {
       await syncSeriesOccupanciesForStatus(tx, id, data.status);

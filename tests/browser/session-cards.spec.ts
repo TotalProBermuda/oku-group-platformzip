@@ -185,19 +185,31 @@ test.describe("individual session editor", () => {
     expect(f.commits).toEqual(Array(3).fill({ previewId: "fixture-preview", requestId: "fixture-request" }));
   });
 
-  test("capacity floor and restricted controls, locale review preserves manual draft", async ({ page, context, baseURL }) => {
+  test("capacity floor and restricted controls, artwork locale preserves the single English draft", async ({ page, context, baseURL }) => {
     const f = await setup(page, context, baseURL, ["FB_DIRECTOR"]);
     const sheet = await f.open();
     await expect(sheet.getByLabel("Price (cents)")).toBeDisabled();
     await expect(sheet.getByText("Artwork changes require additional access.").first()).toBeVisible();
+    await sheet.getByLabel("Title", { exact: false }).first().fill("English draft");
     await sheet.getByRole("tab", { name: "ES", exact: true }).click();
-    await sheet.getByLabel("Title", { exact: false }).first().fill("Texto manual");
     await sheet.getByRole("tab", { name: "EN", exact: true }).click();
     await sheet.getByRole("tab", { name: "ES", exact: true }).click();
-    await expect(sheet.getByLabel("Title", { exact: false }).first()).toHaveValue("Texto manual");
+    await expect(sheet.getByLabel("Title", { exact: false }).first()).toHaveValue("English draft");
+    await expect(sheet.getByRole("tablist", { name: "Artwork language" })).toHaveCount(1);
+    await expect(sheet.getByRole("tablist", { name: "Language", exact: true })).toHaveCount(0);
     await sheet.getByLabel("Capacity", { exact: false }).fill("2");
     await sheet.getByRole("button", { name: "Save", exact: true }).click();
     await expect(sheet.getByRole("alert")).toContainText("Capacity must be");
     expect(f.previews).toHaveLength(0);
+  });
+  test("saving English once sends no ES/PT text fields, but preserves per-language artwork", async ({ page, context, baseURL }) => {
+    const f = await setup(page, context, baseURL);
+    const sheet = await f.open();
+    await sheet.getByLabel("Title", { exact: false }).first().fill("New English source");
+    await sheet.getByRole("tab", { name: "PT", exact: true }).click();
+    await expect(sheet.getByLabel("Title", { exact: false }).first()).toHaveValue("New English source");
+    await sheet.getByRole("button", { name: "Save", exact: true }).click();
+    expect(f.previews[0].patch["content.title.en"]).toEqual({ mode: "override", value: "New English source" });
+    expect(Object.keys(f.previews[0].patch).filter(key => key.startsWith("content.") && (key.endsWith(".es") || key.endsWith(".pt")))).toEqual([]);
   });
 });

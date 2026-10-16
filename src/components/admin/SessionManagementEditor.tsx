@@ -113,27 +113,6 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
     ...(canManageRestricted ? ["artwork." + locale] : []),
   ].filter((key) => data?.fields.includes(key));
   const localizedEffective = (key: string) => kind === "defaults" ? data?.defaults[key] : selectedSessions[0]?.fields[key];
-  const localizedEditMode = (locale: string) => {
-    const keys = localizedKeys(locale);
-    const modes = keys.map((key) => edits[key]?.mode ?? localizedEffective(key)?.mode ?? "inherit");
-    if (keys.length && modes.every((mode) => mode === "inherit")) return "inherit";
-    if (keys.length && modes.every((mode) => mode === "clear")) return "clear";
-    if (keys.some((key) => edits[key]?.mode === "override" || localizedEffective(key)?.mode === "override")) return "override";
-    return "";
-  };
-  function setLocalizedMode(locale: string, mode: "" | Mode) {
-    setEdits((previous) => {
-      const next = { ...previous };
-      for (const key of localizedKeys(locale)) {
-        if (!mode) { delete next[key]; continue; }
-        if (mode === "override") {
-          const existing = next[key];
-          next[key] = { mode, value: existing?.mode === "override" ? existing.value : localizedEffective(key)?.value ?? "" };
-        } else next[key] = { mode, value: undefined };
-      }
-      return next;
-    });
-  }
   function setLocalizedValue(key: string, value: unknown) { setEdit(key, { mode: "override", value }); }
   const canEditLocalized = kind === "defaults" || selectedSessions.length > 0;
 
@@ -276,43 +255,29 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
           <section aria-labelledby="localized-session-content-title" style={{ ...cardStyle, background: "#fff", marginBottom: 12, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <h4 id="localized-session-content-title" style={{ margin: 0, color: "#27211d", fontSize: 16 }}>{tr("session_localized_content", "Session content & artwork")}</h4>
-                <p style={{ color: "#756a61", fontSize: 12, lineHeight: 1.5, margin: "5px 0 0" }}>{tr("session_localized_content_help", "Choose a language, edit its text and flyer together, then save once. Existing translations stay separate.")}</p>
+                <h4 id="localized-session-content-title" style={{ margin: 0, color: "#27211d", fontSize: 16 }}>English content &amp; localized artwork</h4>
+                <p style={{ color: "#756a61", fontSize: 12, lineHeight: 1.5, margin: "5px 0 0" }}>Enter each text field once in English. Spanish and Portuguese are generated after save, with English fallback while pending. Artwork remains language-specific.</p>
               </div>
-              <label style={{ minWidth: 190, fontSize: 12, fontWeight: 650 }}>
-                {tr("session_locale_mode", "Language content")}
-                <select aria-label={tr("session_locale_mode", "Language content")} value={localizedEditMode(contentLocale)} disabled={!canEditLocalized}
-                  onChange={(event) => setLocalizedMode(contentLocale, event.target.value as "" | Mode)} style={{ ...textStyle, marginTop: 4 }}>
-                  <option value="">{tr("session_untouched", "Keep current")}</option>
-                  {kind === "sessions" && <option value="inherit">{tr("session_inherit", "Use series defaults")}</option>}
-                  <option value="override">{tr("session_override", "Customize this language")}</option>
-                  <option value="clear">{tr("session_clear", "Clear this language")}</option>
-                </select>
-              </label>
             </div>
-            <div role="tablist" aria-label={tr("session_content_language", "Content language")} style={{ display: "flex", gap: 8, overflowX: "auto", margin: "14px 0" }}>
-              {(["en", "es", "pt"] as const).map((locale) => (
-                <button key={locale} type="button" role="tab" aria-selected={contentLocale === locale} onClick={() => setContentLocale(locale)}
-                  style={{ border: contentLocale === locale ? "1px solid #9f4d36" : "1px solid #e5e0d8", borderRadius: 999, padding: "8px 14px", background: contentLocale === locale ? "#f8eee8" : "#fff", color: "#27211d", fontWeight: 650, cursor: "pointer" }}>
-                  {locale.toUpperCase()}
-                </button>
-              ))}
-            </div>
-            {canEditLocalized ? <div role="tabpanel" aria-label={contentLocale.toUpperCase() + " content"} style={{ display: "grid", gap: 12 }}>
+            {canEditLocalized ? <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
               {selectedSessions.length > 1 && kind === "sessions" && <p role="note" style={{ color: "#735a43", fontSize: 12, margin: 0 }}>{tr("session_bulk_content_note", "Editing this language applies the same content to all selected sessions.")}</p>}
-              {localizedKeys(contentLocale).filter((key) => key.startsWith("content.")).map((key) => {
+              {localizedKeys("en").filter((key) => key.startsWith("content.")).map((key) => {
                 const field = localizedEffective(key);
                 const edit = edits[key];
-                const value = edit?.mode === "override" ? edit.value : field?.value;
+                const value = edit?.mode === "clear" ? "" : edit?.mode === "override" ? edit.value : field?.value;
                 const description = key.includes("description");
                 const label = fieldLabel(key, tr, data.options.referrals).replace(/ · [A-Z]{2}$/, "");
                 return <label key={key} style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>
                   {label}
                   {description
-                    ? <textarea aria-label={label} rows={5} maxLength={5000} value={String(value ?? "")} disabled={localizedEditMode(contentLocale) !== "override"} onChange={(event) => setLocalizedValue(key, event.target.value)} style={textStyle} />
-                    : <input aria-label={label} maxLength={key.includes("subtitle") ? 240 : 160} value={String(value ?? "")} disabled={localizedEditMode(contentLocale) !== "override"} onChange={(event) => setLocalizedValue(key, event.target.value)} style={textStyle} />}
+                    ? <textarea aria-label={label} rows={5} maxLength={5000} value={String(value ?? "")} onChange={(event) => setEdit(key, event.target.value ? { mode: "override", value: event.target.value } : { mode: "clear", value: undefined })} style={textStyle} />
+                    : <input aria-label={label} maxLength={key.includes("subtitle") ? 240 : 160} value={String(value ?? "")} onChange={(event) => setEdit(key, event.target.value ? { mode: "override", value: event.target.value } : { mode: "clear", value: undefined })} style={textStyle} />}
+                  <button type="button" className="btn btn-ghost" onClick={() => setEdit(key, { mode: "inherit", value: undefined })}>Use series details</button>
                 </label>;
               })}
+              {canManageRestricted && <div role="tablist" aria-label="Artwork language" style={{ display: "flex", gap: 8 }}>
+                {(["en", "es", "pt"] as const).map(locale => <button key={locale} type="button" role="tab" aria-selected={contentLocale === locale} onClick={() => setContentLocale(locale)} className="btn btn-ghost">{locale.toUpperCase()}</button>)}
+              </div>}
               {canManageRestricted && localizedKeys(contentLocale).some((key) => key.startsWith("artwork.")) && (() => {
                 const key = "artwork." + contentLocale;
                 const field = localizedEffective(key);
@@ -320,7 +285,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
                 return <div>
                   <MediaUpload label={tr("session_field_artwork", "Session flyer")} value={String(edit?.mode === "override" ? edit.value ?? "" : field?.value ?? "")}
                     onChange={(url) => setLocalizedValue(key, url)} uploadEndpoint="/api/v1/admin/event-artwork/upload" mediaType="image" aspectRatio="portrait" maxSizeMB={10}
-                    hint={tr("event_artwork_upload_hint", "Upload the flyer for this language. JPG, PNG, WEBP or GIF · max 10 MB")} disabled={localizedEditMode(contentLocale) !== "override"} />
+                    hint={tr("event_artwork_upload_hint", "Upload the flyer for this language. JPG, PNG, WEBP or GIF · max 10 MB")} />
                   <p style={{ color: "#756a61", fontSize: 11, margin: "5px 0 0" }}>{tr("session_artwork_fallback_note", "If this language has no flyer, guests see the English flyer, then the legacy image.")}</p>
                 </div>;
               })()}

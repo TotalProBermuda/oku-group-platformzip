@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { sessionTranslation } from "@/server/i18n/sessionTranslation";
+import { matchesSource } from "@/server/i18n/sourceHash";
 import { Prisma } from "@prisma/client";
 import { hostRoles, locales, profileRoles, resolveField, modes, type EffectiveField } from "./sessionFields";
 import { panamaDateTimeLocalInput } from "@/lib/panamaDateTime";
@@ -48,7 +50,7 @@ export async function loadSessionState(tx: Prisma.TransactionClient, seriesId: s
   if (sessions.length > (ids ? 50 : 200)) throw Object.assign(new Error("This selection is too large. Manage at most 50 selected sessions or 200 default inheritors."), { status: 409 });
   if (ids && sessions.length !== ids.length) throw Object.assign(new Error("Every selected session must belong to this series"), { status: 400 });
   const [translations, sponsors] = await Promise.all([
-    tx.contentTranslation.findMany({ where: { OR: [{ entityType: "Series", entityId: seriesId }, { entityType: "EventSession", entityId: { in: sessions.map(s => s.id) } }] }, orderBy: { id: "asc" } }),
+    tx.contentTranslation.findMany({ where: { OR: [{ entityType: "Series", entityId: seriesId }, { entityType: "SeriesSessionDefaults", entityId: seriesId }, { entityType: "EventSession", entityId: { in: sessions.map(s => s.id) } }] }, orderBy: { id: "asc" } }),
     tx.sponsorAssignment.findMany({ where: { OR: [{ scopeType: "SERIES", scopeId: seriesId }, { scopeType: "EVENT", scopeId: { in: sessions.map(s => s.id) } }] }, orderBy: { id: "asc" } }),
   ]);
   const financialAssignments = withFinancial ? await tx.referralAssignment.findMany({
@@ -89,6 +91,14 @@ export function effectiveField(state: State, session: ManagedSession, key: strin
     legacy = session[key as "giftBagEnabled"]; base = false; inherits = false;
   } else if (kind === "content") {
     const field = name as "title" | "subtitle" | "description";
+    if (locale !== "en") {
+      const englishKey = `content.${name}.en`;
+      const english = effectiveField(state, session, englishKey);
+      const localMode = modes(session.fieldModes)[key];
+      const reviewed = state.translations.some(row => row.entityType === "EventSession" && row.entityId === session.id && row.fieldName === name && row.targetLocale === locale && row.status === "COMPLETED" && row.provider === "manual-session-management" && matchesSource(row.sourceTextHash, String(english.value ?? "")));
+      const value = english.mode === "clear" ? null : sessionTranslation(state.translations, series, session, english, name, locale) ?? english.value;
+      return reviewed && localMode && localMode.mode !== "inherit" ? { value, mode: localMode.mode, source: localMode.mode === "clear" ? "clear" : "override" } : { ...english, value };
+    }
     legacy = translated(state, "EventSession", session.id, field, locale, session[field]);
     base = translated(state, "Series", series.id, field, locale, series[field]) ?? series[field];
     inherits = legacy === null;
@@ -136,7 +146,8 @@ export function defaultField(state: State, key: string): EffectiveField {
     return { value: null, source: "series", mode: "inherit" };
   const dummy = state.sessions[0];
   if (dummy) {
-    const field = effectiveField(state, { ...dummy, fieldModes: { [key]: { mode: "inherit" } } }, key);
+    const englishKey = key.startsWith("content.") ? key.replace(/\.(es|pt)$/, ".en") : key;
+    const field = effectiveField(state, { ...dummy, fieldModes: { [key]: { mode: "inherit" }, [englishKey]: { mode: "inherit" } } }, key);
     const edit = modes(state.series.sessionDefaults)[key];
     return { ...field, mode: edit?.mode ?? "inherit", source: edit?.mode === "clear" ? "clear" : "series" };
   }

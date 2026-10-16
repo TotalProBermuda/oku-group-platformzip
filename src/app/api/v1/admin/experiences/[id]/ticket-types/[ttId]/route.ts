@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { legacySeriesWriteBlocked, managedWriteMessage } from "@/server/series/legacySessionGuard";
@@ -54,7 +55,7 @@ export async function PATCH(
       tx.orderLineItem.aggregate({ where: { ticketTypeId: ttId, order: { status: "PENDING" } }, _sum: { qty: true } }),
     ]);
     if (body.typeCapacity !== undefined && body.typeCapacity !== null && (!Number.isSafeInteger(Number(body.typeCapacity)) || Number(body.typeCapacity) < Math.max(current.soldCount, committed._sum.qty ?? 0, issued + (held._sum.qty ?? 0)))) return null;
-    return tx.ticketType.update({
+    const updated = await tx.ticketType.update({
     where: { id: ttId },
     data: {
       ...(name !== undefined && { name }),
@@ -74,6 +75,8 @@ export async function PATCH(
       ...(ticketStatus !== undefined && { ticketStatus: ticketStatus as any }),
     },
   });
+    await syncTranslations(tx, "TicketType", ttId, { name: updated.name, description: updated.description });
+    return updated;
   });
   if (!ticketType) return NextResponse.json({ error: managedWriteMessage + " Product capacity also cannot undercut issued or held inventory." }, { status: 409 });
 

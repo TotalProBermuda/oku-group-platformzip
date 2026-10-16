@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { requireSession } from "@/server/auth/session";
 import { Prisma } from "@prisma/client";
 import { sessionTicketPriceInputSchema, updateSessionContentSchema } from "@/server/series/createSessionInput";
@@ -91,6 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (ticketPriceOverrides) await tx.auditLog.create({ data: {
         actorId: userId, action: "session.ticket_prices.updated", metadata: { sessionId: id, ticketTypeIds: ticketPriceOverrides.map((price) => price.ticketTypeId) },
       } });
+      await syncTranslations(tx, "EventSession", id, updated);
       return updated;
     });
 
