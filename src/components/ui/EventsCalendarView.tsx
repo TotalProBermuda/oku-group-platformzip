@@ -48,8 +48,8 @@ const shellStyle: CSSProperties = {
   background: "#fff",
   border: "1px solid #e5e0d8",
   borderRadius: 16,
-  maxWidth: 920,
-  margin: "0 auto",
+  width: "100%",
+  margin: 0,
 };
 const buttonStyle: CSSProperties = {
   alignItems: "center",
@@ -85,6 +85,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const [year, setYear] = useState(() => Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, year: "numeric" }).format(today)));
   const [month, setMonth] = useState(() => Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, month: "numeric" }).format(today)) - 1);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,57 +198,87 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
 
   return (
     <section aria-label={locale === "es" ? "Calendario de eventos" : locale === "pt" ? "Calendário de eventos" : "Events calendar"}>
-      <div style={shellStyle}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "16px clamp(12px, 4vw, 24px)", borderBottom: "1px solid #e5e0d8" }}>
-          <button type="button" onClick={() => changeMonth(-1)} aria-label={l.calendarPrev ?? "Previous month"} style={{ ...buttonStyle, width: 48, minHeight: 48, fontSize: 22 }}>‹</button>
-          <h2 aria-live="polite" style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(17px, 4vw, 22px)", fontWeight: 400, color: "#1a1614", textTransform: "capitalize", margin: 0 }}>{monthLabel}</h2>
-          <button type="button" onClick={() => changeMonth(1)} aria-label={l.calendarNext ?? "Next month"} style={{ ...buttonStyle, width: 48, minHeight: 48, fontSize: 22 }}>›</button>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid #f3f4f6" }}>
-          {weekdayNames.map((day, index) => <div key={index} style={{ padding: "10px 2px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#7c7168", textTransform: "uppercase" }}>{day}</div>)}
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", padding: "4px clamp(4px, 1vw, 10px) 10px", gap: 2 }}>
-          {Array.from({ length: firstDay }).map((_, index) => <div key={`empty-${index}`} aria-hidden="true" />)}
-          {Array.from({ length: daysInMonth }).map((_, index) => {
-            const day = index + 1;
-            const daySessions = sessionsByDay.get(day) ?? [];
-            const active = daySessions.length > 0;
-            const isToday = day === todayDay && month === todayMonth && year === todayYear;
-            const selected = selectedDay === day;
-            const preview = hoveredDay === day ? daySessions.slice(0, 2) : [];
-            return (
-              <div key={day} style={{ minWidth: 0, position: "relative", zIndex: hoveredDay === day ? 3 : 0 }}
-                onPointerEnter={(event) => { if (event.pointerType === "mouse" && active) setHoveredDay(day); }}
-                onPointerLeave={(event) => { if (event.pointerType === "mouse") setHoveredDay((current) => current === day ? null : current); }}>
-                <button type="button" disabled={!active} aria-pressed={selected}
-                  aria-label={`${new Date(Date.UTC(year, month, day, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}${active ? `, ${daySessions.length} ${daySessions.length === 1 ? "event" : "events"}` : ""}`}
-                  onClick={() => active && setSelectedDay(selected ? null : day)}
-                  onFocus={() => active && setHoveredDay(day)}
-                  onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setHoveredDay(null); }}
-                  style={{ ...buttonStyle, minHeight: 54, background: selected ? "#fff1f2" : active ? "#fffafa" : "#fff", borderColor: selected ? "#c41e3a" : active ? "#f0d4d9" : "#f0ece8", color: isToday ? "#fff" : active ? "#1a1614" : "#a8a29e" }}>
-                  <span style={{ alignItems: "center", background: isToday ? "#c41e3a" : "transparent", borderRadius: 99, display: "inline-flex", height: 26, justifyContent: "center", width: 26, fontSize: 13, fontWeight: isToday || selected ? 700 : 500 }}>{day}</span>
-                  {active ? <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "#c41e3a" }} /> : <span aria-hidden="true" style={{ height: 6 }} />}
-                </button>
-                {preview.length > 0 ? <div role="group" aria-label={`Event previews for ${day}`} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, boxShadow: "0 12px 32px rgba(26,22,20,.18)", left: index % 7 < 4 ? 0 : undefined, padding: 8, position: "absolute", right: index % 7 < 4 ? undefined : 0, top: 58, width: "min(300px, calc(100vw - 48px))", zIndex: 4 }}>
-                  {preview.map((session) => sessionCard(session, true))}
-                  {daySessions.length > preview.length ? <p style={{ color: "#6b7280", fontSize: 12, margin: "8px 4px 2px" }}>+{daySessions.length - preview.length} more · select date to view all</p> : null}
-                </div> : null}
-              </div>
-            );
-          })}
-        </div>
-        {loading ? <div role="status" style={{ textAlign: "center", padding: 14, color: "#6b7280", fontSize: 13 }}>Loading events…</div> : null}
+      <style jsx global>{`
+        .events-view-toggle { display: none; }
+        .events-calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+        .events-calendar-column, .events-month-column { min-width: 0; }
+        .events-month-column { background: #fff; border: 1px solid #e5e0d8; border-radius: 16px; padding: 20px; }
+        .events-month-title { color: #1a1614; font-family: var(--font-heading); font-size: 24px; font-weight: 400; margin: 0 0 16px; }
+        .events-month-cards { display: grid; gap: 12px; }
+        .events-session-card { min-width: 0; }
+        @media (max-width: 767px) {
+          .events-view-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 0 14px; padding: 4px; background: #eee9e4; border-radius: 12px; }
+          .events-view-toggle button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: #746a62; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+          .events-view-toggle button[aria-selected="true"] { background: #fff; color: #1a1614; box-shadow: 0 1px 4px rgba(26,22,20,.12); }
+          .events-calendar-layout { display: block; }
+          .events-calendar-column[data-active="false"], .events-month-column[data-active="false"] { display: none; }
+          .events-month-column { padding: 16px; }
+          .events-month-title { font-size: 22px; }
+        }
+      `}</style>
+      <div className="events-view-toggle" role="tablist" aria-label={locale === "es" ? "Vista de eventos" : locale === "pt" ? "Visualização de eventos" : "Event view"}>
+        <button type="button" role="tab" aria-selected={mobileView === "list"} aria-controls="events-month-panel" onClick={() => setMobileView("list")}>{locale === "es" ? "Lista" : locale === "pt" ? "Lista" : "List"}</button>
+        <button type="button" role="tab" aria-selected={mobileView === "calendar"} aria-controls="events-calendar-panel" onClick={() => setMobileView("calendar")}>{locale === "es" ? "Calendario" : locale === "pt" ? "Calendário" : "Calendar"}</button>
       </div>
+      <div className="events-calendar-layout">
+        <div id="events-calendar-panel" className="events-calendar-column" data-active={mobileView === "calendar"}>
+          <div style={shellStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "16px clamp(12px, 4vw, 24px)", borderBottom: "1px solid #e5e0d8" }}>
+              <button type="button" onClick={() => changeMonth(-1)} aria-label={l.calendarPrev ?? "Previous month"} style={{ ...buttonStyle, width: 48, minHeight: 48, fontSize: 22 }}>‹</button>
+              <h2 aria-live="polite" style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(17px, 4vw, 22px)", fontWeight: 400, color: "#1a1614", textTransform: "capitalize", margin: 0 }}>{monthLabel}</h2>
+              <button type="button" onClick={() => changeMonth(1)} aria-label={l.calendarNext ?? "Next month"} style={{ ...buttonStyle, width: 48, minHeight: 48, fontSize: 22 }}>›</button>
+            </div>
 
-      <div style={{ maxWidth: 920, margin: "20px auto 0" }}>
-        <div style={{ alignItems: "baseline", display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
-          <h2 style={{ color: "#1a1614", fontFamily: "var(--font-heading)", fontSize: 22, margin: 0 }}>{selectedDay === null ? monthSessionsLabel : new Date(Date.UTC(year, month, selectedDay, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}</h2>
-          {selectedDay !== null ? <button type="button" onClick={() => setSelectedDay(null)} className="btn btn-ghost btn-sm" style={{ minHeight: 44 }}>{locale === "es" ? "Ver todo el mes" : locale === "pt" ? "Ver o mês todo" : "Show all dates"}</button> : null}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid #f3f4f6" }}>
+              {weekdayNames.map((day, index) => <div key={index} style={{ padding: "10px 2px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#7c7168", textTransform: "uppercase" }}>{day}</div>)}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", padding: "4px clamp(4px, 1vw, 10px) 10px", gap: 2 }}>
+              {Array.from({ length: firstDay }).map((_, index) => <div key={`empty-${index}`} aria-hidden="true" />)}
+              {Array.from({ length: daysInMonth }).map((_, index) => {
+                const day = index + 1;
+                const daySessions = sessionsByDay.get(day) ?? [];
+                const active = daySessions.length > 0;
+                const isToday = day === todayDay && month === todayMonth && year === todayYear;
+                const selected = selectedDay === day;
+                const preview = hoveredDay === day ? daySessions.slice(0, 3) : [];
+                return (
+                  <div key={day} style={{ minWidth: 0, position: "relative", zIndex: hoveredDay === day ? 3 : 0 }}
+                    onPointerEnter={(event) => { if (event.pointerType === "mouse" && active) setHoveredDay(day); }}
+                    onPointerLeave={(event) => { if (event.pointerType === "mouse") setHoveredDay((current) => current === day ? null : current); }}>
+                    <button type="button" disabled={!active} aria-pressed={selected}
+                      aria-label={`${new Date(Date.UTC(year, month, day, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}${active ? `, ${daySessions.length} ${daySessions.length === 1 ? "event" : "events"}` : ""}`}
+                      onClick={() => {
+                        if (!active) return;
+                        setSelectedDay(selected ? null : day);
+                        setMobileView("list");
+                      }}
+                      onFocus={() => active && setHoveredDay(day)}
+                      onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setHoveredDay(null); }}
+                      style={{ ...buttonStyle, minHeight: 54, background: selected ? "#fff1f2" : active ? "#fffafa" : "#fff", borderColor: selected ? "#c41e3a" : active ? "#f0d4d9" : "#f0ece8", color: isToday ? "#fff" : active ? "#1a1614" : "#a8a29e" }}>
+                      <span style={{ alignItems: "center", background: isToday ? "#c41e3a" : "transparent", borderRadius: 99, display: "inline-flex", height: 26, justifyContent: "center", width: 26, fontSize: 13, fontWeight: isToday || selected ? 700 : 500 }}>{day}</span>
+                      {active ? <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "#c41e3a" }} /> : <span aria-hidden="true" style={{ height: 6 }} />}
+                    </button>
+                    {preview.length > 0 ? <div role="group" aria-label={`Event previews for ${day}`} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, boxShadow: "0 12px 32px rgba(26,22,20,.18)", left: index % 7 < 4 ? 0 : undefined, padding: 8, position: "absolute", right: index % 7 < 4 ? undefined : 0, top: 58, width: "min(360px, calc(100vw - 48px))", zIndex: 4, display: "grid", gap: 8 }}>
+                      {preview.map((session) => sessionCard(session, true))}
+                      {daySessions.length > preview.length ? <p style={{ color: "#6b7280", fontSize: 12, margin: "8px 4px 2px" }}>+{daySessions.length - preview.length} more · select date to view all</p> : null}
+                    </div> : null}
+                  </div>
+                );
+              })}
+            </div>
+            {loading ? <div role="status" style={{ textAlign: "center", padding: 14, color: "#6b7280", fontSize: 13 }}>Loading events…</div> : null}
+          </div>
         </div>
-        {selectedSessions.length ? <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))" }}>{selectedSessions.map((session) => sessionCard(session))}</div>
-          : !loading ? <p style={{ color: "#6b7280", fontSize: 14 }}>{selectedDay === null ? noSessionsLabel : selectDayLabel}</p> : null}
+
+        <div id="events-month-panel" className="events-month-column" data-active={mobileView === "list"}>
+          <div style={{ alignItems: "baseline", display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
+            <h2 className="events-month-title">{selectedDay === null ? monthSessionsLabel : new Date(Date.UTC(year, month, selectedDay, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}</h2>
+            {selectedDay !== null ? <button type="button" onClick={() => setSelectedDay(null)} className="btn btn-ghost btn-sm" style={{ minHeight: 44 }}>{locale === "es" ? "Ver todo el mes" : locale === "pt" ? "Ver o mês todo" : "Show all dates"}</button> : null}
+          </div>
+          {selectedSessions.length ? <div className="events-month-cards">{selectedSessions.map((session) => sessionCard(session, true))}</div>
+            : !loading ? <p style={{ color: "#6b7280", fontSize: 14 }}>{selectedDay === null ? noSessionsLabel : selectDayLabel}</p> : null}
+        </div>
       </div>
     </section>
   );
