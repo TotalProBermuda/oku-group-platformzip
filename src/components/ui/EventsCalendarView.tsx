@@ -88,6 +88,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
 
   useEffect(() => {
     let active = true;
@@ -204,14 +205,26 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
         .events-month-title { color: #1a1614; font-family: var(--font-heading); font-size: 24px; font-weight: 400; margin: 0 0 16px; }
         .events-month-cards { display: grid; gap: 12px; }
         .events-session-card { min-width: 0; }
+        .events-mobile-tabs { display: none; }
         @media (max-width: 767px) {
+          .events-mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
           .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "month" "calendar"; gap: 16px; }
+          .events-calendar-column[data-mobile-hidden="true"], .events-month-column[data-mobile-hidden="true"] { display: none; }
           .events-month-column { padding: 16px; }
           .events-month-title { font-size: 22px; }
         }
       `}</style>
+      <div className="events-mobile-tabs" role="tablist" aria-label={locale === "es" ? "Vista de eventos" : locale === "pt" ? "Visualização de eventos" : "Event view"}>
+        {(["list", "calendar"] as const).map((view) => {
+          const selected = mobileView === view;
+          const label = view === "list"
+            ? (locale === "es" ? "Lista" : locale === "pt" ? "Lista" : "List")
+            : (locale === "es" ? "Calendario" : locale === "pt" ? "Calendário" : "Calendar");
+          return <button key={view} type="button" role="tab" aria-selected={selected} onClick={() => setMobileView(view)} className={selected ? "btn btn-primary btn-sm" : "btn btn-ghost btn-sm"} style={{ minHeight: 44 }}>{label}</button>;
+        })}
+      </div>
       <div className="events-calendar-layout">
-        <div id="events-month-panel" className="events-month-column">
+        <div id="events-month-panel" className="events-month-column" data-mobile-hidden={mobileView !== "list"}>
           <div style={{ alignItems: "baseline", display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
             <h2 className="events-month-title">{selectedDay === null ? monthSessionsLabel : new Date(Date.UTC(year, month, selectedDay, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}</h2>
             {selectedDay !== null ? <button type="button" onClick={() => setSelectedDay(null)} className="btn btn-ghost btn-sm" style={{ minHeight: 44 }}>{locale === "es" ? "Ver todo el mes" : locale === "pt" ? "Ver o mês todo" : "Show all dates"}</button> : null}
@@ -220,7 +233,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
             : !loading ? <p style={{ color: "#6b7280", fontSize: 14 }}>{selectedDay === null ? noSessionsLabel : selectDayLabel}</p> : null}
         </div>
 
-        <div id="events-calendar-panel" className="events-calendar-column">
+        <div id="events-calendar-panel" className="events-calendar-column" data-mobile-hidden={mobileView !== "calendar"}>
           <div style={shellStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "16px clamp(12px, 4vw, 24px)", borderBottom: "1px solid #e5e0d8" }}>
               <button type="button" onClick={() => changeMonth(-1)} aria-label={l.calendarPrev ?? "Previous month"} style={{ ...buttonStyle, width: 48, minHeight: 48, fontSize: 22 }}>‹</button>
