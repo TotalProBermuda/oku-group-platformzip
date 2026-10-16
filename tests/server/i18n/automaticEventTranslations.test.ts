@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: db }));
 import { syncTranslations, localizeEventCatalog } from "@/server/i18n/eventTranslations";
 import { sourceHash } from "@/server/i18n/sourceHash";
 import { deeplProvider, TranslationError } from "@/server/i18n/deeplProvider";
-import { drainTranslations, startTranslationPolling } from "@/server/i18n/translationProcessor";
+import { drainTranslations } from "@/server/i18n/translationProcessor";
 import { localizeSessions } from "@/server/series/localizeSessions";
 import { isTranslatableField } from "@/config/translatableFields";
 
@@ -117,13 +117,6 @@ describe("durable processor, retries and concurrency", () => {
     expect(update).toMatchObject({ status: "FAILED", lastErrorCode: code, attemptCount: attempts, processingUntil: null });
     expect(update.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
     expect(JSON.stringify(update)).not.toContain("PRIVATE CONTENT");
-  });
-  it("polls durable rows without constructing a Redis connection", async () => {
-    vi.useFakeTimers();
-    const stop = startTranslationPolling(100);
-    await vi.advanceTimersByTimeAsync(210);
-    stop(); vi.useRealTimers();
-    expect(db.contentTranslation.findMany.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
 describe("DeepL adapter and privacy", () => {

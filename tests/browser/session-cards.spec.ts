@@ -36,6 +36,10 @@ async function setup(page: Page, context: BrowserContext, baseURL?: string, role
   await page.route("**/api/**", (route) => route.fulfill({ status: 501, json: { ok: false, error: "Unstubbed fixture API" } }));
   await page.route("**/fixture-flyer.png", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==", "base64") }));
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { user: { id: "fixture-admin", name: "Fixture", roles }, expires: "2099-01-01" } }));
+  await page.route(`**/api/v1/admin/series/${id}/translations`, route => route.fulfill({ json: {
+    ok: true, translation: { seriesId: id, state: "ready", completed: 2,
+      pending: 0, failed: 0, processing: 0, canContinue: false, retryAfterMs: 0 },
+  } }));
   await page.route(`**/api/v1/admin/experiences/${id}`, (route) => route.fulfill({ json: { series: {
     id, title: "Wine fixture", slug: id, status: "DRAFT", startsAt: sessions[0].startsAt, endsAt: sessions[0].endsAt,
     capacityTotal: 48, venueId: null, spaceId: null, ticketTypes: [{ id: "general", name: "General", priceCents: 4500 }],
@@ -78,6 +82,22 @@ async function setup(page: Page, context: BrowserContext, baseURL?: string, role
 }
 
 test.describe("individual session editor", () => {
+  test("resumable translations remain pending on open until explicit Resume", async ({ page, context, baseURL }) => {
+    const f = await setup(page, context, baseURL);
+    let posts = 0;
+    await page.route(`**/api/v1/admin/series/${id}/translations`, route => {
+      if (route.request().method() === "POST") posts++;
+      return route.fulfill({ json: { ok: true, translation: { seriesId: id,
+        state: posts ? "ready" : "pending", completed: posts ? 2 : 0, pending: posts ? 0 : 2,
+        failed: 0, processing: 0, canContinue: !posts, retryAfterMs: 0 } } });
+    });
+    const sheet = await f.open();
+    await expect(sheet.getByText("Saved / translation pending", { exact: false })).toBeVisible();
+    expect(posts).toBe(0);
+    await sheet.getByRole("button", { name: "Resume translations" }).click();
+    await expect(sheet.getByText("Saved / translations ready.", { exact: true })).toBeVisible();
+    expect(posts).toBe(1);
+  });
   test("calm cards, effective preview, one Save and no postponement for content history", async ({ page, context, baseURL }) => {
     const f = await setup(page, context, baseURL);
     await expect(page.getByLabel("Change scope")).toHaveCount(0);

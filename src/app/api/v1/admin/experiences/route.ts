@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { parseArtworkEdit } from "@/server/series/artworkInput";
@@ -80,5 +81,5 @@ export async function POST(req: NextRequest) {
   return created;
   });
 
-  return NextResponse.json({ series }, { status: 201 });
+  return finishEventSave(series.id, { series }, req, 201);
 }

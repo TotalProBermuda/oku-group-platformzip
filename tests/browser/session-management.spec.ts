@@ -91,6 +91,10 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = [], role
     await route.fulfill({ status: method === "GET" || method === "HEAD" ? 404 : 501, contentType: "application/json", body: JSON.stringify({ ok: false, error: "Unstubbed fixture request" }) });
   });
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { user: { id: "fixture-superadmin", name: "Fixture Administrator", email: "fixture-admin@example.test", roles }, expires: "2099-01-01T00:00:00.000Z" } }));
+  await page.route(`**/api/v1/admin/series/${SERIES_ID}/translations`, route => route.fulfill({ json: {
+    ok: true, translation: { seriesId: SERIES_ID, state: "ready", completed: 2,
+      pending: 0, failed: 0, processing: 0, canContinue: false, retryAfterMs: 0 },
+  } }));
   await page.route("**/api/v1/admin/experiences/" + SERIES_ID, (route) => route.fulfill({ json: { series: {
     id: SERIES_ID, title: "Fixture series", slug: SERIES_ID, status: "DRAFT", startsAt: start, endsAt: end, capacityTotal: 30,
     venueId: "fixture-venue", spaceId: null, ticketTypes: [{ id: "fixture-ticket", name: "General", priceCents: 4500 }],
@@ -144,7 +148,10 @@ async function installApiFixtures(page: Page, patchStatuses: number[] = [], role
           if (assignment) assignment.status = change.status;
         }
       }
-      return route.fulfill({ status, json: status === 200 ? { ok: true, data: { changeId: "fixture-change", targetIds: [sessions[0].id], noticeCount: 2 } } : { ok: false, error: "Preview is stale" } });
+      return route.fulfill({ status, json: status === 200 ? { ok: true, data: { changeId: "fixture-change", targetIds: [sessions[0].id], noticeCount: 2 },
+        saved: true, translation: { seriesId: SERIES_ID, state: "ready", completed: 2, pending: 0,
+          failed: 0, processing: 0, canContinue: false, retryAfterMs: 0 },
+      } : { ok: false, error: "Preview is stale" } });
     }
     return route.fulfill({ status: 405, json: { ok: false, error: "Unexpected method" } });
   });
@@ -206,7 +213,7 @@ test.describe("session management fixture workflow", () => {
     expect(previewRequests).toHaveLength(2);
     expect(previewRequests[1]).toEqual(previewRequests[0]);
     await page.getByRole("dialog").getByRole("button", { name: "Confirm and apply" }).click();
-    await expect(page.getByRole("status")).toContainText("Session changes saved.");
+    await expect(page.getByLabel("Session management").getByRole("status").filter({ hasText: "Saved / translations ready." }).first()).toBeVisible();
     expect(committed).toEqual([
       { previewId: "fixture-preview", requestId: "fixture-request" },
       { previewId: "fixture-preview", requestId: "fixture-request" },
@@ -229,7 +236,7 @@ test.describe("session management fixture workflow", () => {
       assignmentChanges: [{ assignmentId: "referral-draft", status: "ACTIVE" }],
     });
     await dialog.getByRole("button", { name: "Confirm and apply" }).click();
-    await expect(page.getByRole("status")).toContainText("Session changes saved.");
+    await expect(page.getByLabel("Session management").getByRole("status").filter({ hasText: "Saved / translations ready." }).first()).toBeVisible();
     await expect(page.getByLabel("Draft referral Assignment status")).toHaveValue("");
 
     await page.getByLabel("Draft referral Assignment status").selectOption("RETIRED");
@@ -243,7 +250,7 @@ test.describe("session management fixture workflow", () => {
       assignmentChanges: [{ assignmentId: "referral-draft", status: "RETIRED" }],
     });
     await dialog.getByRole("button", { name: "Confirm and apply" }).click();
-    await expect(page.getByRole("status")).toContainText("Session changes saved.");
+    await expect(page.getByLabel("Session management").getByRole("status").filter({ hasText: "Saved / translations ready." }).first()).toBeVisible();
     expect(committed).toEqual([
       { previewId: "fixture-preview", requestId: "fixture-request" },
       { previewId: "fixture-preview", requestId: "fixture-request" },
@@ -325,7 +332,7 @@ test.describe("session management fixture workflow", () => {
     const confirm = page.getByRole("button", { name: "Confirm and apply" });
     await expect(confirm).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("status")).toContainText("Session changes saved.");
+    await expect(page.getByLabel("Session management").getByRole("status").filter({ hasText: "Saved / translations ready." }).first()).toBeVisible();
     expect(committed).toEqual([{ previewId: "fixture-preview", requestId: "fixture-request" }]);
   });
 

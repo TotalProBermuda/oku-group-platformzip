@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { legacySeriesWriteBlocked, managedWriteMessage } from "@/server/series/legacySessionGuard";
@@ -80,7 +81,7 @@ export async function PATCH(
   });
   if (!ticketType) return NextResponse.json({ error: managedWriteMessage + " Product capacity also cannot undercut issued or held inventory." }, { status: 409 });
 
-  return NextResponse.json({ ticketType });
+  return finishEventSave(id, { ticketType }, req);
 }
 
 export async function DELETE(

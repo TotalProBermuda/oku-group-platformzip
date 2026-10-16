@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -197,5 +198,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   return created;
   });
-  return NextResponse.json({ series: newSeries });
+  return finishEventSave(newSeries.id, { series: newSeries }, req);
 }

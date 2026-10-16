@@ -1,7 +1,6 @@
 import { Worker } from "bullmq";
-import { drainTranslations, startTranslationPolling } from "../src/server/i18n/translationProcessor";
 import { prisma } from "../src/lib/prisma";
-import { redisConnection, translationQueue, invuSyncQueue, invuTokenRotationQueue, retentionSweepQueue, auditAnomalyScanQueue, launchReadinessAlertQueue, attributionAnchorQueue, capacityExpirySweepQueue, ledgerOutboxQueue } from "../src/server/queue/queue";
+import { redisConnection, invuSyncQueue, invuTokenRotationQueue, retentionSweepQueue, auditAnomalyScanQueue, launchReadinessAlertQueue, attributionAnchorQueue, capacityExpirySweepQueue, ledgerOutboxQueue } from "../src/server/queue/queue";
 import { handleInvuSyncJob } from "./jobs/invu-sync";
 import { handleInvuTokenRotationJob } from "./jobs/invu-token-rotation";
 import { handleRetentionSweepJob } from "./jobs/retention-sweep";
@@ -13,8 +12,6 @@ import { handleLedgerOutboxDrainJob } from "./jobs/ledger-outbox-drain";
 import { getQueueRedisUrl } from "../src/server/redis/config";
 import { sendNewReservationOperationalAlerts, sendPaidTicketOperationalAlerts } from "../src/server/notifications/operationalCommerceAlerts";
 
-// Always active: a Redis outage must not strand durable translation records.
-startTranslationPolling();
 if (!getQueueRedisUrl()) {
   // Redis unavailable — start a polling-based drain so PENDING outbox rows are
   // still drained to LedgerEvent on every configured interval. All other jobs
@@ -178,18 +175,6 @@ const worker = new Worker(
 
 worker.on("completed", (job) => console.log("Job completed", job.id, job.name));
 worker.on("failed", (job, err) => console.error("Job failed", job?.id, job?.name, err));
-
-const translationWorker = new Worker(
-  "translation",
-  // Old jobs are wake-ups only; never replay stale source text from Redis.
-  async () => drainTranslations(),
-  redisConnection
-);
-
-translationWorker.on("failed", () => console.warn("[translations] queue drain failed; polling remains active"));
-translationWorker.on("error", () => console.warn("[translations] Redis unavailable; polling remains active"));
-translationQueue?.add("drain", {}, { repeat: { every: 30_000 }, jobId: "translation-drain", attempts: 3, backoff: { type: "exponential", delay: 5000 }, removeOnComplete: 25, removeOnFail: 25 })
-  .catch(() => console.warn("[translations] queue registration unavailable; polling remains active"));
 
 const invuWorker = new Worker("invu-sync", handleInvuSyncJob, redisConnection);
 invuWorker.on("completed", (job) => console.log("INVU sync job completed", job.id, job.name));
@@ -378,9 +363,9 @@ ledgerOutboxQueue.add(
   },
 ).catch((err) => console.warn("[ledger-outbox-drain] Failed to register repeatable job:", err));
 
-// A configured-but-unreachable Redis must not terminate the independent DB poll.
+// Keep existing non-translation consumers observable without activating new jobs.
 for (const consumer of [worker, invuWorker, invuTokenRotationWorker, retentionWorker, auditAnomalyWorker, launchReadinessAlertWorker, attributionAnchorWorker, capacityExpirySweepWorker, ledgerOutboxWorker]) {
-  consumer.on("error", () => console.warn("[worker] Redis consumer unavailable; translation DB polling remains active"));
+  consumer.on("error", () => console.warn("[worker] Redis consumer unavailable"));
 }
 console.log("Worker started...");
 } // end startWorkers

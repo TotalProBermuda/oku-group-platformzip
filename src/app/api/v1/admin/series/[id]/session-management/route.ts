@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/rbac";
 import { applySessionManagement, previewSessionManagement } from "@/server/series/sessionManagement";
 import { defaultField, effectiveField, fieldKeys, inventory, loadSessionState } from "@/server/series/sessionState";
 import { Prisma } from "@prisma/client";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 
 function failure(error: unknown) {
   if (error instanceof z.ZodError) return NextResponse.json({ ok: false, error: error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ") }, { status: 400 });
@@ -63,6 +64,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const auth = await authorize(), { id } = await params;
     const input = z.object({ previewId: z.string().min(1).max(100), requestId: z.string().uuid() }).strict().parse(await req.json());
     const data = await applySessionManagement(id, auth.userId, auth.roles, input.previewId, input.requestId);
-    return NextResponse.json({ ok: true, data });
+    return finishEventSave(id, { ok: true, data }, req);
   } catch (error) { return failure(error); }
 }

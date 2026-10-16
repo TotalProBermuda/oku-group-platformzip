@@ -7,6 +7,8 @@ import { FormEvent, useState } from "react";
 import MediaUpload from "@/components/ui/MediaUpload";
 import { panamaDateTimeLocalInput, panamaDateTimeLocalIso } from "@/lib/panamaDateTime";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 type SessionRow = {
   id: string;
@@ -120,6 +122,7 @@ export default function EventScheduleManager({
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const translations = useSeriesTranslations(seriesId, showForm);
 
   function openForm() {
     setNotice("");
@@ -167,14 +170,19 @@ export default function EventScheduleManager({
         return;
       }
 
+      const translation = await translations.onSave(payload);
       const conflicts = Number((payload as { conflictCount?: unknown } | null)?.conflictCount ?? 0);
       setNotice(
-        conflicts > 0
+        translation?.state === "ready"
+          ? "Saved / translations ready."
+          : translation?.state === "retry"
+            ? "Saved / translation needs retry."
+            : conflicts > 0
           ? `Event created. ${conflicts} existing reservation(s) need review; none were cancelled.`
-          : "Event created.",
+          : "Saved / translation pending.",
       );
-      setShowForm(false);
       await onCreated();
+      setShowForm(false);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not create this event.");
     } finally {
@@ -201,6 +209,7 @@ export default function EventScheduleManager({
           {notice}
         </div>
       ) : null}
+      {showForm && <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />}
 
       {showForm ? (
         <form onSubmit={createEvent} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, marginTop: 16, padding: 18 }}>
