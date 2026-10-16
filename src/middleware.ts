@@ -5,6 +5,7 @@ import { isValidLocale } from "@/i18n/config";
 import { detectLocaleFromHeader } from "@/i18n/utils";
 import type { Locale } from "@/types/i18n";
 import { logRequest } from "@/server/security/requestLogger";
+import { resolveAuthSecret } from "@/lib/authSecret";
 import {
   ROLE_ROUTES,
   canonicalDestinationForRoles,
@@ -23,16 +24,6 @@ const PUBLIC_PATHS = [
 
 // The cookie name and salt must match exactly what demo-login uses in encode().
 const SESSION_COOKIE = "next-auth.session-token";
-// Inline fail-closed copy (Edge runtime imports must be cheap and self-contained).
-// Mirrors src/lib/authSecret.ts intentionally so the policy is identical.
-function resolveAuthSecret(): string {
-  const s = process.env.NEXTAUTH_SECRET;
-  if (s && s.length > 0) return s;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("NEXTAUTH_SECRET is required in production. Refusing to boot middleware with an insecure default.");
-  }
-  return "replace-me";
-}
 const SECRET = resolveAuthSecret();
 
 // Any role in this set is allowed to *reach* an `/api/v1/admin/**` route at
@@ -66,7 +57,7 @@ async function recordAdminApiDenial(
   roles: string[],
 ): Promise<void> {
   // Fire-and-forget POST to the Node-runtime internal endpoint, signed with
-  // NEXTAUTH_SECRET so external callers can't forge denial rows. We never
+  // the shared resolved auth secret so external callers can't forge denial rows. We never
   // await the response — if Sentry pages 60s late, that's still well inside
   // the detector's 15-min scan window.
   try {

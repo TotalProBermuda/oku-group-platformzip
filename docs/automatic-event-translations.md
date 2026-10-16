@@ -1,5 +1,29 @@
 # Automatic event text translations
 
+## Shared auth secret policy
+
+Production startup follows the existing shell entrypoint -> supervisor ->
+translation worker readiness -> Next.js chain. Auth is resolved by the shared,
+dependency-free `src/lib/authSecret.ts` in Node auth options, demo-login cookie
+issuance, Edge middleware cookie decoding/audit signing, and Node audit signature
+verification. Middleware no longer maintains a separate resolver.
+
+The first nonempty value wins: `NEXTAUTH_SECRET`, then `AUTH_SECRET`. Empty strings
+are missing; secret bytes are never trimmed, rewritten, generated, or copied.
+If both names differ, NEXTAUTH_SECRET retains precedence to preserve existing
+sessions. If both are absent/empty, production throws rather than using a known
+fallback; the existing development/test fallback remains non-production only.
+This does not rotate or modify any stored secret or environment file.
+
+Readiness uses the same presence check, keeps the legacy `auth.nextauth_secret`
+gate/API boolean for compatibility, and returns no secret values. The Payments
+label shows both supported names. Rate-limit fingerprint/encryption key policy
+is separate and deliberately unchanged. DEEPL_AUTH_KEY remains independent.
+
+Regression tests cover Node-issued cookies decoded by Edge, Edge-signed denial
+audits verified by Node, precedence, empty/missing values, readiness, no resolver
+logging, and a built Next.js startup using only an isolated AUTH_SECRET fixture.
+
 ## Authoring boundary and audited fields
 
 Staff enter the English source once. The session card and advanced/defaults editor
@@ -111,9 +135,10 @@ After review/merge, perform these steps in order:
 
 1. Reconcile/pull merged main while retaining unrelated local changes. Install
    the merged lockfile and build, including `build:translations`.
-2. Securely configure DEEPL_AUTH_KEY for production. Confirm NEXTAUTH_SECRET is
-   available to a clean production build/runtime: the existing auth resolver does
-   not use AUTH_SECRET. Never substitute the disposable test credential.
+2. Securely configure DEEPL_AUTH_KEY for production. Confirm the existing auth
+   secret is available to a clean production build/runtime: NEXTAUTH_SECRET takes
+   precedence over the AUTH_SECRET alias. No remapping or rotation is required.
+   Never substitute the disposable test credential.
 3. Confirm the database target is development. Review the additive translation
    migration and development schema/index parity; reconcile existing Prisma
    migration history separately if necessary. Do not run the post-merge script

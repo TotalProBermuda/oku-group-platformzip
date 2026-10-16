@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { encode } from "next-auth/jwt";
+import { resolveAuthSecret } from "../../src/lib/authSecret";
 import nextEnv from "@next/env";
 
 nextEnv.loadEnvConfig(process.cwd());
@@ -19,7 +20,7 @@ const defaults = {
 
 async function setup(page: Page, context: BrowserContext, baseURL?: string, roles = ["SUPERADMIN"], failures: number[] = []) {
   const origin = new URL(baseURL ?? "http://localhost:5000");
-  const token = await encode({ secret: process.env.NEXTAUTH_SECRET ?? "replace-me", salt: "next-auth.session-token", maxAge: 3600,
+  const token = await encode({ secret: resolveAuthSecret(), salt: "next-auth.session-token", maxAge: 3600,
     token: { sub: "fixture-admin", userId: "fixture-admin", roles, name: "Fixture", email: "fixture@example.test" } });
   await context.addCookies([{ name: "next-auth.session-token", value: token, domain: origin.hostname, path: "/", httpOnly: true, secure: origin.protocol === "https:", sameSite: "Lax" }]);
   const previews: Array<Record<string, any>> = [];

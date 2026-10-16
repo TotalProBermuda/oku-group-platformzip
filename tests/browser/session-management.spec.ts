@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page, type Route } from "@playwright/test";
 import { encode } from "next-auth/jwt";
+import { resolveAuthSecret } from "../../src/lib/authSecret";
 import nextEnv from "@next/env";
 
 nextEnv.loadEnvConfig(process.cwd());
@@ -58,7 +59,7 @@ const managementFixture = {
 
 async function addFixtureAuth(context: BrowserContext, baseURL?: string, roles = ["SUPERADMIN"]) {
   const origin = new URL(baseURL ?? "http://localhost:5000");
-  const secret = process.env.NEXTAUTH_SECRET ?? "replace-me";
+  const secret = resolveAuthSecret();
   const token = await encode({
     secret,
     salt: "next-auth.session-token",

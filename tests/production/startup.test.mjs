@@ -145,7 +145,7 @@ test("missing provider key keeps the worker/web available with explicit English 
   assert.equal((await run.closed)[0], 0);
 });
 
-test("built Next.js starts under the real supervisor and serves its health route", {
+test("built Next.js starts with AUTH_SECRET only under the real supervisor and serves its health route", {
   timeout: 20000, skip: !existsSync(join(root, ".next/BUILD_ID")),
 }, async t => {
   const reservation = createServer();
@@ -154,7 +154,8 @@ test("built Next.js starts under the real supervisor and serves its health route
   await new Promise(resolve => reservation.close(resolve));
   const run = await launch(t, {
     TEST_WEB_MODE: "real-next", PORT: String(port),
-    NEXTAUTH_SECRET: "isolated-build-fixture-not-a-deployment-credential",
+    NEXTAUTH_SECRET: "",
+    AUTH_SECRET: "isolated-build-fixture-not-a-deployment-credential",
     DATABASE_URL: "postgresql://validation:validation@127.0.0.1:55439/translation_startup_check?connect_timeout=1&pool_timeout=1",
     NODE_OPTIONS: `--require=${join(root, "scripts/validation/no-external-network.cjs")}`,
   });
@@ -172,6 +173,10 @@ test("built Next.js starts under the real supervisor and serves its health route
   assert.equal(result.status, 503);
   assert.equal(result.body.checks.application, "ok");
   assert.equal(result.body.checks.database, "unavailable");
+  // Exercise Node auth configuration too, not only the unauthenticated health route.
+  const providers = await fetch(`http://127.0.0.1:${port}/api/auth/providers`);
+  assert.equal(providers.status, 200);
+  assert.ok((await providers.json()).passwordless);
   run.child.kill("SIGTERM");
   assert.equal((await run.closed)[0], 0);
 });
