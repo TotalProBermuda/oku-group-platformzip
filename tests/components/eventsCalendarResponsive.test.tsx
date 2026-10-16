@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import EventsCalendarView from "@/components/ui/EventsCalendarView";
 
 describe("events landing calendar responsive layout", () => {
-  it("shows the monthly event list before the calendar in a stacked mobile layout", () => {
+  it("keeps desktop columns and defaults mobile to the list tab", () => {
     const markup = renderToStaticMarkup(
       <EventsCalendarView locale="en" labels={{}} />,
     );
