@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { deeplProvider, TranslationError, type TranslationProvider } from "./deeplProvider";
 
 /** DB rows are the durable queue; BullMQ is an accelerator, never the sole owner. */
-export async function drainTranslations(provider: TranslationProvider = deeplProvider(), limit = 10) {
+export async function drainTranslations(provider: TranslationProvider = deeplProvider(), limit = 10, signal?: AbortSignal) {
+  if (signal?.aborted) return 0;
   const now = new Date();
   const rows = await prisma.contentTranslation.findMany({
     where: { sourceLocale: "en", targetLocale: { in: ["es", "pt"] }, status: { in: ["PENDING", "STALE", "FAILED"] },
@@ -10,6 +11,7 @@ export async function drainTranslations(provider: TranslationProvider = deeplPro
     orderBy: { nextAttemptAt: "asc" }, take: limit,
   });
   for (const row of rows) {
+    if (signal?.aborted) break;
     const processingUntil = new Date(Date.now() + 60_000);
     const claim = await prisma.contentTranslation.updateMany({
       where: { id: row.id, sourceTextHash: row.sourceTextHash, status: row.status, processingUntil: row.processingUntil, attemptCount: row.attemptCount },
@@ -34,15 +36,20 @@ export async function drainTranslations(provider: TranslationProvider = deeplPro
 }
 
 export function startTranslationPolling(interval = 30_000) {
-  let running = false;
-  const poll = async () => {
-    if (running) return;
-    running = true;
-    try { await drainTranslations(); }
-    catch { console.warn("[translations] drain unavailable; durable rows retained"); }
-    finally { running = false; }
+  const controller = new AbortController();
+  let active: Promise<void> | undefined;
+  const poll = () => {
+    if (active || controller.signal.aborted) return;
+    active = drainTranslations(undefined, 10, controller.signal)
+      .then(() => {})
+      .catch(() => { console.warn("[translations] drain unavailable; durable rows retained"); })
+      .finally(() => { active = undefined; });
   };
-  void poll();
-  const timer = setInterval(() => { void poll(); }, interval);
-  return () => clearInterval(timer);
+  poll();
+  const timer = setInterval(poll, interval);
+  return async () => {
+    controller.abort();
+    clearInterval(timer);
+    await active;
+  };
 }

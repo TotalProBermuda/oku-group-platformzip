@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "dev:replit": "prisma generate && next dev -p 5000",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && npm run build:translations && next build",
+    "build:translations": "node scripts/build-translation-worker.mjs",
     "start": "sh scripts/deploy-prisma-with-rate-limit-repair.sh",
     "start:production": "sh scripts/deploy-prisma-with-rate-limit-repair.sh",
     "start:next": "next start",
@@ -26,6 +27,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "node scripts/run-browser-tests.mjs",
+    "test:production-startup": "node --test tests/production/*.test.mjs",
     "i18n:check": "node scripts/check-i18n-parity.mjs",
     "prod:bootstrap": "tsx scripts/prod-bootstrap.ts"
   },
@@ -63,6 +65,7 @@
     "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.5.27",
+    "esbuild": "0.27.3",
     "prisma": "^5.22.0",
     "sharp": "0.35.5",
     "tsx": "^4.19.2",

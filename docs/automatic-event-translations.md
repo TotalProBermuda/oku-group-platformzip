@@ -84,5 +84,54 @@ DDL. Additive DDL was applied to development only; apply/review the schema throu
 the project's normal production schema process before activating in production.
 Application startup does not run migrations. No publication was performed.
 
+## Production startup and reviewed release sequence
+
+The existing deployment shell entrypoint now execs a Node supervisor. It launches
+only the compiled translation worker, waits for its read-only schema/database
+preflight, then starts Next.js. Neither this entrypoint nor the translation worker
+imports the general BullMQ worker, Redis, retention, INVU, ledger, or notifications.
+The existing development/general worker remains unchanged.
+
+The production worker is bundled during `npm run build` and needs only Node and
+the existing production Prisma client at runtime, not tsx/esbuild/dev dependencies.
+An unexpected exit (including exit 0) or spawn/readiness failure stops both children
+and exits nonzero. SIGTERM/SIGINT stop polling, finish the current translation,
+stop claiming further rows, and disconnect Prisma. After 30 seconds the supervisor
+force-kills surviving child process groups; unfinished claims recover via their
+existing leases. Transient polling failures retain durable rows and retry.
+
+**Hosting release gate:** the checked-in deployment target is still Autoscale.
+An operator must select **Reserved VM** in Publishing before this release:
+Autoscale can go idle and is not an always-on queue consumer. This is an explicit
+hosting/cost-model decision; no hosting settings or live deployment were changed
+by this PR. Do not publish this startup integration on Autoscale and assume idle
+backlogs will drain.
+
+After review/merge, perform these steps in order:
+
+1. Reconcile/pull merged main while retaining unrelated local changes. Install
+   the merged lockfile and build, including `build:translations`.
+2. Securely configure DEEPL_AUTH_KEY for production. Confirm NEXTAUTH_SECRET is
+   available to a clean production build/runtime: the existing auth resolver does
+   not use AUTH_SECRET. Never substitute the disposable test credential.
+3. Confirm the database target is development. Review the additive translation
+   migration and development schema/index parity; reconcile existing Prisma
+   migration history separately if necessary. Do not run the post-merge script
+   against an unidentified database.
+4. Inspect Replit's managed development-to-production schema diff. It must include
+   the four retry/lease columns and retry index, with no unintended drops or data
+   loss. Production schema synchronization belongs to reviewed Publish, not
+   `prisma migrate deploy` in application startup.
+5. Select Reserved VM and review its always-on compute cost. Only after separate
+   approval, publish the reviewed build with the reviewed schema synchronization.
+   Do not start the broader `npm run worker` in production for this feature.
+6. Confirm worker-ready precedes web-ready, the public health path responds, and
+   an authorized disposable event edit progresses from English fallback to ES/PT.
+   Review only status/error codes, never submitted content or credentials.
+
+This startup fix adds no migration. Until credentials and the existing schema
+change are approved, do not point a verification worker at production. The
+process tests use fixture database/provider adapters and exercise real OS signals.
+
 Tests use mocked DeepL/DB services or an explicitly isolated loopback PostgreSQL
 fixture. Browser fixtures deny unstubbed API calls and never mutate real events.
