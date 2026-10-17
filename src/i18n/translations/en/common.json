@@ -467,6 +467,7 @@
   "sessionViewOptions": "Session display options",
   "sessionListView": "List",
   "sessionCalendarView": "Calendar",
+  "sessionEvent": "event",
   "sessionEventCount": "events",
   "sessionCoHostedBy": "Co-hosted by:",
   "sessionFromPrice": "From",

@@ -228,7 +228,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
                   from: c.sessionFromPrice,
                   viewEvent: c.viewEventLink ?? (safeLocale === "es" ? "Ver evento" : safeLocale === "pt" ? "Ver evento" : "View event"),
                   coHostedBy: c.sessionCoHostedBy,
-                  previousMonth: c.calendarPrev, nextMonth: c.calendarNext, events: c.sessionEventCount,
+                  previousMonth: c.calendarPrev, nextMonth: c.calendarNext, event: c.sessionEvent, events: c.sessionEventCount,
                   chooseDate: c.calendarSelectDay, noSessions: c.noSessionsYet,
                 }}
               />

@@ -48,6 +48,7 @@ export default function ExperienceSessionsView({
   });
   const [selectedDate, setSelectedDate] = useState("");
   const localeTag = locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
+  const eventCountLabel = (count: number) => `${count} ${count === 1 ? labels.event : labels.events}`;
   const weekdays = Array.from({ length: 7 }, (_, index) => new Date(Date.UTC(2024, 0, 1 + index, 12)).toLocaleDateString(localeTag, { weekday: "short", timeZone: EVENT_TIME_ZONE }));
   const monthLabel = month.toLocaleDateString(localeTag, { month: "long", year: "numeric" });
   const sessionsByDate = useMemo(() => {
@@ -134,10 +135,10 @@ export default function ExperienceSessionsView({
               if (!day) return <div key={`blank-${index}`} />;
               const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
               const count = sessionsByDate.get(key)?.length ?? 0;
-              return <button key={key} type="button" disabled={!count} aria-pressed={selectedDate === key} onClick={() => setSelectedDate(key)} style={{ aspectRatio: "1", border: selectedDate === key ? "2px solid #c41e3a" : "1px solid #eee7df", borderRadius: 8, background: count ? "#fff8f8" : "#fafaf9", color: count ? "#1a1614" : "#a8a29e", fontSize: 13, fontWeight: count ? 700 : 400, cursor: count ? "pointer" : "default" }}>{day}{count ? <span aria-label={`${count} ${labels.events}`} style={{ color: "#c41e3a", display: "block", fontSize: 9 }}>● {count}</span> : null}</button>;
+              return <button key={key} type="button" disabled={!count} aria-pressed={selectedDate === key} onClick={() => setSelectedDate(key)} style={{ aspectRatio: "1", border: selectedDate === key ? "2px solid #c41e3a" : "1px solid #eee7df", borderRadius: 8, background: count ? "#fff8f8" : "#fafaf9", color: count ? "#1a1614" : "#a8a29e", fontSize: 13, fontWeight: count ? 700 : 400, cursor: count ? "pointer" : "default" }}>{day}{count ? <span aria-label={eventCountLabel(count)} style={{ color: "#c41e3a", display: "block", fontSize: 9 }}>● {count}</span> : null}</button>;
             })}
           </div>
-          {selectedDate ? <p style={{ color: "#6b7280", fontSize: 13, margin: "12px 0 0" }}>{new Date(`${selectedDate}T12:00:00Z`).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: EVENT_TIME_ZONE })} · {visibleSessions.length} {labels.events}</p> : <p style={{ color: "#6b7280", fontSize: 13, margin: "12px 0 0" }}>{labels.chooseDate}</p>}
+          {selectedDate ? <p style={{ color: "#6b7280", fontSize: 13, margin: "12px 0 0" }}>{new Date(`${selectedDate}T12:00:00Z`).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: EVENT_TIME_ZONE })} · {eventCountLabel(visibleSessions.length)}</p> : <p style={{ color: "#6b7280", fontSize: 13, margin: "12px 0 0" }}>{labels.chooseDate}</p>}
         </div>
       ) : null}
       <div style={{ display: "grid", gap: 12 }}>
