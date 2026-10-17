@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { Locale } from "@/types/i18n";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
 import { persistLocale } from "./LocaleProvider";
+import { localizedPathWithState } from "@/i18n/localeNavigation";
 
 interface Props {
   currentLocale: Locale;
@@ -26,7 +27,7 @@ export default function LanguageSwitcher({ currentLocale, variant = "header" }: 
     // LocaleProvider re-resolve from the persisted cookie.
     const localePrefixed = /^\/(en|es|pt)(\/|$)/.test(pathname);
     if (localePrefixed) {
-      router.push(pathname.replace(/^\/(en|es|pt)(\/|$)/, `/${locale}$2`));
+      router.push(localizedPathWithState(pathname, locale, window.location.search, window.location.hash));
     } else {
       router.refresh();
     }
