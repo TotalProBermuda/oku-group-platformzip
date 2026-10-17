@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { requirePermission } from "@/lib/rbac";
 import { requireSession } from "@/server/auth/session";
 import { createSessionInputSchema } from "@/server/series/createSessionInput";
 import { createReservationConflictRecords } from "@/server/events/eventOccupancyService";
 import { lockOccupancySpaces } from "@/server/series/publicationLifecycle";
 import { parseArtworkEdit } from "@/server/series/artworkInput";
+import { fieldKeys, loadSessionState, effectiveField } from "@/server/series/sessionState";
+import { applyScheduleTemplate } from "@/server/series/sessionFields";
+import { materializeSession } from "@/server/series/sessionManagement";
+import { Prisma } from "@prisma/client";
 
 function failure(error: unknown) {
   const status = typeof (error as { status?: unknown })?.status === "number"
@@ -54,6 +60,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Series" WHERE "id" = ${seriesId} FOR UPDATE`;
       const created = await tx.session.create({
         data: {
           ...artwork,
@@ -69,6 +76,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           status: "SCHEDULED",
         },
       });
+      await syncTranslations(tx, "EventSession", created.id, { title: created.title, subtitle: created.subtitle, description: created.description });
+      if (body.data.useSeriesDefaults) {
+        const state = await loadSessionState(tx, seriesId, [created.id]);
+        const current = state.sessions[0];
+        const fieldModes: Record<string, { mode: "inherit" } | { mode: "override"; value: unknown }> = Object.fromEntries(fieldKeys(state).map(k => [k, { mode: "inherit" as const }]));
+        for (const field of ["title", "subtitle", "description"] as const) if (body.data[field]) fieldModes[`content.${field}.en`] = { mode: "override", value: body.data[field] };
+        for (const [locale, key] of [["en", "flyerImageUrlEn"], ["es", "flyerImageUrlEs"], ["pt", "flyerImageUrlPt"]] as const)
+          if (body.data[key]) fieldModes[`artwork.${locale}`] = { mode: "override", value: body.data[key] };
+        for (const price of body.data.ticketPrices ?? []) fieldModes[`ticket.${price.ticketTypeId}.price`] = { mode: "override", value: price.priceCents };
+        const next = { ...current, fieldModes: JSON.parse(JSON.stringify(fieldModes)) as Prisma.JsonValue };
+        const template = effectiveField(state, next, "schedule").value;
+        const scheduled = applyScheduleTemplate(current.startsAt, template);
+        next.startsAt = scheduled.startsAt; next.endsAt = scheduled.endsAt;
+        next.capacity = Number(effectiveField(state, next, "capacity").value);
+        await materializeSession(tx, state, current, next, fieldKeys(state));
+        created.startsAt = next.startsAt; created.endsAt = next.endsAt; created.capacity = next.capacity;
+      }
       let occupancy = null;
       let conflictCount = 0;
       if (body.data.occupancyScope !== "NONE" && parent.venueId) {
@@ -84,10 +108,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             scope,
             policy: "EXCLUSIVE",
             status: parent.status === "PUBLISHED" ? "ACTIVE" : "DRAFT",
-            eventStartsAt: body.data.startsAt,
-            eventEndsAt: body.data.endsAt,
-            blockStartsAt: new Date(body.data.startsAt.getTime() - body.data.setupMinutes * 60_000),
-            blockEndsAt: new Date(body.data.endsAt.getTime() + body.data.resetMinutes * 60_000),
+            eventStartsAt: created.startsAt,
+            eventEndsAt: created.endsAt,
+            blockStartsAt: new Date(created.startsAt.getTime() - body.data.setupMinutes * 60_000),
+            blockEndsAt: new Date(created.endsAt.getTime() + body.data.resetMinutes * 60_000),
             setupMinutes: body.data.setupMinutes,
             resetMinutes: body.data.resetMinutes,
             createdByUserId: userId,
@@ -119,7 +143,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
       return { event: created, occupancy, conflictCount };
     });
-    return NextResponse.json({ ok: true, data: result.event, occupancy: result.occupancy, conflictCount: result.conflictCount }, { status: 201 });
+    return finishEventSave(seriesId, { ok: true, data: result.event, occupancy: result.occupancy, conflictCount: result.conflictCount }, req, 201);
   } catch (error) {
     return failure(error);
   }

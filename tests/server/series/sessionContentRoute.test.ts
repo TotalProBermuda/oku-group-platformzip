@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 const auth = vi.hoisted(() => ({ requireSession: vi.fn() }));
 vi.mock("@/server/auth/session", () => ({ requireSession: auth.requireSession }));
 const db = vi.hoisted(() => {
-  const tx = { session: { update: vi.fn() }, sessionTicketPrice: { deleteMany: vi.fn(), createMany: vi.fn() }, auditLog: { create: vi.fn() } };
+  const tx = { contentTranslation: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() }, $queryRaw: vi.fn(), session: { update: vi.fn(), findUnique: vi.fn().mockResolvedValue(null) }, sessionTicketPrice: { deleteMany: vi.fn(), createMany: vi.fn() }, auditLog: { create: vi.fn() } };
   return { tx, prisma: { session: { findUnique: vi.fn() }, ticketType: { findMany: vi.fn() }, $transaction: vi.fn((operation: (client: typeof tx) => unknown) => operation(tx)) } };
 });
 vi.mock("@/lib/prisma", () => ({ prisma: db.prisma }));

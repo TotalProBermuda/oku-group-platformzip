@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
-import { reserveCatalogCapacityOrThrow } from "@/server/commerce/capacity";
+import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";
+import { lockSessionInventory } from "@/server/commerce/sessionInventory";
+import { purchasedEntitlements } from "@/server/commerce/sessionProducts";
+import { Prisma } from "@prisma/client";
 import { getEventReferrerByCode } from "@/server/events/eventReferrerService";
 import { resolveActorFromCode } from "@/server/referrals/referralActorService";
 import { assertCheckoutCatalogPolicy, CatalogPolicyError } from "@/server/commerce/catalogPolicy";
@@ -62,9 +65,11 @@ export async function POST(req: Request) {
 
     await expireCheckoutHoldsForSession(body.sessionId);
 
+    return await prisma.$transaction(async tx => {
+    await lockSessionInventory(tx, body.sessionId);
     // Validate identity, product scope, visibility, access, sale windows, and
     // per-product inventory before any capacity is reserved or order is made.
-    const catalog = await assertCheckoutCatalogPolicy({ userId, sessionId: body.sessionId, items: body.items });
+    const catalog = await assertCheckoutCatalogPolicy({ userId, sessionId: body.sessionId, items: body.items, db: tx });
 
     const ticketTypes = catalog.tickets;
     const addons = catalog.addons;
@@ -91,7 +96,7 @@ export async function POST(req: Request) {
     }
 
     // Reserve capacity atomically only after policy has passed.
-    await reserveCatalogCapacityOrThrow({
+    await reserveCatalogCapacityInTransaction(tx, {
       sessionId: body.sessionId,
       ticketItems: body.items.filter((item) => item.ticketTypeId).map((item) => ({ id: item.ticketTypeId!, qty: item.qty })),
       addonItems: body.items.filter((item) => item.addonId).map((item) => ({ id: item.addonId!, qty: item.qty })),
@@ -155,12 +160,14 @@ export async function POST(req: Request) {
     // to the guest.  Amounts are calculated server-side; the browser never
     // supplies a payable total.
 
-    const order = await prisma.order.create({
+    const order = await tx.order.create({
     data: {
       userId,
       seriesId: series.id,
       sessionId: session.id,
       status: "PENDING",
+      entitlementSnapshot: purchasedEntitlements(session),
+      checkoutLocale: body.guest?.locale ?? "en",
       subtotalCents,
       feesCents,
       taxCents,
@@ -180,14 +187,14 @@ export async function POST(req: Request) {
     },
   });
 
-    const checkoutHoldExpiresAt = await createCheckoutHold(order.id);
-    const guestCredential = auth ? null : await createGuestCheckoutCredential(order.id);
-    if (body.guest) await prisma.orderEvent.create({ data: {
+    const checkoutHoldExpiresAt = await createCheckoutHold(order.id, tx);
+    const guestCredential = auth ? null : await createGuestCheckoutCredential(order.id, tx);
+    if (body.guest) await tx.orderEvent.create({ data: {
       orderId: order.id, eventType: "ORDER_CREATED", eventLabel: "guest-checkout-contact",
       eventPayload: { email: body.guest.email, name: body.guest.name, phone: body.guest.phone ?? null, locale: body.guest.locale ?? "en", marketingEmailConsent: body.guest.marketingEmailConsent },
     }});
 
-    await prisma.orderLineItem.createMany({
+    await tx.orderLineItem.createMany({
     data: body.items.map(i => {
       const tt = i.ticketTypeId ? ticketTypes.find(t => t.id === i.ticketTypeId) : undefined;
       const addon = i.addonId ? addons.find(a => a.id === i.addonId) : undefined;
@@ -219,7 +226,9 @@ export async function POST(req: Request) {
       confirmationEmail: account?.email ?? body.guest!.email,
       ...(guestCredential ? { guestCheckoutToken: guestCredential.token } : {}),
     } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2034") return NextResponse.json({ ok: false, error: "INVENTORY_CHANGED", message: "Availability changed. Review a fresh quote." }, { status: 409 });
     if (error instanceof CatalogPolicyError) {
       return NextResponse.json({ ok: false, error: error.code, message: error.message }, { status: error.status });
     }

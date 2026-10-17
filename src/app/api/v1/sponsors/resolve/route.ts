@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mergeSponsors, resolveSponsors } from "@/lib/sponsor-render";
+import { effectiveSeriesSponsors } from "@/server/series/effectiveAssignments";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -18,11 +19,7 @@ export async function GET(req: Request) {
   };
 
   if (scopeType === "SERIES") {
-    const assignments = await prisma.sponsorAssignment.findMany({
-      where: { scopeType: "SERIES", scopeId, isActive: true },
-      include: INCLUDE,
-      orderBy: [{ tier: { displayOrder: "asc" } }, { sortOrder: "asc" }],
-    });
+    const assignments = await effectiveSeriesSponsors(scopeId);
     const resolved = resolveSponsors(assignments, surface, false);
     return NextResponse.json(resolved);
   }
@@ -40,11 +37,7 @@ export async function GET(req: Request) {
       orderBy: [{ tier: { displayOrder: "asc" } }, { sortOrder: "asc" }],
     }),
     sessionRecord.inheritsSeriesSponsors
-      ? prisma.sponsorAssignment.findMany({
-          where: { scopeType: "SERIES", scopeId: sessionRecord.seriesId, isActive: true },
-          include: INCLUDE,
-          orderBy: [{ tier: { displayOrder: "asc" } }, { sortOrder: "asc" }],
-        })
+      ? effectiveSeriesSponsors(sessionRecord.seriesId)
       : Promise.resolve([]),
   ]);
 

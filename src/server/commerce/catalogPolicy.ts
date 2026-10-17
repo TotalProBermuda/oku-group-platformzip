@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { sessionProductEnabled } from "./sessionProducts";
+import type { Prisma } from "@prisma/client";
 
 type CheckoutItem = { ticketTypeId?: string; addonId?: string; qty: number };
 
@@ -19,9 +21,11 @@ export async function assertCheckoutCatalogPolicy(input: {
   sessionId: string;
   items: CheckoutItem[];
   now?: Date;
+  db?: Prisma.TransactionClient;
 }) {
+  const db = input.db ?? prisma;
   const now = input.now ?? new Date();
-  const session = await prisma.session.findUnique({
+  const session = await db.session.findUnique({
     where: { id: input.sessionId },
     include: {
       ticketPrices: true,
@@ -35,6 +39,7 @@ export async function assertCheckoutCatalogPolicy(input: {
           commercialOwnerInfluencerId: true,
           influencerId: true,
           membershipRuleMode: true,
+          sessionDefaults: true,
         },
       },
     },
@@ -60,16 +65,16 @@ export async function assertCheckoutCatalogPolicy(input: {
   }
 
   const [membership, user, tickets, addons] = await Promise.all([
-    prisma.membership.findFirst({
+    db.membership.findFirst({
       where: { userId: input.userId, status: "ACTIVE" },
       select: { tier: true, benefitsJson: true },
     }),
-    prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } }),
-    prisma.ticketType.findMany({
+    db.user.findUnique({ where: { id: input.userId }, select: { email: true } }),
+    db.ticketType.findMany({
       where: { id: { in: [...ticketQuantities.keys()] } },
       include: { pricingRules: { where: { isActive: true }, orderBy: { priority: "asc" } } },
     }),
-    prisma.experienceAddon.findMany({ where: { id: { in: [...addonQuantities.keys()] } } }),
+    db.experienceAddon.findMany({ where: { id: { in: [...addonQuantities.keys()] } } }),
   ]);
 
   if (tickets.length !== ticketQuantities.size) {
@@ -82,9 +87,9 @@ export async function assertCheckoutCatalogPolicy(input: {
   const email = user?.email?.toLowerCase();
   const [newsletter, invitations] = await Promise.all([
     email
-      ? prisma.newsletterSubscription.findFirst({ where: { email, isActive: true }, select: { id: true } })
+      ? db.newsletterSubscription.findFirst({ where: { email, isActive: true }, select: { id: true } })
       : null,
-    prisma.eventInvitation.findMany({
+    db.eventInvitation.findMany({
       where: {
         seriesId: session.series.id,
         status: { notIn: ["DECLINED"] },
@@ -109,6 +114,7 @@ export async function assertCheckoutCatalogPolicy(input: {
       throw new CatalogPolicyError("TICKET_SCOPE_MISMATCH", "A ticket does not belong to this experience.", 400);
     }
     if (ticket.ticketStatus !== "ACTIVE") throw new CatalogPolicyError("TICKET_INACTIVE", "This ticket is not available.");
+    if (!sessionProductEnabled(session, session.series, ticket.id)) throw new CatalogPolicyError("SESSION_PRODUCT_DISABLED", "This ticket is not available for this session.");
     if ((ticket.saleStartsAt && now < ticket.saleStartsAt) || (ticket.saleEndsAt && now > ticket.saleEndsAt)) {
       throw new CatalogPolicyError("TICKET_OUTSIDE_SALE_WINDOW", "This ticket is not currently on sale.");
     }

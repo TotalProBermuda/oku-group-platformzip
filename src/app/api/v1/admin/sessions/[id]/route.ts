@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { requireSession } from "@/server/auth/session";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { sessionTicketPriceInputSchema, updateSessionContentSchema } from "@/server/series/createSessionInput";
+import { legacySessionWriteBlocked, managedWriteMessage } from "@/server/series/legacySessionGuard";
+import { lockSessionInventory } from "@/server/commerce/sessionInventory";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -36,6 +40,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { id } = await params;
     const body = await req.json();
+    if (await legacySessionWriteBlocked(id)) return NextResponse.json({ ok: false, error: managedWriteMessage }, { status: 409 });
+    if (body.giftBagEnabled === false && await prisma.ticket.count({ where: { sessionId: id, entitlementSnapshot: { equals: Prisma.DbNull } } }) > 0)
+      return NextResponse.json({ ok: false, error: "Existing ticket rights require owner review before disabling gift bags." }, { status: 409 });
 
     const update: Prisma.SessionUpdateInput = {};
     let ticketPriceOverrides: Array<{ ticketTypeId: string; priceCents: number }> | null = null;
@@ -66,10 +73,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (body.streetsideEnabled !== undefined) update.streetsideEnabled = Boolean(body.streetsideEnabled);
 
     const session = await prisma.$transaction(async tx => {
+      await lockSessionInventory(tx, id);
+      if (await legacySessionWriteBlocked(id, tx)) throw Object.assign(new Error(managedWriteMessage), { status: 409 });
       const updated = await tx.session.update({
       where: { id },
       data: update,
-      select: { id: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
+      select: { id: true, seriesId: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
       });
       if (ticketPriceOverrides) {
         await tx.sessionTicketPrice.deleteMany({ where: { sessionId: id } });
@@ -84,10 +93,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (ticketPriceOverrides) await tx.auditLog.create({ data: {
         actorId: userId, action: "session.ticket_prices.updated", metadata: { sessionId: id, ticketTypeIds: ticketPriceOverrides.map((price) => price.ticketTypeId) },
       } });
+      await syncTranslations(tx, "EventSession", id, updated);
       return updated;
     });
 
-    return NextResponse.json({ ok: true, data: session });
+    const { seriesId, ...data } = session;
+    return finishEventSave(seriesId, { ok: true, data }, req);
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
   }

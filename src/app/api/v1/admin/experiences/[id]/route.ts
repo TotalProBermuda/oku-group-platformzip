@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { assertSeriesReadyForPublication, SeriesPublicationError, syncSeriesOccupanciesForStatus } from "@/server/series/publicationLifecycle";
 import { seriesSocialLinksSchema } from "@/lib/socialLinks";
 import { parseArtworkEdit } from "@/server/series/artworkInput";
+import { legacySeriesWriteBlocked, managedWriteMessage } from "@/server/series/legacySessionGuard";
 
 function isAdmin(session: any) {
-  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r));
+  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR"].includes(r));
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -103,7 +106,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // availability while preserving the event and its reservation-conflict audit.
   try {
     const series = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Series" WHERE "id" = ${id} FOR UPDATE`;
+      const defaultFields = ["title", "subtitle", "description", "capacityTotal", "heroImageUrl", "heroImageUrlEn", "heroImageUrlEs", "heroImageUrlPt", "startsAt", "endsAt"];
+      if (defaultFields.some(k => k in data) && await legacySeriesWriteBlocked(id, tx)) throw Object.assign(new Error(managedWriteMessage), { status: 409 });
       const updated = await tx.series.update({ where: { id }, data });
+      await syncTranslations(tx, "Series", id, updated);
       if (data.status === "PUBLISHED") await assertSeriesReadyForPublication(tx, id);
     if (data.status) {
       await syncSeriesOccupanciesForStatus(tx, id, data.status);
@@ -111,8 +118,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await tx.auditLog.create({ data: { actorId, action: "EXPERIENCE_UPDATED", metadata: { seriesId: id, fields: Object.keys(data) } } });
     return updated;
     });
-    return NextResponse.json({ series });
+    return finishEventSave(id, { series }, req);
   } catch (error) {
+    if (error && typeof error === "object" && "status" in error && error.status === 409) return NextResponse.json({ error: error instanceof Error ? error.message : managedWriteMessage }, { status: 409 });
     if (error instanceof SeriesPublicationError) {
       return NextResponse.json({ error: "This series is not ready to publish.", issues: error.issues }, { status: 409 });
     }

@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { createHash } from "crypto";
+import { sourceHash, matchesSource } from "./sourceHash";
+import { syncTranslations } from "./eventTranslations";
 import { SUPPORTED_LOCALES, type Locale } from "@/types/i18n";
 import { isTranslatableField, type TranslatableEntityType } from "@/config/translatableFields";
 
 function hashText(text: string): string {
-  return createHash("sha256").update(text).digest("hex").slice(0, 16);
+  return sourceHash(text);
 }
 
 export type TranslationStatus = "PENDING" | "COMPLETED" | "FAILED" | "STALE";
@@ -110,42 +111,8 @@ export async function queueTranslations(params: {
   sourceLocale: Locale;
   sourceText: string;
 }): Promise<void> {
-  const { entityType, entityId, fieldName, sourceLocale, sourceText } = params;
-  if (!sourceText?.trim()) return;
-
-  const sourceTextHash = hashText(sourceText);
-  const targetLocales = SUPPORTED_LOCALES.filter((l) => l !== sourceLocale);
-
-  for (const targetLocale of targetLocales) {
-    await prisma.contentTranslation.upsert({
-      where: {
-        entityType_entityId_fieldName_targetLocale: {
-          entityType,
-          entityId,
-          fieldName,
-          targetLocale,
-        },
-      },
-      create: {
-        entityType,
-        entityId,
-        fieldName,
-        sourceLocale,
-        targetLocale,
-        sourceText,
-        sourceTextHash,
-        translatedText: "",
-        status: "PENDING",
-        provider: null,
-      },
-      update: {
-        sourceText,
-        sourceTextHash,
-        status: "PENDING",
-        updatedAt: new Date(),
-      },
-    });
-  }
+  if (params.sourceLocale !== "en") throw new Error("English source content is required");
+  await prisma.$transaction(tx => syncTranslations(tx, params.entityType as TranslatableEntityType, params.entityId, { [params.fieldName]: params.sourceText }));
 }
 
 /**
@@ -161,7 +128,7 @@ export async function queueEntityTranslations(params: {
   const { entityType, entityId, fields, sourceLocale = "en" } = params;
 
   for (const [fieldName, sourceText] of Object.entries(fields)) {
-    if (!sourceText || !isTranslatableField(entityType, fieldName)) continue;
+    if (sourceText === undefined || !isTranslatableField(entityType, fieldName)) continue;
     await queueTranslations({ entityType, entityId, fieldName, sourceLocale, sourceText });
   }
 }
@@ -179,7 +146,8 @@ export async function resolveTranslation(params: {
 }): Promise<string> {
   const { entityType, entityId, fieldName, sourceText, targetLocale } = params;
   const translated = await getTranslation(entityType, entityId, fieldName, targetLocale);
-  return translated ?? sourceText;
+  const row = await prisma.contentTranslation.findUnique({ where: { entityType_entityId_fieldName_targetLocale: { entityType, entityId, fieldName, targetLocale } } });
+  return row?.status === "COMPLETED" && matchesSource(row.sourceTextHash, sourceText) ? translated ?? sourceText : sourceText;
 }
 
 /**

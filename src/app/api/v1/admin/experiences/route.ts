@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { parseArtworkEdit } from "@/server/series/artworkInput";
@@ -29,7 +31,8 @@ export async function GET(_req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const actorId = session?.user?.id;
+  if (!actorId || !isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   let artwork;
@@ -49,7 +52,8 @@ export async function POST(req: NextRequest) {
   const eventSpace = spaceId ? await prisma.restaurantSpace.findFirst({ where: { id: spaceId, venueId, isActive: true }, select: { conceptKey: true } }) : null;
   if (spaceId && !eventSpace) return NextResponse.json({ error: "Space must belong to the selected venue" }, { status: 400 });
 
-  const series = await prisma.series.create({
+  const series = await prisma.$transaction(async tx => {
+  const created = await tx.series.create({
     data: {
       ...artwork,
       slug, title, subtitle, description, category, venue: eventSpace?.conceptKey === "OKU" || eventSpace?.conceptKey === "CATCH" ? eventSpace.conceptKey : undefined, venueId, spaceId: spaceId ?? null, hostType,
@@ -72,7 +76,10 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await prisma.auditLog.create({ data: { actorId: session.user.id, action: "EXPERIENCE_CREATED", metadata: { seriesId: series.id, slug } } });
+  await syncTranslations(tx, "Series", created.id, created);
+  await tx.auditLog.create({ data: { actorId, action: "EXPERIENCE_CREATED", metadata: { seriesId: created.id, slug } } });
+  return created;
+  });
 
-  return NextResponse.json({ series }, { status: 201 });
+  return finishEventSave(series.id, { series }, req, 201);
 }

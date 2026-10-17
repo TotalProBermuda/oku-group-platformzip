@@ -3,13 +3,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import AddToCalendar from "@/components/ui/AddToCalendar";
+import ExpandableText from "@/components/ui/ExpandableText";
 import ResponsiveEventArtwork from "@/components/ui/ResponsiveEventArtwork";
 import { sessionArtworkCandidates, sessionMobileArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
+import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
 type Session = SessionArtwork & {
   id: string; title: string | null; subtitle?: string | null; description?: string | null;
   flyerImageUrl?: string | null; startsAt: string; endsAt: string; capacity: number;
   soldCount: number; status: string; ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
+  eventHosts?: Array<{ role: string; entity: { displayName: string } }>;
 };
 
 const cardStyle: React.CSSProperties = { background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, padding: 16 };
@@ -24,10 +27,12 @@ function eventDateKey(value: Date) {
 }
 
 export default function ExperienceSessionsView({
-  sessions, ticketTypes, seriesTitle, seriesDescription, seriesImage, seriesArtwork, checkoutHrefBase, venue, locale, labels,
+  sessions, ticketTypes, seriesTitle, seriesDescription, seriesImage, seriesArtwork, seriesHosts, focusSessionId, checkoutHrefBase, venue, locale, labels,
 }: {
   sessions: Session[]; seriesTitle: string; seriesDescription: string; seriesImage?: string | null;
   seriesArtwork?: SeriesArtwork;
+  seriesHosts?: Array<{ role: string; entity: { displayName: string } }>;
+  focusSessionId?: string | null;
   ticketTypes: Array<{ id: string; priceCents: number }>;
   checkoutHrefBase: string; venue: string; locale: string;
   labels: Record<string, string>;
@@ -62,15 +67,19 @@ export default function ExperienceSessionsView({
     : sessions;
 
   function renderSession(session: Session) {
-    const title = session.title || seriesTitle;
+    const title = session.title ?? seriesTitle;
     const artwork = sessionArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
     const mobileArtwork = sessionMobileArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
-    const description = session.description || seriesDescription;
-    const prices = ticketTypes.map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
+    const description = session.description ?? seriesDescription;
+    const coHosts = [...(seriesHosts ?? []), ...(session.eventHosts ?? [])].filter((host) => host.role === "CO_HOST");
+    const prices = ticketTypes.filter(ticket => sessionProductEnabled(session, seriesArtwork ?? {}, ticket.id)).map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
     const fromPrice = prices.length ? Math.min(...prices) : null;
     return (
-      <article key={session.id} style={{ ...cardStyle, overflow: "hidden" }}>
-        <ResponsiveEventArtwork desktopCandidates={artwork} mobileCandidates={mobileArtwork} alt={`${title} event artwork`} loading="lazy" style={{ borderRadius: 8, marginBottom: 14 }} />
+      <article id={`session-${session.id}`} key={session.id} style={{ ...cardStyle, borderColor: focusSessionId === session.id ? "#c41e3a" : "#e5e0d8", borderWidth: focusSessionId === session.id ? 2 : 1, display: "grid", gridTemplateColumns: "clamp(88px, 16vw, 128px) minmax(0, 1fr)", gap: 14, alignItems: "start", padding: 12, scrollMarginTop: 96 }}>
+        <div style={{ aspectRatio: "4 / 5", background: "#f4eee8", borderRadius: 8, overflow: "hidden" }}>
+          <ResponsiveEventArtwork desktopCandidates={artwork} mobileCandidates={mobileArtwork} alt={`${title} event artwork`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        </div>
+        <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <h3 style={{ color: "#1a1614", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{title}</h3>
@@ -86,13 +95,15 @@ export default function ExperienceSessionsView({
             {fromPrice !== null ? <div style={{ color: "#c41e3a", fontSize: 13, fontWeight: 700, marginTop: 5 }}>{labels.from} ${(fromPrice / 100).toFixed(2)}</div> : null}
           </div>
         </div>
-        {description ? <p style={{ color: "#4b5563", fontSize: 14, lineHeight: 1.65, margin: "12px 0 0", whiteSpace: "pre-line" }}>{description}</p> : null}
+        {description ? <div style={{ marginTop: 10 }}><ExpandableText text={description} locale={locale} maxLines={2} /></div> : null}
+        {coHosts.length ? <p style={{ color: "#7c7168", fontSize: 13, margin: "8px 0 0" }}><strong>Co-hosted by:</strong> {[...new Set(coHosts.map((host) => host.entity.displayName))].join(", ")}</p> : null}
         {session.status === "SCHEDULED" ? (
           <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", marginTop: 14 }}>
             <AddToCalendar sessionId={session.id} title={title} startsAt={session.startsAt} endsAt={session.endsAt} location={venue} description={description} labels={{ addToCalendar: labels.addToCalendar, google: labels.calGoogleCalendar, apple: labels.calAppleIcal, outlook: labels.calOutlook, yahoo: labels.calYahoo }} />
             <Link href={`${checkoutHrefBase}?sessionId=${encodeURIComponent(session.id)}`} className="btn btn-primary">{labels.selectTickets}</Link>
           </div>
         ) : null}
+        </div>
       </article>
     );
   }
