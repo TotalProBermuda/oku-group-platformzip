@@ -85,10 +85,10 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const [year, setYear] = useState(() => Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, year: "numeric" }).format(today)));
   const [month, setMonth] = useState(() => Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, month: "numeric" }).format(today)) - 1);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
 
   useEffect(() => {
     let active = true;
@@ -199,29 +199,41 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   return (
     <section aria-label={locale === "es" ? "Calendario de eventos" : locale === "pt" ? "Calendário de eventos" : "Events calendar"}>
       <style jsx global>{`
-        .events-view-toggle { display: none; }
-        .events-calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
-        .events-calendar-column, .events-month-column { min-width: 0; }
-        .events-month-column { background: #fff; border: 1px solid #e5e0d8; border-radius: 16px; padding: 20px; }
+        .events-calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); grid-template-areas: "calendar month"; gap: 24px; align-items: start; }
+        .events-calendar-column { grid-area: calendar; min-width: 0; }
+        .events-month-column { grid-area: month; min-width: 0; background: #fff; border: 1px solid #e5e0d8; border-radius: 16px; padding: 20px; }
         .events-month-title { color: #1a1614; font-family: var(--font-heading); font-size: 24px; font-weight: 400; margin: 0 0 16px; }
         .events-month-cards { display: grid; gap: 12px; }
         .events-session-card { min-width: 0; }
+        .events-mobile-tabs { display: none; }
         @media (max-width: 767px) {
-          .events-view-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 0 14px; padding: 4px; background: #eee9e4; border-radius: 12px; }
-          .events-view-toggle button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: #746a62; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
-          .events-view-toggle button[aria-selected="true"] { background: #fff; color: #1a1614; box-shadow: 0 1px 4px rgba(26,22,20,.12); }
-          .events-calendar-layout { display: block; }
-          .events-calendar-column[data-active="false"], .events-month-column[data-active="false"] { display: none; }
+          .events-mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+          .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "month" "calendar"; gap: 16px; }
+          .events-calendar-column[data-mobile-hidden="true"], .events-month-column[data-mobile-hidden="true"] { display: none; }
           .events-month-column { padding: 16px; }
           .events-month-title { font-size: 22px; }
         }
       `}</style>
-      <div className="events-view-toggle" role="tablist" aria-label={locale === "es" ? "Vista de eventos" : locale === "pt" ? "Visualização de eventos" : "Event view"}>
-        <button type="button" role="tab" aria-selected={mobileView === "list"} aria-controls="events-month-panel" onClick={() => setMobileView("list")}>{locale === "es" ? "Lista" : locale === "pt" ? "Lista" : "List"}</button>
-        <button type="button" role="tab" aria-selected={mobileView === "calendar"} aria-controls="events-calendar-panel" onClick={() => setMobileView("calendar")}>{locale === "es" ? "Calendario" : locale === "pt" ? "Calendário" : "Calendar"}</button>
+      <div className="events-mobile-tabs" role="tablist" aria-label={locale === "es" ? "Vista de eventos" : locale === "pt" ? "Visualização de eventos" : "Event view"}>
+        {(["list", "calendar"] as const).map((view) => {
+          const selected = mobileView === view;
+          const label = view === "list"
+            ? (locale === "es" ? "Lista" : locale === "pt" ? "Lista" : "List")
+            : (locale === "es" ? "Calendario" : locale === "pt" ? "Calendário" : "Calendar");
+          return <button key={view} type="button" role="tab" aria-selected={selected} onClick={() => setMobileView(view)} className={selected ? "btn btn-primary btn-sm" : "btn btn-ghost btn-sm"} style={{ minHeight: 44 }}>{label}</button>;
+        })}
       </div>
       <div className="events-calendar-layout">
-        <div id="events-calendar-panel" className="events-calendar-column" data-active={mobileView === "calendar"}>
+        <div id="events-month-panel" className="events-month-column" data-mobile-hidden={mobileView !== "list"}>
+          <div style={{ alignItems: "baseline", display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
+            <h2 className="events-month-title">{selectedDay === null ? monthSessionsLabel : new Date(Date.UTC(year, month, selectedDay, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}</h2>
+            {selectedDay !== null ? <button type="button" onClick={() => setSelectedDay(null)} className="btn btn-ghost btn-sm" style={{ minHeight: 44 }}>{locale === "es" ? "Ver todo el mes" : locale === "pt" ? "Ver o mês todo" : "Show all dates"}</button> : null}
+          </div>
+          {selectedSessions.length ? <div className="events-month-cards">{selectedSessions.map((session) => sessionCard(session, true))}</div>
+            : !loading ? <p style={{ color: "#6b7280", fontSize: 14 }}>{selectedDay === null ? noSessionsLabel : selectDayLabel}</p> : null}
+        </div>
+
+        <div id="events-calendar-panel" className="events-calendar-column" data-mobile-hidden={mobileView !== "calendar"}>
           <div style={shellStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "16px clamp(12px, 4vw, 24px)", borderBottom: "1px solid #e5e0d8" }}>
               <button type="button" onClick={() => changeMonth(-1)} aria-label={l.calendarPrev ?? "Previous month"} style={{ ...buttonStyle, width: 48, minHeight: 48, fontSize: 22 }}>‹</button>
@@ -251,7 +263,6 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
                       onClick={() => {
                         if (!active) return;
                         setSelectedDay(selected ? null : day);
-                        setMobileView("list");
                       }}
                       onFocus={() => active && setHoveredDay(day)}
                       onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setHoveredDay(null); }}
@@ -269,15 +280,6 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
             </div>
             {loading ? <div role="status" style={{ textAlign: "center", padding: 14, color: "#6b7280", fontSize: 13 }}>Loading events…</div> : null}
           </div>
-        </div>
-
-        <div id="events-month-panel" className="events-month-column" data-active={mobileView === "list"}>
-          <div style={{ alignItems: "baseline", display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
-            <h2 className="events-month-title">{selectedDay === null ? monthSessionsLabel : new Date(Date.UTC(year, month, selectedDay, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}</h2>
-            {selectedDay !== null ? <button type="button" onClick={() => setSelectedDay(null)} className="btn btn-ghost btn-sm" style={{ minHeight: 44 }}>{locale === "es" ? "Ver todo el mes" : locale === "pt" ? "Ver o mês todo" : "Show all dates"}</button> : null}
-          </div>
-          {selectedSessions.length ? <div className="events-month-cards">{selectedSessions.map((session) => sessionCard(session, true))}</div>
-            : !loading ? <p style={{ color: "#6b7280", fontSize: 14 }}>{selectedDay === null ? noSessionsLabel : selectDayLabel}</p> : null}
         </div>
       </div>
     </section>
