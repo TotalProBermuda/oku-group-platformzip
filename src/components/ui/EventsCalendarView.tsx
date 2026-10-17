@@ -207,15 +207,17 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
     <section aria-label={locale === "es" ? "Calendario de eventos" : locale === "pt" ? "Calendário de eventos" : "Events calendar"}>
       <style jsx global>{`
         .events-calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); grid-template-areas: "calendar month"; gap: 24px; align-items: start; }
-        .events-calendar-column { grid-area: calendar; min-width: 0; }
-        .events-month-column { grid-area: month; min-width: 0; background: #fff; border: 1px solid #e5e0d8; border-radius: 16px; padding: 20px; }
+        .events-calendar-column { grid-area: calendar; min-width: 0; position: sticky; top: 88px; align-self: start; }
+        .events-month-column { grid-area: month; min-width: 0; background: #fff; border: 1px solid #e5e0d8; border-radius: 16px; padding: 20px; max-height: calc(100vh - 104px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
         .events-month-title { color: #1a1614; font-family: var(--font-heading); font-size: 24px; font-weight: 400; margin: 0 0 16px; }
         .events-month-cards { display: grid; gap: 12px; }
         .events-session-card { min-width: 0; }
         .events-mobile-tabs { display: none; }
         @media (max-width: 767px) {
           .events-mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-          .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "month" "calendar"; gap: 16px; }
+           .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "month" "calendar"; gap: 16px; }
+          .events-calendar-column { position: static; top: auto; }
+          .events-month-column { max-height: none; overflow: visible; overscroll-behavior: auto; scrollbar-gutter: auto; }
           .events-calendar-column[data-mobile-hidden="true"], .events-month-column[data-mobile-hidden="true"] { display: none; }
           .events-month-column { padding: 16px; }
           .events-month-title { font-size: 22px; }
