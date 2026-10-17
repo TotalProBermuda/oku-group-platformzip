@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, type CSSProperties } from "react";
+import { useState, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import EventArtwork from "@/components/ui/EventArtwork";
 import { sessionArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
@@ -88,6 +88,8 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const [month, setMonth] = useState(() => Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, month: "numeric" }).format(today)) - 1);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ top: number; left: number } | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
@@ -125,6 +127,33 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
     }
     return grouped;
   }, [sessions]);
+
+  useEffect(() => {
+    if (hoveredDay === null) { setHoverPosition(null); return; }
+    const placePreview = () => {
+      const anchor = document.querySelector<HTMLElement>(`[data-event-day="${hoveredDay}"]`);
+      const preview = previewRef.current;
+      if (!anchor || !preview) return;
+      const anchorRect = anchor.getBoundingClientRect();
+      const previewRect = preview.getBoundingClientRect();
+      const gap = 8;
+      const inset = 8;
+      const maxLeft = Math.max(inset, window.innerWidth - previewRect.width - inset);
+      const left = Math.min(Math.max(inset, anchorRect.left), maxLeft);
+      const below = anchorRect.bottom + gap;
+      const top = below + previewRect.height <= window.innerHeight - inset
+        ? below
+        : Math.max(inset, anchorRect.top - previewRect.height - gap);
+      setHoverPosition({ top, left });
+    };
+    placePreview();
+    window.addEventListener("resize", placePreview);
+    window.addEventListener("scroll", placePreview, true);
+    return () => {
+      window.removeEventListener("resize", placePreview);
+      window.removeEventListener("scroll", placePreview, true);
+    };
+  }, [hoveredDay, sessionsByDay]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDay = new Date(year, month, 1).getDay();
@@ -185,13 +214,13 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
         scrollMarginTop: 96,
       }}>
         {artwork.length ? (
-          <div style={{ aspectRatio: "4 / 5", width: "100%", background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }}><EventArtwork candidates={artwork} alt={`${title} artwork`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+          <Link href={view} aria-label={`${viewEventLabel}: ${title}${sessionTitle ? `, ${sessionTitle}` : ""}`} style={{ aspectRatio: "4 / 5", width: "100%", background: "linear-gradient(135deg,#f4eee8,#e8d9d0)", display: "block" }}><EventArtwork candidates={artwork} alt={`${title}${sessionTitle ? ` — ${sessionTitle}` : ""} artwork`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></Link>
         ) : <div aria-hidden="true" style={{ aspectRatio: "4 / 5", background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }} />}
         <div style={{ minWidth: 0, padding: compact ? 12 : 16, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
           <div style={{ color: "#1a1614", fontSize: compact ? 15 : 17, fontWeight: 650, lineHeight: 1.3 }}>{title}</div>
           {sessionTitle ? <div style={{ color: "#7c7168", fontSize: 14, fontWeight: 600 }}>{sessionTitle}</div> : null}
           {session.subtitle ? <div style={{ color: "#6b7280", fontSize: 13 }}>{session.subtitle}</div> : null}
-          {coHosts.length ? <div style={{ color: "#7c7168", fontSize: 12 }}><strong>Co-hosted by:</strong> {[...new Set(coHosts.map((host) => host.entity.displayName))].join(", ")}</div> : null}
+          {coHosts.length ? <div style={{ color: "#7c7168", fontSize: 12 }}><strong>{locale === "es" ? "Con la coorganización de:" : locale === "pt" ? "Coorganizado por:" : "Co-hosted by:"}</strong> {[...new Set(coHosts.map((host) => host.entity.displayName))].join(", ")}</div> : null}
           <div style={{ color: "#6b7280", fontSize: 13 }}>{formatDate(session.startsAt)} · {formatTime(session.startsAt)}</div>
           {session.series.venue ? <div style={{ color: "#8b8179", fontSize: 12 }}>{session.series.venue}</div> : null}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
@@ -264,7 +293,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
                 const selected = selectedDay === day;
                 const preview = hoveredDay === day ? daySessions.slice(0, 3) : [];
                 return (
-                  <div key={day} style={{ minWidth: 0, position: "relative", zIndex: hoveredDay === day ? 3 : 0 }}
+                  <div key={day} data-event-day={day} style={{ minWidth: 0, position: "relative", zIndex: hoveredDay === day ? 3 : 0 }}
                     onPointerEnter={(event) => { if (event.pointerType === "mouse" && active) setHoveredDay(day); }}
                     onPointerLeave={(event) => { if (event.pointerType === "mouse") setHoveredDay((current) => current === day ? null : current); }}>
                     <button type="button" disabled={!active} aria-pressed={selected}
@@ -279,7 +308,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
                       <span style={{ alignItems: "center", background: isToday ? "#c41e3a" : "transparent", borderRadius: 99, display: "inline-flex", height: 26, justifyContent: "center", width: 26, fontSize: 13, fontWeight: isToday || selected ? 700 : 500 }}>{day}</span>
                       {active ? <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 99, background: "#c41e3a" }} /> : <span aria-hidden="true" style={{ height: 6 }} />}
                     </button>
-                    {preview.length > 0 ? <div role="group" aria-label={`Event previews for ${day}`} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, boxShadow: "0 12px 32px rgba(26,22,20,.18)", left: index % 7 < 4 ? 0 : undefined, padding: 8, position: "absolute", right: index % 7 < 4 ? undefined : 0, top: 58, width: "min(360px, calc(100vw - 48px))", zIndex: 4, display: "grid", gap: 8 }}>
+                    {preview.length > 0 ? <div ref={previewRef} role="group" aria-label={`Event previews for ${day}`} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, boxShadow: "0 12px 32px rgba(26,22,20,.18)", left: hoverPosition?.left ?? 8, padding: 8, position: "fixed", top: hoverPosition?.top ?? 8, visibility: hoverPosition ? "visible" : "hidden", width: "min(360px, calc(100vw - 16px))", maxHeight: "calc(100vh - 16px)", overflowY: "auto", zIndex: 40, display: "grid", gap: 8 }}>
                       {preview.map((session) => sessionCard(session, true))}
                       {daySessions.length > preview.length ? <p style={{ color: "#6b7280", fontSize: 12, margin: "8px 4px 2px" }}>+{daySessions.length - preview.length} more · select date to view all</p> : null}
                     </div> : null}

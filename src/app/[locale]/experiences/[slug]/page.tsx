@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getTranslations } from "@/i18n/getTranslations";
 import { isValidLocale } from "@/i18n/config";
 import { localePath } from "@/i18n/utils";
-import { getSeriesContent, getTicketTypeName } from "@/data/seriesTranslations";
+import { getSeriesContent } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
 import EventPageSponsorBlock from "@/components/sponsors/EventPageSponsorBlock";
 import EventMenusSection from "@/components/experiences/EventMenusSection";
@@ -15,7 +15,8 @@ import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
 import type { Metadata } from "next";
 import EventArtwork from "@/components/ui/EventArtwork";
 import ExpandableText from "@/components/ui/ExpandableText";
-import { seriesArtworkCandidates } from "@/lib/eventArtwork";
+import { seriesArtworkCandidates, sessionArtworkCandidates } from "@/lib/eventArtwork";
+import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
@@ -42,16 +43,18 @@ const venueGrad: Record<string, string> = {
 
 interface Props { params: Promise<{ locale: string; slug: string }>; searchParams?: Promise<{ sessionId?: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { locale, slug } = await params;
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({ sessionId: undefined })]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
   const series = await getSeries(slug, safeLocale);
   if (!series) return {};
 
   const content = getSeriesContent(series.slug, safeLocale);
-  const title = content?.title ?? series.title;
-  const description = content?.description ?? series.description ?? "";
-  const imageUrl = seriesArtworkCandidates(series, safeLocale)[0];
+  const focusedSession = series.sessions?.find((session: any) => session.id === query.sessionId);
+  const seriesTitle = series.title ?? content?.title ?? slug;
+  const title = focusedSession?.title ? `${seriesTitle} — ${focusedSession.title}` : seriesTitle;
+  const description = focusedSession?.subtitle || focusedSession?.description || series.description || content?.description || "";
+  const imageUrl = (focusedSession ? sessionArtworkCandidates(focusedSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale))[0];
   const canonicalUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
 
   return {
@@ -61,7 +64,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description,
       url: canonicalUrl,
-      images: imageUrl ? [{ url: imageUrl, width: 1200, height: 630, alt: title }] : [],
+      images: imageUrl ? [{ url: imageUrl, width: focusedSession ? 1080 : 1200, height: focusedSession ? 1350 : 630, alt: title }] : [],
       type: "website",
     },
     twitter: {
@@ -74,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ExperienceDetailPage({ params, searchParams }: Props) {
-  const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({})]);
+  const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({ sessionId: undefined })]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
@@ -105,33 +108,50 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
   const focusSessionId = sessions.some((event: any) => event.id === query.sessionId) ? query.sessionId ?? null : null;
+  const focusSession = focusSessionId ? sessions.find((event: any) => event.id === focusSessionId) : null;
+  const heroArtwork = focusSession ? sessionArtworkCandidates(focusSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
+  const displayedTicketTypes = focusSession
+    ? ticketTypes.filter((ticket: any) => sessionProductEnabled(focusSession, series, ticket.id))
+    : ticketTypes;
+  const pricingSessions = focusSession ? [focusSession] : sessions;
   const isCountdownActive = series.showCountdown && series.earlyReleaseAt && new Date() < new Date(series.earlyReleaseAt);
 
   const content = getSeriesContent(series.slug, safeLocale);
-  const title = content?.title ?? series.title;
-  const description = content?.description ?? series.description;
+  const title = series.title ?? content?.title ?? slug;
+  const description = series.description ?? content?.description;
+  const displayDescription = focusSession?.description || description;
 
   const pageUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
   const locationStr = [series.venue, series.venueAddress, series.city].filter(Boolean).join(", ");
 
   return (
     <div>
+      <style jsx global>{`
+        @media (max-width: 767px) {
+          .experience-focus-poster { position: relative !important; inset: auto !important; width: min(240px, 66vw) !important; height: 300px !important; margin: 0 auto 20px; }
+          .experience-focus-copy { max-width: 100% !important; }
+          .experience-hero { padding-top: 32px !important; padding-bottom: 36px !important; }
+        }
+      `}</style>
       {/* Hero */}
-      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: seriesArtworkCandidates(series, safeLocale).length ? 360 : undefined }}>
-        {seriesArtworkCandidates(series, safeLocale).length > 0 && (
-          <EventArtwork candidates={seriesArtworkCandidates(series, safeLocale)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
+      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: heroArtwork.length ? 420 : undefined }}>
+        {heroArtwork.length > 0 && !focusSession && (
+          <EventArtwork candidates={heroArtwork} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
         )}
-        <div style={{ position: "absolute", inset: 0, background: seriesArtworkCandidates(series, safeLocale).length ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.72) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: heroArtwork.length ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.78) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
         <div className="page-container" style={{ position: "relative", zIndex: 1 }}>
+          {focusSession && heroArtwork.length > 0 ? <div className="experience-focus-poster" style={{ position: "absolute", right: 24, top: 0, bottom: 0, width: "min(300px, 28vw)", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 16px 28px rgba(0,0,0,.35))" }}><EventArtwork candidates={heroArtwork} alt={`${title} — ${focusSession.title ?? "event"}`} style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div> : null}
+          <div className="experience-focus-copy" style={{ maxWidth: focusSession && heroArtwork.length ? "calc(100% - min(340px, 30vw))" : undefined }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
             {series.venue && <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>{series.venue}</span>}
             {series.category && <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#f9a8d4", textTransform: "uppercase" }}>{series.category}</span>}
           </div>
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(32px, 5vw, 60px)", fontWeight: 400, color: "white", letterSpacing: "-0.02em", margin: "0 0 12px", lineHeight: 1.1 }}>{title}</h1>
-          {series.subtitle && <p style={{ fontSize: 18, color: "rgba(255,255,255,0.7)", margin: "0 0 24px", maxWidth: 560 }}>{content?.subtitle ?? series.subtitle}</p>}
+          {focusSession?.title ? <p style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(23px, 3vw, 34px)", color: "white", margin: "0 0 10px", lineHeight: 1.2 }}>{safeLocale === "es" ? "Presenta" : safeLocale === "pt" ? "Apresenta" : "Presents"} {focusSession.title}</p> : null}
+          {(focusSession?.subtitle || series.subtitle || content?.subtitle) && <p style={{ fontSize: 18, color: "rgba(255,255,255,0.78)", margin: "0 0 24px", maxWidth: 720 }}>{focusSession?.subtitle || series.subtitle || content?.subtitle}</p>}
           <div className="experience-hero-meta" style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 20 }}>
             {series.city && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>📍 {series.city}{series.venueAddress ? ` — ${series.venueAddress}` : ""}</span>}
-            {firstSession && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>📅 {fmtDate(firstSession.startsAt)}</span>}
+            {(focusSession ?? firstSession) && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.78)" }}>📅 {fmtDate((focusSession ?? firstSession).startsAt)}{focusSession ? ` · ${fmtTime(focusSession.startsAt)}–${fmtTime(focusSession.endsAt)}` : ""}</span>}
           </div>
           {/* Social sharing in hero */}
           <ShareButtons
@@ -156,6 +176,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
               })}
             </nav>
           ) : null}
+          </div>
         </div>
       </div>
 
@@ -176,26 +197,28 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
             <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
               {c.aboutThisExperience}
             </h2>
-            {description ? <ExpandableText text={description} locale={safeLocale} maxLines={3} /> : null}
+            {displayDescription ? <ExpandableText text={displayDescription} locale={safeLocale} maxLines={3} /> : null}
           </section>
 
           {/* Sessions */}
           {sessions.length > 0 && (
             <section style={{ marginBottom: 48 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
-                {c.sessionsHeading}
+                {focusSession ? (safeLocale === "es" ? "Detalles del evento" : safeLocale === "pt" ? "Detalhes do evento" : "Event details") : c.sessionsHeading}
               </h2>
               <div id="sessions">
               <ExperienceSessionsView
-                sessions={sessions}
-                ticketTypes={ticketTypes}
+                sessions={focusSession ? [focusSession] : sessions}
+                ticketTypes={displayedTicketTypes}
                 seriesTitle={title}
                 seriesDescription={description ?? ""}
                 seriesImage={series.heroImageUrl}
                 seriesArtwork={series}
+                seriesSessionDefaults={series.sessionDefaults}
                 seriesHosts={series.seriesHosts ?? []}
                 focusSessionId={focusSessionId}
                 checkoutHrefBase={localePath(safeLocale, `/checkout/${slug}`)}
+                eventHrefBase={localePath(safeLocale, `/experiences/${slug}`)}
                 venue={locationStr}
                 locale={safeLocale}
                 labels={{
@@ -203,6 +226,8 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
                   calAppleIcal: c.calAppleIcal, calOutlook: c.calOutlook, calYahoo: c.calYahoo,
                   selectTickets: c.selectTickets, sessionView: "Session display options", listView: "List", calendarView: "Calendar",
                   from: "From",
+                  viewEvent: c.viewEventLink ?? (safeLocale === "es" ? "Ver evento" : safeLocale === "pt" ? "Ver evento" : "View event"),
+                  coHostedBy: safeLocale === "es" ? "En colaboración con:" : safeLocale === "pt" ? "Coorganizado por:" : "Co-hosted by:",
                   previousMonth: "Previous month", nextMonth: "Next month", events: "events", chooseDate: "Choose a date with an event to see its details.", noSessions: c.noSessions ?? "No upcoming sessions.",
                 }}
               />
@@ -302,17 +327,17 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
                 {availability.label}
               </div>
             )}
-            {ticketTypes.length === 0 ? (
+            {displayedTicketTypes.length === 0 ? (
               <p style={{ fontSize: 14, color: "#9ca3af" }}>
                 {c.noTicketsAvailable}
               </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
-                {ticketTypes.map((t: any) => (
+                {displayedTicketTypes.map((t: any) => (
                   <div key={t.id} className="experience-ticket-type" style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{getTicketTypeName(t.name, safeLocale)}</div>
-                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{sessions.some((eventSession: any) => eventSession.ticketPrices?.some((price: any) => price.ticketTypeId === t.id && price.priceCents !== t.priceCents)) ? `${c.from ?? "From"} ` : ""}{fmt(sessions.reduce((lowest: number, eventSession: any) => {
+                      <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{t.name}</div>
+                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{pricingSessions.some((eventSession: any) => eventSession.ticketPrices?.some((price: any) => price.ticketTypeId === t.id && price.priceCents !== t.priceCents)) ? `${c.from ?? "From"} ` : ""}{fmt(pricingSessions.reduce((lowest: number, eventSession: any) => {
                         const override = eventSession.ticketPrices?.find((price: { ticketTypeId: string; priceCents: number }) => price.ticketTypeId === t.id)?.priceCents;
                         return Math.min(lowest, override ?? t.priceCents);
                       }, t.priceCents))}</div>
@@ -349,9 +374,13 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
         </div>
       </div>
 
-      {/* Sponsor placement block */}
+      {/* Resolve the correct sponsor scope: a selected date may have its own
+          sponsors (and may inherit series sponsors) independently. */}
       {series?.id && (
-        <EventPageSponsorBlock scopeType="SERIES" scopeId={series.id} />
+        <EventPageSponsorBlock
+          scopeType={focusSession ? "EVENT" : "SERIES"}
+          scopeId={focusSession?.id ?? series.id}
+        />
       )}
     </div>
   );
