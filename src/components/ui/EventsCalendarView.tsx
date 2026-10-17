@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import Link from "next/link";
 import EventArtwork from "@/components/ui/EventArtwork";
-import { seriesArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
+import { sessionArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
 
 interface SessionRow extends SessionArtwork {
   id: string;
@@ -175,7 +175,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   function sessionCard(session: SessionRow, compact = false) {
     const title = session.series.title;
     const sessionTitle = session.title ?? null;
-    const artwork = seriesArtworkCandidates(session.series, locale);
+    const artwork = sessionArtworkCandidates(session, locale, session.series);
     const coHosts = [...(session.series.seriesHosts ?? []), ...(session.eventHosts ?? [])].filter((host) => host.role === "CO_HOST");
     const { view, buy } = eventLinks(session);
     return (
