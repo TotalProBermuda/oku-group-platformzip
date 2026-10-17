@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSafeArtworkUrl, seriesArtworkCandidates, sessionArtworkCandidates, sessionMobileArtworkCandidates } from "@/lib/eventArtwork";
+import { isSafeArtworkUrl, seriesArtworkCandidates, sessionArtworkCandidates, sessionMobileArtworkCandidates, checkoutArtworkCandidates } from "@/lib/eventArtwork";
 import { parseArtworkEdit, artworkUploadSchema } from "@/server/series/artworkInput";
 import { createSessionInputSchema, updateSessionContentSchema } from "@/server/series/createSessionInput";
 import { createSeriesInputSchema } from "@/server/series/createSeriesInput";
@@ -18,6 +18,11 @@ describe("locale artwork selection", () => {
     expect(sessionArtworkCandidates({ flyerImageUrl: "/legacy.jpg" }, "pt")).toEqual(["/legacy.jpg"]);
     expect(seriesArtworkCandidates({}, "pt")).toEqual([]);
     expect(seriesArtworkCandidates(series, "fr")[0]).toBe("/en.jpg");
+  });
+  it("keeps series branding in checkout when a session flyer is explicitly cleared or unavailable", () => {
+    expect(checkoutArtworkCandidates({ ...session, fieldModes: { "artwork.es": { mode: "clear" } } }, "es", series)).toEqual(["/es.jpg", "/en.jpg", "/legacy.jpg"]);
+    expect(checkoutArtworkCandidates(null, "es", series)).toEqual(["/es.jpg", "/en.jpg", "/legacy.jpg"]);
+    expect(checkoutArtworkCandidates(session, "es", series)[0]).toBe("/session-es.jpg");
   });
   it("retains ordered load-failure candidates, deduplicating and rejecting unsafe URLs", () => {
     expect(sessionArtworkCandidates(session, "pt", series)).toEqual([
