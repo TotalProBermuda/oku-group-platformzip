@@ -224,11 +224,12 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
                 labels={{
                   left: c.left, addToCalendar: c.addToCalendar, calGoogleCalendar: c.calGoogleCalendar,
                   calAppleIcal: c.calAppleIcal, calOutlook: c.calOutlook, calYahoo: c.calYahoo,
-                  selectTickets: c.selectTickets, sessionView: "Session display options", listView: "List", calendarView: "Calendar",
-                  from: "From",
+                  selectTickets: c.selectTickets, sessionView: c.sessionViewOptions, listView: c.sessionListView, calendarView: c.sessionCalendarView,
+                  from: c.sessionFromPrice,
                   viewEvent: c.viewEventLink ?? (safeLocale === "es" ? "Ver evento" : safeLocale === "pt" ? "Ver evento" : "View event"),
-                  coHostedBy: safeLocale === "es" ? "En colaboración con:" : safeLocale === "pt" ? "Coorganizado por:" : "Co-hosted by:",
-                  previousMonth: "Previous month", nextMonth: "Next month", events: "events", chooseDate: "Choose a date with an event to see its details.", noSessions: c.noSessions ?? "No upcoming sessions.",
+                  coHostedBy: c.sessionCoHostedBy,
+                  previousMonth: c.calendarPrev, nextMonth: c.calendarNext, events: c.sessionEventCount,
+                  chooseDate: c.calendarSelectDay, noSessions: c.noSessionsYet,
                 }}
               />
               </div>
