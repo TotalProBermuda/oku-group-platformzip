@@ -24,10 +24,14 @@ export async function GET(req: NextRequest) {
     orderBy: [{ isFeatured: "desc" }, { startsAt: "asc" }],
     include: {
       ticketTypes: { where: { ticketStatus: "ACTIVE" }, orderBy: { displayOrder: "asc" } },
+      seriesHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
       sessions: {
         where: { status: "SCHEDULED", OR: [{ startsAt: { gt: now } }, { allowLateSales: true }], endsAt: { gt: now } },
         orderBy: { startsAt: "asc" },
-        include: { ticketPrices: { select: { ticketTypeId: true, priceCents: true } } },
+        include: {
+          ticketPrices: { select: { ticketTypeId: true, priceCents: true } },
+          eventHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
+        },
         ...(slug ? {} : { take: 3 }),
       },
       experienceInfluencer: {
