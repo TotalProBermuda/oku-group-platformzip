@@ -8,6 +8,7 @@ import {
   myReferralsLookbackStart,
 } from "@/server/referrals/myReferralsSource";
 import { ensureStreetsideReferralIdentity } from "@/server/referrals/streetsideReferralService";
+import { hostUpcomingReservationWhere } from "@/server/host/upcomingReservations";
 
 export async function GET() {
   try {
@@ -186,6 +187,16 @@ export async function GET() {
             reservationDate: { gte: windowStart, lt: windowEnd },
             status: { notIn: ["CANCELLED", "COMPLETED"] },
           },
+          include: reservationInclude,
+          orderBy: { reservationDate: "asc" as const },
+        })
+      : [];
+
+    // Future reservations are available from the dashboard without changing
+    // the current-day queue or its operational counts.
+    const upcomingReservations = (isRestaurantHost && venue)
+      ? await prisma.reservation.findMany({
+          where: hostUpcomingReservationWhere(venue.id, windowEnd),
           include: reservationInclude,
           orderBy: { reservationDate: "asc" as const },
         })
@@ -442,6 +453,7 @@ export async function GET() {
         streetsideReferralCode,
         provisionFailed,
         todayReservations: actionableReservations,
+        upcomingReservations,
         // Closed within the last 7 days at this venue. Powers the host
         // dashboard's Closed tab + stats chip. Empty for non-restaurant
         // hosts (their Closed view is currently scoped to mySubmissions).

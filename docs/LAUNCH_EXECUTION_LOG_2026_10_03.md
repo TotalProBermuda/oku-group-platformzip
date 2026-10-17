@@ -1,47 +1,39 @@
 # Launch execution log — 3 October 2026
 
-## 4 October: refund origins and policy clarification
+## PR #115: durable refund coordination prototype
 
-- Live /my/orders verified: order history, View Tickets and View Experience;
-  no customer refund-request button. Left this page open for owner inspection.
-- Live /admin/payments?tab=refunds loads Refunds & Voids and Open order controls;
-  no refund/void activity reported. No action submitted. Source admin/orders
-  and OrderDrawer expose Refund/Full Refund for PAID orders; the API requires
-  admin:payments:refund. The payment-intent refund API allows SUPERADMIN and
-  ADMIN_FINANCE. These are administrative operations, not customer requests.
-- Owner clarified tickets are non-refundable. Do not introduce a customer ticket
-  refund request flow. Exceptional administrative refunds require a separately
-  agreed policy; no policy enforcement or financial settings changed in this pass.
-- Patron checkout-session source records PENDING_APPROVAL, not automated card
-  checkout. No implemented membership refund window found in reviewed routes.
-  Owner must specify duration, start date basis and benefit-use restrictions.
-- Existing isolated coordinator/admission rerun: 31 tests passed in two files.
-  Added a ten-caller duplicate request/claim test; results recorded below.
-- Final rerun: 32 tests passed in two files. Ten simultaneous same-key requests
-  produced one new operation and nine replays; ten claims produced one winner.
-  git diff --check passed. This remains a draft, unintegrated production control.
-- Shared Vitest files were missing; used separate temporary test runtime rather
-  than modifying application dependencies. Attempted local PostgreSQL install
-  for multi-connection testing, stopped because Homebrew required unsupported
-  source builds. Homebrew updated its runtime and installed icu4c/ca-certificates
-  before cancellation. No PostgreSQL service started. Multi-connection gate stays
-  open; embedded PGlite serializes one connection and cannot certify that gate.
+- Added an isolated SQL coordinator prototype for payment-scoped reservations,
+  single submission claims, UNKNOWN-result balance retention and evidence-bound
+  terminal reconciliation. It is not imported by production routes.
+- The proposed tables exist only in a test fixture; no Prisma migration or
+  production database change is included.
+- The PR reports 331 tests across 44 files, including eight isolated PGlite tests.
+  PGlite uses one connection and cannot establish multi-worker PostgreSQL locking
+  or serialization-retry safety. The prototype is not an active refund fix.
+- Remaining gates include reviewed production schema/migration, trusted provider
+  reconciliation, verified enrollment of historical captures/refunds, durable
+  worker recovery, exactly-once bundle entitlement/capacity/ledger effects,
+  owner-approved policy, and a separately approved controlled live test.
+- No payment, refund, payout, database or production setting was changed for this
+  prototype or while resolving PR conflicts.
 
-## Release and durable refund follow-up
+## 4 October: membership policy calculation implementation
 
-- Source candidate from latest user pull: 763e65b8. No newer welcome-sender work
-  included. Replit showed reconnect failure and blank shell, then loading spinner
-  after one reload. Deployment log visible before reload was 8c0a8937, successful
-  October 2 at 03:21 UTC. No current source-to-deployment or rollback verification.
-  No build/publish command sent to the disconnected shell; owner asked to reopen it.
-- Added review-gated SQL refund persistence and eight isolated PostgreSQL tests,
-  including restart with UNKNOWN balance preserved. 45 focused tests pass.
-  PGlite is single-connection, so multi-connection concurrency remains unverified.
-- No real database, migration, gateway, refund, payout, invitation or financial
-  configuration touched. Partial bundle restoration and owner decisions still open.
-- Workstream #1 remains blocked, #2 advances but is not complete. #3–#10 unchanged.
-- Regression after reconciling this branch with main 763e65b8: 331 tests passed
-  across 44 files, including the opt-in database suite. git diff --check passed.
+- Owner approved implementing the recommended annual 30-day refund structure and
+  described membership value as private dinners, specialised products, keynotes,
+  entertainment and year-round discounts. No event price/deduction value invented.
+- Implemented a quote-only engine for explicitly accepted new annual USD terms.
+  Actual paid principal is prorated; included access and separately purchased
+  tickets are not double-deducted. Only disclosed redeemed extra values count.
+  Billing/service exceptions, renewals, legacy terms, unknown payment/redemption
+  evidence and existing refund operations require review.
+- 27 focused tests pass. No live imports, migration, access changes, automatic
+  refund, invitations, payments or production settings. Customer/admin request
+  screens and persistent source records remain unimplemented, explicitly gated.
+- Existing Membership lacks verified payment/policy/redemption/request records;
+  manual Patron enrollment does not prove a payment was captured. The exact new
+  schema and production migration require separate review before route integration.
+- Ten-item tracker: #2 advanced; #1 and #3–#10 not closed by this work.
 
 ## Batch A: release baseline (partial)
 
@@ -164,3 +156,31 @@ local isolated fixture: fabricated fragment token survives mount, simulated auth
 failure shows recovery alert and enabled button. At 320px document width is 320px.
 No real auth request, email or database was used. 24-hour invitation remains open:
 REFERRER_INVITE presently signs in directly and cannot safely be extended unchanged.
+# 4 October — Superadmin membership control implementation
+
+Follow-up release validation: 353 tests / 45 files passed; isolated Next production
+build exits 0; mobile actual-component checks repeated successfully with locked
+React 18. Six server access-boundary tests now exercise the real guard with mocked
+sessions and no database. Global type-check still fails: candidate and unchanged
+main each have 267 diagnostics with identical location/code keys; no added errors.
+PR116 foundation is eligible for review/merge, not full-feature activation. No
+production deployment or data changes. Recorded rollback and Replit commands in
+MEMBERSHIP_REFUND_POLICY_IMPLEMENTATION.md. All ten workstreams remain open.
+
+PR116 remains review-only. Added a server-guarded draft editor, Memberships link,
+typed rule contracts and a conservative synthetic commission decision preview.
+No server persistence, live commission enforcement, POS configuration or financial
+actions are implied. The owner scope remains undecided rather than guessed.
+
+Verification: 47 focused unit tests passed; component/CSS bundled successfully.
+Isolated Chrome actual-component checks passed 320/390/1024px: no overflow/errors,
+scope/identity/split decision changes, extra deduction inputs and draft JSON download.
+Screenshots inspected; long dropdown options shortened. Local UI runtime dependencies
+installed only under /private/tmp/oku-refund-test-runtime; application lockfile unchanged.
+Shared old test runtime had a missing esbuild binary, so it was not repaired or reused.
+
+Next sequence: additive audited persistence/snapshot proposal and POS payload review;
+then every commission entry point and replay tests. In parallelizable checklist work,
+prioritize checkout failure/retry matrix and role navigation tests over upsells.
+No whole workstream newly completed. Release SHA/rollback, durable live refund
+integration, invitation delivery, actual-device checks and bank specification remain open.

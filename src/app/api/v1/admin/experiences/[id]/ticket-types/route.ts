@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -59,7 +61,8 @@ export async function POST(
     return NextResponse.json({ error: "name and priceCents are required" }, { status: 400 });
   }
 
-  const ticketType = await prisma.ticketType.create({
+  const ticketType = await prisma.$transaction(async tx => {
+  const created = await tx.ticketType.create({
     data: {
       seriesId: id,
       name,
@@ -80,5 +83,8 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ ticketType }, { status: 201 });
+  await syncTranslations(tx, "TicketType", created.id, { name: created.name, description: created.description });
+  return created;
+  });
+  return finishEventSave(id, { ticketType }, req, 201);
 }

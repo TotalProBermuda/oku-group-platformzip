@@ -941,7 +941,7 @@ export default function PaymentsPage() {
             </Card>
           )}
           <Card title="Auth & URLs">
-            <Row label="NEXTAUTH_SECRET">
+            <Row label="NEXTAUTH_SECRET / AUTH_SECRET">
               <StatusPill ok={data.auth.nextAuthSecretConfigured} />
             </Row>
             <Row label="NEXTAUTH_URL">

@@ -5,6 +5,7 @@ vi.mock("@/server/auth/session", () => ({ requireSession: sessionMock.requireSes
 
 const dbMock = vi.hoisted(() => {
   const tx = {
+    contentTranslation: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
     series: { create: vi.fn() },
     auditLog: { create: vi.fn() },
   };
@@ -53,6 +54,15 @@ beforeEach(() => {
 });
 
 describe("POST /api/v1/admin/series", () => {
+  it("denies localized artwork to other admins before touching storage", async () => {
+    expect((await POST(request({ ...validBody, heroImageUrlEs: "/es.jpg" }))).status).toBe(403);
+    expect(dbMock.tx.series.create).not.toHaveBeenCalled();
+  });
+  it("stores localized series artwork for superadmins", async () => {
+    sessionMock.requireSession.mockResolvedValue({ userId: "admin-1", roles: ["SUPERADMIN"] });
+    expect((await POST(request({ ...validBody, heroImageUrlPt: "/pt.jpg" }))).status).toBe(201);
+    expect(dbMock.tx.series.create).toHaveBeenCalledWith({ data: expect.objectContaining({ heroImageUrlPt: "/pt.jpg" }) });
+  });
   it("creates a draft with an operational venue and records the action", async () => {
     const response = await POST(request(validBody));
     expect(response.status).toBe(201);

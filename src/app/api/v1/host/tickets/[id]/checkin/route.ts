@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
+import { claimAdmission } from "@/server/checkin/claimAdmission";
 
 // POST /api/v1/host/tickets/[id]/checkin
 // Flips a Ticket from ISSUED → CHECKED_IN, stamps checkedInAt + the
@@ -25,7 +26,7 @@ export async function POST(
 
     const ticket = await prisma.ticket.findUnique({
       where: { id },
-      select: { id: true, ticketStatus: true, checkedInAt: true, checkedInById: true, orderId: true, order: { select: { status: true } } },
+      select: { id: true, sessionId: true, ticketStatus: true, checkedInAt: true, checkedInById: true, orderId: true, order: { select: { status: true } } },
     });
     if (!ticket) {
       return NextResponse.json({ ok: false, error: "Ticket not found" }, { status: 404 });
@@ -51,10 +52,7 @@ export async function POST(
     }
 
     const now = new Date();
-    const claim = await prisma.ticket.updateMany({
-      where: { id, ticketStatus: "ISSUED", order: { status: { notIn: ["CANCELLED", "REFUNDED", "FAILED"] } } },
-      data: { ticketStatus: "CHECKED_IN", checkedInAt: now, checkedInById: userId },
-    });
+    const claim = await claimAdmission({ ticketId: id, sessionId: ticket.sessionId, actorId: userId, at: now });
     if (claim.count !== 1) return NextResponse.json({ ok: false, error: "Ticket changed during check-in. Refresh and try again." }, { status: 409 });
     const updated = { id: ticket.id, orderId: ticket.orderId, checkedInAt: now };
 

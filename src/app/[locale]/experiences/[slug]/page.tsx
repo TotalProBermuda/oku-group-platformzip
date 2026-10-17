@@ -5,19 +5,23 @@ import { authOptions } from "@/lib/auth";
 import { getTranslations } from "@/i18n/getTranslations";
 import { isValidLocale } from "@/i18n/config";
 import { localePath } from "@/i18n/utils";
-import { getSeriesContent, getSessionTitle, getTicketTypeName } from "@/data/seriesTranslations";
+import { getSeriesContent, getTicketTypeName } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
 import EventPageSponsorBlock from "@/components/sponsors/EventPageSponsorBlock";
 import EventMenusSection from "@/components/experiences/EventMenusSection";
-import AddToCalendar from "@/components/ui/AddToCalendar";
 import ShareButtons from "@/components/ui/ShareButtons";
+import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsView";
+import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
 import type { Metadata } from "next";
+import EventArtwork from "@/components/ui/EventArtwork";
+import ExpandableText from "@/components/ui/ExpandableText";
+import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
 
-async function getSeries(slug: string) {
-  const res = await fetch(`${BASE}/api/v1/experiences?slug=${slug}`, { cache: "no-store" });
+async function getSeries(slug: string, locale = "en") {
+  const res = await fetch(`${BASE}/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${encodeURIComponent(locale)}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
   return data.series?.[0] ?? null;
@@ -36,18 +40,18 @@ const venueGrad: Record<string, string> = {
   CATCH:"linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%)",
 };
 
-interface Props { params: Promise<{ locale: string; slug: string }> }
+interface Props { params: Promise<{ locale: string; slug: string }>; searchParams?: Promise<{ sessionId?: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
-  const series = await getSeries(slug);
+  const series = await getSeries(slug, safeLocale);
   if (!series) return {};
 
   const content = getSeriesContent(series.slug, safeLocale);
   const title = content?.title ?? series.title;
   const description = content?.description ?? series.description ?? "";
-  const imageUrl = series.heroImageUrl ?? undefined;
+  const imageUrl = seriesArtworkCandidates(series, safeLocale)[0];
   const canonicalUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
 
   return {
@@ -69,12 +73,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ExperienceDetailPage({ params }: Props) {
-  const { locale, slug } = await params;
+export default async function ExperienceDetailPage({ params, searchParams }: Props) {
+  const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({})]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
-    getSeries(slug),
+    getSeries(slug, safeLocale),
     getAvailability(slug),
     getServerSession(authOptions),
     getTranslations(safeLocale, ["common"]),
@@ -100,6 +104,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
   const sessions    = series.sessions ?? [];
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
+  const focusSessionId = sessions.some((event: any) => event.id === query.sessionId) ? query.sessionId ?? null : null;
   const isCountdownActive = series.showCountdown && series.earlyReleaseAt && new Date() < new Date(series.earlyReleaseAt);
 
   const content = getSeriesContent(series.slug, safeLocale);
@@ -112,11 +117,11 @@ export default async function ExperienceDetailPage({ params }: Props) {
   return (
     <div>
       {/* Hero */}
-      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: series.heroImageUrl ? 360 : undefined }}>
-        {series.heroImageUrl && (
-          <img src={series.heroImageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
+      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: seriesArtworkCandidates(series, safeLocale).length ? 360 : undefined }}>
+        {seriesArtworkCandidates(series, safeLocale).length > 0 && (
+          <EventArtwork candidates={seriesArtworkCandidates(series, safeLocale)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
         )}
-        <div style={{ position: "absolute", inset: 0, background: series.heroImageUrl ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.72) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: seriesArtworkCandidates(series, safeLocale).length ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.72) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
         <div className="page-container" style={{ position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
             {series.venue && <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>{series.venue}</span>}
@@ -132,7 +137,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
           <ShareButtons
             url={pageUrl}
             title={title}
-            imageUrl={series.heroImageUrl ?? undefined}
+            imageUrl={seriesArtworkCandidates(series, safeLocale)[0]}
             labels={{
               shareHeading: c.shareHeading,
               copyLink: c.shareCopyLink,
@@ -141,6 +146,16 @@ export default async function ExperienceDetailPage({ params }: Props) {
               instagram: c.shareInstagram,
             }}
           />
+          {series.socialLinksJson && typeof series.socialLinksJson === "object" && Object.keys(series.socialLinksJson).length > 0 ? (
+            <nav aria-label="Series social links" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 }}>
+              {Object.entries(series.socialLinksJson as Record<string, unknown>).map(([key, value]) => {
+                if (typeof value !== "string" || !/^https:\/\//i.test(value)) return null;
+                const label = SERIES_SOCIAL_LINK_LABELS[key as keyof typeof SERIES_SOCIAL_LINK_LABELS];
+                if (!label) return null;
+                return <a key={key} href={value} target="_blank" rel="noopener noreferrer" style={{ border: "1px solid rgba(255,255,255,.35)", borderRadius: 999, color: "white", fontSize: 12, padding: "7px 11px", textDecoration: "none" }}>{label}</a>;
+              })}
+            </nav>
+          ) : null}
         </div>
       </div>
 
@@ -157,11 +172,11 @@ export default async function ExperienceDetailPage({ params }: Props) {
         {/* Left column */}
         <div className="experience-main">
           {/* Description */}
-          <section style={{ marginBottom: 48 }}>
-            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
               {c.aboutThisExperience}
             </h2>
-            <p style={{ fontSize: 16, lineHeight: 1.8, color: "#4b5563", whiteSpace: "pre-line" }}>{description}</p>
+            {description ? <ExpandableText text={description} locale={safeLocale} maxLines={3} /> : null}
           </section>
 
           {/* Sessions */}
@@ -170,45 +185,27 @@ export default async function ExperienceDetailPage({ params }: Props) {
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
                 {c.sessionsHeading}
               </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {sessions.map((s: any) => (
-                  <div key={s.id} className="experience-session" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px" }}>
-                    <div className="experience-session-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: "#1a1614", marginBottom: 4 }}>
-                          {getSessionTitle(s.title ?? c.sessionLabel, safeLocale)}
-                        </div>
-                        <div style={{ fontSize: 13, color: "#6b7280" }}>{fmtDate(s.startsAt)} · {fmtTime(s.startsAt)} – {fmtTime(s.endsAt)}</div>
-                      </div>
-                      <div className="experience-session-availability" style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-                        <div style={{ fontSize: 12, color: "#9ca3af" }}>{s.capacity - s.soldCount} {c.left}</div>
-                        <span className={`badge ${s.status === "SOLD_OUT" ? "badge-error" : s.status === "CANCELLED" ? "badge-neutral" : "badge-success"}`}>
-                          {s.status === "SOLD_OUT" ? c.sessionStatusSoldOut
-                            : s.status === "CANCELLED" ? c.sessionStatusCancelled
-                            : s.status === "COMPLETED" ? c.sessionStatusCompleted
-                            : c.sessionStatusScheduled}
-                        </span>
-                      </div>
-                    </div>
-                    {s.status === "SCHEDULED" && (
-                      <AddToCalendar
-                        sessionId={s.id}
-                        title={s.title ?? series.title}
-                        startsAt={s.startsAt}
-                        endsAt={s.endsAt}
-                        location={locationStr}
-                        description={series.description ?? ""}
-                        labels={{
-                          addToCalendar: c.addToCalendar,
-                          google: c.calGoogleCalendar,
-                          apple: c.calAppleIcal,
-                          outlook: c.calOutlook,
-                          yahoo: c.calYahoo,
-                        }}
-                      />
-                    )}
-                  </div>
-                ))}
+              <div id="sessions">
+              <ExperienceSessionsView
+                sessions={sessions}
+                ticketTypes={ticketTypes}
+                seriesTitle={title}
+                seriesDescription={description ?? ""}
+                seriesImage={series.heroImageUrl}
+                seriesArtwork={series}
+                seriesHosts={series.seriesHosts ?? []}
+                focusSessionId={focusSessionId}
+                checkoutHrefBase={localePath(safeLocale, `/checkout/${slug}`)}
+                venue={locationStr}
+                locale={safeLocale}
+                labels={{
+                  left: c.left, addToCalendar: c.addToCalendar, calGoogleCalendar: c.calGoogleCalendar,
+                  calAppleIcal: c.calAppleIcal, calOutlook: c.calOutlook, calYahoo: c.calYahoo,
+                  selectTickets: c.selectTickets, sessionView: "Session display options", listView: "List", calendarView: "Calendar",
+                  from: "From",
+                  previousMonth: "Previous month", nextMonth: "Next month", events: "events", chooseDate: "Choose a date with an event to see its details.", noSessions: c.noSessions ?? "No upcoming sessions.",
+                }}
+              />
               </div>
             </section>
           )}
@@ -315,7 +312,10 @@ export default async function ExperienceDetailPage({ params }: Props) {
                   <div key={t.id} className="experience-ticket-type" style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{getTicketTypeName(t.name, safeLocale)}</div>
-                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{fmt(t.priceCents)}</div>
+                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{sessions.some((eventSession: any) => eventSession.ticketPrices?.some((price: any) => price.ticketTypeId === t.id && price.priceCents !== t.priceCents)) ? `${c.from ?? "From"} ` : ""}{fmt(sessions.reduce((lowest: number, eventSession: any) => {
+                        const override = eventSession.ticketPrices?.find((price: { ticketTypeId: string; priceCents: number }) => price.ticketTypeId === t.id)?.priceCents;
+                        return Math.min(lowest, override ?? t.priceCents);
+                      }, t.priceCents))}</div>
                     </div>
                     {t.description && <div style={{ fontSize: 12, color: "#9ca3af" }}>{t.description}</div>}
                     {t.requiresMembership && <div style={{ fontSize: 11, color: "#c41e3a", fontWeight: 600, marginTop: 4 }}>
@@ -329,7 +329,11 @@ export default async function ExperienceDetailPage({ params }: Props) {
               </div>
             )}
             <div>
-              <Link href={localePath(safeLocale, `/checkout/${slug}`)} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+              {sessions.length > 0 ? (
+                <Link href={focusSessionId ? `${localePath(safeLocale, `/checkout/${slug}`)}?sessionId=${encodeURIComponent(focusSessionId)}` : "#sessions"} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+              ) : (
+                <span className="btn btn-ghost" aria-disabled="true" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.noSessions ?? "No upcoming sessions"}</span>
+              )}
               <p style={{ fontSize: 12, color: "#6b7280", textAlign: "center", marginTop: 8 }}>Continue as a guest. We’ll email your booking confirmation after payment.</p>
             </div>
           </div>

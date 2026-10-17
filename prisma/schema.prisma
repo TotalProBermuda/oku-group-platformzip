@@ -1203,6 +1203,7 @@ model FounderMembershipApplication {
 
 model Series {
   id          String         @id @default(cuid())
+  sessionDefaults Json?
   slug        String         @unique
   title       String
   subtitle    String?
@@ -1233,7 +1234,12 @@ model Series {
 
   // Media
   heroImageUrl String?
+  heroImageUrlEn String?
+  heroImageUrlEs String?
+  heroImageUrlPt String?
   galleryJson  Json?
+  // Optional network links for this programme (website, social profiles, etc.).
+  socialLinksJson Json?
 
   // Capacity
   capacityTotal    Int @default(0)
@@ -1335,8 +1341,15 @@ model ExperienceInfluencer {
 
 model Session {
   id                     String        @id @default(cuid())
+  fieldModes             Json?
   seriesId               String
   title                  String?
+  subtitle               String?
+  description            String?
+  flyerImageUrl          String?
+  flyerImageUrlEn        String?
+  flyerImageUrlEs        String?
+  flyerImageUrlPt        String?
   startsAt               DateTime
   endsAt                 DateTime
   capacity               Int
@@ -1352,6 +1365,7 @@ model Session {
 
   series             Series                     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   tickets            Ticket[]
+  ticketPrices        SessionTicketPrice[]
   Order              Order[]
   checkins           ExperienceCheckin[]
   attendanceEvents   AttendanceEvent[]
@@ -1399,6 +1413,58 @@ model TicketType {
   pricingRules        TicketPricingRule[]
   tickets             Ticket[]
   intendedInvitations EventInvitation[]   @relation("InvitationIntendedTicketType")
+  sessionPrices       SessionTicketPrice[]
+}
+
+// Optional per-session price override for a shared series ticket product.
+// A missing row means the ticket's series-level price is inherited.
+model SessionTicketPrice {
+  id           String   @id @default(cuid())
+  sessionId    String
+  ticketTypeId String
+  priceCents   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  session    Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, ticketTypeId])
+  @@index([ticketTypeId])
+}
+
+// Durable previews and accepted mutations; history is never cascade-deleted.
+model SessionManagementChange {
+  id String @id @default(cuid())
+  requestId String @unique
+  actorId String
+  seriesId String
+  state String @default("PREVIEW")
+  payload Json
+  snapshotHash String
+  preview Json
+  result Json?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  appliedAt DateTime?
+  notices SessionAttendeeNotice[]
+  @@index([seriesId, createdAt])
+}
+
+// Intentionally HELD only: no worker, sending handler or release endpoint.
+model SessionAttendeeNotice {
+  id String @id @default(cuid())
+  changeId String
+  sessionId String
+  recipientKey String
+  recipientEmail String
+  locale String
+  state String @default("HELD")
+  payload Json
+  createdAt DateTime @default(now())
+  change SessionManagementChange @relation(fields: [changeId], references: [id])
+  @@unique([changeId, recipientKey])
+  @@index([state, createdAt])
 }
 
 model TicketPricingRule {
@@ -1438,6 +1504,8 @@ model ExperienceAddon {
 
 model Order {
   id        String      @id @default(cuid())
+  entitlementSnapshot Json?
+  checkoutLocale String?
   userId    String
   seriesId  String
   sessionId String
@@ -1554,6 +1622,7 @@ model OrderNote {
 
 model Ticket {
   id                String       @id @default(cuid())
+  entitlementSnapshot Json?
   orderId           String
   userId            String
   sessionId         String
@@ -3828,6 +3897,10 @@ model ContentTranslation {
   translatedText String                   @db.Text
   status         ContentTranslationStatus @default(PENDING)
   provider       String?
+  attemptCount   Int                      @default(0)
+  nextAttemptAt  DateTime                 @default(now())
+  processingUntil DateTime?
+  lastErrorCode  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3837,6 +3910,7 @@ model ContentTranslation {
   @@index([status])
   @@index([targetLocale])
   @@index([entityType, targetLocale, status])
+  @@index([status, nextAttemptAt])
 }
 
 // ── CHECK-IN + ATTENDANCE SYSTEM ────────────────────────────────────────────

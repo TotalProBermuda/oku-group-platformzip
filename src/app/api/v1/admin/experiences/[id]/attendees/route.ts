@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { checkInEmitter } from "@/lib/checkInEmitter";
+import { claimAdmission } from "@/server/checkin/claimAdmission";
 
 function isAdmin(session: any) {
-  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r));
+  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR"].includes(r));
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,14 +59,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id: ticketId },
     include: { order: { select: { id: true, seriesId: true } } },
   });
-  if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+  if (!ticket || ticket.order.seriesId !== seriesId) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
   if (ticket.ticketStatus === "CHECKED_IN") return NextResponse.json({ error: "Already checked in" }, { status: 400 });
 
   const now = new Date();
-  await prisma.$transaction([
-    prisma.ticket.update({ where: { id: ticketId }, data: { ticketStatus: "CHECKED_IN", checkedInAt: now, checkedInById: session.user.id } }),
-    prisma.experienceCheckin.create({ data: { ticketId, sessionId: ticket.sessionId, checkedInById: session.user.id, method: method ?? "ADMIN_OVERRIDE" } }),
-  ]);
+  try {
+    const actorId = (session?.user as { id?: string } | undefined)?.id;
+    if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const claim = await prisma.$transaction(async tx => {
+      const result = await claimAdmission({ ticketId, sessionId: ticket.sessionId, actorId, at: now }, tx);
+      if (result.count) await tx.experienceCheckin.create({ data: {
+        ticketId, sessionId: ticket.sessionId, checkedInById: actorId,
+        method: method === "QR" || method === "MANUAL" ? method : "ADMIN_OVERRIDE",
+      } });
+      return result;
+    });
+    if (!claim.count) return NextResponse.json({ error: "Ticket cannot be checked in." }, { status: 409 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Check-in unavailable" }, { status: 409 });
+  }
 
   // Broadcast real-time event to all SSE subscribers
   checkInEmitter.emit("ticket-checked-in", {

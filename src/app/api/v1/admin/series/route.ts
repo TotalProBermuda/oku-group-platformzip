@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { createSeriesInputSchema } from "@/server/series/createSeriesInput";
+import { parseArtworkEdit } from "@/server/series/artworkInput";
 
 function failure(error: unknown) {
   const status = typeof (error as { status?: unknown })?.status === "number"
@@ -33,6 +36,7 @@ export async function GET() {
         sessions: {
           include: {
             _count: { select: { tickets: true } },
+            ticketPrices: true,
             occupancies: { select: { id: true, scope: true, status: true, space: { select: { id: true, name: true } } } },
           },
           orderBy: { startsAt: "asc" },
@@ -56,7 +60,9 @@ export async function POST(req: Request) {
     const { roles, userId } = await requireSession();
     requirePermission(roles, "admin:experiences:write");
 
-    const parsed = createSeriesInputSchema.safeParse(await req.json());
+    const input = await req.json();
+    parseArtworkEdit(input, roles, "series");
+    const parsed = createSeriesInputSchema.safeParse(input);
     if (!parsed.success) {
       return NextResponse.json(
         { ok: false, error: "Please correct the highlighted details.", fields: parsed.error.flatten().fieldErrors },
@@ -99,9 +105,10 @@ export async function POST(req: Request) {
           metadata: { seriesId: created.id, slug: created.slug },
         },
       });
+      await syncTranslations(tx, "Series", created.id, created);
       return created;
     });
-    return NextResponse.json({ ok: true, data: series }, { status: 201 });
+    return finishEventSave(series.id, { ok: true, data: series }, req, 201);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json({ ok: false, error: "That slug is already in use. Choose a different one." }, { status: 409 });

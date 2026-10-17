@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { requirePermission } from "@/lib/rbac";
 import { requireSession } from "@/server/auth/session";
 import { createSessionInputSchema } from "@/server/series/createSessionInput";
 import { createReservationConflictRecords } from "@/server/events/eventOccupancyService";
 import { lockOccupancySpaces } from "@/server/series/publicationLifecycle";
+import { parseArtworkEdit } from "@/server/series/artworkInput";
+import { fieldKeys, loadSessionState, effectiveField } from "@/server/series/sessionState";
+import { applyScheduleTemplate } from "@/server/series/sessionFields";
+import { materializeSession } from "@/server/series/sessionManagement";
+import { Prisma } from "@prisma/client";
 
 function failure(error: unknown) {
   const status = typeof (error as { status?: unknown })?.status === "number"
@@ -23,7 +30,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { roles, userId } = await requireSession();
     requirePermission(roles, "admin:experiences:write");
 
-    const body = createSessionInputSchema.safeParse(await req.json());
+    const input = await req.json();
+    const artwork = parseArtworkEdit(input, roles, "session");
+    const body = createSessionInputSchema.safeParse(input);
     if (!body.success) {
       return NextResponse.json(
         { ok: false, error: "Please correct the highlighted details.", fields: body.error.flatten().fieldErrors },
@@ -33,9 +42,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const parent = await prisma.series.findUnique({
       where: { id: seriesId },
-      select: { id: true, venueId: true, spaceId: true, status: true },
+      select: { id: true, venueId: true, spaceId: true, status: true, ticketTypes: { select: { id: true } } },
     });
     if (!parent) return NextResponse.json({ ok: false, error: "Series not found." }, { status: 404 });
+    if (body.data.ticketPrices?.length && !roles.includes("SUPERADMIN")) {
+      return NextResponse.json({ ok: false, error: "Only a superadmin can set session-specific ticket prices." }, { status: 403 });
+    }
+    const ticketTypeIds = new Set(parent.ticketTypes.map((ticket) => ticket.id));
+    if (body.data.ticketPrices?.some((price) => !ticketTypeIds.has(price.ticketTypeId))) {
+      return NextResponse.json({ ok: false, error: "Session prices must reference ticket types in this series." }, { status: 400 });
+    }
     if (body.data.occupancyScope !== "NONE" && !parent.venueId) {
       return NextResponse.json({ ok: false, error: "Select an operational venue before creating a dining block." }, { status: 400 });
     }
@@ -44,16 +60,39 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Series" WHERE "id" = ${seriesId} FOR UPDATE`;
       const created = await tx.session.create({
         data: {
+          ...artwork,
           seriesId,
           title: body.data.title || null,
+          subtitle: body.data.subtitle || null,
+          description: body.data.description || null,
+          flyerImageUrl: body.data.flyerImageUrl || null,
+          ticketPrices: body.data.ticketPrices?.length ? { create: body.data.ticketPrices } : undefined,
           startsAt: body.data.startsAt,
           endsAt: body.data.endsAt,
           capacity: body.data.capacity,
           status: "SCHEDULED",
         },
       });
+      await syncTranslations(tx, "EventSession", created.id, { title: created.title, subtitle: created.subtitle, description: created.description });
+      if (body.data.useSeriesDefaults) {
+        const state = await loadSessionState(tx, seriesId, [created.id]);
+        const current = state.sessions[0];
+        const fieldModes: Record<string, { mode: "inherit" } | { mode: "override"; value: unknown }> = Object.fromEntries(fieldKeys(state).map(k => [k, { mode: "inherit" as const }]));
+        for (const field of ["title", "subtitle", "description"] as const) if (body.data[field]) fieldModes[`content.${field}.en`] = { mode: "override", value: body.data[field] };
+        for (const [locale, key] of [["en", "flyerImageUrlEn"], ["es", "flyerImageUrlEs"], ["pt", "flyerImageUrlPt"]] as const)
+          if (body.data[key]) fieldModes[`artwork.${locale}`] = { mode: "override", value: body.data[key] };
+        for (const price of body.data.ticketPrices ?? []) fieldModes[`ticket.${price.ticketTypeId}.price`] = { mode: "override", value: price.priceCents };
+        const next = { ...current, fieldModes: JSON.parse(JSON.stringify(fieldModes)) as Prisma.JsonValue };
+        const template = effectiveField(state, next, "schedule").value;
+        const scheduled = applyScheduleTemplate(current.startsAt, template);
+        next.startsAt = scheduled.startsAt; next.endsAt = scheduled.endsAt;
+        next.capacity = Number(effectiveField(state, next, "capacity").value);
+        await materializeSession(tx, state, current, next, fieldKeys(state));
+        created.startsAt = next.startsAt; created.endsAt = next.endsAt; created.capacity = next.capacity;
+      }
       let occupancy = null;
       let conflictCount = 0;
       if (body.data.occupancyScope !== "NONE" && parent.venueId) {
@@ -69,10 +108,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             scope,
             policy: "EXCLUSIVE",
             status: parent.status === "PUBLISHED" ? "ACTIVE" : "DRAFT",
-            eventStartsAt: body.data.startsAt,
-            eventEndsAt: body.data.endsAt,
-            blockStartsAt: new Date(body.data.startsAt.getTime() - body.data.setupMinutes * 60_000),
-            blockEndsAt: new Date(body.data.endsAt.getTime() + body.data.resetMinutes * 60_000),
+            eventStartsAt: created.startsAt,
+            eventEndsAt: created.endsAt,
+            blockStartsAt: new Date(created.startsAt.getTime() - body.data.setupMinutes * 60_000),
+            blockEndsAt: new Date(created.endsAt.getTime() + body.data.resetMinutes * 60_000),
             setupMinutes: body.data.setupMinutes,
             resetMinutes: body.data.resetMinutes,
             createdByUserId: userId,
@@ -99,12 +138,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorId: userId,
           action: "EXPERIENCE_SESSION_CREATED",
-          metadata: { seriesId, sessionId: created.id, occupancyId: occupancy?.id ?? null, conflicts: conflictCount },
+          metadata: { seriesId, sessionId: created.id, occupancyId: occupancy?.id ?? null, conflicts: conflictCount, sessionTicketPriceOverrides: body.data.ticketPrices?.length ?? 0 },
         },
       });
       return { event: created, occupancy, conflictCount };
     });
-    return NextResponse.json({ ok: true, data: result.event, occupancy: result.occupancy, conflictCount: result.conflictCount }, { status: 201 });
+    return finishEventSave(seriesId, { ok: true, data: result.event, occupancy: result.occupancy, conflictCount: result.conflictCount }, req, 201);
   } catch (error) {
     return failure(error);
   }

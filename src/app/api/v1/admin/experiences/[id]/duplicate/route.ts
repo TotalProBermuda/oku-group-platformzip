@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { randomUUID } from "node:crypto";
 
 type SeriesWithRelations = Prisma.SeriesGetPayload<{
   include: {
     ticketTypes: { include: { pricingRules: true }; orderBy: { displayOrder: "asc" } };
-    sessions: { orderBy: { startsAt: "asc" } };
+    sessions: { orderBy: { startsAt: "asc" }; include: { ticketPrices: true } };
   };
 }>;
 
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id },
     include: {
       ticketTypes: { include: { pricingRules: true }, orderBy: { displayOrder: "asc" } },
-      sessions: { orderBy: { startsAt: "asc" } },
+      sessions: { orderBy: { startsAt: "asc" }, include: { ticketPrices: true } },
     },
   });
 
@@ -67,7 +70,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     slug = `${original.slug}-copy-${attempt}`;
   }
 
-  const newSeries = await prisma.series.create({
+  // Give copied ticket products stable new IDs so session-specific price
+  // overrides can be remapped without ever pointing at the original series.
+  const copiedTicketTypeIds = new Map(original.ticketTypes.map((ticket) => [ticket.id, randomUUID()]));
+
+  const newSeries = await prisma.$transaction(async tx => {
+  const created = await tx.series.create({
     data: {
       title: newTitle,
       subtitle: original.subtitle,
@@ -82,6 +90,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       country: original.country,
       venueAddress: original.venueAddress,
       heroImageUrl: original.heroImageUrl,
+      heroImageUrlEn: original.heroImageUrlEn,
+      heroImageUrlEs: original.heroImageUrlEs,
+      heroImageUrlPt: original.heroImageUrlPt,
       galleryJson: original.galleryJson ?? Prisma.JsonNull,
       capacityTotal: original.capacityTotal,
       capacitySold: 0,
@@ -100,6 +111,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       newsletterCaptureEnabled: original.newsletterCaptureEnabled,
       isFeatured: false,
       communityUrl: original.communityUrl,
+      socialLinksJson: original.socialLinksJson ?? Prisma.JsonNull,
       seoTitle: original.seoTitle,
       seoDescription: original.seoDescription,
       status: "DRAFT",
@@ -110,6 +122,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       isFounderOnly: original.isFounderOnly,
       ticketTypes: {
         create: original.ticketTypes.map((tt) => ({
+          id: copiedTicketTypeIds.get(tt.id)!,
           name: tt.name,
           description: tt.description,
           tierCode: tt.tierCode,
@@ -130,8 +143,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             ? {
                 create: tt.pricingRules.map((pr) => ({
                   ruleType: pr.ruleType,
-                  conditionJson: pr.conditionJson,
-                  actionJson: pr.actionJson,
+                  conditionJson: pr.conditionJson === null ? Prisma.JsonNull : pr.conditionJson as Prisma.InputJsonValue,
+                  actionJson: pr.actionJson === null ? Prisma.JsonNull : pr.actionJson as Prisma.InputJsonValue,
                   priority: pr.priority,
                   isActive: pr.isActive,
                 })),
@@ -142,6 +155,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       sessions: {
         create: original.sessions.map((s) => ({
           title: s.title,
+          subtitle: s.subtitle,
+          description: s.description,
+          flyerImageUrl: s.flyerImageUrl,
+          flyerImageUrlEn: s.flyerImageUrlEn,
+          flyerImageUrlEs: s.flyerImageUrlEs,
+          flyerImageUrlPt: s.flyerImageUrlPt,
           startsAt: shiftDate(s.startsAt, anchorOriginal, anchorNew),
           endsAt: shiftDate(s.endsAt, anchorOriginal, anchorNew),
           capacity: s.capacity,
@@ -151,18 +170,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           inheritsSeriesSponsors: s.inheritsSeriesSponsors,
           giftBagEnabled: s.giftBagEnabled,
           streetsideEnabled: s.streetsideEnabled,
+          ticketPrices: s.ticketPrices.length ? {
+            create: s.ticketPrices.flatMap((price) => {
+              const ticketTypeId = copiedTicketTypeIds.get(price.ticketTypeId);
+              return ticketTypeId ? [{ ticketTypeId, priceCents: price.priceCents }] : [];
+            }),
+          } : undefined,
         })),
       },
     },
   });
 
-  await prisma.auditLog.create({
+  await syncTranslations(tx, "Series", created.id, created);
+  const [tickets, dates] = await Promise.all([
+    tx.ticketType.findMany({ where: { seriesId: created.id } }),
+    tx.session.findMany({ where: { seriesId: created.id } }),
+  ]);
+  for (const ticket of tickets) await syncTranslations(tx, "TicketType", ticket.id, ticket);
+  for (const date of dates) await syncTranslations(tx, "EventSession", date.id, { title: date.title, subtitle: date.subtitle, description: date.description });
+  await tx.auditLog.create({
     data: {
       actorId: (session as { user: { id: string } }).user.id,
       action: "EXPERIENCE_DUPLICATED",
-      metadata: { originalId: id, newId: newSeries.id },
+      metadata: { originalId: id, newId: created.id },
     },
   });
 
-  return NextResponse.json({ series: newSeries });
+  return created;
+  });
+  return finishEventSave(newSeries.id, { series: newSeries }, req);
 }

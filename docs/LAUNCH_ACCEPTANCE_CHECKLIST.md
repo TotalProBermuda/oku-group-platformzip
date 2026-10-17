@@ -6,6 +6,10 @@ Source evidence: LAUNCH_EXECUTION_LOG_2026_10_03.md and the linked tests/PRs.
 An entire workstream closes only when its remaining acceptance checks pass.
 
 ## 1. Release baseline — IN PROGRESS
+- [x] PR116 foundation candidate: isolated Next production build passes; 353 tests
+      across 45 files pass. Compared with unchanged main 763e65b8: 267 existing
+      TypeScript diagnostics on each, identical file/line/code keys, none added.
+      Build skips type/lint checks; this is not a clean global type-check or deployment.
 - [x] GitHub/Replit source synchronized at 2bd7322e; Replit working tree clean.
 - [x] Replit regression selection: 272 tests / 40 files passed.
 - [x] Replit automatic post-merge hook inspected: absent; pull ran no migration.
@@ -13,26 +17,29 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [x] Replit build of 2bd7322e completed: BUILD_EXIT=0. Build skips types/lint;
       those checks remain separate under operational readiness.
 - [ ] Eligible release deployed and smoke-tested. No republish performed in this batch.
-      Latest user-confirmed source is 763e65b8. On this pass Replit first displayed
-      "Attempting to reconnect", then remained on a loading screen after reload.
-      Old deployment 8c0a8937 logs date to October 2, not proof of this candidate.
-      Current build, production SHA and rollback cannot yet be verified; no publish.
 
 ## 2. Payments and refunds — IN PROGRESS / APPROVAL GATES
-- Policy clarification (4 October): owner says tickets are non-refundable;
-  membership refunds may have an eligibility window, not yet specified. Refund
-  safety is not authorization to add customer ticket-refund functionality.
-  Live /my/orders has no refund control. Existing admin controls remain separate.
+- [x] Review-branch Superadmin draft controls and membership exclusion preview:
+      POS/web separation, verified identity/history gates, no split-table blanket
+      exclusion, draft-only export. 47 focused tests pass; NOT live commission enforcement.
+- [ ] Audited rule persistence, owner scope decision, verified INVU mapping and
+      transaction-time snapshots integrated across every commission creation path.
+- [x] Membership annual refund quote engine implemented in a review branch:
+      approved 30-day structure, actual-paid principal proration, disclosed extras,
+      no ordinary discount clawback or separate ticket cancellation. 27 tests pass.
+      No live route, request workflow, migration or financial action. See
+      MEMBERSHIP_REFUND_POLICY_IMPLEMENTATION.md for integration/approval gates.
 - [x] Ticket refund request validation implemented, merged in PR110 and tested.
 - [x] Existing payment/webhook regression selection passes; not settlement evidence.
 - [x] Pure refund admission rules implemented: cumulative balance, reserved/unknown
       amounts, replay and request binding. 23 model tests; 49 focused tests pass.
       Not wired to live routes; NOT proof of database concurrency safety.
+- [x] Review-gated SQL coordinator prototype adds durable reservations, a one-time
+      submission claim and evidence-bound reconciliation. Eight isolated PGlite
+      tests cover persistence/replay and UNKNOWN retention. Test-only schema; no live
+      route or migration. PGlite is single-connection, so multi-worker PostgreSQL
+      concurrency and serialization-retry behavior remain unverified.
 - [ ] Durable cumulative/concurrent refund limits and unknown-result reconciliation.
-      Draft SQL-backed coordinator now persists reservations, single submission
-      claims and reconciliation states. Isolated PostgreSQL restart/replay tests
-      pass; production integration and multi-connection PostgreSQL tests remain.
-      Proposal tables exist ONLY in test fixtures, not deployable migrations.
 - [ ] Partial bundle refunds restore each affected entitlement/capacity exactly once.
 - [ ] Owner approves refund policy, any migration, and controlled live financial tests.
 
@@ -63,6 +70,12 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [ ] Authorized delivery test and end-to-end onboarding completed.
 
 ## 5. Dashboard discovery and mobile — IN PROGRESS
+- [x] New membership draft workspace linked from Memberships and explicitly
+      Superadmin-guarded on server. Isolated Chrome component checks at 320/390/1024px
+      pass (no overflow/errors; controls/export functional). Not a role-session or
+      full dashboard acceptance test; English-only draft copy still needs localization.
+- [x] Server access boundary tested with absent, finance, partner, malformed and
+      Superadmin sessions. Mobile fixture repeated with locked application React 18.
 - [x] Dashboard navigation regression tests included in passing Replit selection.
 - [ ] Task-based mobile checks for customer, Superadmin, F&B, events, hosts,
       partner, seller, independent referrer and finance/beneficiary.

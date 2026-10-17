@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
+import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { assertSeriesReadyForPublication, SeriesPublicationError, syncSeriesOccupanciesForStatus } from "@/server/series/publicationLifecycle";
+import { seriesSocialLinksSchema } from "@/lib/socialLinks";
+import { parseArtworkEdit } from "@/server/series/artworkInput";
+import { legacySeriesWriteBlocked, managedWriteMessage } from "@/server/series/legacySessionGuard";
 
 function isAdmin(session: any) {
-  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r));
+  return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR"].includes(r));
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     where: { id },
     include: {
       ticketTypes: { include: { pricingRules: true }, orderBy: { displayOrder: "asc" } },
-      sessions: { orderBy: { startsAt: "asc" } },
+      sessions: { orderBy: { startsAt: "asc" }, include: { ticketPrices: true } },
       addons: { orderBy: { displayOrder: "asc" } },
       experienceInfluencer: { include: { influencer: { select: { id: true, displayName: true, handle: true } } } },
       operationalVenue: { select: { id: true, name: true, slug: true } },
@@ -39,9 +44,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const allowed = ["title","subtitle","description","category","venue","venueId","spaceId","hostType","influencerId","partnerId","city","country","venueAddress",
     "heroImageUrl","capacityTotal","availableSeatsMode","attendeeListMode","showCountdown","countdownLabel",
     "publicReleaseAt","earlyReleaseAt","newsletterCaptureEnabled","waitlistEnabled","membershipRuleMode",
-    "isFeatured","seoTitle","seoDescription","status","startsAt","endsAt","communityUrl"];
+    "isFeatured","seoTitle","seoDescription","status","startsAt","endsAt","communityUrl","socialLinksJson"];
   const data: any = {};
+  try {
+    Object.assign(data, parseArtworkEdit(body, session?.user?.roles ?? [], "series"));
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: (error as { status: number }).status });
+  }
   for (const k of allowed) if (k in body) data[k] = body[k];
+  if ("socialLinksJson" in data) {
+    const links = seriesSocialLinksSchema.safeParse(data.socialLinksJson ?? {});
+    if (!links.success) return NextResponse.json({ error: "Enter secure HTTPS links for the series social profiles." }, { status: 400 });
+    data.socialLinksJson = links.data;
+  }
   const existing = await prisma.series.findUnique({ where: { id }, select: { venueId: true, spaceId: true, hostType: true, influencerId: true, partnerId: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const targetVenueId = data.venueId ?? existing.venueId;
@@ -91,7 +106,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // availability while preserving the event and its reservation-conflict audit.
   try {
     const series = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Series" WHERE "id" = ${id} FOR UPDATE`;
+      const defaultFields = ["title", "subtitle", "description", "capacityTotal", "heroImageUrl", "heroImageUrlEn", "heroImageUrlEs", "heroImageUrlPt", "startsAt", "endsAt"];
+      if (defaultFields.some(k => k in data) && await legacySeriesWriteBlocked(id, tx)) throw Object.assign(new Error(managedWriteMessage), { status: 409 });
       const updated = await tx.series.update({ where: { id }, data });
+      await syncTranslations(tx, "Series", id, updated);
       if (data.status === "PUBLISHED") await assertSeriesReadyForPublication(tx, id);
     if (data.status) {
       await syncSeriesOccupanciesForStatus(tx, id, data.status);
@@ -99,8 +118,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await tx.auditLog.create({ data: { actorId, action: "EXPERIENCE_UPDATED", metadata: { seriesId: id, fields: Object.keys(data) } } });
     return updated;
     });
-    return NextResponse.json({ series });
+    return finishEventSave(id, { series }, req);
   } catch (error) {
+    if (error && typeof error === "object" && "status" in error && error.status === 409) return NextResponse.json({ error: error instanceof Error ? error.message : managedWriteMessage }, { status: 409 });
     if (error instanceof SeriesPublicationError) {
       return NextResponse.json({ error: "This series is not ready to publish.", issues: error.issues }, { status: 409 });
     }

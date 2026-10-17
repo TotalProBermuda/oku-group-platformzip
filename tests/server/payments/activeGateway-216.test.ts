@@ -48,7 +48,7 @@ vi.mock("@/lib/prisma", () => {
 // ---------------------------------------------------------------------------
 // Subject imports (after mocks)
 // ---------------------------------------------------------------------------
-import { evaluateTestRecency } from "@/server/payments/activeGateway";
+import { evaluateActiveGatewayTestRecency, evaluateTestRecency } from "@/server/payments/activeGateway";
 import { buildCybersourceUpdate } from "@/server/payments/cybersourceCredentialService";
 import { POST } from "@/app/api/v1/admin/payments/cybersource/test/route";
 import { prisma } from "@/lib/prisma";
@@ -189,6 +189,41 @@ describe("evaluateTestRecency", () => {
   });
 });
 
+describe("active Cybersource test recency", () => {
+  it("does not interrupt an already-active gateway when a passing production test ages past 24 hours", () => {
+    const result = evaluateActiveGatewayTestRecency({
+      passed: true,
+      testedAt: new Date(Date.now() - 30 * 24 * 3600 * 1000),
+      environment: "production",
+      providerLabel: LABEL,
+      alreadyActive: true,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("still requires a recent passing test before activating production Cybersource", () => {
+    const result = evaluateActiveGatewayTestRecency({
+      passed: true,
+      testedAt: new Date(Date.now() - 25 * 3600 * 1000),
+      environment: "production",
+      providerLabel: LABEL,
+      alreadyActive: false,
+    });
+    expect(result).toContain("older than 24 hours");
+  });
+
+  it("still blocks an active gateway if it has never passed a test", () => {
+    const result = evaluateActiveGatewayTestRecency({
+      passed: false,
+      testedAt: null,
+      environment: "production",
+      providerLabel: LABEL,
+      alreadyActive: true,
+    });
+    expect(result).toContain("test connection has not passed");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 5: buildCybersourceUpdate credential reset
 // ---------------------------------------------------------------------------
@@ -223,7 +258,17 @@ describe("buildCybersourceUpdate — credential reset", () => {
     expect(data.lastTestMessage).toBeNull();
   });
 
-  it("5d. non-secret change does NOT reset lastTest fields", () => {
+  it("5d. environment change resets lastTest fields", () => {
+    const { data } = buildCybersourceUpdate(
+      { environment: "production" },
+      makePrev({ environment: "test" })
+    );
+    expect(data.lastTestStatus).toBeNull();
+    expect(data.lastTestedAt).toBeNull();
+    expect(data.lastTestMessage).toBeNull();
+  });
+
+  it("5e. non-secret change does NOT reset lastTest fields", () => {
     const { data } = buildCybersourceUpdate(
       { checkoutTitle: "Card Payment", debugMode: "ERRORS_ONLY" },
       makePrev()

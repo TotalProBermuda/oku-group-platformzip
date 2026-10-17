@@ -24,4 +24,17 @@ describe("createSessionInputSchema", () => {
     expect(createSessionInputSchema.safeParse({ ...valid, capacity: 2.5 }).success).toBe(false);
     expect(createSessionInputSchema.safeParse({ ...valid, capacity: 100001 }).success).toBe(false);
   });
+
+  it("accepts optional session theme, description and secure flyer URL", () => {
+    const result = createSessionInputSchema.safeParse({ ...valid, subtitle: "A Taste of Provence", description: "A French wine tasting.", flyerImageUrl: "https://cdn.example.com/provence.png" });
+    expect(result.success).toBe(true);
+  });
+  it("accepts the existing upload service's permanent same-origin media URL as a legacy flyer", () => {
+    expect(createSessionInputSchema.safeParse({ ...valid, flyerImageUrl: "/api/v1/media/bucket/public/uploads/legacy.png" }).success).toBe(true);
+  });
+
+  it("rejects insecure session artwork URLs", () => {
+    expect(createSessionInputSchema.safeParse({ ...valid, flyerImageUrl: "http://example.com/flyer.png" }).success).toBe(false);
+    expect(createSessionInputSchema.safeParse({ ...valid, flyerImageUrl: "javascript:alert(1)" }).success).toBe(false);
+  });
 });

@@ -13,6 +13,7 @@ import { getActiveCheckoutAdapter } from "@/server/payments/providers";
 import type { PaymentInstrument } from "@/server/payments/providers/types";
 import { hasValidGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 import { hasActiveCheckoutHold } from "@/server/commerce/checkoutHold";
+import { lockSessionInventory } from "@/server/commerce/sessionInventory";
 import { bindChallenge, requireBoundChallenge } from "@/server/cybersource/challengeBinding";
 import {
   checkPayerAuthentication,
@@ -97,6 +98,9 @@ export async function POST(req: Request) {
   if (!(await hasActiveCheckoutHold(order.id))) {
     return NextResponse.json({ ok: false, error: "Checkout session expired. Please start again." }, { status: 410 });
   }
+  if (!["SCHEDULED", "SOLD_OUT"].includes(order.session.status)) {
+    return NextResponse.json({ ok: false, error: "Ticket sales are paused for this occurrence. No payment was attempted." }, { status: 409 });
+  }
 
   const invoiceNumber = order.id.slice(-12);
 
@@ -169,11 +173,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Checkout expired during verification.", data: { code: "CHECKOUT_EXPIRED" } }, { status: 410 });
   }
   try {
-    await prisma.payment.create({ data: {
+    await prisma.$transaction(async tx => {
+    await lockSessionInventory(tx, order.sessionId);
+    const current = await tx.session.findUnique({ where: { id: order.sessionId }, select: { status: true } });
+    if (!current || !["SCHEDULED", "SOLD_OUT"].includes(current.status)) throw Object.assign(new Error("Ticket sales are paused. No payment was attempted."), { status: 409 });
+    await tx.payment.create({ data: {
       orderId: order.id, provider, status: "INITIATED", amountCents: order.totalCents,
       currency: order.currency, gatewayReferenceId: invoiceNumber,
     } });
+    });
   } catch (error) {
+    if (error && typeof error === "object" && "status" in error && error.status === 409) return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Ticket sales are paused." }, { status: 409 });
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ ok: false, error: "Payment is already being processed. Please do not retry.", data: { code: "PAYMENT_OUTCOME_UNKNOWN" } }, { status: 409 });
     }
@@ -316,6 +326,7 @@ export async function POST(req: Request) {
   // compatibility with refund/void code paths that still read them).
   const isAuthNet = provider === "AUTHORIZE_NET";
   await prisma.$transaction(async (tx) => {
+    await lockSessionInventory(tx, order.sessionId);
     await tx.order.update({
       where: { id: order.id },
       data: { status: "PAID", paidAt: new Date() },
