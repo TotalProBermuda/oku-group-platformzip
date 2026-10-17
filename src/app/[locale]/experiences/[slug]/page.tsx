@@ -126,7 +126,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
 
   return (
     <div>
-      <style jsx global>{`
+      <style>{`
         @media (max-width: 767px) {
           .experience-focus-poster { position: relative !important; inset: auto !important; width: min(240px, 66vw) !important; height: 300px !important; margin: 0 auto 20px; }
           .experience-focus-copy { max-width: 100% !important; }

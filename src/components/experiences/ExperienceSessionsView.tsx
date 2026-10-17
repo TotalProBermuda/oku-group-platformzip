@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import AddToCalendar from "@/components/ui/AddToCalendar";
-import EventArtwork from "@/components/ui/EventArtwork";
 import ExpandableText from "@/components/ui/ExpandableText";
-import { sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
+import ResponsiveEventArtwork from "@/components/ui/ResponsiveEventArtwork";
+import { sessionArtworkCandidates, sessionMobileArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
 type Session = SessionArtwork & {
@@ -77,6 +77,7 @@ export default function ExperienceSessionsView({
   function renderSession(session: Session) {
     const sessionTitle = session.title ?? null;
     const artwork = sessionArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
+    const mobileArtwork = sessionMobileArtworkCandidates(session, locale, seriesArtwork ?? { heroImageUrl: seriesImage });
     const description = session.description ?? seriesDescription;
     const coHosts = [...(seriesHosts ?? []), ...(session.eventHosts ?? [])].filter((host) => host.role === "CO_HOST");
     const prices = ticketTypes.filter(ticket => sessionProductEnabled(session, { sessionDefaults: seriesSessionDefaults }, ticket.id)).map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
@@ -84,7 +85,7 @@ export default function ExperienceSessionsView({
     return (
       <article id={`session-${session.id}`} key={session.id} style={{ ...cardStyle, borderColor: focusSessionId === session.id ? "#c41e3a" : "#e5e0d8", borderWidth: focusSessionId === session.id ? 2 : 1, display: "grid", gridTemplateColumns: "clamp(88px, 16vw, 128px) minmax(0, 1fr)", gap: 14, alignItems: "start", padding: 12, scrollMarginTop: 96 }}>
         <Link href={`${eventHrefBase}?sessionId=${encodeURIComponent(session.id)}#session-${encodeURIComponent(session.id)}`} aria-label={`${labels.viewEvent ?? (locale === "es" ? "Ver evento" : locale === "pt" ? "Ver evento" : "View event")}: ${seriesTitle}${sessionTitle ? `, ${sessionTitle}` : ""}`} style={{ aspectRatio: "4 / 5", background: "#f4eee8", borderRadius: 8, overflow: "hidden", display: "block" }}>
-          <EventArtwork candidates={artwork} alt={`${seriesTitle}${sessionTitle ? ` — ${sessionTitle}` : ""} event artwork`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <ResponsiveEventArtwork desktopCandidates={artwork} mobileCandidates={mobileArtwork} alt={`${seriesTitle}${sessionTitle ? ` — ${sessionTitle}` : ""} event artwork`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </Link>
         <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>

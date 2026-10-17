@@ -64,6 +64,7 @@ export function fieldKeys(state: State): string[] {
     "capacity", "schedule", "giftBagEnabled", "streetsideEnabled", "allowLateSales",
     ...["title", "subtitle", "description"].flatMap(f => locales.map(l => `content.${f}.${l}`)),
     ...locales.map(l => `artwork.${l}`),
+    ...locales.map(l => `artworkMobile.${l}`),
     ...state.series.ticketTypes.flatMap(t => [`ticket.${t.id}.enabled`, `ticket.${t.id}.price`]),
     ...hostRoles.map(r => `hosts.${r}`), "sponsors", ...profileRoles.map(r => `profiles.${r}`),
   ];
@@ -107,6 +108,13 @@ export function effectiveField(state: State, session: ManagedSession, key: strin
     const seriesField = `heroImageUrl${name === "en" ? "En" : name === "es" ? "Es" : "Pt"}` as "heroImageUrlEn";
     legacy = session[field] ?? (name === "en" ? session.flyerImageUrl : null);
     base = series[seriesField] ?? series.heroImageUrlEn ?? series.heroImageUrl;
+    inherits = legacy === null;
+  } else if (kind === "artworkMobile") {
+    const field = `flyerImageUrlMobile${locale === "en" ? "En" : locale === "es" ? "Es" : "Pt"}` as "flyerImageUrlMobileEn";
+    legacy = session[field];
+    // Mobile art has no series-level counterpart; inherit means use the normal
+    // localized session flyer as the responsive fallback rather than duplicating it.
+    base = null;
     inherits = legacy === null;
   } else if (kind === "ticket") {
     const ticket = series.ticketTypes.find(t => t.id === name);
@@ -160,6 +168,7 @@ export function defaultField(state: State, key: string): EffectiveField {
     const field = name as "title" | "subtitle" | "description";
     base = translated(state, "Series", state.series.id, field, locale, state.series[field]) ?? state.series[field];
   } else if (kind === "artwork") base = state.series[`heroImageUrl${name === "en" ? "En" : name === "es" ? "Es" : "Pt"}` as "heroImageUrlEn"] ?? state.series.heroImageUrlEn ?? state.series.heroImageUrl;
+  else if (kind === "artworkMobile") base = null;
   else if (kind === "ticket") {
     const ticket = state.series.ticketTypes.find(t => t.id === name);
     base = locale === "price" ? ticket?.priceCents ?? 0 : ticket?.ticketStatus === "ACTIVE";

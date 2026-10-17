@@ -109,7 +109,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   }
   useEffect(() => { void load(); }, [seriesId]);
   const sessions = data?.sessions ?? [];
-  const visibleFields = useMemo(() => (data?.fields ?? []).filter((key) => !key.startsWith("content.") && !key.startsWith("artwork.") && (canManageRestricted || !(
+  const visibleFields = useMemo(() => (data?.fields ?? []).filter((key) => !key.startsWith("content.") && !key.startsWith("artwork.") && !key.startsWith("artworkMobile.") && (canManageRestricted || !(
     key.startsWith("artwork.") || key.startsWith("ticket.") || ["giftBagEnabled", "streetsideEnabled", "allowLateSales"].includes(key) ||
     key.startsWith("profiles.")
   ))), [data, canManageRestricted]);
@@ -118,7 +118,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   const selectedSessions = sessions.filter((session) => selected.includes(session.id));
   const localizedKeys = (locale: string) => [
     "content.title." + locale, "content.subtitle." + locale, "content.description." + locale,
-    ...(canManageRestricted ? ["artwork." + locale] : []),
+    ...(canManageRestricted ? ["artwork." + locale, ...(kind === "sessions" ? ["artworkMobile." + locale] : [])] : []),
   ].filter((key) => data?.fields.includes(key));
   const localizedEffective = (key: string) => kind === "defaults" ? data?.defaults[key] : selectedSessions[0]?.fields[key];
   function setLocalizedValue(key: string, value: unknown) { setEdit(key, { mode: "override", value }); }

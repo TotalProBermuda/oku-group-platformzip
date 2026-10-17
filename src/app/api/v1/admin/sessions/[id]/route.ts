@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const session = await prisma.session.findUnique({
       where: { id },
-      select: { id: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true },
+      select: { id: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true },
     });
 
     if (!session) {
@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       ticketPriceOverrides = parsedPrices.data;
     }
-    const contentKeys = ["title", "subtitle", "description", "flyerImageUrl", "flyerImageUrlEn", "flyerImageUrlEs", "flyerImageUrlPt"] as const;
+    const contentKeys = ["title", "subtitle", "description", "flyerImageUrl", "flyerImageUrlEn", "flyerImageUrlEs", "flyerImageUrlPt", "flyerImageUrlMobileEn", "flyerImageUrlMobileEs", "flyerImageUrlMobilePt"] as const;
     const contentInput = Object.fromEntries(contentKeys.filter((key) => key in body).map((key) => [key, body[key]]));
     if (Object.keys(contentInput).length) {
       const parsedContent = updateSessionContentSchema.safeParse(contentInput);
@@ -78,7 +78,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const updated = await tx.session.update({
       where: { id },
       data: update,
-      select: { id: true, seriesId: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
+      select: { id: true, seriesId: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
       });
       if (ticketPriceOverrides) {
         await tx.sessionTicketPrice.deleteMany({ where: { sessionId: id } });

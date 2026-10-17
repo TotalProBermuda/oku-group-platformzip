@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import EventArtwork from "@/components/ui/EventArtwork";
 import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsView";
-import { seriesArtworkCandidates } from "@/lib/eventArtwork";
+import ResponsiveEventArtwork from "@/components/ui/ResponsiveEventArtwork";
+import { seriesArtworkCandidates, sessionMobileArtworkCandidates } from "@/lib/eventArtwork";
 
 describe("series/session artwork rendering", () => {
   it.each(["en", "es", "pt"])("renders %s series hero and session card using shared candidates", locale => {
@@ -19,6 +20,16 @@ describe("series/session artwork rendering", () => {
     expect(markup).toContain(`/${locale}/experiences/series?sessionId=session-1#session-session-1`);
     expect(markup).toContain("Series");
     expect(markup).toContain("Session");
+  });
+  it("server-renders the regular flyer and retains portrait mobile candidates for client selection", () => {
+    const session = { flyerImageUrlEn: "/desktop-en.jpg", flyerImageUrlMobileEn: "/mobile-en.jpg" };
+    const markup = renderToStaticMarkup(<ResponsiveEventArtwork
+      desktopCandidates={["/desktop-en.jpg"]}
+      mobileCandidates={sessionMobileArtworkCandidates(session, "en")}
+      alt="Event artwork"
+    />);
+    expect(markup).toContain('src="/desktop-en.jpg"');
+    expect(sessionMobileArtworkCandidates(session, "en")).toEqual(["/mobile-en.jpg", "/desktop-en.jpg"]);
   });
   it("renders nothing rather than an empty/broken img when no artwork exists", () => {
     expect(renderToStaticMarkup(<EventArtwork candidates={[]} alt="" />)).toBe("");

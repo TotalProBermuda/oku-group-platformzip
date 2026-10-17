@@ -245,6 +245,7 @@ export async function materializeSession(tx: Prisma.TransactionClient, state: St
     const [kind, name, locale] = key.split(".");
     if (["giftBagEnabled", "streetsideEnabled", "allowLateSales"].includes(key)) Object.assign(data, { [key]: value });
     if (kind === "artwork") Object.assign(data, { [`flyerImageUrl${name === "en" ? "En" : name === "es" ? "Es" : "Pt"}`]: value });
+    if (kind === "artworkMobile") Object.assign(data, { [`flyerImageUrlMobile${name === "en" ? "En" : name === "es" ? "Es" : "Pt"}`]: value });
     if (kind === "content" && locale === "en") {
       Object.assign(data, { [name]: value });
       await syncTranslations(tx, "EventSession", next.id, { [name]: modes(next.fieldModes)[key]?.mode === "inherit" ? null : value ?? null });
