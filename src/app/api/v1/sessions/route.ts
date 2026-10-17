@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
       capacity: true,
       soldCount: true,
       status: true,
+      eventHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
       series: {
         select: {
           id: true,
@@ -48,11 +49,13 @@ export async function GET(req: NextRequest) {
           heroImageUrlEn: true,
           heroImageUrlEs: true,
           heroImageUrlPt: true,
+          seriesHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
         },
       },
     },
   });
 
-  const localized = await Promise.all(sessions.map(async s => (await localizeSessions(s.series, [s], searchParams.get("locale") ?? "en"))[0]));
+  const requestedLocale = searchParams.get("locale") ?? "en";
+  const localized = await Promise.all(sessions.map(async s => (await localizeSessions(s.series, [s], requestedLocale))[0]));
   return NextResponse.json({ sessions: localized });
 }
