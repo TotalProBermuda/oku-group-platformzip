@@ -5,6 +5,7 @@ vi.mock("@/server/auth/session", () => ({ requireSession: sessionMock.requireSes
 
 const dbMock = vi.hoisted(() => {
   const tx = {
+    contentTranslation: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
     series: { create: vi.fn() },
     auditLog: { create: vi.fn() },
   };

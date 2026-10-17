@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { getEffectiveScanConfig } from "@/server/streetside/getScanConfig";
+import { ticketGiftBagEntitlement } from "@/server/commerce/sessionProducts";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ ticketId: string }> }) {
   try {
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
       where: { id: ticketId },
       select: {
         id: true,
+        entitlementSnapshot: true,
         sessionId: true,
         checkedInAt: true,
         giftBagLogs: { select: { id: true } },
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
     }
 
     // Enforce event-level gift-bag enablement (SUPERADMINs bypass)
-    if (!roles.includes("SUPERADMIN") && !ticket.session?.giftBagEnabled) {
+    if (!roles.includes("SUPERADMIN") && !ticketGiftBagEntitlement(ticket)) {
       return NextResponse.json({ ok: false, error: "Gift bag mode is not enabled for this event" }, { status: 403 });
     }
 

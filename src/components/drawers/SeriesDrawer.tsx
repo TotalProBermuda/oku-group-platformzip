@@ -8,6 +8,8 @@ import EntityLink from "@/components/entities/EntityLink";
 import ActionMenu, { ActionItem } from "@/components/entities/ActionMenu";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
 import { Globe, EyeOff, Users, DollarSign, Calendar, Plus, Settings } from "lucide-react";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 type Tab = "overview" | "sessions" | "orders";
 
@@ -54,6 +56,7 @@ export default function SeriesDrawer({
   const [sessionForm, setSessionForm] = useState({ title: "", startsAt: "", endsAt: "", capacity: "", occupancyScope: "VENUE", setupMinutes: "0", resetMinutes: "0" });
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const translations = useSeriesTranslations(seriesId, Boolean(seriesId));
 
   const fetchSeries = useCallback(async () => {
     if (!seriesId) return;
@@ -128,12 +131,13 @@ export default function SeriesDrawer({
         setSessionError(responseError(payload, t("admin", "createEventFailed")));
         return;
       }
-      const result = payload as { conflictCount?: number };
+      const result = payload as { conflictCount?: number; translation?: unknown };
+      const translation = await translations.onSave(result);
       setSessionForm({ title: "", startsAt: "", endsAt: "", capacity: "", occupancyScope: series?.spaceId ? "SPACE" : "VENUE", setupMinutes: "0", resetMinutes: "0" });
       setShowSessionForm(false);
       await fetchSeries();
       onUpdated?.();
-      flash(result.conflictCount ? `${t("admin", "eventCreated")} ${result.conflictCount} reservation conflict(s) need review.` : t("admin", "eventCreated"));
+      flash(translation?.state === "ready" ? "Saved / translations ready." : translation?.state === "retry" ? "Saved / translation needs retry." : result.conflictCount ? `${t("admin", "eventCreated")} ${result.conflictCount} reservation conflict(s) need review. Translation pending.` : "Saved / translation pending.");
     } catch {
       setSessionError(t("admin", "createEventFailed"));
     } finally {
@@ -256,6 +260,7 @@ export default function SeriesDrawer({
 
       {series && tab === "overview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />
           <Section title={t("admin", "details")}>
             <Link href={`/admin/experiences/${series.id}`} className="btn btn-primary btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
               <Settings size={13} />

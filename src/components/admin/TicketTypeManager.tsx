@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, type ClipboardEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 interface TicketType {
   id: string;
@@ -78,6 +80,7 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const translations = useSeriesTranslations(seriesId);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,6 +178,7 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
     if (!res.ok) {
       setError(data.error ?? "Save failed");
     } else {
+      await translations.onSave(data);
       setEditing(null);
       setEditingId(null);
       await load();
@@ -230,6 +234,7 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
           {error}
         </div>
       )}
+      <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />
 
       {!editing && (
         <>

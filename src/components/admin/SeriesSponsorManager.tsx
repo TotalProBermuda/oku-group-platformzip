@@ -1,4 +1,5 @@
 "use client";
+import SessionManagementNotice from "./SessionManagementNotice";
 
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
@@ -145,6 +146,8 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
 
   return (
     <div>
+      <SessionManagementNotice />
+      <fieldset disabled style={{ border: 0, padding: 0, margin: 0 }}>
       {/* Header actions */}
       <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
         <button onClick={() => { setEditId(null); resetForm(); setShowAdd(!showAdd); }} className="btn btn-primary" style={{ fontSize: 13 }}>
@@ -382,6 +385,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
           )}
         </div>
       )}
+      </fieldset>
     </div>
   );
 }

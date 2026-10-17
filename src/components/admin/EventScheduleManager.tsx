@@ -1,11 +1,14 @@
 "use client";
 import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
+import SessionManagementEditor from "@/components/admin/SessionManagementEditor";
+import SessionCardsEditor from "@/components/admin/SessionCardsEditor";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import MediaUpload from "@/components/ui/MediaUpload";
-import EventArtwork from "@/components/ui/EventArtwork";
-import { sessionArtworkCandidates } from "@/lib/eventArtwork";
-import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
+import { panamaDateTimeLocalInput, panamaDateTimeLocalIso } from "@/lib/panamaDateTime";
+import { useTranslation } from "@/components/i18n/LocaleProvider";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 type SessionRow = {
   id: string;
@@ -39,6 +42,7 @@ type FormState = {
   occupancyScope: "NONE" | "SPACE" | "VENUE";
   setupMinutes: string;
   resetMinutes: string;
+  useSeriesDefaults: boolean;
 };
 
 function localInput(date: Date) {
@@ -65,6 +69,7 @@ function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
     occupancyScope: hasSpace ? "SPACE" : "NONE",
     setupMinutes: "0",
     resetMinutes: "0",
+    useSeriesDefaults: false,
   };
 }
 
@@ -111,22 +116,13 @@ export default function EventScheduleManager({
   onCreated: () => Promise<void> | void;
   canManageSessionContent?: boolean;
 }) {
+  const t = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(() => initialForm(defaultCapacity, hasPhysicalSpace));
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState({ title: "", subtitle: "", description: "", flyerImageUrl: "", flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "" });
-  const [editTicketPrices, setEditTicketPrices] = useState<Record<string, string>>({});
-  const [savingContent, setSavingContent] = useState(false);
-    const [editingScheduleSessionId, setEditingScheduleSessionId] = useState<string | null>(null);
-    const [editSchedule, setEditSchedule] = useState({ startsAt: "", endsAt: "", capacity: "" });
-    const [savingSchedule, setSavingSchedule] = useState(false);
-
-  const sortedSessions = useMemo(
-    () => [...sessions].sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()),
-    [sessions],
-  );
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const translations = useSeriesTranslations(seriesId, showForm);
 
   function openForm() {
     setNotice("");
@@ -165,6 +161,7 @@ export default function EventScheduleManager({
           occupancyScope: form.occupancyScope,
           setupMinutes: form.setupMinutes,
           resetMinutes: form.resetMinutes,
+          ...(form.useSeriesDefaults ? { useSeriesDefaults: true } : {}),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -173,14 +170,19 @@ export default function EventScheduleManager({
         return;
       }
 
+      const translation = await translations.onSave(payload);
       const conflicts = Number((payload as { conflictCount?: unknown } | null)?.conflictCount ?? 0);
       setNotice(
-        conflicts > 0
+        translation?.state === "ready"
+          ? "Saved / translations ready."
+          : translation?.state === "retry"
+            ? "Saved / translation needs retry."
+            : conflicts > 0
           ? `Event created. ${conflicts} existing reservation(s) need review; none were cancelled.`
-          : "Event created.",
+          : "Saved / translation pending.",
       );
-      setShowForm(false);
       await onCreated();
+      setShowForm(false);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not create this event.");
     } finally {
@@ -207,6 +209,7 @@ export default function EventScheduleManager({
           {notice}
         </div>
       ) : null}
+      {showForm && <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />}
 
       {showForm ? (
         <form onSubmit={createEvent} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, marginTop: 16, padding: 18 }}>
@@ -267,6 +270,10 @@ export default function EventScheduleManager({
               </label>)}
             </div>
           </div> : null}
+          <label style={{ color: "#534942", display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, lineHeight: 1.45, marginTop: 14 }}>
+            <input type="checkbox" checked={form.useSeriesDefaults} onChange={(event) => setForm((current) => ({ ...current, useSeriesDefaults: event.target.checked }))} />
+            <span><strong>{t("admin", "sessionCreateInheritDefaults")}</strong><br /><span style={{ color: "#7c7168" }}>{t("admin", "sessionCreateInheritDefaultsHelp")}</span></span>
+          </label>
           <p style={{ color: "#7c7168", fontSize: 12, lineHeight: 1.5, margin: "14px 0 0" }}>
             Dining coverage creates a linked draft block. Existing reservations are flagged for review and are never cancelled automatically.
           </p>
@@ -279,120 +286,14 @@ export default function EventScheduleManager({
         </form>
       ) : null}
 
-      <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
-        {sortedSessions.length === 0 ? (
-          <p style={{ color: "#8a817a", fontSize: 14, margin: 0 }}>No event sessions yet.</p>
-        ) : sortedSessions.map((session) => (
-          <div key={session.id} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 10, padding: 14 }}>
-            <div style={{ alignItems: "center", display: "flex", gap: 14, justifyContent: "space-between", flexWrap: "wrap" }}>
-              <div style={{ minWidth: 0 }}>
-                <strong style={{ color: "#1a1614", display: "block", fontSize: 14 }}>{session.title || "Event session"}</strong>
-                {session.subtitle && <span style={{ color: "#7c7168", display: "block", fontSize: 13 }}>{session.subtitle}</span>}
-                <span style={{ color: "#6b7280", fontSize: 13 }}>
-                  {new Date(session.startsAt).toLocaleString(undefined, { timeZone: PANAMA_TIME_ZONE })} – {new Date(session.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: PANAMA_TIME_ZONE })} (Panama)
-                </span>
-                <EventArtwork candidates={sessionArtworkCandidates(session, "en")} alt={`${session.title || "Session"} flyer`} style={{ display: "block", borderRadius: 8, marginTop: 10, maxHeight: 120, maxWidth: "100%", objectFit: "cover" }} />
-              </div>
-              <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right" }}>
-                <strong style={{ color: "#374151" }}>{session.status}</strong><br />Capacity {session.capacity}
-                <label style={{ display: "block", paddingTop: 12 }}>
-                  <input type="checkbox" checked={!!session.allowLateSales} onChange={async event => {
-                    try {
-                      const response = await fetch(`/api/v1/admin/sessions/${session.id}`, {
-                        method: "PATCH", headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ allowLateSales: event.target.checked }),
-                      });
-                      if (!response.ok) throw new Error("Unable to change late sales. Superadmin access is required.");
-                      await onCreated();
-                      setNotice("Sales cutoff updated.");
-                    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to update cutoff"); }
-                  }} /> Allow sales after start, until event ends
-                </label>
-                {canManageSessionContent && <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => {
-                  setNotice("");
-                  setEditingSessionId(editingSessionId === session.id ? null : session.id);
-                  setEditContent({ title: session.title ?? "", subtitle: session.subtitle ?? "", description: session.description ?? "", flyerImageUrl: session.flyerImageUrl ?? "", flyerImageUrlEn: session.flyerImageUrlEn ?? "", flyerImageUrlEs: session.flyerImageUrlEs ?? "", flyerImageUrlPt: session.flyerImageUrlPt ?? "" });
-                  setEditTicketPrices(Object.fromEntries((session.ticketPrices ?? []).map((price) => [price.ticketTypeId, (price.priceCents / 100).toFixed(2)])));
-                }}>{editingSessionId === session.id ? "Close content editor" : "Edit session content"}</button>}
-              </div>
-            </div>
-            {editingSessionId === session.id && canManageSessionContent && (
-              <div style={{ borderTop: "1px solid #eee7df", marginTop: 14, paddingTop: 14 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
-                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>Session title<input maxLength={160} value={editContent.title} onChange={(e) => setEditContent((current) => ({ ...current, title: e.target.value }))} style={inputStyle} /></label>
-                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>Theme / subtitle<input maxLength={240} value={editContent.subtitle} onChange={(e) => setEditContent((current) => ({ ...current, subtitle: e.target.value }))} style={inputStyle} /></label>
-                </div>
-                <label style={{ color: "#534942", display: "block", fontSize: 12, fontWeight: 700, marginTop: 12, textTransform: "uppercase" }}>Session description<textarea rows={3} maxLength={5000} value={editContent.description} onChange={(e) => setEditContent((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} /></label>
-                <MediaUpload value={editContent.flyerImageUrl} onChange={(url) => setEditContent((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
-                <LocalizedArtworkEditor kind="session" value={editContent} onChange={(field, url) => setEditContent(current => ({ ...current, [field]: url }))} />
-                {ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
-                  <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
-                  <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave blank to inherit the series price. Paid orders are not repriced.</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-                    {ticketTypes.map((ticket) => <label key={ticket.id} style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>{ticket.name} · base ${(ticket.priceCents / 100).toFixed(2)}
-                      <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="Use series price" value={editTicketPrices[ticket.id] ?? ""} onChange={(event) => setEditTicketPrices((current) => ({ ...current, [ticket.id]: event.target.value }))} style={inputStyle} />
-                    </label>)}
-                  </div>
-                </div> : null}
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-                  <button type="button" className="btn btn-primary" disabled={savingContent} onClick={async () => {
-                    setSavingContent(true); setNotice("");
-                    try {
-                      const response = await fetch(`/api/v1/admin/sessions/${session.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...editContent, ticketPrices: Object.entries(editTicketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })) }) });
-                      const payload = await response.json().catch(() => null);
-                      if (!response.ok) throw new Error(payload?.error ?? "Unable to save session content.");
-                      setEditingSessionId(null); setNotice("Session content saved."); await onCreated();
-                    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to save session content."); }
-                    finally { setSavingContent(false); }
-                  }}>{savingContent ? "Saving…" : "Save session content"}</button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+      <SessionCardsEditor seriesId={seriesId} sessions={sessions} canManageRestricted={canManageSessionContent} onSaved={onCreated} />
+      <div style={{ borderTop: "1px solid #e8e0d8", marginTop: 22, paddingTop: 14 }}>
+        <button type="button" className="btn btn-ghost" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((open) => !open)}>
+          {showAdvanced ? "Close advanced series tools" : "Advanced series tools"}
+        </button>
+        <p style={{ color: "#7c7168", fontSize: 12, margin: "6px 0 0" }}>For administrators who need to apply a change across multiple dates or manage series defaults.</p>
+        {showAdvanced && <div style={{ marginTop: 12 }}><SessionManagementEditor seriesId={seriesId} onSaved={onCreated} canManageRestricted={canManageSessionContent} /></div>}
       </div>
-    {canManageSessionContent && (
-      <div style={{ borderTop: "1px solid #e8e0d8", marginTop: 24, paddingTop: 20 }}>
-        <h3 style={{ color: "#1a1614", fontSize: 18, margin: "0 0 6px" }}>Session schedule &amp; capacity</h3>
-        <p style={{ color: "#7c7168", fontSize: 13, lineHeight: 1.5, margin: "0 0 14px" }}>Each session has its own Panama-local time and seat limit. Capacity cannot be reduced below seats sold or issued. Time changes for sessions with ticket or checkout history require the postponement process.</p>
-        <div style={{ display: "grid", gap: 12 }}>
-          {sortedSessions.map((session) => (
-            <div key={"schedule-" + session.id} style={{ border: "1px solid #e8e0d8", borderRadius: 12, padding: 14 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <div><strong>{session.title || "Event session"}</strong><div style={{ color: "#7c7168", fontSize: 13, marginTop: 4 }}>{new Date(session.startsAt).toLocaleString()} · Capacity {session.capacity}</div></div>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
-                  if (editingScheduleSessionId === session.id) { setEditingScheduleSessionId(null); return; }
-                  setEditSchedule({ startsAt: localInput(new Date(session.startsAt)), endsAt: localInput(new Date(session.endsAt)), capacity: String(session.capacity) });
-                  setEditingScheduleSessionId(session.id);
-                }}>{editingScheduleSessionId === session.id ? "Close schedule editor" : "Edit schedule & capacity"}</button>
-              </div>
-              {editingScheduleSessionId === session.id && (
-                <form onSubmit={async (event) => {
-                  event.preventDefault(); setSavingSchedule(true); setNotice("");
-                  try {
-                    const response = await fetch("/api/v1/admin/sessions/" + session.id + "/schedule", {
-                      method: "PATCH", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ startsAt: panamaDateTimeLocalIso(editSchedule.startsAt), endsAt: panamaDateTimeLocalIso(editSchedule.endsAt), capacity: Number(editSchedule.capacity) }),
-                    });
-                    const payload = await response.json().catch(() => null);
-                    if (!response.ok) throw new Error(payload?.error ?? "Unable to save session schedule.");
-                    setEditingScheduleSessionId(null);
-                    setNotice(payload?.reservationConflictCount ? "Schedule saved; review the new host reservation conflict(s)." : "Session schedule saved.");
-                    await onCreated();
-                  } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to save session schedule."); }
-                  finally { setSavingSchedule(false); }
-                }} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginTop: 14 }}>
-                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>STARTS (PANAMA TIME)<input required type="datetime-local" value={editSchedule.startsAt} onChange={(event) => setEditSchedule((current) => ({ ...current, startsAt: event.target.value }))} style={inputStyle} /></label>
-                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>ENDS (PANAMA TIME)<input required type="datetime-local" min={editSchedule.startsAt} value={editSchedule.endsAt} onChange={(event) => setEditSchedule((current) => ({ ...current, endsAt: event.target.value }))} style={inputStyle} /></label>
-                  <label style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>CAPACITY<input required type="number" min="1" max="100000" step="1" value={editSchedule.capacity} onChange={(event) => setEditSchedule((current) => ({ ...current, capacity: event.target.value }))} style={inputStyle} /></label>
-                  <div style={{ display: "flex", alignItems: "end" }}><button type="submit" className="btn btn-primary" disabled={savingSchedule}>{savingSchedule ? "Saving…" : "Save schedule & capacity"}</button></div>
-                </form>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
     </section>
   );
 }

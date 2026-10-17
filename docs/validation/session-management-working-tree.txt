@@ -1,0 +1,29 @@
+Review-pass pre-commit snapshot; final SHA/status are supplied in the final handoff.
+Branch: codex/session-management-dynamic-20261014
+ M .agents/memory/MEMORY.md
+ M docs/dynamic-session-management-audit.md
+ M docs/dynamic-session-management-handoff.md
+ M docs/validation/session-management-browser-tests.txt
+ M docs/validation/session-management-focused-tests.txt
+ M docs/validation/session-management-isolated-db-tests.txt
+ M docs/validation/session-management-typescript-final.txt
+ M docs/validation/session-management-working-tree.txt
+ D prisma/session-management-additive.sql
+ M src/app/api/v1/admin/experiences/[id]/attendees/route.ts
+ M src/components/admin/SessionManagementEditor.tsx
+ M src/i18n/translations/en/admin.json
+ M src/i18n/translations/es/admin.json
+ M src/i18n/translations/pt/admin.json
+ M src/server/checkin/claimAdmission.ts
+ M src/server/series/sessionFields.ts
+ M src/server/series/sessionFinancialAssignments.ts
+ M src/server/series/sessionState.ts
+ M tests/browser/session-management.spec.ts
+ M tests/server/series/sessionManagement.database.test.ts
+?? .agents/memory/validation-baseline-comparison.md
+?? docs/validation/session-management-browser-initial.txt
+?? docs/validation/session-management-browser-targeted.txt
+?? docs/validation/session-management-build.txt
+?? docs/validation/session-management-typescript-prebuild.txt
+?? prisma/migrations/20261014160000_dynamic_session_management/
+?? tests/server/series/sessionCapacityDefaults.test.ts

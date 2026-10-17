@@ -1,0 +1,249 @@
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(4,68): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(5,77): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(6,74): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(7,73): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(8,72): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(9,71): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(10,70): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(11,71): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(12,75): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(13,74): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(14,69): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(15,71): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(16,60): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/.generated/mockup-components.ts(17,70): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+artifacts/mockup-sandbox/src/App.tsx(91,22): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+artifacts/mockup-sandbox/src/components/mockups/platform-demo/AccessibilityFirst.tsx(2,23): error TS2307: Cannot find module '@/components/ui/badge' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/mockups/platform-demo/AccessibilityFirst.tsx(3,22): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/mockups/platform-demo/AccessibilityFirst.tsx(4,40): error TS2307: Cannot find module '@/components/ui/avatar' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/mockups/platform-demo/AffordanceFirst.tsx(3,23): error TS2307: Cannot find module '@/components/ui/badge' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/accordion.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/alert-dialog.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/alert-dialog.tsx(5,32): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/alert.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/avatar.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/badge.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/breadcrumb.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/button-group.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/button-group.tsx(5,27): error TS2307: Cannot find module '@/components/ui/separator' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/button.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/calendar.tsx(11,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/calendar.tsx(12,40): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/calendar.tsx(39,31): error TS7006: Parameter 'date' implicitly has an 'any' type.
+artifacts/mockup-sandbox/src/components/ui/card.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/carousel.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/carousel.tsx(8,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/chart.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/checkbox.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/command.tsx(8,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/command.tsx(9,39): error TS2307: Cannot find module '@/components/ui/dialog' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/context-menu.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/dialog.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/drawer.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/dropdown-menu.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/empty.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/field.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/field.tsx(7,23): error TS2307: Cannot find module '@/components/ui/label' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/field.tsx(8,27): error TS2307: Cannot find module '@/components/ui/separator' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/form.tsx(13,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/form.tsx(14,23): error TS2307: Cannot find module '@/components/ui/label' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/hover-card.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/input-group.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/input-group.tsx(5,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/input-group.tsx(6,23): error TS2307: Cannot find module '@/components/ui/input' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/input-group.tsx(7,26): error TS2307: Cannot find module '@/components/ui/textarea' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/input-otp.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/input.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/item.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/item.tsx(6,27): error TS2307: Cannot find module '@/components/ui/separator' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/kbd.tsx(1,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/label.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/menubar.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/navigation-menu.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/pagination.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/pagination.tsx(5,45): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/pagination.tsx(68,5): error TS2783: 'size' is specified more than once, so this usage will be overwritten.
+artifacts/mockup-sandbox/src/components/ui/pagination.tsx(84,5): error TS2783: 'size' is specified more than once, so this usage will be overwritten.
+artifacts/mockup-sandbox/src/components/ui/popover.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/progress.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/radio-group.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/resizable.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/scroll-area.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/select.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/separator.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sheet.tsx(8,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(8,29): error TS2307: Cannot find module '@/hooks/use-mobile' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(9,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(10,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(11,23): error TS2307: Cannot find module '@/components/ui/input' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(12,27): error TS2307: Cannot find module '@/components/ui/separator' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(19,8): error TS2307: Cannot find module '@/components/ui/sheet' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(20,26): error TS2307: Cannot find module '@/components/ui/skeleton' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(26,8): error TS2307: Cannot find module '@/components/ui/tooltip' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/sidebar.tsx(270,17): error TS7006: Parameter 'event' implicitly has an 'any' type.
+artifacts/mockup-sandbox/src/components/ui/skeleton.tsx(1,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/slider.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/spinner.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/switch.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/table.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/tabs.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/textarea.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/toast.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/toaster.tsx(1,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/toaster.tsx(9,8): error TS2307: Cannot find module '@/components/ui/toast' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/toaster.tsx(16,31): error TS7031: Binding element 'id' implicitly has an 'any' type.
+artifacts/mockup-sandbox/src/components/ui/toaster.tsx(16,35): error TS7031: Binding element 'title' implicitly has an 'any' type.
+artifacts/mockup-sandbox/src/components/ui/toaster.tsx(16,42): error TS7031: Binding element 'description' implicitly has an 'any' type.
+artifacts/mockup-sandbox/src/components/ui/toaster.tsx(16,55): error TS7031: Binding element 'action' implicitly has an 'any' type.
+artifacts/mockup-sandbox/src/components/ui/toggle-group.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/toggle-group.tsx(8,32): error TS2307: Cannot find module '@/components/ui/toggle' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/toggle-group.tsx(22,4): error TS2322: Type '{ children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; } | { children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; }' is not assignable to type 'IntrinsicAttributes & ((ToggleGroupSingleProps | ToggleGroupMultipleProps) & RefAttributes<HTMLDivElement>)'.
+  Type '{ children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; }' is not assignable to type 'IntrinsicAttributes & ((ToggleGroupSingleProps | ToggleGroupMultipleProps) & RefAttributes<HTMLDivElement>)'.
+    Property 'type' is missing in type '{ children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; }' but required in type 'ToggleGroupMultipleProps'.
+artifacts/mockup-sandbox/src/components/ui/toggle-group.tsx(43,6): error TS2741: Property 'value' is missing in type '{ children: any; ref: ForwardedRef<HTMLButtonElement>; className: any; }' but required in type 'Omit<ToggleGroupItemImplProps, "pressed">'.
+artifacts/mockup-sandbox/src/components/ui/toggle.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/components/ui/tooltip.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/hooks/use-toast.ts(6,8): error TS2307: Cannot find module '@/components/ui/toast' or its corresponding type declarations.
+artifacts/mockup-sandbox/src/hooks/use-toast.ts(156,22): error TS7006: Parameter 'open' implicitly has an 'any' type.
+attached_assets/partnerSeats-service_1777571263836.ts(11,60): error TS2307: Cannot find module './roles' or its corresponding type declarations.
+attached_assets/partnerSeats-service_1777571263836.ts(15,8): error TS2307: Cannot find module './commissionModel' or its corresponding type declarations.
+scripts/seed-demo.ts(454,33): error TS2345: Argument of type 'readonly ["DIRECT", "DIRECT", "INFLUENCER_HOST", "EVENT_REFERRER_LINK"]' is not assignable to parameter of type 'unknown[]'.
+  The type 'readonly ["DIRECT", "DIRECT", "INFLUENCER_HOST", "EVENT_REFERRER_LINK"]' is 'readonly' and cannot be assigned to the mutable type 'unknown[]'.
+scripts/seed-demo.ts(460,34): error TS2345: Argument of type 'readonly ["PAID", "PAID", "PAID", "PENDING", "CANCELLED"]' is not assignable to parameter of type 'unknown[]'.
+  The type 'readonly ["PAID", "PAID", "PAID", "PENDING", "CANCELLED"]' is 'readonly' and cannot be assigned to the mutable type 'unknown[]'.
+scripts/seed-demo.ts(467,13): error TS2322: Type 'unknown' is not assignable to type 'OrderStatus | undefined'.
+scripts/seed-demo.ts(473,13): error TS2322: Type 'unknown' is not assignable to type 'AttributionSource | undefined'.
+scripts/seed-menus.ts(27,18): error TS2353: Object literal may only specify known properties, and 'venueSlug_menuType' does not exist in type 'VenueMenuRecordWhereUniqueInput'.
+scripts/seed-sponsorship.ts(152,24): error TS2322: Type 'string[] | null' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Type 'null' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+scripts/seed-sponsorship.ts(152,52): error TS2322: Type 'string[] | null' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Type 'null' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+scripts/verify-trust-loop.ts(139,71): error TS2339: Property 'sourceValue' does not exist on type '{ id: string; createdAt: Date; createdByUserId: string | null; reservationId: string | null; invuOrderId: string | null; invuOrderNormalizedId: string | null; bookingCode: string | null; ... 5 more ...; supportingDataJson: JsonValue; }'.
+scripts/verify-trust-loop.ts(149,15): error TS2353: Object literal may only specify known properties, and 'invuOrderNormalizedId' does not exist in type '(Without<TableSessionUpdateManyMutationInput, TableSessionUncheckedUpdateManyInput> & TableSessionUncheckedUpdateManyInput) | (Without<...> & TableSessionUpdateManyMutationInput)'.
+src/app/api/hiring/applications/[id]/stage/route.ts(12,19): error TS2339: Property 'user' does not exist on type '{}'.
+src/app/api/hiring/applications/[id]/stage/route.ts(39,27): error TS2339: Property 'user' does not exist on type '{}'.
+src/app/api/v1/admin/commerce/settings/route.ts(119,13): error TS2322: Type '{ changes: Record<string, { from: unknown; to: unknown; }>; timestamp: string; }' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Types of property 'changes' are incompatible.
+    Type 'Record<string, { from: unknown; to: unknown; }>' is not assignable to type 'InputJsonValue | null | undefined'.
+      Type 'Record<string, { from: unknown; to: unknown; }>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
+src/app/api/v1/admin/experiences/route.ts(75,42): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/app/api/v1/admin/experiences/route.ts(75,51): error TS18047: 'session' is possibly 'null'.
+src/app/api/v1/admin/experiences/route.ts(75,51): error TS18048: 'session.user' is possibly 'undefined'.
+src/app/api/v1/admin/influencer-invites/route.ts(50,5): error TS2322: Type '{ token: string; invitedEmail: any; invitedName: any; commissionRateBps: number; seriesId: string | null; createdByUserId: string | undefined; expiresAt: Date; }' is not assignable to type '(Without<InfluencerInviteCreateInput, InfluencerInviteUncheckedCreateInput> & InfluencerInviteUncheckedCreateInput) | (Without<...> & InfluencerInviteCreateInput)'.
+  Types of property 'createdByUserId' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/app/api/v1/admin/integrations/invu/disconnect/route.ts(21,15): error TS18047: 'session' is possibly 'null'.
+src/app/api/v1/admin/integrations/invu/reauth/route.ts(21,15): error TS18047: 'session' is possibly 'null'.
+src/app/api/v1/admin/integrations/invu/sync-trigger/route.ts(38,7): error TS18047: 'session' is possibly 'null'.
+src/app/api/v1/admin/payments/gateways/authorize-net/route.ts(80,13): error TS2322: Type '{ provider: string; changes: Record<string, unknown>; timestamp: string; }' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Types of property 'changes' are incompatible.
+    Type 'Record<string, unknown>' is not assignable to type 'InputJsonValue | null | undefined'.
+      Type 'Record<string, unknown>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
+src/app/api/v1/events/[id]/commission-performance/route.ts(18,9): error TS2561: Object literal may only specify known properties, but 'sessions' does not exist in type 'OrderWhereInput'. Did you mean to write 'session'?
+src/app/api/v1/events/[id]/commission-performance/route.ts(59,43): error TS2339: Property 'amountCents' does not exist on type '{ status: OrderStatus; id: string; seriesId: string; createdAt: Date; updatedAt: Date; entitlementSnapshot: JsonValue; userId: string; sessionId: string; ... 22 more ...; cancelledAt: Date | null; }'.
+src/app/api/v1/events/[id]/commission-performance/route.ts(68,25): error TS2551: Property 'attributedInfluencer' does not exist on type '{ status: OrderStatus; id: string; seriesId: string; createdAt: Date; updatedAt: Date; entitlementSnapshot: JsonValue; userId: string; sessionId: string; ... 22 more ...; cancelledAt: Date | null; }'. Did you mean 'attributedInfluencerId'?
+src/app/api/v1/events/[id]/commission-performance/route.ts(69,23): error TS2551: Property 'attributedInfluencer' does not exist on type '{ status: OrderStatus; id: string; seriesId: string; createdAt: Date; updatedAt: Date; entitlementSnapshot: JsonValue; userId: string; sessionId: string; ... 22 more ...; cancelledAt: Date | null; }'. Did you mean 'attributedInfluencerId'?
+src/app/api/v1/events/[id]/commission-performance/route.ts(82,33): error TS2339: Property 'amountCents' does not exist on type '{ status: OrderStatus; id: string; seriesId: string; createdAt: Date; updatedAt: Date; entitlementSnapshot: JsonValue; userId: string; sessionId: string; ... 22 more ...; cancelledAt: Date | null; }'.
+src/app/api/v1/events/[id]/commission-performance/route.ts(83,34): error TS2339: Property 'tickets' does not exist on type '{ status: OrderStatus; id: string; seriesId: string; createdAt: Date; updatedAt: Date; entitlementSnapshot: JsonValue; userId: string; sessionId: string; ... 22 more ...; cancelledAt: Date | null; }'.
+src/app/api/v1/events/[id]/commission-performance/route.ts(84,53): error TS2339: Property 'amountCents' does not exist on type '{ status: OrderStatus; id: string; seriesId: string; createdAt: Date; updatedAt: Date; entitlementSnapshot: JsonValue; userId: string; sessionId: string; ... 22 more ...; cancelledAt: Date | null; }'.
+src/app/api/v1/events/[id]/commission-performance/route.ts(86,29): error TS2339: Property 'tickets' does not exist on type '{ status: OrderStatus; id: string; seriesId: string; createdAt: Date; updatedAt: Date; entitlementSnapshot: JsonValue; userId: string; sessionId: string; ... 22 more ...; cancelledAt: Date | null; }'.
+src/app/api/v1/events/[id]/funnel/route.ts(25,47): error TS2353: Object literal may only specify known properties, and 'sessionId' does not exist in type 'EventRegistrantWhereInput'.
+src/app/api/v1/events/[id]/invitations/send/route.ts(28,5): error TS18047: 'session' is possibly 'null'.
+src/app/api/v1/events/[id]/invitations/send/route.ts(28,5): error TS18048: 'session.user' is possibly 'undefined'.
+src/app/api/v1/events/[id]/invitations/send/route.ts(28,5): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/app/api/v1/events/[id]/registrants/route.ts(9,23): error TS2339: Property 'isAdmin' does not exist on type '{ name?: string | null | undefined; email?: string | null | undefined; image?: string | null | undefined; } & { id?: string | undefined; roles?: RoleKey[] | undefined; passwordlessDestination?: string | undefined; }'.
+src/app/api/v1/experiences/[slug]/waitlist/route.ts(27,69): error TS2322: Type 'string' is not assignable to type 'WaitlistSource | undefined'.
+src/app/careers/[slug]/apply/page.tsx(42,7): error TS7034: Variable 'existingDraft' implicitly has type 'any' in some locations where its type cannot be determined.
+src/app/careers/[slug]/apply/page.tsx(53,9): error TS7005: Variable 'existingDraft' implicitly has an 'any' type.
+src/app/careers/[slug]/apply/page.tsx(56,17): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
+src/app/careers/[slug]/apply/page.tsx(67,9): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
+src/app/careers/[slug]/apply/page.tsx(79,17): error TS7005: Variable 'existingDraft' implicitly has an 'any' type.
+src/app/careers/[slug]/apply/page.tsx(87,11): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
+src/app/careers/[slug]/apply/page.tsx(93,17): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
+src/app/careers/page.tsx(27,35): error TS2322: Type '{ status: "PUBLISHED"; visibility: "PUBLIC"; } & { department?: string | undefined; engagementType?: string | undefined; }' is not assignable to type 'OpportunityWhereInput | undefined'.
+  Type '{ status: "PUBLISHED"; visibility: "PUBLIC"; } & { department?: string | undefined; engagementType?: string | undefined; }' is not assignable to type 'OpportunityWhereInput'.
+    Types of property 'engagementType' are incompatible.
+      Type 'string | undefined' is not assignable to type 'EngagementType | EnumEngagementTypeFilter<"Opportunity"> | undefined'.
+        Type 'string' is not assignable to type 'EngagementType | EnumEngagementTypeFilter<"Opportunity"> | undefined'.
+src/app/my/membership/page.tsx(79,7): error TS2322: Type '{ id: string; status: OrderStatus; createdAt: string; tickets: { session: { series: { title: string; venue: VenueKey | null; }; } | null; }[]; }[]' is not assignable to type 'OrderItem[]'.
+  Type '{ id: string; status: $Enums.OrderStatus; createdAt: string; tickets: { session: { series: { title: string; venue: $Enums.VenueKey | null; }; } | null; }[]; }' is not assignable to type 'OrderItem'.
+    Types of property 'tickets' are incompatible.
+      Type '{ session: { series: { title: string; venue: VenueKey | null; }; } | null; }[]' is not assignable to type '{ session: { series: { title: string; venue: string; } | null; } | null; }[]'.
+        Type '{ session: { series: { title: string; venue: $Enums.VenueKey | null; }; } | null; }' is not assignable to type '{ session: { series: { title: string; venue: string; } | null; } | null; }'.
+          Types of property 'session' are incompatible.
+            Type '{ series: { title: string; venue: VenueKey | null; }; } | null' is not assignable to type '{ series: { title: string; venue: string; } | null; } | null'.
+              Type '{ series: { title: string; venue: $Enums.VenueKey | null; }; }' is not assignable to type '{ series: { title: string; venue: string; } | null; }'.
+                The types of 'series.venue' are incompatible between these types.
+                  Type 'string | null' is not assignable to type 'string'.
+                    Type 'null' is not assignable to type 'string'.
+src/app/my/orders/page.tsx(39,27): error TS2322: Type '{ id: string; status: OrderStatus; totalCents: number; createdAt: string; series: { title: string; venue: VenueKey | null; slug: string; }; session: { title: string | null; startsAt: string; } | null; lineItems: { ...; }[]; tickets: { ...; }[]; }[]' is not assignable to type 'Order[]'.
+  Type '{ id: string; status: $Enums.OrderStatus; totalCents: number; createdAt: string; series: { title: string; venue: $Enums.VenueKey | null; slug: string; }; session: { title: string | null; startsAt: string; } | null; lineItems: { ...; }[]; tickets: { ...; }[]; }' is not assignable to type 'Order'.
+    The types of 'series.venue' are incompatible between these types.
+      Type 'string | null' is not assignable to type 'string'.
+        Type 'null' is not assignable to type 'string'.
+src/app/my/tickets/page.tsx(43,28): error TS2322: Type '{ id: string; code: string; ticketStatus: TicketStatus; attendeeName: string | null; createdAt: string; session: { startsAt: string; series: { title: string; slug: string; venue: string; city: string | null; } | null; } | null; ticketType: { ...; } | null; }[]' is not assignable to type 'Ticket[]'.
+  Type '{ id: string; code: string; ticketStatus: $Enums.TicketStatus; attendeeName: string | null; createdAt: string; session: { startsAt: string; series: { title: string; slug: string; venue: string; city: string | null; } | null; } | null; ticketType: { ...; } | null; }' is not assignable to type 'Ticket'.
+    Types of property 'ticketType' are incompatible.
+      Type '{ name: string; tierCode: string | null; } | null' is not assignable to type '{ name: string; tierCode: string; } | null'.
+        Type '{ name: string; tierCode: string | null; }' is not assignable to type '{ name: string; tierCode: string; }'.
+          Types of property 'tierCode' are incompatible.
+            Type 'string | null' is not assignable to type 'string'.
+              Type 'null' is not assignable to type 'string'.
+src/i18n/translationsData.ts(166,5): error TS2322: Type '{ backToGroup: string; ourRestaurants: string; restaurantsSubtitle: string; reserveArrow: string; viewProfile: string; cuisine: string; covers: string; setting: string; hours: string; dress: string; ... 11 more ...; terrace: { ...; }; }' is not assignable to type 'Record<string, string>'.
+  Property '"oku"' is incompatible with index signature.
+    Type '{ headline: string; tagline: string; tag: string; description: string; heroLine1: string; heroLine2: string; heroLine3: string; cuisine: string; setting: string; dresscode: string; about: string[]; ... 5 more ...; spaceBody: string; }' is not assignable to type 'string'.
+src/i18n/translationsData.ts(175,5): error TS2322: Type '{ sessionManagementLegacyNotice: string; adminPanel: string; superAdmin: string; dashboard: string; members: string; memberships: string; menus: string; founderApplications: string; events: string; ... 715 more ...; sessionCreateInheritDefaultsHelp: string; }' is not assignable to type 'AdminTranslations'.
+  Type '{ sessionManagementLegacyNotice: string; adminPanel: string; superAdmin: string; dashboard: string; members: string; memberships: string; menus: string; founderApplications: string; events: string; ... 715 more ...; sessionCreateInheritDefaultsHelp: string; }' is not assignable to type 'Record<string, string>'.
+    Property '"revenue"' is incompatible with index signature.
+      Type '{ dashboard: { title: string; subtitle: string; attributedReservations: string; viewSessions: string; closedSessions: string; grossRevenue: string; netCommissionable: string; pendingObligations: string; ... 7 more ...; noSyncYet: string; }; ... 6 more ...; sourceLabel: { ...; }; }' is not assignable to type 'string'.
+src/i18n/translationsData.ts(178,5): error TS2322: Type '{ referrals: string; myReferrals: string; referralCode: string; referralLink: string; copyLink: string; linkCopied: string; shareLink: string; referralNetwork: string; totalReferrals: string; ... 92 more ...; mergeConflicts: { ...; }; }' is not assignable to type 'Record<string, string>'.
+  Property '"console"' is incompatible with index signature.
+    Type '{ title: string; tab: { qr: string; offers: string; activity: string; earnings: string; profile: string; menu: string; }; role: { streetside: string; referrer: string; taxi: string; concierge: string; tourGuide: string; promoter: string; influencer: string; partner: string; generic: string; }; earnings: { ...; }; pr...' is not assignable to type 'string'.
+src/i18n/translationsData.ts(189,5): error TS2322: Type '{ backToGroup: string; ourRestaurants: string; restaurantsSubtitle: string; reserveArrow: string; viewProfile: string; cuisine: string; covers: string; setting: string; hours: string; dress: string; ... 11 more ...; terrace: { ...; }; }' is not assignable to type 'Record<string, string>'.
+  Property '"oku"' is incompatible with index signature.
+    Type '{ headline: string; tagline: string; tag: string; description: string; heroLine1: string; heroLine2: string; heroLine3: string; cuisine: string; setting: string; dresscode: string; about: string[]; ... 5 more ...; spaceBody: string; }' is not assignable to type 'string'.
+src/i18n/translationsData.ts(198,5): error TS2322: Type '{ sessionManagementLegacyNotice: string; adminPanel: string; superAdmin: string; dashboard: string; members: string; memberships: string; menus: string; founderApplications: string; events: string; ... 715 more ...; sessionCreateInheritDefaultsHelp: string; }' is not assignable to type 'AdminTranslations'.
+  Type '{ sessionManagementLegacyNotice: string; adminPanel: string; superAdmin: string; dashboard: string; members: string; memberships: string; menus: string; founderApplications: string; events: string; ... 715 more ...; sessionCreateInheritDefaultsHelp: string; }' is not assignable to type 'Record<string, string>'.
+    Property '"revenue"' is incompatible with index signature.
+      Type '{ dashboard: { title: string; subtitle: string; attributedReservations: string; viewSessions: string; closedSessions: string; grossRevenue: string; netCommissionable: string; pendingObligations: string; ... 7 more ...; noSyncYet: string; }; ... 6 more ...; sourceLabel: { ...; }; }' is not assignable to type 'string'.
+src/i18n/translationsData.ts(201,5): error TS2322: Type '{ referrals: string; myReferrals: string; referralCode: string; referralLink: string; copyLink: string; linkCopied: string; shareLink: string; referralNetwork: string; totalReferrals: string; ... 92 more ...; mergeConflicts: { ...; }; }' is not assignable to type 'Record<string, string>'.
+  Property '"console"' is incompatible with index signature.
+    Type '{ title: string; tab: { qr: string; offers: string; activity: string; earnings: string; profile: string; menu: string; }; role: { streetside: string; referrer: string; taxi: string; concierge: string; tourGuide: string; promoter: string; influencer: string; partner: string; generic: string; }; earnings: { ...; }; pr...' is not assignable to type 'string'.
+src/i18n/translationsData.ts(212,5): error TS2322: Type '{ backToGroup: string; ourRestaurants: string; restaurantsSubtitle: string; reserveArrow: string; viewProfile: string; cuisine: string; covers: string; setting: string; hours: string; dress: string; ... 11 more ...; terrace: { ...; }; }' is not assignable to type 'Record<string, string>'.
+  Property '"oku"' is incompatible with index signature.
+    Type '{ headline: string; tagline: string; tag: string; description: string; heroLine1: string; heroLine2: string; heroLine3: string; cuisine: string; setting: string; dresscode: string; about: string[]; ... 5 more ...; spaceBody: string; }' is not assignable to type 'string'.
+src/i18n/translationsData.ts(221,5): error TS2322: Type '{ sessionManagementLegacyNotice: string; adminPanel: string; superAdmin: string; dashboard: string; members: string; memberships: string; menus: string; founderApplications: string; events: string; ... 715 more ...; sessionCreateInheritDefaultsHelp: string; }' is not assignable to type 'AdminTranslations'.
+  Type '{ sessionManagementLegacyNotice: string; adminPanel: string; superAdmin: string; dashboard: string; members: string; memberships: string; menus: string; founderApplications: string; events: string; ... 715 more ...; sessionCreateInheritDefaultsHelp: string; }' is not assignable to type 'Record<string, string>'.
+    Property '"revenue"' is incompatible with index signature.
+      Type '{ dashboard: { title: string; subtitle: string; attributedReservations: string; viewSessions: string; closedSessions: string; grossRevenue: string; netCommissionable: string; pendingObligations: string; ... 7 more ...; noSyncYet: string; }; ... 6 more ...; sourceLabel: { ...; }; }' is not assignable to type 'string'.
+src/i18n/translationsData.ts(224,5): error TS2322: Type '{ referrals: string; myReferrals: string; referralCode: string; referralLink: string; copyLink: string; linkCopied: string; shareLink: string; referralNetwork: string; totalReferrals: string; ... 92 more ...; mergeConflicts: { ...; }; }' is not assignable to type 'Record<string, string>'.
+  Property '"console"' is incompatible with index signature.
+    Type '{ title: string; tab: { qr: string; offers: string; activity: string; earnings: string; profile: string; menu: string; }; role: { streetside: string; referrer: string; taxi: string; concierge: string; tourGuide: string; promoter: string; influencer: string; partner: string; generic: string; }; earnings: { ...; }; pr...' is not assignable to type 'string'.
+tests/helpers/mockPrisma.ts(458,9): error TS7022: '$transaction' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+tests/helpers/mockPrisma.ts(460,9): error TS7022: 'client' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+tests/server/audit/anomalyAlerter.test.ts(68,28): error TS2352: Conversion of type '{ select?: AuditLogSelect<DefaultArgs> | null | undefined; data: (Without<AuditLogCreateInput, AuditLogUncheckedCreateInput> & AuditLogUncheckedCreateInput) | (Without<...> & AuditLogCreateInput); }' to type '{ data: { action: string; metadata: { signalKey: string; sourceAuditIds: string[]; }; }; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'data' are incompatible.
+    Type '(Without<AuditLogCreateInput, AuditLogUncheckedCreateInput> & AuditLogUncheckedCreateInput) | (Without<...> & AuditLogCreateInput)' is not comparable to type '{ action: string; metadata: { signalKey: string; sourceAuditIds: string[]; }; }'.
+      Type 'Without<AuditLogUncheckedCreateInput, AuditLogCreateInput> & AuditLogCreateInput' is not comparable to type '{ action: string; metadata: { signalKey: string; sourceAuditIds: string[]; }; }'.
+        Types of property 'metadata' are incompatible.
+          Type 'NullableJsonNullValueInput | InputJsonValue | undefined' is not comparable to type '{ signalKey: string; sourceAuditIds: string[]; }'.
+            Type '{ toJSON(): unknown; }' is missing the following properties from type '{ signalKey: string; sourceAuditIds: string[]; }': signalKey, sourceAuditIds
+tests/server/audit/anomalyDetector.test.ts(28,5): error TS2345: Argument of type '(args: unknown) => Promise<never>' is not assignable to parameter of type '(args?: { select?: AuditLogSelect<DefaultArgs> | null | undefined; where?: AuditLogWhereInput | undefined; orderBy?: AuditLogOrderByWithRelationInput | AuditLogOrderByWithRelationInput[] | undefined; cursor?: AuditLogWhereUniqueInput | undefined; take?: number | undefined; skip?: number | undefined; distinct?: Audit...'.
+  Call signature return types 'Promise<never>' and 'PrismaPromise<{ id: string; createdAt: Date; actorId: string; action: string; metadata: JsonValue; ip: string | null; }[]>' are incompatible.
+    The types of '[Symbol.toStringTag]' are incompatible between these types.
+      Type 'string' is not assignable to type '"PrismaPromise"'.
+tests/server/partnerAssignmentAuthz.test.ts(55,58): error TS2345: Argument of type '(args: unknown) => Promise<null>' is not assignable to parameter of type '(args: { select?: SeriesSelect<DefaultArgs> | null | undefined; include?: SeriesInclude<DefaultArgs> | null | undefined; where: SeriesWhereUniqueInput; }) => Prisma__SeriesClient<...>'.
+  Type 'Promise<null>' is missing the following properties from type 'Prisma__SeriesClient<{ status: SeriesStatus; startsAt: Date | null; endsAt: Date | null; title: string; subtitle: string | null; description: string | null; venue: VenueKey | null; ... 50 more ...; communityUrl: string | null; } | null, null, DefaultArgs>': influencer, partner, commercialOwner, operationalVenue, and 22 more.
+tests/server/payments/ticketRefundRequestValidation.test.ts(23,49): error TS2345: Argument of type '{ userId: string; roles: "SUPERADMIN"[]; }' is not assignable to parameter of type '{ session: { user: { name?: string | null; email?: string | null; image?: string | null; } & { id?: string; roles?: RoleKey[]; passwordlessDestination?: string; }; expires: ISODateString; }; userId: string; roles: RoleKey[]; }'.
+  Property 'session' is missing in type '{ userId: string; roles: "SUPERADMIN"[]; }' but required in type '{ session: { user: { name?: string | null; email?: string | null; image?: string | null; } & { id?: string; roles?: RoleKey[]; passwordlessDestination?: string; }; expires: ISODateString; }; userId: string; roles: RoleKey[]; }'.
+tests/server/rateLimit.test.ts(26,17): error TS2540: Cannot assign to 'NODE_ENV' because it is a read-only property.
+tests/server/rateLimit.test.ts(38,19): error TS2540: Cannot assign to 'NODE_ENV' because it is a read-only property.
+tests/server/rateLimit.test.ts(47,17): error TS2540: Cannot assign to 'NODE_ENV' because it is a read-only property.
+tests/server/rateLimit.test.ts(59,19): error TS2540: Cannot assign to 'NODE_ENV' because it is a read-only property.

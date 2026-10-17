@@ -15,8 +15,12 @@ import ReservationBlocksPanel from "@/components/admin/ReservationBlocksPanel";
 import SeriesMenusPanel from "@/components/admin/SeriesMenusPanel";
 import EventOccupancyPanel from "@/components/admin/EventOccupancyPanel";
 import EventScheduleManager from "@/components/admin/EventScheduleManager";
+import AddonTextEditor from "@/components/admin/AddonTextEditor";
+import EventTextNotice from "@/components/admin/EventTextNotice";
 import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
 import MediaUpload from "@/components/ui/MediaUpload";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 const SERIES_SOCIAL_FIELDS = [
   ["website", "Website"], ["instagram", "Instagram"], ["facebook", "Facebook"],
@@ -62,6 +66,7 @@ export default function AdminExperienceEditPage() {
   const [venues, setVenues] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
   const [hostOptions, setHostOptions] = useState<{ influencers: any[]; partners: any[] }>({ influencers: [], partners: [] });
+  const translations = useSeriesTranslations(id);
 
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
@@ -76,7 +81,8 @@ export default function AdminExperienceEditPage() {
     setSeries(data.series);
     setForm(data.series ?? {});
     setLoading(false);
-  }, [id]);
+    await translations.refresh();
+  }, [id, translations.refresh]);
 
   useEffect(() => { loadSeries(); }, [loadSeries]);
   useEffect(() => {
@@ -119,7 +125,11 @@ export default function AdminExperienceEditPage() {
       const issues = Array.isArray(data.issues) ? data.issues.map((issue: { message?: string }) => issue.message).filter(Boolean).join(" ") : "";
       setError(issues || data.error || t("admin", "save_failed") || "Save failed");
     }
-    else         { setSuccess(t("admin", "saved") ?? "Saved successfully"); setSeries(data.series); setForm(data.series); }
+    else {
+      const translation = await translations.onSave(data);
+      setSuccess(translation?.state === "ready" ? "Saved / translations ready." : translation?.state === "retry" ? "Saved / translation needs retry." : "Saved / translation pending.");
+      setSeries(data.series); setForm(data.series);
+    }
     setSaving(false);
   }
 
@@ -134,6 +144,7 @@ export default function AdminExperienceEditPage() {
     setDuplicating(false);
     if (res.ok && data.series?.id) {
       setShowDuplicateModal(false);
+      await translations.onSave(data, data.series.id);
       router.push(`/admin/experiences/${data.series.id}`);
     } else {
       setError(data.error ?? "Duplicate failed");
@@ -257,11 +268,14 @@ export default function AdminExperienceEditPage() {
         </div>
       </div>
 
-      {success && <div style={{ background: "#dcfce7", borderBottom: "1px solid #bbf7d0", padding: "12px 24px", fontSize: 14, color: "#16a34a", fontWeight: 500 }}>{success}</div>}
+      {success && <div role="status" aria-live="polite" style={{ background: "#dcfce7", borderBottom: "1px solid #bbf7d0", padding: "12px 24px", fontSize: 14, color: "#315a43", fontWeight: 500 }}>{success}</div>}
       {error   && <div style={{ background: "#fee2e2", borderBottom: "1px solid #fecaca", padding: "12px 24px", fontSize: 14, color: "#dc2626", fontWeight: 500 }}>{error}</div>}
+      <div className="page-container" style={{ paddingTop: 8 }}>
+        <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />
+      </div>
 
-      <div style={{ display: "flex" }}>
-        <div style={{ width: 200, borderRight: "1px solid #e5e0d8", minHeight: "calc(100vh - 120px)", background: "#fafaf9", padding: "20px 0", flexShrink: 0 }}>
+      <div className="experience-layout" style={{ display: "flex" }}>
+        <div className="experience-tabs" style={{ width: 200, borderRight: "1px solid #e5e0d8", minHeight: "calc(100vh - 120px)", background: "#fafaf9", padding: "20px 0", flexShrink: 0 }}>
           {SECTION_TABS.map((s) => (
             <button key={s.id} onClick={() => setTab(s.id)}
               style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 20px", background: tab === s.id ? "white" : "transparent", color: tab === s.id ? "#c41e3a" : "#6b7280", fontSize: 14, fontWeight: tab === s.id ? 600 : 400, cursor: "pointer", border: "none", borderLeft: tab === s.id ? "2px solid #c41e3a" : "2px solid transparent" }}>
@@ -270,9 +284,10 @@ export default function AdminExperienceEditPage() {
           ))}
         </div>
 
-        <div style={{ flex: 1, padding: analyticsTab ? "0" : "32px", maxWidth: analyticsTab ? "none" : 720 }}>
+        <div className="experience-content" style={{ flex: 1, minWidth: 0, padding: analyticsTab ? "0" : "32px", maxWidth: analyticsTab ? "none" : 720 }}>
           {tab === "basics" && (
             <div>
+              <EventTextNotice />
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, marginBottom: 24, color: "#1a1614" }}>{t("admin", "basic_info") ?? "Basic Information"}</h2>
               {field("title", t("admin", "title") ?? "Title")}
               {field("subtitle", t("admin", "subtitle") ?? "Subtitle")}
@@ -449,18 +464,10 @@ export default function AdminExperienceEditPage() {
                 {tab === "tickets" ? (t("admin", "ticket_types") ?? "Ticket Types") : tab === "addons" ? (t("admin", "addons") ?? "Add-Ons") : tab === "influencers" ? (t("admin", "influencer_assignments") ?? "Influencer Assignments") : (t("admin", "attendees") ?? "Attendees")}
               </h2>
               {tab === "tickets" && (
-                <TicketTypeManager seriesId={id} />
+                <><EventTextNotice /><TicketTypeManager seriesId={id} /></>
               )}
               {tab === "addons" && (
-                <>
-                  {series.addons?.map((a: any) => (
-                    <div key={a.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
-                      <div style={{ fontWeight: 600, color: "#1a1614" }}>{a.name}</div>
-                      <div style={{ fontSize: 12, color: "#9ca3af" }}>${(a.priceCents / 100).toFixed(0)} · Cap: {a.capacity ?? "∞"}</div>
-                      {a.description && <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>{a.description}</div>}
-                    </div>
-                  ))}
-                </>
+                <AddonTextEditor seriesId={id} addons={series.addons ?? []} canEdit={isSuperAdmin} onSaved={loadSeries} />
               )}
               {tab === "influencers" && (
                 <SeriesInfluencerManager seriesId={id} />
@@ -593,6 +600,14 @@ export default function AdminExperienceEditPage() {
           )}
         </div>
       </div>
+      <style jsx>{`
+        @media (max-width: 767px) {
+          .experience-layout { flex-direction: column; }
+          .experience-tabs { width: 100% !important; min-height: 0 !important; box-sizing: border-box; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0 !important; padding: 8px !important; }
+          .experience-tabs :global(button) { padding: 9px 10px !important; overflow-wrap: anywhere; }
+          .experience-content { padding: 16px !important; box-sizing: border-box; }
+        }
+      `}</style>
     </div>
   );
 }

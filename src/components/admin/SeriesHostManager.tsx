@@ -1,4 +1,5 @@
 "use client";
+import SessionManagementNotice from "./SessionManagementNotice";
 
 import { useEffect, useState, useCallback } from "react";
 
@@ -163,6 +164,8 @@ export default function SeriesHostManager({ seriesId }: Props) {
 
   return (
     <div>
+      <SessionManagementNotice />
+      <fieldset disabled style={{ border: 0, padding: 0, margin: 0 }}>
       {error && <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>}
 
       {/* Existing hosts */}
@@ -391,6 +394,7 @@ export default function SeriesHostManager({ seriesId }: Props) {
           Sessions inherit these hosts by default, but each session can override with its own host list.
         </div>
       )}
+      </fieldset>
     </div>
   );
 }

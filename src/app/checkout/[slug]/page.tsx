@@ -8,6 +8,7 @@ import { BILLING_COUNTRIES } from "@/lib/billingCountries";
 import { formatCardExpiry, parseCardExpiry } from "@/lib/cardExpiry";
 import { createCheckoutContinuation, isConfirmedCheckout, isVerificationReturn } from "@/lib/checkoutContinuation";
 import { PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
+import { useLocale } from "@/components/i18n/LocaleProvider";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
 
@@ -34,6 +35,7 @@ function safePaymentFailureMessage(environment: unknown, code: unknown) {
 }
 
 export default function CheckoutPage() {
+  const locale = useLocale();
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -43,6 +45,7 @@ export default function CheckoutPage() {
   const [quantities, setQty]      = useState<Record<string, number>>({});
   const [addonQty, setAddonQty]   = useState<Record<string, number>>({});
   const [selectedSession, setSession] = useState<string>("");
+  const [sessionDeepLinked, setSessionDeepLinked] = useState(false);
   const [quote, setQuote]         = useState<any>(null);
   const [quoting, setQuoting]     = useState(false);
   const [paying, setPaying]       = useState(false);
@@ -107,18 +110,25 @@ export default function CheckoutPage() {
   }, [payerChallengeComplete, payerChallenge, paying, done, paymentDeclined, paymentUnderReview]);
 
   useEffect(() => {
-    fetch(`/api/v1/experiences?slug=${slug}`)
+    fetch(`/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${locale}`)
       .then((r) => r.json())
       .then((d) => {
         const s = d.series?.[0];
         setSeries(s);
         const requestedSessionId = new URLSearchParams(window.location.search).get("sessionId");
         const requestedSession = s?.sessions?.find((candidate: any) => candidate.id === requestedSessionId);
-        if (requestedSession) setSession(requestedSession.id);
-        else if (s?.sessions?.[0]) setSession(s.sessions[0].id);
+        if (requestedSession) {
+          setSession(requestedSession.id);
+          setSessionDeepLinked(true);
+          const firstPublicTicket = s?.ticketTypes?.find((ticket: any) => !ticket.requiresMembership && !ticket.earlyAccessOnly);
+          if (firstPublicTicket) setQty((current) => current[firstPublicTicket.id] ? current : { ...current, [firstPublicTicket.id]: 1 });
+        } else {
+          setSessionDeepLinked(false);
+          if (s?.sessions?.[0]) setSession(s.sessions[0].id);
+        }
       })
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, locale]);
 
   useEffect(() => {
     if (!flexConfig) return;
@@ -191,7 +201,7 @@ export default function CheckoutPage() {
       const intentResponse = await fetch("/api/v1/checkout/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: quote.sessionId, expectedTotalCents: quote.totalCents, items: checkoutItems, guest: { ...guest, phone: guest.phone.trim() || undefined, locale: "en" } }),
+        body: JSON.stringify({ sessionId: quote.sessionId, expectedTotalCents: quote.totalCents, items: checkoutItems, guest: { ...guest, phone: guest.phone.trim() || undefined, locale } }),
       });
       const intentData = await intentResponse.json();
       if (!intentResponse.ok) throw new Error(intentData.message ?? intentData.error ?? "Unable to create payment order.");
@@ -402,7 +412,7 @@ export default function CheckoutPage() {
       <div style={{ background: "#fafaf9", borderBottom: "1px solid #e5e0d8", padding: "32px 0" }}>
         <div className="page-container">
           <Link href={`/experiences/${slug}`} style={{ fontSize: 13, color: "#9ca3af", textDecoration: "none" }}>← Back to {series.title}</Link>
-          {activeSession && <p style={{ color: "#6b7280", fontSize: 14, margin: "10px 0 0" }}>{activeSession.title || series.title}{activeSession.subtitle ? ` · ${activeSession.subtitle}` : ""} · {new Date(activeSession.startsAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: PANAMA_TIME_ZONE })} (Panama)</p>}
+          {activeSession && <p style={{ color: "#6b7280", fontSize: 14, margin: "10px 0 0" }}>{series.title}{activeSession.title ? ` · ${activeSession.title}` : ""}{activeSession.subtitle ? ` · ${activeSession.subtitle}` : ""} · {new Date(activeSession.startsAt).toLocaleString(locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: PANAMA_TIME_ZONE })} (Panama)</p>}
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 400, color: "#1a1614", margin: "12px 0 0", letterSpacing: "-0.02em" }}>
             {quote ? "Review & Pay" : "Select Tickets"}
           </h1>
@@ -415,7 +425,7 @@ export default function CheckoutPage() {
             {/* Step 1: Selection */}
             <div>
               {/* Session selector */}
-              {sessions.length > 1 && (
+              {sessions.length > 1 && !sessionDeepLinked && (
                 <section style={{ marginBottom: 32 }}>
                   <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>Choose a Session</h2>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -423,8 +433,8 @@ export default function CheckoutPage() {
                       <label key={s.id} style={{ display: "flex", gap: 14, alignItems: "center", padding: "14px 16px", border: `1px solid ${selectedSession === s.id ? "#c41e3a" : "#e5e0d8"}`, borderRadius: 10, cursor: "pointer", background: selectedSession === s.id ? "#fff9f9" : "white" }}>
                         <input type="radio" name="session" value={s.id} checked={selectedSession === s.id} onChange={() => setSession(s.id)} />
                         <div>
-                          <div style={{ fontWeight: 600, color: "#1a1614" }}>{s.title ?? "Session"}</div>
-                          <div style={{ fontSize: 13, color: "#6b7280" }}>{new Date(s.startsAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · {new Date(s.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>
+                          <div style={{ fontWeight: 600, color: "#1a1614" }}>{series.title}{s.title ? ` · ${s.title}` : ""}</div>
+                          <div style={{ fontSize: 13, color: "#6b7280" }}>{new Date(s.startsAt).toLocaleDateString(locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US", { weekday: "long", month: "long", day: "numeric", timeZone: PANAMA_TIME_ZONE })} · {new Date(s.startsAt).toLocaleTimeString(locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US", { hour: "numeric", minute: "2-digit", timeZone: PANAMA_TIME_ZONE })} (Panama)</div>
                         </div>
                       </label>
                     ))}

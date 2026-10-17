@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { claimAdmission } from "./claimAdmission";
 import { checkInEmitter } from "@/lib/checkInEmitter";
 
 export interface CheckInResult {
@@ -107,10 +108,7 @@ export async function validateAndCheckIn(
   }
 
   // Atomic claim — only one concurrent scan can flip ISSUED -> CHECKED_IN.
-  const claim = await prisma.ticket.updateMany({
-    where: { id: ticket.id, ticketStatus: "ISSUED", order: { status: { notIn: ["CANCELLED", "REFUNDED", "FAILED"] } } },
-    data: { ticketStatus: "CHECKED_IN", checkedInAt: new Date(), checkedInById: scannedByUserId },
-  });
+  const claim = await claimAdmission({ ticketId: ticket.id, sessionId: ticket.sessionId, actorId: scannedByUserId, at: new Date() });
 
   if (claim.count === 0) {
     // Lost the race — another scan claimed it. Re-read for the truth.

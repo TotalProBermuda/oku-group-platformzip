@@ -176,86 +176,6 @@ const worker = new Worker(
 worker.on("completed", (job) => console.log("Job completed", job.id, job.name));
 worker.on("failed", (job, err) => console.error("Job failed", job?.id, job?.name, err));
 
-const translationWorker = new Worker(
-  "translation",
-  async (job) => {
-    switch (job.name) {
-      case "translate_field": {
-        const { entityType, entityId, fieldName, sourceLocale, sourceText, targetLocale } = job.data as {
-          entityType: string;
-          entityId: string;
-          fieldName: string;
-          sourceLocale: string;
-          sourceText: string;
-          targetLocale: string;
-        };
-
-        console.log(`Translating ${entityType}#${entityId}.${fieldName} → ${targetLocale}`);
-
-        await prisma.contentTranslation.upsert({
-          where: {
-            entityType_entityId_fieldName_targetLocale: {
-              entityType, entityId, fieldName, targetLocale,
-            },
-          },
-          create: {
-            entityType, entityId, fieldName,
-            sourceLocale, targetLocale, sourceText,
-            sourceTextHash: sourceText.slice(0, 16),
-            translatedText: "",
-            status: "PENDING",
-            provider: "pending",
-          },
-          update: { status: "PENDING" },
-        });
-
-        console.log(`Translation job queued for ${entityType}.${fieldName} → ${targetLocale}. Connect a translation provider to process.`);
-        return true;
-      }
-
-      case "translate_entity": {
-        const { entityType, entityId, fields, sourceLocale } = job.data as {
-          entityType: string;
-          entityId: string;
-          fields: Record<string, string>;
-          sourceLocale: string;
-        };
-        const targetLocales = ["es", "pt"].filter((l) => l !== sourceLocale);
-        for (const [fieldName, sourceText] of Object.entries(fields)) {
-          for (const targetLocale of targetLocales) {
-            await prisma.contentTranslation.upsert({
-              where: {
-                entityType_entityId_fieldName_targetLocale: {
-                  entityType, entityId, fieldName, targetLocale,
-                },
-              },
-              create: {
-                entityType, entityId, fieldName,
-                sourceLocale, targetLocale, sourceText,
-                sourceTextHash: sourceText.slice(0, 16),
-                translatedText: "",
-                status: "PENDING",
-                provider: "pending",
-              },
-              update: { status: "PENDING" },
-            });
-          }
-        }
-        console.log(`Entity translation jobs created for ${entityType}#${entityId}`);
-        return true;
-      }
-
-      default:
-        console.log("Unknown translation job", job.name);
-        return false;
-    }
-  },
-  redisConnection
-);
-
-translationWorker.on("completed", (job) => console.log("Translation job completed", job.id, job.name));
-translationWorker.on("failed", (job, err) => console.error("Translation job failed", job?.id, err.message));
-
 const invuWorker = new Worker("invu-sync", handleInvuSyncJob, redisConnection);
 invuWorker.on("completed", (job) => console.log("INVU sync job completed", job.id, job.name));
 invuWorker.on("failed", (job, err) => console.error("INVU sync job failed", job?.id, err.message));
@@ -443,5 +363,9 @@ ledgerOutboxQueue.add(
   },
 ).catch((err) => console.warn("[ledger-outbox-drain] Failed to register repeatable job:", err));
 
+// Keep existing non-translation consumers observable without activating new jobs.
+for (const consumer of [worker, invuWorker, invuTokenRotationWorker, retentionWorker, auditAnomalyWorker, launchReadinessAlertWorker, attributionAnchorWorker, capacityExpirySweepWorker, ledgerOutboxWorker]) {
+  consumer.on("error", () => console.warn("[worker] Redis consumer unavailable"));
+}
 console.log("Worker started...");
 } // end startWorkers

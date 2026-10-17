@@ -1,14 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { releaseCatalogCapacity } from "@/server/commerce/capacity";
+import { releaseCatalogCapacityInTransaction } from "@/server/commerce/capacity";
+import type { Prisma } from "@prisma/client";
+import { lockSessionInventory } from "./sessionInventory";
 
 export const CHECKOUT_HOLD_EVENT = "checkout-capacity-hold";
 export const CHECKOUT_HOLD_MS = 15 * 60 * 1000;
 
 type HoldPayload = { expiresAt?: string };
 
-export async function createCheckoutHold(orderId: string) {
+export async function createCheckoutHold(orderId: string, db: Prisma.TransactionClient = prisma) {
   const expiresAt = new Date(Date.now() + CHECKOUT_HOLD_MS);
-  await prisma.orderEvent.create({
+  await db.orderEvent.create({
     data: {
       orderId,
       eventType: "OTHER",
@@ -46,15 +48,17 @@ export async function expireCheckoutHoldsForSession(sessionId: string) {
   });
 
   for (const order of expired) {
+    await prisma.$transaction(async tx => {
+    await lockSessionInventory(tx, sessionId);
     // The status transition is the idempotency gate: only the request that
     // changes PENDING to CANCELLED is permitted to release capacity.
-    const changed = await prisma.order.updateMany({
+    const changed = await tx.order.updateMany({
       where: { id: order.id, status: "PENDING", payment: { is: null } },
       data: { status: "CANCELLED", cancelledAt: new Date() },
     });
-    if (changed.count !== 1) continue;
+    if (changed.count !== 1) return;
 
-    await releaseCatalogCapacity({
+    await releaseCatalogCapacityInTransaction(tx, {
       sessionId: order.sessionId,
       ticketItems: order.lineItems
         .filter((item) => item.ticketTypeId)
@@ -63,13 +67,14 @@ export async function expireCheckoutHoldsForSession(sessionId: string) {
         .filter((item) => item.addonId)
         .map((item) => ({ id: item.addonId!, qty: item.qty })),
     });
-    await prisma.orderEvent.create({
+    await tx.orderEvent.create({
       data: {
         orderId: order.id,
         eventType: "OTHER",
         eventLabel: "checkout-hold-expired",
         eventPayload: { expiredAt: new Date().toISOString() },
       },
+    });
     });
   }
 }

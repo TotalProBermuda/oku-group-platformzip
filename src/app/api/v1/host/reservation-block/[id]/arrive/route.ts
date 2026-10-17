@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { lockSessionInventory } from "@/server/commerce/sessionInventory";
 import { requireSession } from "@/server/auth/session";
 import { getEffectiveScanConfig } from "@/server/streetside/getScanConfig";
 
@@ -46,13 +47,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       include: {
         arrivals: { select: { partySize: true } },
         series: { select: { venueId: true } },
-        session: { select: { id: true, streetsideEnabled: true, giftBagEnabled: true } },
+        session: { select: { id: true, status: true, streetsideEnabled: true, giftBagEnabled: true } },
       },
     });
 
     if (!block) {
       return NextResponse.json({ ok: false, error: "Reservation block not found" }, { status: 404 });
     }
+    if (block.session && !["SCHEDULED", "SOLD_OUT"].includes(block.session.status))
+      return NextResponse.json({ ok: false, error: "Arrivals are paused for this occurrence." }, { status: 409 });
 
     // Venue-scoping: reject cross-venue access with a non-enumerating 404.
     if (supervisorVenueId && block.series.venueId !== supervisorVenueId) {
@@ -67,12 +70,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       );
     }
 
-    const arrival = await prisma.reservationBlockArrival.create({
+    const arrival = await prisma.$transaction(async tx => {
+      if (block.session) {
+        await lockSessionInventory(tx, block.session.id);
+        const current = await tx.session.findUniqueOrThrow({ where: { id: block.session.id }, select: { status: true } });
+        if (!["SCHEDULED", "SOLD_OUT"].includes(current.status)) throw Object.assign(new Error("Arrivals are paused for this occurrence."), { status: 409 });
+      }
+      return tx.reservationBlockArrival.create({
       data: {
         blockId: id,
         partySize,
         scannedByUserId: userId,
       },
+    });
     });
 
     const totalArrived = block.arrivals.reduce((sum, a) => sum + a.partySize, 0) + partySize;

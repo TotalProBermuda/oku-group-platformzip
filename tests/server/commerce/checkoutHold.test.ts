@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ findMany: vi.fn(), updateMany: vi.fn(), release: vi.fn(), event: vi.fn() }));
-vi.mock("@/lib/prisma", () => ({ prisma: { order: { findMany: mocks.findMany, updateMany: mocks.updateMany }, orderEvent: { create: mocks.event } } }));
-vi.mock("@/server/commerce/capacity", () => ({ releaseCatalogCapacity: mocks.release }));
+vi.mock("@/lib/prisma", () => ({ prisma: { order: { findMany: mocks.findMany, updateMany: mocks.updateMany }, orderEvent: { create: mocks.event }, $transaction: (fn: (tx: unknown) => unknown) => fn({ order: { updateMany: mocks.updateMany }, orderEvent: { create: mocks.event } }) } }));
+vi.mock("@/server/commerce/capacity", () => ({ releaseCatalogCapacityInTransaction: mocks.release }));
+vi.mock("@/server/commerce/sessionInventory", () => ({ lockSessionInventory: vi.fn() }));
 import { expireCheckoutHoldsForSession } from "@/server/commerce/checkoutHold";
 
 describe("checkout hold cleanup", () => {
@@ -17,7 +18,7 @@ describe("checkout hold cleanup", () => {
   it("releases capacity only after successfully claiming expiry", async () => {
     mocks.updateMany.mockResolvedValue({ count: 1 });
     await expireCheckoutHoldsForSession("s");
-    expect(mocks.release).toHaveBeenCalledWith({ sessionId: "s", ticketItems: [{ id: "t", qty: 1 }], addonItems: [] });
+    expect(mocks.release).toHaveBeenCalledWith(expect.anything(), { sessionId: "s", ticketItems: [{ id: "t", qty: 1 }], addonItems: [] });
     expect(mocks.event).toHaveBeenCalledOnce();
   });
 });

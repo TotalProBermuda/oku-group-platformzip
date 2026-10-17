@@ -24,6 +24,7 @@ import {
 import { isEncryptionAvailable } from "@/server/security/encryption";
 import { getResendClient } from "@/server/invitation/resend";
 import { hasRedisConfig } from "@/server/redis/config";
+import { hasConfiguredAuthSecret } from "@/lib/authSecret";
 
 export type GateStatus = "pass" | "warn" | "fail";
 export type GateSeverity = "blocking" | "informational";
@@ -495,13 +496,14 @@ export async function getLaunchReadiness(): Promise<LaunchReadinessSnapshot> {
       category: "environment",
       remediation: "Set DATABASE_URL to the production Postgres connection string.",
     }),
-    checkEnvVar({
+    gate({
       name: "auth.nextauth_secret",
-      varName: "NEXTAUTH_SECRET",
-      label: "NEXTAUTH_SECRET set",
+      label: "NEXTAUTH_SECRET or AUTH_SECRET set",
       category: "auth",
+      severity: "blocking",
+      status: hasConfiguredAuthSecret() ? "pass" : "fail",
       remediation:
-        "Set NEXTAUTH_SECRET to a strong random string before launch.",
+        hasConfiguredAuthSecret() ? "OK" : "Configure NEXTAUTH_SECRET or AUTH_SECRET before launch.",
     }),
     checkEnvVar({
       name: "auth.nextauth_url",

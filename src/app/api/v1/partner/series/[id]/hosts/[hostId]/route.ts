@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { legacySeriesMutation } from "@/server/series/legacySessionGuard";
 import { requirePartnerForSeries, PartnerAuthError } from "@/lib/partnerAuth";
 
 export async function PATCH(
@@ -32,11 +33,11 @@ export async function PATCH(
     }
     if ("sortOrder" in body && typeof body.sortOrder === "number") data.sortOrder = body.sortOrder;
 
-    const host = await prisma.seriesHost.update({
+    const host = await legacySeriesMutation(id, tx => tx.seriesHost.update({
       where: { id: hostId },
       data,
       include: { entity: { include: { linkedUser: { select: { id: true, name: true, email: true } } } } },
-    });
+    }));
     return NextResponse.json({ ok: true, host });
   } catch (e: any) {
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
@@ -64,9 +65,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Partners may only remove CO_HOST entries" }, { status: 403 });
     }
 
-    await prisma.seriesHost.delete({ where: { id: hostId } });
+    await legacySeriesMutation(id, tx => tx.seriesHost.delete({ where: { id: hostId } }));
     return NextResponse.json({ ok: true });
   } catch (e: any) {
+    if (e.status === 409) return NextResponse.json({ error: e.message }, { status: 409 });
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/hosts/:hostId] DELETE", e);

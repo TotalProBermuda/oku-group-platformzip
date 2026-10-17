@@ -1,11 +1,13 @@
 /** Reusable across every series/host type. Legacy fields remain the final fallback. */
 export type SeriesArtwork = {
+  sessionDefaults?: unknown;
   heroImageUrl?: string | null;
   heroImageUrlEn?: string | null;
   heroImageUrlEs?: string | null;
   heroImageUrlPt?: string | null;
 };
 export type SessionArtwork = {
+  fieldModes?: unknown;
   flyerImageUrl?: string | null;
   flyerImageUrlEn?: string | null;
   flyerImageUrlEs?: string | null;
@@ -37,6 +39,13 @@ export function seriesArtworkCandidates(series: SeriesArtwork, locale: string): 
 }
 
 export function sessionArtworkCandidates(session: SessionArtwork, locale: string, series?: SeriesArtwork): string[] {
+  const key = `artwork.${locale === "es" || locale === "pt" ? locale : "en"}`;
+  const fields = session.fieldModes as Record<string, { mode?: string; value?: unknown }> | undefined;
+  const defaults = series?.sessionDefaults as Record<string, { mode?: string; value?: unknown }> | undefined;
+  const mode = fields?.[key];
+  if (mode?.mode === "clear" || ((!mode || mode.mode === "inherit") && defaults?.[key]?.mode === "clear")) return [];
+  if (mode?.mode === "override" && typeof mode.value === "string") return uniqueSafe([mode.value]);
+  if (mode?.mode === "inherit" && defaults?.[key]?.mode === "override" && typeof defaults[key].value === "string") return uniqueSafe([defaults[key].value as string]);
   const selected = locale === "es" ? session.flyerImageUrlEs : locale === "pt" ? session.flyerImageUrlPt : session.flyerImageUrlEn;
   return uniqueSafe([selected, session.flyerImageUrlEn, session.flyerImageUrl, ...(series ? seriesArtworkCandidates(series, locale) : [])]);
 }

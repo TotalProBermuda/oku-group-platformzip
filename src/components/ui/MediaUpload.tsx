@@ -18,6 +18,7 @@ interface MediaUploadProps {
   dark?: boolean;
   disabled?: boolean;
   compact?: boolean;
+  imageFit?: "cover" | "contain";
 }
 
 const TYPE_ACCEPT: Record<MediaType, string> = {
@@ -58,6 +59,7 @@ export default function MediaUpload({
   dark = false,
   disabled = false,
   compact = false,
+  imageFit = "cover",
 }: MediaUploadProps) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -213,7 +215,7 @@ export default function MediaUpload({
               <EventArtwork
                 candidates={[value!]}
                 alt="Media preview"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: 9 }}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: imageFit, borderRadius: 9 }}
               />
             )}
             {/* Overlay on hover */}

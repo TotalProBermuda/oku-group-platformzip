@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({ find: vi.fn(), update: vi.fn(), count: vi.fn() }));
+vi.mock("@/server/checkin/claimAdmission", () => ({ claimAdmission: mocks.update }));
 vi.mock("@/lib/prisma", () => ({ prisma: { ticket: { findUnique: mocks.find, updateMany: mocks.update, count: mocks.count } } }));
 vi.mock("@/server/auth/session", () => ({ requireSession: vi.fn().mockResolvedValue({ roles: ["SUPERADMIN"], userId: "host" }) }));
 vi.mock("@/lib/rbac", () => ({ requirePermission: vi.fn() }));
@@ -18,6 +19,6 @@ describe("ticket admission safeguards", () => {
     mocks.find.mockResolvedValue({ id: "t", orderId: "o", ticketStatus: "ISSUED", order: { status: "PAID" } });
     mocks.update.mockResolvedValue({ count: 0 });
     expect((await request()).status).toBe(409);
-    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "t", ticketStatus: "ISSUED", order: { status: { notIn: ["CANCELLED", "REFUNDED", "FAILED"] } } } }));
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ ticketId: "t", actorId: "host" }));
   });
 });

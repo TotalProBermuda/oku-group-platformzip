@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, getOptionalSession } from "@/server/auth/session";
+import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";
+import { purchasedEntitlements } from "@/server/commerce/sessionProducts";
 
 export async function GET(_req: NextRequest) {
   const auth = await getOptionalSession();
@@ -45,12 +47,20 @@ export async function POST(req: NextRequest) {
   if (!series) return NextResponse.json({ error: "Experience not found" }, { status: 404 });
 
   const order = await prisma.$transaction(async (tx) => {
+    const current = await reserveCatalogCapacityInTransaction(tx, {
+      sessionId,
+      ticketItems: lineItems.filter((li: { ticketTypeId?: string }) => li.ticketTypeId).map((li: { ticketTypeId: string; qty: number }) => ({ id: li.ticketTypeId, qty: li.qty })),
+      addonItems: lineItems.filter((li: { addonId?: string }) => li.addonId).map((li: { addonId: string; qty: number }) => ({ id: li.addonId, qty: li.qty })),
+    });
+    if (current.seriesId !== seriesId) throw new Error("Session does not belong to this experience");
+    const rights = purchasedEntitlements(current);
     const ord = await tx.order.create({
       data: {
         userId: auth.userId,
         seriesId,
         sessionId,
         status: "PAID",
+        entitlementSnapshot: rights,
         subtotalCents: subtotalCents ?? 0,
         feesCents: feesCents ?? 0,
         taxCents: taxCents ?? 0,
@@ -95,6 +105,7 @@ export async function POST(req: NextRequest) {
             attendeeEmail: auth.session.user.email ?? "",
             attendeeEmailNormalized: auth.session.user.email?.trim().toLowerCase() ?? null,
             ticketStatus: "ISSUED",
+            entitlementSnapshot: rights,
           },
         });
       }

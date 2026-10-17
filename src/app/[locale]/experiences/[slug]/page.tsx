@@ -14,13 +14,14 @@ import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsV
 import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
 import type { Metadata } from "next";
 import EventArtwork from "@/components/ui/EventArtwork";
+import ExpandableText from "@/components/ui/ExpandableText";
 import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
 
-async function getSeries(slug: string) {
-  const res = await fetch(`${BASE}/api/v1/experiences?slug=${slug}`, { cache: "no-store" });
+async function getSeries(slug: string, locale = "en") {
+  const res = await fetch(`${BASE}/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${encodeURIComponent(locale)}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
   return data.series?.[0] ?? null;
@@ -39,12 +40,12 @@ const venueGrad: Record<string, string> = {
   CATCH:"linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%)",
 };
 
-interface Props { params: Promise<{ locale: string; slug: string }> }
+interface Props { params: Promise<{ locale: string; slug: string }>; searchParams?: Promise<{ sessionId?: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
-  const series = await getSeries(slug);
+  const series = await getSeries(slug, safeLocale);
   if (!series) return {};
 
   const content = getSeriesContent(series.slug, safeLocale);
@@ -72,12 +73,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ExperienceDetailPage({ params }: Props) {
-  const { locale, slug } = await params;
+export default async function ExperienceDetailPage({ params, searchParams }: Props) {
+  const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({})]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
-    getSeries(slug),
+    getSeries(slug, safeLocale),
     getAvailability(slug),
     getServerSession(authOptions),
     getTranslations(safeLocale, ["common"]),
@@ -103,6 +104,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
   const sessions    = series.sessions ?? [];
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
+  const focusSessionId = sessions.some((event: any) => event.id === query.sessionId) ? query.sessionId ?? null : null;
   const isCountdownActive = series.showCountdown && series.earlyReleaseAt && new Date() < new Date(series.earlyReleaseAt);
 
   const content = getSeriesContent(series.slug, safeLocale);
@@ -170,11 +172,11 @@ export default async function ExperienceDetailPage({ params }: Props) {
         {/* Left column */}
         <div className="experience-main">
           {/* Description */}
-          <section style={{ marginBottom: 48 }}>
-            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
               {c.aboutThisExperience}
             </h2>
-            <p style={{ fontSize: 16, lineHeight: 1.8, color: "#4b5563", whiteSpace: "pre-line" }}>{description}</p>
+            {description ? <ExpandableText text={description} locale={safeLocale} maxLines={3} /> : null}
           </section>
 
           {/* Sessions */}
@@ -191,6 +193,8 @@ export default async function ExperienceDetailPage({ params }: Props) {
                 seriesDescription={description ?? ""}
                 seriesImage={series.heroImageUrl}
                 seriesArtwork={series}
+                seriesHosts={series.seriesHosts ?? []}
+                focusSessionId={focusSessionId}
                 checkoutHrefBase={localePath(safeLocale, `/checkout/${slug}`)}
                 venue={locationStr}
                 locale={safeLocale}
@@ -326,7 +330,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
             )}
             <div>
               {sessions.length > 0 ? (
-                <Link href="#sessions" className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+                <Link href={focusSessionId ? `${localePath(safeLocale, `/checkout/${slug}`)}?sessionId=${encodeURIComponent(focusSessionId)}` : "#sessions"} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
               ) : (
                 <span className="btn btn-ghost" aria-disabled="true" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.noSessions ?? "No upcoming sessions"}</span>
               )}
