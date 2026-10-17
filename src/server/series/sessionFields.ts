@@ -30,6 +30,8 @@ export function fieldDefinition(key: string): { schema: z.ZodTypeAny; clear: boo
     return { schema: z.string().trim().min(1).max(parts[1] === "description" ? 5000 : parts[1] === "subtitle" ? 240 : 160), clear: true, restricted: false };
   if (parts.length === 2 && parts[0] === "artwork" && (locales as readonly string[]).includes(parts[1]))
     return { schema: z.string().max(2048).refine(isSafeArtworkUrl, "Use a secure artwork URL"), clear: true, restricted: true };
+  if (parts.length === 2 && parts[0] === "artworkMobile" && (locales as readonly string[]).includes(parts[1]))
+    return { schema: z.string().max(2048).refine(isSafeArtworkUrl, "Use a secure artwork URL"), clear: true, restricted: true };
   if (parts.length === 3 && parts[0] === "ticket" && id.safeParse(parts[1]).success && ["price", "enabled"].includes(parts[2]))
     return { schema: parts[2] === "price" ? z.number().int().min(0).max(100000000) : z.boolean(), clear: false, restricted: true };
   if (parts.length === 2 && ((parts[0] === "hosts" && (hostRoles as readonly string[]).includes(parts[1])) || (parts[0] === "profiles" && (profileRoles as readonly string[]).includes(parts[1]))))
@@ -75,6 +77,7 @@ export const managementInputSchema = z.object({
     ctx.addIssue({ code: "custom", message: "Financial assignments affect the whole series, not selected sessions. No SESSION financial scope exists." });
   if (v.kind === "sessions" && !v.sessionIds.length) ctx.addIssue({ code: "custom", path: ["sessionIds"], message: "Explicit session selection required" });
   if (v.kind === "defaults" && (v.sessionIds.length || v.schedules)) ctx.addIssue({ code: "custom", message: "Defaults target inheritors separately, not a selected occurrence date" });
+  if (v.kind === "defaults" && Object.keys(v.patch).some(key => key.startsWith("artworkMobile."))) ctx.addIssue({ code: "custom", message: "Mobile artwork is specific to an event date; choose a session instead of changing series defaults." });
   for (const key of Object.keys(v.schedules ?? {})) if (!v.sessionIds.includes(key)) ctx.addIssue({ code: "custom", message: "Schedule references an unselected session" });
   if (v.postponement?.treatment === "HOLD_PENDING_DATE" && (v.schedules || v.patch.schedule)) ctx.addIssue({ code: "custom", message: "Pending-date hold cannot confirm a replacement schedule" });
 });

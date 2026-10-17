@@ -1,5 +1,6 @@
 "use client";
 import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
+import MobileSessionArtworkEditor from "@/components/admin/MobileSessionArtworkEditor";
 import SessionManagementEditor from "@/components/admin/SessionManagementEditor";
 import SessionCardsEditor from "@/components/admin/SessionCardsEditor";
 
@@ -19,6 +20,9 @@ type SessionRow = {
   flyerImageUrlEn?: string | null;
   flyerImageUrlEs?: string | null;
   flyerImageUrlPt?: string | null;
+  flyerImageUrlMobileEn?: string | null;
+  flyerImageUrlMobileEs?: string | null;
+  flyerImageUrlMobilePt?: string | null;
   ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
   startsAt: string;
   endsAt: string;
@@ -35,6 +39,9 @@ type FormState = {
   flyerImageUrlEn: string;
   flyerImageUrlEs: string;
   flyerImageUrlPt: string;
+  flyerImageUrlMobileEn: string;
+  flyerImageUrlMobileEs: string;
+  flyerImageUrlMobilePt: string;
   ticketPrices: Record<string, string>;
   startsAt: string;
   endsAt: string;
@@ -62,6 +69,7 @@ function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
     description: "",
     flyerImageUrl: "",
     flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "",
+    flyerImageUrlMobileEn: "", flyerImageUrlMobileEs: "", flyerImageUrlMobilePt: "",
     ticketPrices: {},
     startsAt: localInput(start),
     endsAt: localInput(end),
@@ -153,7 +161,7 @@ export default function EventScheduleManager({
           subtitle: form.subtitle.trim() || undefined,
           description: form.description.trim() || undefined,
           flyerImageUrl: form.flyerImageUrl || undefined,
-          ...(canManageSessionContent ? { flyerImageUrlEn: form.flyerImageUrlEn, flyerImageUrlEs: form.flyerImageUrlEs, flyerImageUrlPt: form.flyerImageUrlPt } : {}),
+          ...(canManageSessionContent ? { flyerImageUrlEn: form.flyerImageUrlEn, flyerImageUrlEs: form.flyerImageUrlEs, flyerImageUrlPt: form.flyerImageUrlPt, flyerImageUrlMobileEn: form.flyerImageUrlMobileEn, flyerImageUrlMobileEs: form.flyerImageUrlMobileEs, flyerImageUrlMobilePt: form.flyerImageUrlMobilePt } : {}),
           ticketPrices: Object.entries(form.ticketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })),
           startsAt: panamaDateTimeLocalIso(form.startsAt),
           endsAt: panamaDateTimeLocalIso(form.endsAt),
@@ -261,6 +269,7 @@ export default function EventScheduleManager({
           </label>
           <MediaUpload value={form.flyerImageUrl} onChange={(url) => setForm((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image (optional)" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
           {canManageSessionContent && <LocalizedArtworkEditor kind="session" value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
+          {canManageSessionContent && <MobileSessionArtworkEditor value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
           {canManageSessionContent && ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
             <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
             <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave a price blank to inherit the series ticket price. Existing paid orders keep their recorded prices.</p>

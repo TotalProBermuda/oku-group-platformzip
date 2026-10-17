@@ -8,6 +8,7 @@ function row() {
     id: "artwork-session", title: "Artwork session", startsAt: start.toISOString(), endsAt: new Date(start.getTime() + 3600000).toISOString(),
     capacity: 10, soldCount: 0, status: "SCHEDULED",
     flyerImageUrl: "/__artwork/session-legacy.gif", flyerImageUrlEn: "/__artwork/session-en.gif", flyerImageUrlEs: "/__artwork/session-es.gif", flyerImageUrlPt: "/__artwork/session-pt.gif",
+    flyerImageUrlMobileEn: "/__artwork/session-mobile-en.gif", flyerImageUrlMobileEs: "/__artwork/session-mobile-es.gif", flyerImageUrlMobilePt: "/__artwork/session-mobile-pt.gif",
     series: { id: "artwork-series", slug: "artwork-series", title: "Artwork series", venue: "OKU", heroImageUrl: "/__artwork/series-legacy.gif", heroImageUrlEn: "/__artwork/series-en.gif", heroImageUrlEs: "/__artwork/series-es.gif", heroImageUrlPt: "/__artwork/series-pt.gif" },
   };
 }
@@ -18,40 +19,65 @@ async function stubImages(page: Page, failed: string[] = []) {
   });
 }
 
+function artworkSessionCard(page: Page) {
+  // Route stubs may coexist with server-rendered development events; scope to this fixture.
+  return page.locator("article").filter({ hasText: "Artwork session" });
+}
+
 test.describe("localized artwork guest rendering", () => {
   for (const locale of ["en", "es", "pt"]) {
-    test(`calendar renders matching ${locale} session and series artwork`, async ({ page }) => {
+    test(`calendar renders matching ${locale} session and series artwork`, async ({ page }, testInfo) => {
+      await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 800 });
       await stubImages(page);
       const session = row();
-      await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session, { ...session, id: "series-fallback", title: "Series fallback", flyerImageUrl: null, flyerImageUrlEn: null, flyerImageUrlEs: null, flyerImageUrlPt: null }] } }));
+      await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session, { ...session, id: "series-fallback", title: "Series fallback", flyerImageUrl: null, flyerImageUrlEn: null, flyerImageUrlEs: null, flyerImageUrlPt: null, flyerImageUrlMobileEn: null, flyerImageUrlMobileEs: null, flyerImageUrlMobilePt: null }] } }));
       await page.goto(`/${locale}/calendar`, { waitUntil: "domcontentloaded" });
-      const sessionImage = page.locator(`article img[src="/__artwork/session-${locale}.gif"]`);
+      const mobilePrefix = testInfo.project.name === "mobile" ? "mobile-" : "";
+      const sessionImage = artworkSessionCard(page).locator(`img[src="/__artwork/session-${mobilePrefix}${locale}.gif"]`);
       const seriesImage = page.locator(`article img[src="/__artwork/series-${locale}.gif"]`);
       await expect(sessionImage).toHaveCount(1);
       await expect(seriesImage).toHaveCount(1);
       await expect.poll(() => sessionImage.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
     });
   }
-  test("failed Spanish image uses English, then legacy; all failures remove img", async ({ page }) => {
+  test("small-screen calendar cards use the matching mobile flyer", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await stubImages(page);
     const session = row();
-    let failed = ["session-es.gif"];
+    await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [session] } }));
+    await page.goto("/es/calendar", { waitUntil: "domcontentloaded" });
+    const mobileImage = artworkSessionCard(page).locator('img[src="/__artwork/session-mobile-es.gif"]');
+    await expect(mobileImage).toHaveCount(1);
+    await expect.poll(() => mobileImage.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  });
+
+  test("failed Spanish image uses English, then legacy; all failures remove img", async ({ page }, testInfo) => {
+    await page.setViewportSize(testInfo.project.name === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 800 });
+    const session = row();
+    const mobilePrefix = testInfo.project.name === "mobile" ? "mobile-" : "";
+    // On mobile, same-language standard art takes priority over another language's mobile art.
+    let failed = [`session-${mobilePrefix}es.gif`, ...(mobilePrefix ? ["session-es.gif"] : [])];
     await page.route("**/__artwork/**", route => {
       const path = new URL(route.request().url()).pathname;
       return failed.some(name => path.endsWith(name)) ? route.fulfill({ status: 404, body: "Missing" }) : route.fulfill({ contentType: "image/gif", body: pixel });
     });
     await page.route("**/api/v1/sessions?**", route => route.fulfill({ json: { sessions: [{ ...session, series: { ...session.series, heroImageUrl: null, heroImageUrlEn: null, heroImageUrlEs: null, heroImageUrlPt: null } }] } }));
     await page.goto("/es/calendar", { waitUntil: "domcontentloaded" });
-    await expect(page.locator('article img[src="/__artwork/session-en.gif"]')).toHaveCount(1);
-    failed = ["session-es.gif", "session-en.gif"];
+    await expect(artworkSessionCard(page).locator(`img[src="/__artwork/session-${mobilePrefix}en.gif"]`)).toHaveCount(1);
+    failed = [
+      `session-${mobilePrefix}es.gif`,
+      ...(mobilePrefix ? ["session-es.gif"] : []),
+      `session-${mobilePrefix}en.gif`,
+      ...(mobilePrefix ? ["session-en.gif"] : []),
+    ];
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator('article img[src="/__artwork/session-legacy.gif"]')).toHaveCount(1);
+    await expect(artworkSessionCard(page).locator('img[src="/__artwork/session-legacy.gif"]')).toHaveCount(1);
     failed.push("session-legacy.gif");
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("article")).toHaveCount(1);
-    await expect(page.locator("article img")).toHaveCount(0);
+    await expect(artworkSessionCard(page).locator("img")).toHaveCount(0);
     failed = [];
     await page.goto("/pt/calendar", { waitUntil: "domcontentloaded" });
-    await expect(page.locator('article img[src="/__artwork/session-pt.gif"]')).toHaveCount(1);
+    await expect(artworkSessionCard(page).locator(`img[src="/__artwork/session-${mobilePrefix}pt.gif"]`)).toHaveCount(1);
   });
 });
 
@@ -72,4 +98,7 @@ test("superadmin editor exposes distinct EN/ES/PT series and session upload cont
   const sessionEditor = page.locator("fieldset").filter({ hasText: "Localized session flyer" });
   await expect(sessionEditor).toHaveCount(1);
   for (const language of ["English (EN)", "Spanish (ES)", "Portuguese (PT)"]) await expect(sessionEditor.getByLabel(language)).toHaveCount(1);
+  const mobileEditor = page.locator("fieldset").filter({ hasText: "Mobile flyer artwork (optional)" });
+  await expect(mobileEditor).toHaveCount(1);
+  for (const language of ["English (EN)", "Spanish (ES)", "Portuguese (PT)"]) await expect(mobileEditor.getByLabel(language)).toHaveCount(1);
 });

@@ -12,9 +12,13 @@ export type SessionArtwork = {
   flyerImageUrlEn?: string | null;
   flyerImageUrlEs?: string | null;
   flyerImageUrlPt?: string | null;
+  flyerImageUrlMobileEn?: string | null;
+  flyerImageUrlMobileEs?: string | null;
+  flyerImageUrlMobilePt?: string | null;
 };
 export const seriesArtworkFields = ["heroImageUrlEn", "heroImageUrlEs", "heroImageUrlPt"] as const;
 export const sessionArtworkFields = ["flyerImageUrlEn", "flyerImageUrlEs", "flyerImageUrlPt"] as const;
+export const sessionMobileArtworkFields = ["flyerImageUrlMobileEn", "flyerImageUrlMobileEs", "flyerImageUrlMobilePt"] as const;
 
 /** No script/data URLs, protocol-relative URLs, credentials or transient presigns.
  * Same-origin media/assets are allowed; this only renders images, never fetches URLs server-side.
@@ -48,4 +52,27 @@ export function sessionArtworkCandidates(session: SessionArtwork, locale: string
   if (mode?.mode === "inherit" && defaults?.[key]?.mode === "override" && typeof defaults[key].value === "string") return uniqueSafe([defaults[key].value as string]);
   const selected = locale === "es" ? session.flyerImageUrlEs : locale === "pt" ? session.flyerImageUrlPt : session.flyerImageUrlEn;
   return uniqueSafe([selected, session.flyerImageUrlEn, session.flyerImageUrl, ...(series ? seriesArtworkCandidates(series, locale) : [])]);
+}
+
+/** Mobile override first, then the same locale's standard flyer, then English fallbacks.
+ * A translated standard flyer always wins over a different language's mobile override.
+ */
+export function sessionMobileArtworkCandidates(session: SessionArtwork, locale: string, series?: SeriesArtwork): string[] {
+  const normalizedLocale = locale === "es" || locale === "pt" ? locale : "en";
+  const mobileKey = `artworkMobile.${normalizedLocale}`;
+  const fields = session.fieldModes as Record<string, { mode?: string; value?: unknown }> | undefined;
+  const mobileMode = fields?.[mobileKey];
+  const legacyMobile = normalizedLocale === "es" ? session.flyerImageUrlMobileEs : normalizedLocale === "pt" ? session.flyerImageUrlMobilePt : session.flyerImageUrlMobileEn;
+  const selectedMobile = mobileMode?.mode === "clear"
+    ? null
+    : mobileMode?.mode === "inherit"
+      ? null
+    : mobileMode?.mode === "override" && typeof mobileMode.value === "string"
+      ? mobileMode.value
+      : legacyMobile;
+  const selected = locale === "es" ? session.flyerImageUrlEs : locale === "pt" ? session.flyerImageUrlPt : session.flyerImageUrlEn;
+  return uniqueSafe([
+    selectedMobile, selected, session.flyerImageUrlMobileEn, session.flyerImageUrlEn,
+    session.flyerImageUrl, ...(series ? seriesArtworkCandidates(series, locale) : []),
+  ]);
 }

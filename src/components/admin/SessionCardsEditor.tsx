@@ -5,7 +5,7 @@ import MediaUpload from "@/components/ui/MediaUpload";
 import EventArtwork from "@/components/ui/EventArtwork";
 import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
 import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
-import { sessionArtworkCandidates } from "@/lib/eventArtwork";
+import { sessionArtworkCandidates, sessionMobileArtworkCandidates } from "@/lib/eventArtwork";
 import { panamaDateTimeLocalInput, panamaDateTimeLocalIso, PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
 
 type Effective = { value: unknown; source: string; mode: "inherit" | "override" | "clear" };
@@ -47,7 +47,7 @@ function initialDraft(session: Session): Draft {
 }
 
 export default function SessionCardsEditor({ seriesId, sessions, canManageRestricted, onSaved }: {
-  seriesId: string; sessions: Array<{ id: string; title?: string | null; subtitle?: string | null; startsAt: string; endsAt: string; capacity: number; status: string; flyerImageUrl?: string | null; flyerImageUrlEn?: string | null; flyerImageUrlEs?: string | null; flyerImageUrlPt?: string | null }>;
+  seriesId: string; sessions: Array<{ id: string; title?: string | null; subtitle?: string | null; startsAt: string; endsAt: string; capacity: number; status: string; fieldModes?: unknown; flyerImageUrl?: string | null; flyerImageUrlEn?: string | null; flyerImageUrlEs?: string | null; flyerImageUrlPt?: string | null; flyerImageUrlMobileEn?: string | null; flyerImageUrlMobileEs?: string | null; flyerImageUrlMobilePt?: string | null }>;
   canManageRestricted: boolean; onSaved: () => Promise<void> | void;
 }) {
   const [payload, setPayload] = useState<Payload | null>(null);
@@ -125,7 +125,7 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
     setLocale("en"); setCreateHost(false); setHostError("");
   }
   function setEdit(key: string, value: unknown) {
-    const mode = value === "" && (key.startsWith("content.") || key.startsWith("artwork.")) ? "clear" : "override";
+    const mode = value === "" && (key.startsWith("content.") || key.startsWith("artwork.") || key.startsWith("artworkMobile.")) ? "clear" : "override";
     setDraft((current) => current ? { ...current, edits: { ...current.edits, [key]: { mode, ...(mode === "override" ? { value } : {}) } } } : current);
     setReturnedPreview(null);
     setRetryPreview(null);
@@ -143,7 +143,7 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
     return draft?.edits[key]?.mode === "inherit" || (!draft?.edits[key] && active?.fields[key]?.mode === "inherit") ? "Using series details" : "Specific to this date";
   }
   function resetControl(key: string) {
-    const restricted = key.startsWith("ticket.") || key.startsWith("artwork.") || key.startsWith("profiles.");
+    const restricted = key.startsWith("ticket.") || key.startsWith("artwork.") || key.startsWith("artworkMobile.") || key.startsWith("profiles.");
     const alreadyInherited = draft?.edits[key]?.mode === "inherit" || (!draft?.edits[key] && active?.fields[key]?.mode === "inherit");
     return <button type="button" style={smallButton} onClick={() => resetField(key)} disabled={alreadyInherited || (restricted && !canManageRestricted)}>Use series details</button>;
   }
@@ -158,6 +158,7 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
     if (key === "sponsors") return "Sponsors";
     if (key.startsWith("content.")) return labels[key.slice(0, key.lastIndexOf("."))] ?? "Details";
     if (key.startsWith("artwork.")) return `Flyer · ${key.split(".")[1].toUpperCase()}`;
+    if (key.startsWith("artworkMobile.")) return `Mobile flyer · ${key.split(".")[1].toUpperCase()}`;
     return labels[key] ?? key;
   }
   function displayValue(key: string, value: unknown): string {
@@ -411,6 +412,10 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
             {locales.map((item) => {
               const key = `artwork.${item}`;
               const value = String(effective(key) ?? "");
+              const mobileKey = `artworkMobile.${item}`;
+              const mobileValue = String(effective(mobileKey) ?? "");
+              const sourceSession = sessions.find((session) => session.id === active.id);
+              const mobilePreview = mobileValue ? [mobileValue] : sourceSession ? sessionMobileArtworkCandidates(sourceSession, item) : value ? [value] : [];
               return <div key={key} hidden={locale !== item}>
                 <div className="sc-artwork-preview">{value ? <EventArtwork candidates={[value]} alt={`${item.toUpperCase()} flyer preview`} /> : <span style={{ color: "#8c7f74", fontSize: 12 }}>No flyer for {item.toUpperCase()}</span>}</div>
                 {canManageRestricted ? <>
@@ -418,6 +423,16 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
                   {value && <button type="button" style={{ ...smallButton, marginTop: 8 }} onClick={() => setEdit(key, "")}>Remove this flyer</button>}
                 </> : <p className="sc-value">Artwork changes require additional access.</p>}
                 <div className="sc-value"><span>{sourceLabel(key)}</span>{resetControl(key)}</div>
+                <div style={{ borderTop: "1px solid #eee6de", marginTop: 14, paddingTop: 12 }}>
+                  <strong style={{ display: "block", fontSize: 13 }}>Mobile artwork (optional)</strong>
+                  <p className="sc-value">Shown on phones. If left empty, this language’s regular flyer is used.</p>
+                  <div className="sc-artwork-preview">{mobilePreview.length ? <EventArtwork candidates={mobilePreview} alt={`${item.toUpperCase()} mobile flyer preview`} /> : <span style={{ color: "#8c7f74", fontSize: 12 }}>No mobile flyer</span>}</div>
+                  {canManageRestricted ? <>
+                    <MediaUpload label={`${item.toUpperCase()} mobile flyer`} value={mobileValue} onChange={(url) => setEdit(mobileKey, url)} uploadEndpoint="/api/v1/admin/event-artwork/upload" mediaType="image" accept="image/jpeg,image/png,image/webp,image/gif" hint="Optional 4:5 portrait JPG, PNG, WEBP or GIF · max 10 MB. The full image is preserved." aspectRatio="portrait" maxSizeMB={10} imageFit="contain" compact />
+                    {mobileValue && <button type="button" style={{ ...smallButton, marginTop: 8 }} onClick={() => setEdit(mobileKey, "")}>Remove mobile flyer</button>}
+                  </> : <p className="sc-value">Artwork changes require additional access.</p>}
+                  <div className="sc-value"><span>{sourceLabel(mobileKey)}</span>{resetControl(mobileKey)}</div>
+                </div>
               </div>;
             })}
              <p className="sc-value">Flyer files remain independent for English, Spanish and Portuguese. Artwork is never sent for text translation.</p>

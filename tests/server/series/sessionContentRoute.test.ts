@@ -33,6 +33,14 @@ describe("PATCH /api/v1/admin/sessions/[id] session content", () => {
     expect(response.status).toBe(200);
     expect(db.tx.session.update).toHaveBeenCalledWith(expect.objectContaining({ data: { title: "Existing session", flyerImageUrl: "/api/v1/media/bucket/public/uploads/legacy.png", flyerImageUrlEs: "/es.jpg" } }));
   });
+  it("saves a localized mobile flyer through the same audited session-content path", async () => {
+    const response = await PATCH(request({ flyerImageUrlMobileEs: "/api/v1/media/bucket/public/uploads/es-mobile.png" }), context());
+    expect(response.status).toBe(200);
+    expect(db.tx.session.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { flyerImageUrlMobileEs: "/api/v1/media/bucket/public/uploads/es-mobile.png" },
+      select: expect.objectContaining({ flyerImageUrlMobileEs: true }),
+    }));
+  });
   it("saves and removes locale artwork without touching legacy or unspecified locales", async () => {
     const response = await PATCH(request({ flyerImageUrlEs: "/api/v1/media/bucket/public/uploads/es.png", flyerImageUrlPt: "" }), context());
     expect(response.status).toBe(200);

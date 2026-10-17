@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSafeArtworkUrl, seriesArtworkCandidates, sessionArtworkCandidates } from "@/lib/eventArtwork";
+import { isSafeArtworkUrl, seriesArtworkCandidates, sessionArtworkCandidates, sessionMobileArtworkCandidates } from "@/lib/eventArtwork";
 import { parseArtworkEdit, artworkUploadSchema } from "@/server/series/artworkInput";
 import { createSessionInputSchema, updateSessionContentSchema } from "@/server/series/createSessionInput";
 import { createSeriesInputSchema } from "@/server/series/createSeriesInput";
@@ -25,6 +25,16 @@ describe("locale artwork selection", () => {
     ]);
     expect(seriesArtworkCandidates({ heroImageUrlEs: "javascript:alert(1)", heroImageUrlEn: "/en.jpg", heroImageUrl: "/en.jpg" }, "es")).toEqual(["/en.jpg"]);
   });
+  it("prefers the matching mobile flyer, then locale artwork; explicit removal falls back safely", () => {
+    const responsive = {
+      flyerImageUrl: "/legacy.jpg", flyerImageUrlEn: "/en.jpg", flyerImageUrlEs: "/es.jpg",
+      flyerImageUrlMobileEn: "/en-mobile.jpg", flyerImageUrlMobileEs: "/es-mobile.jpg",
+    };
+    expect(sessionMobileArtworkCandidates(responsive, "es")).toEqual(["/es-mobile.jpg", "/es.jpg", "/en-mobile.jpg", "/en.jpg", "/legacy.jpg"]);
+    expect(sessionMobileArtworkCandidates({ ...responsive, fieldModes: { "artworkMobile.es": { mode: "clear" } } }, "es")).toEqual(["/es.jpg", "/en-mobile.jpg", "/en.jpg", "/legacy.jpg"]);
+    expect(sessionMobileArtworkCandidates({ ...responsive, fieldModes: { "artworkMobile.es": { mode: "inherit" } } }, "es")).toEqual(["/es.jpg", "/en-mobile.jpg", "/en.jpg", "/legacy.jpg"]);
+    expect(sessionMobileArtworkCandidates({ ...responsive, fieldModes: { "artworkMobile.es": { mode: "override", value: "/new-es-mobile.jpg" } } }, "es")[0]).toBe("/new-es-mobile.jpg");
+  });
   it.each(["javascript:alert(1)", "data:image/svg+xml,test", "//evil.test/x", "/\\evil.test/x", "http://evil.test/x", "https://user:pass@evil.test/x", "https://cdn.test/x?X-Goog-Signature=temporary", "https://cdn.test/x?Expires=123", "/bad\nurl"])("rejects unsafe/transient URL %s", value => {
     expect(isSafeArtworkUrl(value)).toBe(false);
     expect(() => parseArtworkEdit({ heroImageUrlEs: value }, ["SUPERADMIN"], "series")).toThrow();
@@ -43,6 +53,11 @@ describe("artwork input and permissions", () => {
     }
     expect(() => parseArtworkEdit({ flyerImageUrlPt: "/pt.jpg" }, [role], "session")).toThrow();
     expect(parseArtworkEdit({ title: "Unrelated" }, [role], "series")).toEqual({});
+  });
+  it("allows clearing mobile artwork and restricts its changes to Superadmin", () => {
+    expect(parseArtworkEdit({ flyerImageUrlMobileEs: "" }, ["SUPERADMIN"], "session")).toEqual({ flyerImageUrlMobileEs: null });
+    expect(() => parseArtworkEdit({ flyerImageUrlMobileEs: "/es-mobile.jpg" }, ["FB_DIRECTOR"], "session")).toThrow();
+    expect(updateSessionContentSchema.parse({ flyerImageUrlMobilePt: "" })).toEqual({ flyerImageUrlMobilePt: null });
   });
   it("normalizes removal and does not overwrite unspecified locales or legacy URLs", () => {
     expect(parseArtworkEdit({ heroImageUrlEs: " ", heroImageUrl: "/legacy.jpg" }, ["SUPERADMIN"], "series")).toEqual({ heroImageUrlEs: null });
