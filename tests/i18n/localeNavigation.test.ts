@@ -16,3 +16,17 @@ describe("locale navigation", () => {
       .toBe("/pt/checkout/wine-down-wednesday?sessionId=session-123");
   });
 });
+
+
+describe("translation locale selection", () => {
+  it("uses the locale selected by the localized site shell", async () => {
+    const { resolveTranslationLocale } = await import("@/i18n/useTranslation");
+    expect(resolveTranslationLocale("es", "en")).toBe("es");
+    expect(resolveTranslationLocale("pt", "en")).toBe("pt");
+  });
+
+  it("keeps English for legacy surfaces outside the localized shell", async () => {
+    const { resolveTranslationLocale } = await import("@/i18n/useTranslation");
+    expect(resolveTranslationLocale(undefined, "en")).toBe("en");
+  });
+});
