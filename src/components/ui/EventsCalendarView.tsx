@@ -115,7 +115,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [year, month]);
+  }, [year, month, locale]);
 
   const sessionsByDay = useMemo(() => {
     const grouped = new Map<number, SessionRow[]>();
