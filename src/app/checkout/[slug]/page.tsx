@@ -12,7 +12,7 @@ import { useLocale } from "@/components/i18n/LocaleProvider";
 import { useTranslation } from "@/i18n/useTranslation";
 import { translations as localeTranslations } from "@/i18n/translationsData";
 import EventArtwork from "@/components/ui/EventArtwork";
-import { sessionArtworkCandidates } from "@/lib/eventArtwork";
+import { checkoutArtworkCandidates } from "@/lib/eventArtwork";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(2)}`; }
@@ -416,7 +416,7 @@ export default function CheckoutPage() {
     ? ticketTypes.filter((ticket: any) => sessionProductEnabled(activeSession, series, ticket.id))
     : ticketTypes;
   const addons      = series.addons      ?? [];
-  const checkoutArtwork = activeSession ? sessionArtworkCandidates(activeSession, locale, series) : [];
+  const checkoutArtwork = checkoutArtworkCandidates(activeSession, locale, series);
 
   return (
     <div>
