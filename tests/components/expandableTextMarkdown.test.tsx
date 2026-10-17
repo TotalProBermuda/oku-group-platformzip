@@ -14,8 +14,9 @@ describe("ExpandableText Markdown rendering", () => {
 
     expect(markup).toContain("A Taste of Provence");
     expect(markup).toContain("<strong>Wine Down Wednesday</strong>");
-    expect(markup).toContain("• Featured wines");
-    expect(markup).toContain("• Hand-passed tapas");
+    expect(markup).toContain("Featured wines");
+    expect(markup).toContain("Hand-passed tapas");
+    expect(markup).toContain('aria-hidden="true">• </span>');
     expect(markup).not.toContain("**");
     expect(markup).not.toContain("# A Taste");
   });
