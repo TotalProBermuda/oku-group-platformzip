@@ -2,6 +2,33 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("*") && part.endsWith("*")) return <em key={index}>{part.slice(1, -1)}</em>;
+    if (part.startsWith("__") && part.endsWith("__")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("_") && part.endsWith("_")) return <em key={index}>{part.slice(1, -1)}</em>;
+    return part;
+  });
+}
+
+function renderDescription(text: string) {
+  return text.split(/\n\s*\n/).filter((block) => block.trim()).map((block, index) => {
+    const lines = block.split(/\r?\n/).map((line) => line.replace(/^\s{0,3}#{1,6}\s+/, "").trim());
+    const isList = lines.every((line) => /^[-*]\s+/.test(line));
+    return (
+      <span key={index} style={{ display: "block", marginBottom: index ? 10 : 0 }}>
+        {lines.map((line, lineIndex) => (
+          <span key={lineIndex} style={{ display: "block" }}>
+            {isList ? <><span aria-hidden="true">• </span>{renderInlineMarkdown(line.replace(/^[-*]\s+/, ""))}</> : renderInlineMarkdown(line)}
+          </span>
+        ))}
+      </span>
+    );
+  });
+}
+
 const LABELS: Record<string, { more: string; less: string }> = {
   en: { more: "Read more", less: "Read less" },
   es: { more: "Leer más", less: "Leer menos" },
@@ -52,7 +79,7 @@ export default function ExpandableText({
           overflow: "hidden",
         }}
       >
-        {text}
+        {renderDescription(text)}
       </p>
       {hasOverflow ? (
         <button

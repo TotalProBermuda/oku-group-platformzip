@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import Link from "next/link";
 import EventArtwork from "@/components/ui/EventArtwork";
-import { sessionArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
+import { seriesArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
 
 interface SessionRow extends SessionArtwork {
   id: string;
@@ -15,12 +15,14 @@ interface SessionRow extends SessionArtwork {
   capacity: number;
   soldCount: number;
   status: string;
+  eventHosts?: Array<{ role: string; entity: { displayName: string; logoUrl?: string | null; websiteUrl?: string | null } }>;
   series: SeriesArtwork & {
     id: string;
     slug: string;
     title: string;
     venue: string | null;
     heroImageUrl: string | null;
+    seriesHosts?: Array<{ role: string; entity: { displayName: string; logoUrl?: string | null; websiteUrl?: string | null } }>;
   };
 }
 
@@ -98,7 +100,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
     setHoveredDay(null);
     const { after, before } = getPanamaMonthBounds(year, month);
 
-    fetch(`/api/v1/sessions?after=${encodeURIComponent(after)}&before=${encodeURIComponent(before)}`)
+    fetch(`/api/v1/sessions?after=${encodeURIComponent(after)}&before=${encodeURIComponent(before)}&locale=${encodeURIComponent(locale)}`)
       .then((response) => {
         if (!response.ok) throw new Error("Unable to load sessions");
         return response.json();
@@ -113,7 +115,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [year, month]);
+  }, [year, month, locale]);
 
   const sessionsByDay = useMemo(() => {
     const grouped = new Map<number, SessionRow[]>();
@@ -165,26 +167,31 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
 
   function eventLinks(session: SessionRow) {
     return {
-      view: `/${locale}/experiences/${session.series.slug}`,
+      view: `/${locale}/experiences/${session.series.slug}?sessionId=${encodeURIComponent(session.id)}#session-${encodeURIComponent(session.id)}`,
       buy: `/${locale}/checkout/${session.series.slug}?sessionId=${encodeURIComponent(session.id)}`,
     };
   }
 
   function sessionCard(session: SessionRow, compact = false) {
-    const title = session.title ?? session.series.title;
-    const artwork = sessionArtworkCandidates(session, locale, session.series);
+    const title = session.series.title;
+    const sessionTitle = session.title ?? null;
+    const artwork = seriesArtworkCandidates(session.series, locale);
+    const coHosts = [...(session.series.seriesHosts ?? []), ...(session.eventHosts ?? [])].filter((host) => host.role === "CO_HOST");
     const { view, buy } = eventLinks(session);
     return (
-      <article key={session.id} style={{
+      <article id={`session-${session.id}`} key={session.id} style={{
         background: "#fff", border: "1px solid #e5e0d8", borderRadius: 14, overflow: "hidden",
-        display: "grid", gridTemplateColumns: compact ? "88px minmax(0, 1fr)" : "minmax(110px, 190px) minmax(0, 1fr)",
+        display: "grid", gridTemplateColumns: compact ? "minmax(88px, 120px) minmax(0, 1fr)" : "minmax(110px, 190px) minmax(0, 1fr)",
+        scrollMarginTop: 96,
       }}>
         {artwork.length ? (
-          <div style={{ background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }}><EventArtwork candidates={artwork} alt="" loading="lazy" style={{ width: "100%", height: "100%", minHeight: compact ? 100 : 150, objectFit: "cover" }} /></div>
-        ) : <div aria-hidden="true" style={{ minHeight: compact ? 100 : 150, background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }} />}
+          <div style={{ aspectRatio: "4 / 5", width: "100%", background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }}><EventArtwork candidates={artwork} alt={`${title} artwork`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+        ) : <div aria-hidden="true" style={{ aspectRatio: "4 / 5", background: "linear-gradient(135deg,#f4eee8,#e8d9d0)" }} />}
         <div style={{ minWidth: 0, padding: compact ? 12 : 16, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
           <div style={{ color: "#1a1614", fontSize: compact ? 15 : 17, fontWeight: 650, lineHeight: 1.3 }}>{title}</div>
-          {session.subtitle ? <div style={{ color: "#7c7168", fontSize: 13 }}>{session.subtitle}</div> : null}
+          {sessionTitle ? <div style={{ color: "#7c7168", fontSize: 14, fontWeight: 600 }}>{sessionTitle}</div> : null}
+          {session.subtitle ? <div style={{ color: "#6b7280", fontSize: 13 }}>{session.subtitle}</div> : null}
+          {coHosts.length ? <div style={{ color: "#7c7168", fontSize: 12 }}><strong>Co-hosted by:</strong> {[...new Set(coHosts.map((host) => host.entity.displayName))].join(", ")}</div> : null}
           <div style={{ color: "#6b7280", fontSize: 13 }}>{formatDate(session.startsAt)} · {formatTime(session.startsAt)}</div>
           {session.series.venue ? <div style={{ color: "#8b8179", fontSize: 12 }}>{session.series.venue}</div> : null}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
@@ -200,15 +207,17 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
     <section aria-label={locale === "es" ? "Calendario de eventos" : locale === "pt" ? "Calendário de eventos" : "Events calendar"}>
       <style jsx global>{`
         .events-calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); grid-template-areas: "calendar month"; gap: 24px; align-items: start; }
-        .events-calendar-column { grid-area: calendar; min-width: 0; }
-        .events-month-column { grid-area: month; min-width: 0; background: #fff; border: 1px solid #e5e0d8; border-radius: 16px; padding: 20px; }
+        .events-calendar-column { grid-area: calendar; min-width: 0; position: sticky; top: 88px; align-self: start; }
+        .events-month-column { grid-area: month; min-width: 0; background: #fff; border: 1px solid #e5e0d8; border-radius: 16px; padding: 20px; max-height: calc(100vh - 104px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
         .events-month-title { color: #1a1614; font-family: var(--font-heading); font-size: 24px; font-weight: 400; margin: 0 0 16px; }
         .events-month-cards { display: grid; gap: 12px; }
         .events-session-card { min-width: 0; }
         .events-mobile-tabs { display: none; }
         @media (max-width: 767px) {
           .events-mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-          .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "month" "calendar"; gap: 16px; }
+           .events-calendar-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "month" "calendar"; gap: 16px; }
+          .events-calendar-column { position: static; top: auto; }
+          .events-month-column { max-height: none; overflow: visible; overscroll-behavior: auto; scrollbar-gutter: auto; }
           .events-calendar-column[data-mobile-hidden="true"], .events-month-column[data-mobile-hidden="true"] { display: none; }
           .events-month-column { padding: 16px; }
           .events-month-title { font-size: 22px; }
