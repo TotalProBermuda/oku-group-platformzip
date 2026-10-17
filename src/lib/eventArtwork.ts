@@ -54,6 +54,14 @@ export function sessionArtworkCandidates(session: SessionArtwork, locale: string
   return uniqueSafe([selected, session.flyerImageUrlEn, session.flyerImageUrl, ...(series ? seriesArtworkCandidates(series, locale) : [])]);
 }
 
+
+
+/** Checkout must retain series branding even when this session has no localized flyer. */
+export function checkoutArtworkCandidates(session: SessionArtwork | null | undefined, locale: string, series: SeriesArtwork): string[] {
+  const sessionCandidates = session ? sessionArtworkCandidates(session, locale, series) : [];
+  return sessionCandidates.length > 0 ? sessionCandidates : seriesArtworkCandidates(series, locale);
+}
+
 /** Mobile override first, then the same locale's standard flyer, then English fallbacks.
  * A translated standard flyer always wins over a different language's mobile override.
  */
