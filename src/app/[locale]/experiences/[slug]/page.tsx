@@ -73,7 +73,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ExperienceDetailPage({ params }: Props) {
+export default async function ExperienceDetailPage({ params, searchParams }: Props) {
   const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({})]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
