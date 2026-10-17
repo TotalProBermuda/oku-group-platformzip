@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ImgHTMLAttributes } from "react";
+import { useEffect, useState, type CSSProperties, type ImgHTMLAttributes } from "react";
 import EventArtwork from "@/components/ui/EventArtwork";
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "onError"> & {
@@ -23,7 +23,7 @@ export default function ResponsiveEventArtwork({ desktopCandidates, mobileCandid
     return () => query.removeEventListener?.("change", update);
   }, []);
 
-  const responsiveStyle = isMobile
+  const responsiveStyle: CSSProperties = isMobile
     ? { width: "100%", height: "auto", maxHeight: "none", objectFit: mobileFit, ...style }
     : { width: "100%", maxHeight: 300, objectFit: "cover", ...style };
   return <EventArtwork candidates={isMobile ? mobileCandidates : desktopCandidates} {...props} style={responsiveStyle} />;
