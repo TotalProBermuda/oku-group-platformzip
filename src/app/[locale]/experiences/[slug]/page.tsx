@@ -40,7 +40,7 @@ const venueGrad: Record<string, string> = {
   CATCH:"linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%)",
 };
 
-interface Props { params: Promise<{ locale: string; slug: string }> }
+interface Props { params: Promise<{ locale: string; slug: string }>; searchParams?: Promise<{ sessionId?: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
@@ -74,7 +74,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ExperienceDetailPage({ params }: Props) {
-  const { locale, slug } = await params;
+  const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({})]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
@@ -104,6 +104,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
   const sessions    = series.sessions ?? [];
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
+  const focusSessionId = sessions.some((event: any) => event.id === query.sessionId) ? query.sessionId ?? null : null;
   const isCountdownActive = series.showCountdown && series.earlyReleaseAt && new Date() < new Date(series.earlyReleaseAt);
 
   const content = getSeriesContent(series.slug, safeLocale);
@@ -192,6 +193,8 @@ export default async function ExperienceDetailPage({ params }: Props) {
                 seriesDescription={description ?? ""}
                 seriesImage={series.heroImageUrl}
                 seriesArtwork={series}
+                seriesHosts={series.seriesHosts ?? []}
+                focusSessionId={focusSessionId}
                 checkoutHrefBase={localePath(safeLocale, `/checkout/${slug}`)}
                 venue={locationStr}
                 locale={safeLocale}
@@ -327,7 +330,7 @@ export default async function ExperienceDetailPage({ params }: Props) {
             )}
             <div>
               {sessions.length > 0 ? (
-                <Link href="#sessions" className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+                <Link href={focusSessionId ? `${localePath(safeLocale, `/checkout/${slug}`)}?sessionId=${encodeURIComponent(focusSessionId)}` : "#sessions"} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
               ) : (
                 <span className="btn btn-ghost" aria-disabled="true" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.noSessions ?? "No upcoming sessions"}</span>
               )}
