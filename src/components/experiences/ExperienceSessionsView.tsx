@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import AddToCalendar from "@/components/ui/AddToCalendar";
 import EventArtwork from "@/components/ui/EventArtwork";
+import ExpandableText from "@/components/ui/ExpandableText";
 import { sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
@@ -69,8 +70,11 @@ export default function ExperienceSessionsView({
     const prices = ticketTypes.filter(ticket => sessionProductEnabled(session, seriesArtwork ?? {}, ticket.id)).map((ticket) => session.ticketPrices?.find((override) => override.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents);
     const fromPrice = prices.length ? Math.min(...prices) : null;
     return (
-      <article key={session.id} style={{ ...cardStyle, overflow: "hidden" }}>
-        <EventArtwork candidates={artwork} alt={`${title} event artwork`} loading="lazy" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 8, marginBottom: 14 }} />
+      <article key={session.id} style={{ ...cardStyle, display: "grid", gridTemplateColumns: "clamp(88px, 16vw, 128px) minmax(0, 1fr)", gap: 14, alignItems: "start", padding: 12 }}>
+        <div style={{ aspectRatio: "4 / 5", background: "#f4eee8", borderRadius: 8, overflow: "hidden" }}>
+          <EventArtwork candidates={artwork} alt={`${title} event artwork`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        </div>
+        <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <h3 style={{ color: "#1a1614", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{title}</h3>
@@ -86,13 +90,14 @@ export default function ExperienceSessionsView({
             {fromPrice !== null ? <div style={{ color: "#c41e3a", fontSize: 13, fontWeight: 700, marginTop: 5 }}>{labels.from} ${(fromPrice / 100).toFixed(2)}</div> : null}
           </div>
         </div>
-        {description ? <p style={{ color: "#4b5563", fontSize: 14, lineHeight: 1.65, margin: "12px 0 0", whiteSpace: "pre-line" }}>{description}</p> : null}
+        {description ? <div style={{ marginTop: 10 }}><ExpandableText text={description} locale={locale} maxLines={2} /></div> : null}
         {session.status === "SCHEDULED" ? (
           <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", marginTop: 14 }}>
             <AddToCalendar sessionId={session.id} title={title} startsAt={session.startsAt} endsAt={session.endsAt} location={venue} description={description} labels={{ addToCalendar: labels.addToCalendar, google: labels.calGoogleCalendar, apple: labels.calAppleIcal, outlook: labels.calOutlook, yahoo: labels.calYahoo }} />
             <Link href={`${checkoutHrefBase}?sessionId=${encodeURIComponent(session.id)}`} className="btn btn-primary">{labels.selectTickets}</Link>
           </div>
         ) : null}
+        </div>
       </article>
     );
   }

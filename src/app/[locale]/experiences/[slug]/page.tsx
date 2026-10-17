@@ -14,6 +14,7 @@ import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsV
 import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
 import type { Metadata } from "next";
 import EventArtwork from "@/components/ui/EventArtwork";
+import ExpandableText from "@/components/ui/ExpandableText";
 import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
@@ -170,11 +171,11 @@ export default async function ExperienceDetailPage({ params }: Props) {
         {/* Left column */}
         <div className="experience-main">
           {/* Description */}
-          <section style={{ marginBottom: 48 }}>
-            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
               {c.aboutThisExperience}
             </h2>
-            <p style={{ fontSize: 16, lineHeight: 1.8, color: "#4b5563", whiteSpace: "pre-line" }}>{description}</p>
+            {description ? <ExpandableText text={description} locale={safeLocale} maxLines={3} /> : null}
           </section>
 
           {/* Sessions */}
