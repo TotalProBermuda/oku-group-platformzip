@@ -99,7 +99,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const fmtTime = (d: string | Date) =>
     new Date(d).toLocaleTimeString(
       safeLocale === "es" ? "es-PA" : safeLocale === "pt" ? "pt-BR" : "en-US",
-      { hour: "numeric", minute: "2-digit" }
+      { hour: "numeric", minute: "2-digit", timeZone: "America/Panama" }
     );
 
   const influencers = series.experienceInfluencer ?? [];
