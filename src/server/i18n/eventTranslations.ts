@@ -15,7 +15,14 @@ export async function syncTranslations(tx: TranslationStore, entityType: Transla
       const identity = { entityType, entityId, fieldName, targetLocale };
       const where = { entityType_entityId_fieldName_targetLocale: identity };
       const existing = await tx.contentTranslation.findUnique({ where });
-      if (existing && matchesSource(existing.sourceTextHash, sourceText)) continue;
+      if (existing && matchesSource(existing.sourceTextHash, sourceText)) {
+        // Older session editors could mark English fallback text as a completed
+        // manual translation. Re-queue only that untranslated fallback; preserve
+        // real reviewed translations even when their English source is unchanged.
+        const untranslatedManualFallback = existing.provider === "manual-session-management"
+          && existing.translatedText.trim() === sourceText.trim();
+        if (!untranslatedManualFallback) continue;
+      }
       const status = sourceText.trim() ? (existing ? "STALE" : "PENDING") : "COMPLETED";
       const data = { sourceLocale: "en", sourceText, sourceTextHash, translatedText: "", status, provider: "deepl",
         attemptCount: 0, nextAttemptAt: new Date(), processingUntil: null, lastErrorCode: null } as const;
