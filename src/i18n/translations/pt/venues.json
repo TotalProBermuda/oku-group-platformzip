@@ -19,20 +19,20 @@
   "theSpace": "O Espaço",
   "seats": "assentos",
   "oku": {
-    "headline": "Alta Gastronomia Íntima",
-    "tagline": "Toalha branca. Luz de velas. Serviço estruturado para 27.",
-    "tag": "Alta Gastronomia",
-    "description": "OKÜ é o nosso restaurante principal — uma experiência íntima guiada pelo chef, enraizada na cozinha mediterrânea moderna. O salão acomoda 27 e cada mesa parece um caso privado.",
+    "headline": "OKÜ: Fusão Asiática",
+    "tagline": "Comida cuidadosa. Hospitalidade acolhedora. Um balcão de sushi no centro.",
+    "tag": "Fusão Asiática",
+    "description": "OKÜ é nosso restaurante de fusão asiática no Gold House, com uma estação de sushi própria e um salão pensado para boa comida e hospitalidade acolhedora.",
     "heroLine1": "Íntimo.",
     "heroLine2": "Deliberado.",
-    "heroLine3": "27 lugares.",
-    "cuisine": "Mediterrânea Moderna",
+    "heroLine3": "",
+    "cuisine": "Fusão Asiática",
     "setting": "Interior · Climatizado",
     "dresscode": "Smart casual a formal",
     "about": [
-      "Batizado em homenagem ao grupo que ancora, OKÜ é um estudo em contenção. Toalha branca impecável, cristaleria soprada à mão e uma cozinha que acredita que a simplicidade é a forma mais elevada de sofisticação.",
-      "O menu muda com as estações — abastecido por produtores de todo o Mediterrâneo. Embutidos ibéricos, cítricos sicilianos, azeites do Egeu — compostos em menus de degustação que parecem inevitáveis.",
-      "O salão tem 27 lugares. A iluminação é sempre exatamente certa."
+      "OKÜ é um espaço próprio dentro do restaurante, com uma estação de sushi no centro da experiência.",
+      "Sua proposta de fusão asiática e hospitalidade cuidadosa fazem do OKÜ um lugar para jantar, celebrar e compartilhar.",
+      "O salão do OKÜ é um espaço próprio do restaurante, separado da Sala de Jantar Privativa."
     ],
     "sushiBarHeading": "O Balcão de Sushi",
     "sushiBarBody": "No coração do OKÜ encontra-se um íntimo balcão de sushi. Cada dia os chefs preparam cortes frescos de peixes inteiros selecionados pelos nossos fornecedores — atum, salmão, polvo — expostos na vitrine iluminada para os clientes verem antes de pedir.",
@@ -49,7 +49,7 @@
     "heroLine1": "Encontrem-se.",
     "heroLine2": "Compartilhem.",
     "heroLine3": "",
-    "cuisine": "Pratos caribenhos para compartilhar",
+    "cuisine": "Fusão Caribenha",
     "setting": "Híbrido interior/exterior",
     "dresscode": "Smart casual",
     "about": [
@@ -62,7 +62,7 @@
     "headline": "Restaurante em Terraço ao Ar Livre",
     "tagline": "Azulejo pintado. Brisa noturna. A cidade lá embaixo.",
     "tag": "Terraço",
-    "description": "O Terraço é a coroa ao ar livre do Gold House — 42 lugares sob o céu do Panamá, rodeados de azulejos pintados à mão e luz de lanternas. Pratos pan-americanos para compartilhar, coquetéis artesanais e vistas imperdíveis do pôr do sol.",
+    "description": "The Terrace é o espaço na cobertura do Gold House para refeições ao ar livre, comida, bebidas e encontros.",
     "heroLine1": "A cidade",
     "heroLine2": "aos seus pés.",
     "heroLine3": "",
@@ -72,7 +72,7 @@
     "about": [
       "O Terraço fica no telhado do Gold House e abre todas as noites para o céu do Panamá. Azulejo marroquino pintado à mão cobre o chão. Lanternas de ferro forjado contornam o perímetro. Buganvílias sobem pela parede sul.",
       "A cozinha serve pratos pan-americanos para compartilhar — ceviches, anticuchos, pães planos no forno de lenha — criados para serem comidos devagar, em conversa, enquanto a cidade transita do dia para a noite.",
-      "Com 42 lugares, é o nosso maior espaço e também o mais querido."
+      "Um espaço de restaurante ao ar livre para comida, bebidas e momentos juntos acima de Casco Viejo."
     ]
   }
 }
