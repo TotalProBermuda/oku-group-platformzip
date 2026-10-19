@@ -288,7 +288,6 @@ export default async function LocaleRestaurantSlugPage({
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
               {[
                 { label: v.cuisine as string,  value: vd.cuisine as string },
-                { label: v.covers as string,   value: `${safeSlug === "oku" ? 27 : safeSlug === "catch" ? 24 : 42} ${v.seats as string}` },
                 { label: v.hours as string,    value: sd.hours.map((row) => `${row.day}: ${row.time}`).join(" · ") },
                 { label: v.dress as string,    value: vd.dresscode as string },
               ].map(item => (
