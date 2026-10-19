@@ -25,14 +25,14 @@
     "description": "OKÜ es nuestro restaurante de fusión asiática en Gold House, con una estación de sushi propia y un comedor pensado para disfrutar de buena comida y hospitalidad cálida.",
     "heroLine1": "Íntimo.",
     "heroLine2": "Deliberado.",
-    "heroLine3": "27 cubiertos.",
+    "heroLine3": "",
     "cuisine": "Fusión Asiática",
     "setting": "Interior · Climatizado",
     "dresscode": "Smart casual a formal",
     "about": [
       "OKÜ es un espacio propio dentro del restaurante, con una estación de sushi en el centro de la experiencia.",
       "Su propuesta de fusión asiática y su hospitalidad cuidada lo convierten en un lugar para cenar, celebrar y compartir.",
-      "El comedor tiene 27 asientos. La iluminación es siempre exactamente la correcta."
+      "El comedor de OKÜ es un espacio propio del restaurante, separado del comedor privado."
     ],
     "sushiBarHeading": "La Barra de Sushi",
     "sushiBarBody": "En el corazón de OKÜ se encuentra una íntima barra de sushi. Cada día los chefs preparan cortes frescos de pescado entero seleccionado por nuestros proveedores — atún, salmón, pulpo — expuestos en la vitrina iluminada para que los comensales los vean antes de ordenar.",
@@ -49,7 +49,7 @@
     "heroLine1": "Encuéntrense.",
     "heroLine2": "Compartan.",
     "heroLine3": "",
-    "cuisine": "Platos caribeños para compartir",
+    "cuisine": "Fusión Caribeña",
     "setting": "Híbrido interior/exterior",
     "dresscode": "Smart casual",
     "about": [
@@ -62,7 +62,7 @@
     "headline": "Restaurante en Azotea al Aire Libre",
     "tagline": "Azulejo pintado. Brisa nocturna. La ciudad abajo.",
     "tag": "Azotea",
-    "description": "La Terraza es la corona al aire libre de Gold House — 42 cubiertos bajo el cielo de Panamá, rodeados de azulejos pintados a mano y luz de faroles. Platos panamericanos para compartir, cócteles artesanales y vistas de atardecer.",
+    "description": "The Terrace es el espacio en la azotea de Gold House para disfrutar de comida, bebidas y encuentros al aire libre.",
     "heroLine1": "La ciudad",
     "heroLine2": "a tus pies.",
     "heroLine3": "",
@@ -72,7 +72,7 @@
     "about": [
       "La Terraza se encuentra en la azotea de Gold House y abre cada noche al cielo de Panamá. Azulejo marroquí pintado a mano cubre el suelo. Faroles de hierro forjado bordean el perímetro. Buganvilla trepa por la pared sur.",
       "La cocina sirve platos panamericanos para compartir — ceviches, anticuchos, panes planos al horno de leña — diseñados para comerse lentamente, en conversación, mientras la ciudad transita del día a la noche.",
-      "Con 42 cubiertos, es nuestro espacio más grande y también el más querido."
+      "Un espacio de restaurante al aire libre para disfrutar de comida, bebidas y tiempo juntos sobre Casco Viejo."
     ]
   }
 }
