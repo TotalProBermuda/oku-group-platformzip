@@ -126,6 +126,15 @@ const STATIC_DATA: Record<SlugType, {
     logoLight: "/images/logo-terrace-cream.png",
     logoDark: "/images/logo-terrace-green.png",
     logoNeedsWhiteBox: false,
+    heroPhoto: "/images/terrace/terrace-hero.jpg",
+    gallery: [
+      { src: "/images/terrace/terrace-daylight.jpg", alt: "Open-air Terrace dining above Casco Viejo in daylight", pos: "center 45%" },
+      { src: "/images/oku/dsc08712.jpg", alt: "Fresh tuna and salmon from the OKÜ menu, available to Terrace diners", pos: "center center" },
+      { src: "/images/catch/sushi-burger.jpg", alt: "A CATCH signature dish from the Caribbean Fusion menu, available to Terrace diners", pos: "center center" },
+      { src: "/images/terrace/terrace-night.jpg", alt: "The Terrace bar and dining area in warm evening light", pos: "center center" },
+      { src: "/images/terrace/terrace-seating.jpg", alt: "Open-air Terrace tables and seating", pos: "center center" },
+      { src: "/images/terrace/terrace-bar-detail.jpg", alt: "The Terrace bar, dining tables and patterned tile in evening light", pos: "center center" },
+    ],
     accent: "#2d4a1e", accentLight: "#f2f5f0", accentMid: "rgba(45,74,30,0.88)",
     phone: "+507 6000 0003", email: "terrace@okugroup.com",
     address: "Gold House (Rooftop), Casco Viejo, Panama City",
@@ -155,6 +164,30 @@ const STATIC_DATA: Record<SlugType, {
         { name: "Terrace Sunset",  desc: "Rum, mango, passion fruit, lime, basil, sparkling wine", price: "$15" },
       ]},
     ],
+  },
+};
+
+const TERRACE_SHARED_MENU_COPY: Record<Locale, { title: string; intro: string; oku: string; catch: string; availability: string }> = {
+  en: {
+    title: "Two kitchens. One terrace.",
+    intro: "Enjoy dishes from both OKÜ Asian Fusion and CATCH Caribbean Fusion while dining on the Terrace.",
+    oku: "OKÜ · Asian Fusion menu",
+    catch: "CATCH · Caribbean Fusion menu",
+    availability: "Menu items and prices are subject to availability and may change.",
+  },
+  es: {
+    title: "Dos cocinas. Una terraza.",
+    intro: "Disfruta en la Terraza de los platos de OKÜ Fusión Asiática y de CATCH Fusión Caribeña.",
+    oku: "OKÜ · Menú de fusión asiática",
+    catch: "CATCH · Menú de fusión caribeña",
+    availability: "Los platos y precios están sujetos a disponibilidad y pueden cambiar.",
+  },
+  pt: {
+    title: "Duas cozinhas. Um terraço.",
+    intro: "Desfrute no Terraço de pratos do menu de Fusão Asiática do OKÜ e do menu de Fusão Caribenha do CATCH.",
+    oku: "OKÜ · Menu de Fusão Asiática",
+    catch: "CATCH · Menu de Fusão Caribenha",
+    availability: "Os pratos e preços estão sujeitos à disponibilidade e podem mudar.",
   },
 };
 
@@ -207,8 +240,15 @@ export default async function LocaleRestaurantSlugPage({
   const vd: Record<string, unknown> = { ...((v[safeSlug] as Record<string, unknown>) || {}), ...(venueCopy(websiteContent, safeSlug, safeLocale) as unknown as Record<string, unknown>) };
   const sd = { ...STATIC_DATA[safeSlug], hours: operatingHoursRows(websiteContent, safeLocale).map((entry) => ({ day: entry.days, time: entry.time })) };
 
-  const foodMenu = await getFoodMenuByVenueDb(safeSlug);
-  const drinksMenu = await getDrinksMenuByVenueDb(safeSlug);
+  const [foodMenu, drinksMenu, okuFoodMenu, okuDrinksMenu, catchFoodMenu, catchDrinksMenu] = await Promise.all([
+    getFoodMenuByVenueDb(safeSlug),
+    getDrinksMenuByVenueDb(safeSlug),
+    safeSlug === "terrace" ? getFoodMenuByVenueDb("oku") : Promise.resolve(null),
+    safeSlug === "terrace" ? getDrinksMenuByVenueDb("oku") : Promise.resolve(null),
+    safeSlug === "terrace" ? getFoodMenuByVenueDb("catch") : Promise.resolve(null),
+    safeSlug === "terrace" ? getDrinksMenuByVenueDb("catch") : Promise.resolve(null),
+  ]);
+  const terraceMenuCopy = TERRACE_SHARED_MENU_COPY[safeLocale];
 
   const sectionLabel: React.CSSProperties = {
     fontSize: 10, fontWeight: 700, letterSpacing: "0.2em",
@@ -509,6 +549,45 @@ export default async function LocaleRestaurantSlugPage({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {safeSlug === "terrace" && (
+            <div style={{ marginTop: 56, paddingTop: 40, borderTop: "1px solid #e8e2dd" }}>
+              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(28px, 4vw, 42px)", color: "#1f1a17", letterSpacing: "-0.03em", margin: "0 0 12px" }}>
+                {terraceMenuCopy.title}
+              </h2>
+              <p style={{ maxWidth: 720, fontSize: 15, lineHeight: 1.75, color: "#6f655e", margin: "0 0 24px" }}>
+                {terraceMenuCopy.intro}
+              </p>
+              <div style={{ display: "grid", gap: 12 }}>
+                {[
+                  { key: "oku", label: terraceMenuCopy.oku, food: okuFoodMenu, drinks: okuDrinksMenu },
+                  { key: "catch", label: terraceMenuCopy.catch, food: catchFoodMenu, drinks: catchDrinksMenu },
+                ].map((menu) => (
+                  <details key={menu.key} style={{ background: "#fff", border: "1px solid #e8e2dd", borderRadius: 14, overflow: "hidden" }}>
+                    <summary style={{ cursor: "pointer", listStyle: "none", padding: "20px 24px", color: menu.key === "oku" ? "#1a1614" : "#1e3a5f", fontSize: 16, fontWeight: 700 }}>
+                      {menu.label}
+                    </summary>
+                    <div style={{ borderTop: "1px solid #eee8e2" }}>
+                      <MenuView
+                        venueSlug={menu.key as "oku" | "catch"}
+                        locale={safeLocale}
+                        variant="embedded"
+                        accent={menu.key === "oku" ? "#1a1614" : "#1e3a5f"}
+                        accentLight={menu.key === "oku" ? "#f5f2ef" : "#f0f4f8"}
+                        background="transparent"
+                        drinksLabel={v.drinkMenu as string}
+                        foodMenu={menu.food ?? undefined}
+                        drinksMenu={menu.drinks ?? undefined}
+                      />
+                    </div>
+                  </details>
+                ))}
+              </div>
+              <p style={{ fontSize: 12, lineHeight: 1.6, color: "#8a8078", margin: "16px 0 0" }}>
+                {terraceMenuCopy.availability}
+              </p>
             </div>
           )}
         </div>
