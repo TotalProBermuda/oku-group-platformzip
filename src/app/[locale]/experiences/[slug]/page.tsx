@@ -197,13 +197,16 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
       <div className="page-container experience-layout" style={{ padding: "48px 24px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 48, alignItems: "start" }}>
         {/* Left column */}
         <div className="experience-main">
-          {/* Description */}
-          <section style={{ marginBottom: 28 }}>
-            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
-              {c.aboutThisExperience}
-            </h2>
-            {displayDescription ? <ExpandableText text={displayDescription} locale={safeLocale} maxLines={3} /> : null}
-          </section>
+          {/* Keep the series overview on the series page; the selected event has its
+              own description in the event detail card below. */}
+          {!focusSession && (
+            <section style={{ marginBottom: 28 }}>
+              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
+                {c.aboutThisExperience}
+              </h2>
+              {displayDescription ? <ExpandableText text={displayDescription} locale={safeLocale} maxLines={3} /> : null}
+            </section>
+          )}
 
           {/* Sessions */}
           {sessions.length > 0 && (
@@ -328,11 +331,15 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
             <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 4 }}>
               {c.bookYourPlace}
             </h3>
-            {availability?.label && (
+            {focusSession ? (
+              <div style={{ fontSize: 12, fontWeight: 600, color: focusSession.capacity - focusSession.soldCount > 0 ? "#16a34a" : "#dc2626", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
+                {Math.max(0, focusSession.capacity - focusSession.soldCount)} {c.left}
+              </div>
+            ) : availability?.label ? (
               <div style={{ fontSize: 12, fontWeight: 600, color: availability.remaining > 0 ? "#16a34a" : "#dc2626", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
                 {availability.label}
               </div>
-            )}
+            ) : null}
             {displayedTicketTypes.length === 0 ? (
               <p style={{ fontSize: 14, color: "#9ca3af" }}>
                 {c.noTicketsAvailable}
