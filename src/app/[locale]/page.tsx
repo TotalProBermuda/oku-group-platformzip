@@ -159,6 +159,62 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
           </Link>
         </section>
 
+        {/* Restaurant discovery is visual and directly connected to each venue. */}
+        <section className="home-venue-showcase" aria-labelledby="home-venue-showcase-title">
+          <div className="home-venue-showcase-heading">
+            <span className="home-venue-showcase-eyebrow">{home.venueShowcaseEyebrow}</span>
+            <h2 id="home-venue-showcase-title">{home.venueShowcaseTitle}</h2>
+            <p>{home.venueShowcaseDescription}</p>
+          </div>
+          <div className="home-venue-showcase-grid">
+            {[
+              {
+                href: "/restaurants/oku",
+                title: home.okuCardTitle,
+                category: home.okuCardCategory,
+                description: home.okuCardDescription,
+                image: "/images/home/oku-sushi-feature.webp",
+                alt: home.okuCardAlt,
+              },
+              {
+                href: "/restaurants/catch",
+                title: home.catchCardTitle,
+                category: home.catchCardCategory,
+                description: home.catchCardDescription,
+                image: "/images/catch/grill.jpg",
+                alt: home.catchCardAlt,
+              },
+              {
+                href: "/restaurants/terrace",
+                title: home.terraceCardTitle,
+                category: home.terraceCardCategory,
+                description: home.terraceCardDescription,
+                image: "/images/catch/sushi-burger.jpg",
+                alt: home.terraceCardAlt,
+              },
+            ].map((venue) => (
+              <Link key={venue.href} href={localePath(safeLocale, venue.href)} className="home-venue-card">
+                <div className="home-venue-card-image">
+                  <Image
+                    src={venue.image}
+                    alt={venue.alt}
+                    width={1200}
+                    height={1500}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1000px) 50vw, 33vw"
+                    loading="lazy"
+                  />
+                  <span className="home-venue-card-category">{venue.category}</span>
+                </div>
+                <div className="home-venue-card-copy">
+                  <h3>{venue.title}</h3>
+                  <p>{venue.description}</p>
+                  <span className="home-venue-card-link">{home.venueCardCta} <span aria-hidden="true">→</span></span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         {/* ── PORTAL CARDS — elevated roles only ─────────────────────── */}
         {showPortal && visiblePortals.length > 0 && (
           <section style={{ marginBottom: 56 }}>
