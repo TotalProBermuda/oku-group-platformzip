@@ -196,7 +196,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
 
   function eventLinks(session: SessionRow) {
     return {
-      view: `/${locale}/experiences/${session.series.slug}?sessionId=${encodeURIComponent(session.id)}#session-${encodeURIComponent(session.id)}`,
+      view: `/${locale}/experiences/${session.series.slug}/sessions/${encodeURIComponent(session.id)}`,
       buy: `/${locale}/checkout/${session.series.slug}?sessionId=${encodeURIComponent(session.id)}`,
     };
   }
