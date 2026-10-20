@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -120,21 +121,28 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
       {/* ── PUBLIC MARKETING HERO — always visible regardless of session ── */}
       <section className="hero">
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="hero-eyebrow">{home.eyebrow}</div>
-          <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(48px, 7vw, 80px)", fontWeight: 400, letterSpacing: "-0.03em", color: "white", marginBottom: 20, lineHeight: 1 }}>
-            {home.headline}
+            <div className="home-hero-layout">
+          <div className="home-hero-copy">
+            <div className="hero-eyebrow">{home.eyebrow}</div>
+            <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(48px, 7vw, 80px)", fontWeight: 400, letterSpacing: "-0.03em", color: "white", marginBottom: 20, lineHeight: 1 }}>
+              {home.headline}
+            </div>
+            <p className="hero-subtitle">{home.subtitle}</p>
+            <div className="hero-actions">
+              <Link href={localePath(safeLocale, "/restaurants")} className="btn btn-primary btn-lg">
+                {home.browseRestaurants}
+              </Link>
+              <Link href={localePath(safeLocale, "/experiences")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                {home.browseEvents}
+              </Link>
+            </div>
           </div>
-          <p className="hero-subtitle">{home.subtitle}</p>
-          <div className="hero-actions">
-            <Link href={localePath(safeLocale, "/restaurants")} className="btn btn-primary btn-lg">
-              {home.browseRestaurants}
-            </Link>
-            <Link href={localePath(safeLocale, "/experiences")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-              {home.browseEvents}
-            </Link>
-          </div>
+          <figure className="home-hero-photo">
+            <Image src="/images/home/oku-sushi-feature.webp" alt="Fresh salmon sushi, thoughtfully plated at OKÜ" width={1200} height={1800} sizes="(max-width: 768px) 100vw, 48vw" priority />
+          </figure>
         </div>
-      </section>
+      </div>
+    </section>
 
       <div className="page-container">
         {/* Primary public journeys stay ahead of portals and secondary content. */}

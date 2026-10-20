@@ -2599,3 +2599,33 @@ tbody tr:hover td {
     padding: 22px;
   }
 }
+
+.home-hero-layout {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 72px);
+}
+
+.home-hero-copy {
+  min-width: 0;
+  text-align: left;
+}
+
+.home-hero-photo {
+  margin: 0;
+  width: 100%;
+  height: clamp(360px, 40vw, 600px);
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22);
+}
+
+.home-hero-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 54%;
