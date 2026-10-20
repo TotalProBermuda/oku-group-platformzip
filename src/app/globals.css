@@ -2629,6 +2629,7 @@ tbody tr:hover td {
   height: 100%;
   object-fit: cover;
   object-position: center 54%;
+}
 
 /* Visual restaurant discovery on the public home page */
 .home-venue-showcase {
