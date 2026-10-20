@@ -17,7 +17,7 @@ describe("series/session artwork rendering", () => {
       checkoutHrefBase={`/${locale}/checkout/series`} eventHrefBase={`/${locale}/experiences/series`} venue="OKU" locale={locale} labels={{}} />);
     expect(markup).toContain(`src="/session-${locale}.jpg"`);
     expect(markup).toContain(`/${locale}/checkout/series?sessionId=session-1`);
-    expect(markup).toContain(`/${locale}/experiences/series?sessionId=session-1#session-session-1`);
+    expect(markup).toContain(`/${locale}/experiences/series/sessions/session-1`);
     expect(markup).toContain("Series");
     expect(markup).toContain("Session");
   });
