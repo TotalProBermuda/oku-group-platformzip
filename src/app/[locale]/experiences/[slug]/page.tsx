@@ -55,7 +55,9 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const title = focusedSession?.title ? `${seriesTitle} — ${focusedSession.title}` : seriesTitle;
   const description = focusedSession?.subtitle || focusedSession?.description || series.description || content?.description || "";
   const imageUrl = (focusedSession ? sessionArtworkCandidates(focusedSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale))[0];
-  const canonicalUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
+  const canonicalUrl = focusedSession
+    ? `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}/sessions/${encodeURIComponent(focusedSession.id)}`
+    : `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
 
   return {
     title,
@@ -109,6 +111,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const firstSession = sessions[0];
   const focusSessionId = sessions.some((event: any) => event.id === query.sessionId) ? query.sessionId ?? null : null;
   const focusSession = focusSessionId ? sessions.find((event: any) => event.id === focusSessionId) : null;
+  if (query.sessionId && !focusSession) notFound();
   const heroArtwork = focusSession ? sessionArtworkCandidates(focusSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
   const displayedTicketTypes = focusSession
     ? ticketTypes.filter((ticket: any) => sessionProductEnabled(focusSession, series, ticket.id))
@@ -121,7 +124,9 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const description = series.description ?? content?.description;
   const displayDescription = focusSession?.description || description;
 
-  const pageUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
+  const pageUrl = focusSession
+    ? `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}/sessions/${encodeURIComponent(focusSession.id)}`
+    : `${PUBLIC_BASE}/${safeLocale}/experiences/${slug}`;
   const locationStr = [series.venue, series.venueAddress, series.city].filter(Boolean).join(", ");
 
   return (
@@ -157,7 +162,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
           <ShareButtons
             url={pageUrl}
             title={title}
-            imageUrl={seriesArtworkCandidates(series, safeLocale)[0]}
+            imageUrl={heroArtwork[0]}
             labels={{
               shareHeading: c.shareHeading,
               copyLink: c.shareCopyLink,
