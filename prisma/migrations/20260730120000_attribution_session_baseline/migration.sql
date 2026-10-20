@@ -5,12 +5,10 @@ DO $$ BEGIN
   CREATE TYPE "AttributionSessionKind" AS ENUM ('RESERVATION', 'WALKIN', 'TICKET_PURCHASE');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
 DO $$ BEGIN
   CREATE TYPE "AttributionSessionSource" AS ENUM ('QR_RESERVATION', 'HOST_CHECKIN', 'HOST_WALKIN', 'MANUAL_ADMIN', 'DIRECT', 'TICKET_PURCHASE');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
 DO $$ BEGIN
   CREATE TYPE "AttributionSessionStatus" AS ENUM ('CAPTURED', 'SEATED', 'POS_BIND_INTENT_RECORDED', 'BOUND_TO_POS', 'VERIFIED_POS_SALE', 'CANCELED', 'EXPIRED');
 EXCEPTION WHEN duplicate_object THEN NULL;
@@ -32,7 +30,6 @@ CREATE TABLE IF NOT EXISTS "AttributionSession" (
   "hostProfileId" TEXT,
   "referralActorId" TEXT,
   "legacyReferrerId" TEXT,
-  "referralLinkId" TEXT,
   "openedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "closedAt" TIMESTAMP(3),
   "createdByUserId" TEXT,
@@ -45,7 +42,6 @@ CREATE TABLE IF NOT EXISTS "AttributionSession" (
   "bindMethod" TEXT,
   CONSTRAINT "AttributionSession_pkey" PRIMARY KEY ("id")
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS "AttributionSession_reservationId_key" ON "AttributionSession"("reservationId");
 CREATE UNIQUE INDEX IF NOT EXISTS "AttributionSession_orderId_key" ON "AttributionSession"("orderId");
 CREATE UNIQUE INDEX IF NOT EXISTS "AttributionSession_bookingCode_key" ON "AttributionSession"("bookingCode");
