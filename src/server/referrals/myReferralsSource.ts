@@ -503,7 +503,7 @@ export function projectReferralRow(
     partySize: r.partySize ?? 0,
     conceptRequested: r.conceptRequested ?? null,
     zoneName: r.zone?.name ?? null,
-    assignedSpaceName: (r as any).assignedSpace?.name ?? null,
+    assignedSpaceName: (r as unknown as { assignedSpace?: { name?: string | null } | null }).assignedSpace?.name ?? null,
     reservationDate: r.reservationDate.toISOString(),
     ticketPurchaseDate: null,
     reservationStatus: r.status,
