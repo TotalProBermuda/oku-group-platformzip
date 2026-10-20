@@ -6,7 +6,26 @@ on:
     branches: [main]
 
 jobs:
-  quality:
+  static-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/oku_ci
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm audit --audit-level=moderate
+      - run: npm run i18n:check
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+  database-and-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -35,9 +54,5 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
-      - run: npm audit --audit-level=moderate
-      - run: npm run i18n:check
       - run: npm test -- --reporter=dot
-      - run: npm run lint
-      - run: npx tsc --noEmit
       - run: npm run build
