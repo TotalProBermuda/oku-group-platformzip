@@ -25,7 +25,7 @@ export const seriesInclude = {
 } satisfies Prisma.SeriesInclude;
 export type ManagedSession = Prisma.SessionGetPayload<{ include: typeof sessionInclude }>;
 export type ManagedSeries = Prisma.SeriesGetPayload<{ include: typeof seriesInclude }>;
-export type Translation = Prisma.ContentTranslationGetPayload<{}>;
+export type Translation = Prisma.ContentTranslationGetPayload<Prisma.ContentTranslationDefaultArgs>;
 export type Sponsor = Prisma.SponsorAssignmentGetPayload<{}>;
 export type State = { series: ManagedSeries; sessions: ManagedSession[]; translations: Translation[]; sponsors: Sponsor[]; financialAssignments?: FinancialAssignment[] };
 
