@@ -199,7 +199,7 @@ export function AccountContent() {
         <article key={ticket.id} className="card" style={{ padding: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <Link href={`/${locale}/experiences/${ticket.session.series.slug}`} style={{ fontWeight: 700, color: "var(--color-text)" }}>
+              <Link href={`/${locale}/experiences/${ticket.session.series.slug}/sessions/${encodeURIComponent(ticket.session.id)}`} style={{ fontWeight: 700, color: "var(--color-text)" }}>
                 {ticket.session.series.title}
               </Link>
               <div className="text-sm text-secondary" style={{ marginTop: 5 }}>
