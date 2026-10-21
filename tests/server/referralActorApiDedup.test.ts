@@ -302,6 +302,7 @@ describe("POST /api/v1/operators/create — dedupe scenarios", () => {
 
     const res = await operatorCreatePost(req);
     const body = await res.json();
+    console.log("DEBUG merge resolve", body);
 
     expect(res.status).toBe(409);
     expect(body.ok).toBe(false);
@@ -422,6 +423,7 @@ describe("POST /api/v1/admin/users/[id]/referrer-resolution/resolve — dedupe s
       params: Promise.resolve({ id: "target-user" }),
     });
     const body = await res.json();
+    console.log("DEBUG same-user resolve", body);
 
     // Same-user match is always idempotent — never a 409
     expect(res.status).toBe(200);
