@@ -69,8 +69,8 @@ export default function BeneficiarySelfServiceForm({
       });
       setPayoutAuthorization(false);
       setOk(true);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (error: unknown) {
+      setErr(error instanceof Error ? error.message : "Failed to save bank details.");
     } finally {
       setBusy(false);
     }
