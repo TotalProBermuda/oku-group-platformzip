@@ -33,7 +33,7 @@ const {
   const mockEventReferrerAssignmentFindFirst = vi.fn();
 
   const mockTxClient = {
-    auditLog: { create: mockAuditLogCreate },
+    auditLog: { create: mockAuditLogCreate, findFirst: mockAuditLogFindFirst },
     referralActor: {
       findUnique: mockReferralActorFindUnique,
       findFirst: mockReferralActorFindFirst,
@@ -53,7 +53,7 @@ const {
   );
 
   const mockPrisma = {
-    auditLog: { create: mockAuditLogCreate },
+    auditLog: { create: mockAuditLogCreate, findFirst: mockAuditLogFindFirst },
     referralActor: {
       findUnique: mockReferralActorFindUnique,
       findFirst: mockReferralActorFindFirst,
