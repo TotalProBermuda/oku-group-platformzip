@@ -5,6 +5,16 @@
 -- the ledger/payment migrations add foreign keys. Do not remove or replace
 -- existing reservation data.
 
+-- The payment-foundation migration adds RESERVATION_DEPOSIT to this type,
+-- but clean migration history did not include its pre-existing schema-push type.
+DO $$ BEGIN
+  CREATE TYPE "OrderType" AS ENUM (
+    'TICKET', 'EXPERIENCE', 'MEMBERSHIP', 'DINING', 'PRIVATE_BOOKING',
+    'EVENT', 'OTHER', 'RESERVATION_DEPOSIT'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 -- Restore schema-push-era dining location tables before migrations add their FKs.
 DO $$ BEGIN
   CREATE TYPE "CommissionValidationMode" AS ENUM ('ON_SEATED', 'ON_COMPLETED');
