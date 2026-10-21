@@ -70,6 +70,19 @@ export async function POST(req: NextRequest) {
     accountNumber: normalizedAccountNumber,
   } = validation.data;
 
+  // Keep the pre-existing public profile fields intact while treating the
+  // invitation email as the immutable account identity.
+  const profileBody = body && typeof body === "object" && !Array.isArray(body)
+    ? body as Record<string, unknown>
+    : {};
+  const profileImageUrl = typeof profileBody.profileImageUrl === "string" ? profileBody.profileImageUrl.trim() : "";
+  const shortBio = typeof profileBody.shortBio === "string" ? profileBody.shortBio.trim() : "";
+  const instagramUrl = typeof profileBody.instagramUrl === "string" ? profileBody.instagramUrl.trim() : "";
+  const tiktokUrl = typeof profileBody.tiktokUrl === "string" ? profileBody.tiktokUrl.trim() : "";
+  const websiteUrl = typeof profileBody.websiteUrl === "string" ? profileBody.websiteUrl.trim() : "";
+  const whatsapp = typeof profileBody.whatsapp === "string" ? profileBody.whatsapp.trim() : "";
+  const preferredLanguage = typeof profileBody.preferredLanguage === "string" ? profileBody.preferredLanguage.trim() : "";
+
   // Invitation email is the identity anchor; ignore any email in the payload.
   const userEmail = invite.invitedEmail.trim().toLowerCase();
   if (!isEncryptionAvailable()) {
