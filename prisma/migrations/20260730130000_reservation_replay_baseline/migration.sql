@@ -125,8 +125,6 @@ CREATE TABLE IF NOT EXISTS "Reservation" (
   "celebrationMessage" TEXT,
   "contactName" TEXT NOT NULL,
   "contactEmail" TEXT NOT NULL,
-  "contactEmailNormalized" TEXT,
-  "customerLocale" TEXT NOT NULL DEFAULT 'en',
   "contactPhone" TEXT,
   "contactWhatsapp" TEXT,
   "confirmationCode" TEXT NOT NULL,
@@ -140,8 +138,6 @@ CREATE TABLE IF NOT EXISTS "Reservation" (
   "arrivalConfirmedAt" TIMESTAMP(3),
   "arrivedHeadcount" INTEGER,
   "seatedAt" TIMESTAMP(3),
-  "requestedSpaceId" TEXT,
-  "assignedSpaceId" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "Reservation_pkey" PRIMARY KEY ("id")
@@ -151,16 +147,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Reservation_confirmationCode_key"
   ON "Reservation"("confirmationCode");
 CREATE INDEX IF NOT EXISTS "Reservation_venueId_reservationDate_idx"
   ON "Reservation"("venueId", "reservationDate");
-CREATE INDEX IF NOT EXISTS "Reservation_contactEmailNormalized_reservationDate_idx"
-  ON "Reservation"("contactEmailNormalized", "reservationDate");
 CREATE INDEX IF NOT EXISTS "Reservation_zoneId_reservationDate_idx"
   ON "Reservation"("zoneId", "reservationDate");
 CREATE INDEX IF NOT EXISTS "Reservation_status_idx" ON "Reservation"("status");
 CREATE INDEX IF NOT EXISTS "Reservation_contactEmail_idx" ON "Reservation"("contactEmail");
-CREATE INDEX IF NOT EXISTS "Reservation_requestedSpaceId_idx"
-  ON "Reservation"("requestedSpaceId");
-CREATE INDEX IF NOT EXISTS "Reservation_assignedSpaceId_idx"
-  ON "Reservation"("assignedSpaceId");
 
 
 -- CommissionAllocation is also a schema-push-era table. The later rule-engine
