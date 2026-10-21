@@ -115,11 +115,13 @@ export default function AcceptInvitePage() {
       setPayoutError("Enter your bank and account holder name.");
       return;
     }
-    if (form.bankAccountNumber.replace(/[\s-]/g, "").length < 5) {
-      setPayoutError("Enter a valid bank account number.");
+    const accountNumber = form.bankAccountNumber.trim();
+    const accountNumberConfirmation = form.bankAccountNumberConfirmation.trim();
+    if (!accountNumber.trim() || accountNumber.length > 128 || /[\u0000-\u001f\u007f]/.test(accountNumber)) {
+      setPayoutError("Enter the account identifier exactly as provided by your bank.");
       return;
     }
-    if (form.bankAccountNumber.replace(/[\s-]/g, "") !== form.bankAccountNumberConfirmation.replace(/[\s-]/g, "")) {
+    if (accountNumber !== accountNumberConfirmation) {
       setPayoutError("The account numbers do not match.");
       return;
     }
@@ -256,11 +258,11 @@ export default function AcceptInvitePage() {
             <div>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 6 }}>How you receive commission</h2>
               <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 20, lineHeight: 1.6 }}>
-                OKÜ pays eligible commissions by online bank transfer only. Add the account where you want commission payments sent.
+                OKÜ pays eligible commissions by online bank transfer only. OKÜ funds commission payments from its Banesco account, but your receiving bank can be another bank. Enter the beneficiary account where you want to receive commissions; OKÜ Finance must review the bank and transfer route before it is approved for payment.
               </p>
 
               <div style={{ background: "#f8f5f3", border: "1px solid #eee7df", borderRadius: 10, padding: "14px 16px", marginBottom: 24, fontSize: 13, color: "#5b514a", lineHeight: 1.6 }}>
-                Your account number is encrypted in storage and masked after submission. OKÜ Finance must review and verify your bank details before any payout can be included in a payment batch. We do not ask for ID here; supporting documents will be requested only if a documented bank or legal requirement applies.
+                Your account number is encrypted in storage and masked after submission. OKÜ’s Banesco account is the funding account; it does not mean your beneficiary account must be at Banesco. Finance will verify whether the receiving bank and transfer route are supported. Only USD bank-transfer details can be submitted at this time; other currencies or unconfirmed transfer routes remain pending review and cannot be paid until approved. We do not ask for ID here; supporting documents will be requested only if a documented bank or legal requirement applies.
               </div>
 
               <div style={{ marginBottom: 18 }}>
@@ -280,6 +282,7 @@ export default function AcceptInvitePage() {
               </div>
               <div style={{ marginBottom: 18 }}>
                 <label style={labelStyle}>Account currency</label>
+                <p style={{ fontSize: 12, color: "#6b7280", margin: "-2px 0 8px" }}>USD only for now. Other payout currencies are pending review and cannot be paid until OKÜ Finance confirms the transfer route.</p>
                 <select style={{ ...inputStyle, cursor: "pointer" }} {...f("currency")}>
                   <option value="USD">USD — current OKÜ payout currency</option>
                 </select>

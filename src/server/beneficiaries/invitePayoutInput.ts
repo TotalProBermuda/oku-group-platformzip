@@ -37,11 +37,13 @@ export function validateInvitePayoutDetails(
     : null;
   const currency = typeof body.currency === "string" ? body.currency.trim().toUpperCase() : "USD";
   const swiftBicInput = typeof body.swiftBic === "string" ? body.swiftBic.trim().toUpperCase() : "";
+  // Preserve the beneficiary bank's account identifier exactly (apart from
+  // surrounding whitespace); the receiving-bank format is not established yet.
   const accountNumber = typeof body.bankAccountNumber === "string"
-    ? body.bankAccountNumber.replace(/[\s-]/g, "")
+    ? body.bankAccountNumber.trim()
     : "";
   const confirmation = typeof body.bankAccountNumberConfirmation === "string"
-    ? body.bankAccountNumberConfirmation.replace(/[\s-]/g, "")
+    ? body.bankAccountNumberConfirmation.trim()
     : "";
 
   if (!name || name.length > 120) {
@@ -56,11 +58,16 @@ export function validateInvitePayoutDetails(
   if (!accountType) {
     return { ok: false, error: "Select checking or savings." };
   }
-  if (!/^[A-Z]{3}$/.test(currency)) {
-    return { ok: false, error: "Enter a valid 3-letter account currency." };
+  // USD is the only currency currently offered by the OKÜ payout flow.
+  // Banesco's beneficiary transfer contract is not confirmed for other currencies.
+  if (currency !== "USD") {
+    return { ok: false, error: "Only USD is currently available. Other payout currencies are pending Finance review." };
   }
-  if (!/^[A-Z0-9]{5,34}$/i.test(accountNumber)) {
-    return { ok: false, error: "Enter a valid bank account number (5–34 letters or numbers)." };
+  // No beneficiary-bank account-number format has been confirmed for OKÜ's
+  // transfer route. Accept a bounded opaque identifier and leave route/format
+  // verification to Finance; do not guess another bank's local format here.
+  if (!accountNumber.trim() || accountNumber.length > 128 || /[\u0000-\u001f\u007f]/.test(accountNumber)) {
+    return { ok: false, error: "Enter the account identifier exactly as provided by your bank." };
   }
   if (accountNumber !== confirmation) {
     return { ok: false, error: "The account numbers do not match." };
