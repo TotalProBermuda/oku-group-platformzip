@@ -41,6 +41,7 @@ export async function GET() {
           checkedInAt: true,
           session: {
             select: {
+              id: true,
               startsAt: true,
               title: true,
               series: { select: { title: true, slug: true, venue: true } },
