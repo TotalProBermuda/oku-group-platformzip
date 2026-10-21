@@ -20,7 +20,7 @@ function request(resume = false) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
-  m.order.mockResolvedValue({ id: "order", userId: "user", status: "PENDING", totalCents: 227, currency: "USD", lineItems: [], user: { name: "Test Buyer" }, payment: null });
+  m.order.mockResolvedValue({ id: "order", userId: "user", status: "PENDING", totalCents: 227, currency: "USD", lineItems: [], user: { name: "Test Buyer" }, session: { status: "SCHEDULED" }, payment: null });
   m.hold.mockResolvedValue(true); m.audit.mockResolvedValue({});
   m.enroll.mockResolvedValue({ kind: "challenge", challenge });
   m.require.mockResolvedValue({ authenticationTransactionId: "auth", cardType: "002" });
