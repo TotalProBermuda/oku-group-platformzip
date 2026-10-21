@@ -198,7 +198,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
         }
       `}</style>
       {/* Hero */}
-      <div className="experience-hero" style={{ background: venueGrad[series.venue] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: heroArtwork.length ? 420 : undefined }}>
+      <div className="experience-hero" style={{ background: venueGrad[series.venue ?? "OKU"] ?? venueGrad.OKU, padding: "72px 0 56px", position: "relative", overflow: "hidden", minHeight: heroArtwork.length ? 420 : undefined }}>
         {heroArtwork.length > 0 && !focusSession && (
           <EventArtwork candidates={heroArtwork} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
         )}
