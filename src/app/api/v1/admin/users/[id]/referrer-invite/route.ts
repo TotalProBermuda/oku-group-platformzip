@@ -30,7 +30,7 @@ export async function POST(
       email: user.email,
       purpose: "REFERRER_INVITE",
       requireExistingUserId: user.id,
-      callbackUrl: "/referrer/dashboard",
+      callbackUrl: "/my/beneficiary",
     });
     if (!result.issued) {
       return NextResponse.json({ ok: false, error: "Invitation could not be issued" }, { status: 409 });
