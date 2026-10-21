@@ -78,7 +78,7 @@ const {
       findFirst: mockPrismaReferralAssignmentFindFirst,
       create: mockPrismaReferralAssignmentCreate,
     },
-    auditLog: { create: mockPrismaAuditLogCreate },
+    auditLog: { create: mockPrismaAuditLogCreate, findFirst: vi.fn().mockResolvedValue(null) },
     userAuditLog: { create: mockPrismaUserAuditLogCreate },
   };
 
@@ -103,7 +103,7 @@ const {
       findFirst: mockPrismaReferralAssignmentFindFirst,
       create: mockPrismaReferralAssignmentCreate,
     },
-    auditLog: { create: mockPrismaAuditLogCreate },
+    auditLog: { create: mockPrismaAuditLogCreate, findFirst: vi.fn().mockResolvedValue(null) },
     userAuditLog: { create: mockPrismaUserAuditLogCreate },
     $transaction: mockPrismaTransaction,
   };
