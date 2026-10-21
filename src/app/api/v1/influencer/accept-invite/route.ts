@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, isEncryptionAvailable, maskSecret } from "@/server/security/encryption";
+import { validateInvitePayoutDetails } from "@/server/beneficiaries/invitePayoutInput";
 
 function randRefCode(name: string) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -57,59 +58,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This invite has expired" }, { status: 410 });
   }
 
-  const rawBody = await req.json().catch(() => ({}));
-  const body = rawBody && typeof rawBody === "object" && !Array.isArray(rawBody)
-    ? rawBody as Record<string, any>
-    : {};
+  const body = await req.json().catch(() => ({}));
+  const validation = validateInvitePayoutDetails(body, invite.invitedName);
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
   const {
-    name, profileImageUrl, shortBio, instagramUrl, tiktokUrl, websiteUrl,
-    whatsapp, preferredLanguage, bankName, accountHolderName, accountType,
-    currency, swiftBic, bankAccountNumber, bankAccountNumberConfirmation,
-  } = body;
+    name: userName, bankName: normalizedBankName,
+    accountHolderName: normalizedHolder, accountType: normalizedAccountType,
+    currency: normalizedCurrency, swiftBic: normalizedSwift,
+    accountNumber: normalizedAccountNumber,
+  } = validation.data;
 
-  // The invitation address is the identity anchor; never let a public invite
-  // submission redirect acceptance to a different account.
+  // Invitation email is the identity anchor; ignore any email in the payload.
   const userEmail = invite.invitedEmail.trim().toLowerCase();
-  const userName = typeof name === "string" ? name.trim() : invite.invitedName;
-  const normalizedBankName = typeof bankName === "string" ? bankName.trim() : "";
-  const normalizedHolder = typeof accountHolderName === "string" ? accountHolderName.trim() : "";
-  const normalizedAccountType = accountType === "CHECKING" || accountType === "SAVINGS" ? accountType : null;
-  const normalizedCurrency = typeof currency === "string" ? currency.trim().toUpperCase() : "";
-  const normalizedSwift = typeof swiftBic === "string" ? swiftBic.trim().toUpperCase() : "";
-  const normalizedAccountNumber = typeof bankAccountNumber === "string"
-    ? bankAccountNumber.replace(/[\s-]/g, "")
-    : "";
-  const normalizedConfirmation = typeof bankAccountNumberConfirmation === "string"
-    ? bankAccountNumberConfirmation.replace(/[\s-]/g, "")
-    : "";
-
-  if (body.payoutAuthorization !== true) {
-    return NextResponse.json({ error: "Confirm the bank-details authorization to continue." }, { status: 400 });
-  }
-  if (!userName || userName.length > 120) {
-    return NextResponse.json({ error: "Enter a valid full name." }, { status: 400 });
-  }
-  if (!normalizedBankName || normalizedBankName.length > 120) {
-    return NextResponse.json({ error: "Enter the name of your bank." }, { status: 400 });
-  }
-  if (!normalizedHolder || normalizedHolder.length > 120) {
-    return NextResponse.json({ error: "Enter the account holder name exactly as shown by your bank." }, { status: 400 });
-  }
-  if (!normalizedAccountType) {
-    return NextResponse.json({ error: "Select checking or savings." }, { status: 400 });
-  }
-  if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
-    return NextResponse.json({ error: "Enter a valid 3-letter account currency." }, { status: 400 });
-  }
-  if (!/^[A-Z0-9]{5,34}$/i.test(normalizedAccountNumber)) {
-    return NextResponse.json({ error: "Enter a valid bank account number (5–34 letters or numbers)." }, { status: 400 });
-  }
-  if (normalizedAccountNumber !== normalizedConfirmation) {
-    return NextResponse.json({ error: "The account numbers do not match." }, { status: 400 });
-  }
-  if (normalizedSwift && !/^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$/.test(normalizedSwift)) {
-    return NextResponse.json({ error: "Enter a valid 8- or 11-character SWIFT/BIC, or leave it blank." }, { status: 400 });
-  }
   if (!isEncryptionAvailable()) {
     return NextResponse.json(
       { error: "Secure bank-detail storage is temporarily unavailable. Please try again later." },
