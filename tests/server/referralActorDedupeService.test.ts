@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
   mockAuditLogCreate,
+  mockAuditLogFindFirst,
   mockReferralActorFindUnique,
   mockReferralActorFindFirst,
   mockReferralActorFindMany,
