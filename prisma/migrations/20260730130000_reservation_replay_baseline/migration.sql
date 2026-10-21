@@ -194,3 +194,35 @@ CREATE INDEX IF NOT EXISTS "CommissionSuggestion_referrerId_status_idx"
   ON "CommissionSuggestion" ("referrerId", "status");
 CREATE INDEX IF NOT EXISTS "CommissionSuggestion_reservationId_idx"
   ON "CommissionSuggestion" ("reservationId");
+
+-- ReservationAttribution was also provisioned outside the migration chain.
+-- Recreate the Prisma model on a clean database before the anchor-field
+-- migration adds its partial unique index. Existing production rows are kept.
+CREATE TABLE IF NOT EXISTS "ReservationAttribution" (
+  "id" TEXT NOT NULL,
+  "reservationId" TEXT NOT NULL,
+  "referrerId" TEXT,
+  "sourceType" "ReservationSource" NOT NULL,
+  "sourceLabel" TEXT,
+  "commissionEligible" BOOLEAN NOT NULL DEFAULT false,
+  "commissionStatus" "CommissionStatus" NOT NULL DEFAULT 'PENDING',
+  "coversAttributed" INTEGER,
+  "conversionStage" "ConversionStage" NOT NULL DEFAULT 'INITIATED',
+  "lossReason" "LossReasonType",
+  "lossReasonNotes" TEXT,
+  "patronizedAt" TIMESTAMP(3),
+  "notes" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "ReservationAttribution_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "ReservationAttribution_reservationId_fkey"
+    FOREIGN KEY ("reservationId") REFERENCES "Reservation"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "ReservationAttribution_referrerId_fkey"
+    FOREIGN KEY ("referrerId") REFERENCES "Referrer"("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "ReservationAttribution_reservationId_idx"
+  ON "ReservationAttribution" ("reservationId");
+CREATE INDEX IF NOT EXISTS "ReservationAttribution_referrerId_idx"
+  ON "ReservationAttribution" ("referrerId");
+CREATE INDEX IF NOT EXISTS "ReservationAttribution_conversionStage_idx"
+  ON "ReservationAttribution" ("conversionStage");
