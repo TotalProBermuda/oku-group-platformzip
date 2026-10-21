@@ -15,13 +15,72 @@ import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
 import type { Metadata } from "next";
 import EventArtwork from "@/components/ui/EventArtwork";
 import ExpandableText from "@/components/ui/ExpandableText";
-import { seriesArtworkCandidates, sessionArtworkCandidates } from "@/lib/eventArtwork";
+import { seriesArtworkCandidates, sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
 
-async function getSeries(slug: string, locale = "en") {
+type EventPageTicketPrice = { ticketTypeId: string; priceCents: number };
+type EventPageSession = SessionArtwork & {
+  id: string;
+  title: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  soldCount: number;
+  status: string;
+  ticketPrices?: EventPageTicketPrice[];
+  eventHosts?: Array<{ role: string; entity: { displayName: string } }>;
+};
+type EventPageTicketType = {
+  id: string;
+  name: string;
+  priceCents: number;
+  description?: string | null;
+  requiresMembership?: boolean;
+  earlyAccessOnly?: boolean;
+};
+type EventPageInfluencer = {
+  id: string;
+  roleLabel: string;
+  influencer: { displayName?: string | null; handle?: string | null; isVerified: boolean };
+};
+type EventPageAddon = {
+  id: string;
+  name: string;
+  description?: string | null;
+  requiresMembership?: boolean;
+  priceCents: number;
+};
+type EventPageSeries = SeriesArtwork & {
+  id: string;
+  slug: string;
+  title?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  category?: string | null;
+  socialLinksJson?: Record<string, string> | null;
+  countdownLabel?: string | null;
+  heroImageUrl?: string | null;
+  sessionDefaults?: unknown;
+  seriesHosts?: Array<{ role: string; entity: { displayName: string } }>;
+  sessions?: EventPageSession[];
+  ticketTypes?: EventPageTicketType[];
+  experienceInfluencer?: EventPageInfluencer[];
+  addons?: EventPageAddon[];
+  showCountdown?: boolean;
+  earlyReleaseAt?: string | null;
+  venue?: string | null;
+  venueAddress?: string | null;
+  city?: string | null;
+  newsletterCaptureEnabled?: boolean;
+  waitlistEnabled?: boolean;
+};
+
+async function getSeries(slug: string, locale = "en"): Promise<EventPageSeries | null> {
   const res = await fetch(`${BASE}/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${encodeURIComponent(locale)}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
@@ -50,7 +109,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!series) return {};
 
   const content = getSeriesContent(series.slug, safeLocale);
-  const focusedSession = series.sessions?.find((session: any) => session.id === query.sessionId);
+  const focusedSession = series.sessions?.find((session) => session.id === query.sessionId);
   const seriesTitle = series.title ?? content?.title ?? slug;
   const title = focusedSession?.title ? `${seriesTitle} — ${focusedSession.title}` : seriesTitle;
   const description = focusedSession?.subtitle || focusedSession?.description || series.description || content?.description || "";
@@ -109,12 +168,12 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const sessions    = series.sessions ?? [];
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
-  const focusSessionId = sessions.some((event: any) => event.id === query.sessionId) ? query.sessionId ?? null : null;
+  const focusSessionId = sessions.some((event) => event.id === query.sessionId) ? query.sessionId ?? null : null;
   const focusSession = focusSessionId ? sessions.find((event: any) => event.id === focusSessionId) : null;
   if (query.sessionId && !focusSession) notFound();
   const heroArtwork = focusSession ? sessionArtworkCandidates(focusSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
   const displayedTicketTypes = focusSession
-    ? ticketTypes.filter((ticket: any) => sessionProductEnabled(focusSession, series, ticket.id))
+    ? ticketTypes.filter((ticket) => sessionProductEnabled(focusSession, series, ticket.id))
     : ticketTypes;
   const pricingSessions = focusSession ? [focusSession] : sessions;
   const isCountdownActive = series.showCountdown && series.earlyReleaseAt && new Date() < new Date(series.earlyReleaseAt);
@@ -251,7 +310,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
                 {c.yourHosts}
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {influencers.map((ei: any) => {
+                {influencers.map((ei) => {
                   const inf = ei.influencer;
                   return (
                     <div key={ei.id} className="experience-host" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "20px 24px", display: "flex", gap: 20, alignItems: "center" }}>
@@ -282,7 +341,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
                 {c.addOns}
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {addons.map((a: any) => (
+                {addons.map((a) => (
                   <div key={a.id} className="experience-addon" style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 600, color: "#1a1614" }}>{a.name}</div>
@@ -346,11 +405,11 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
               </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
-                {displayedTicketTypes.map((t: any) => (
+                {displayedTicketTypes.map((t) => (
                   <div key={t.id} className="experience-ticket-type" style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{t.name}</div>
-                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{pricingSessions.some((eventSession: any) => eventSession.ticketPrices?.some((price: any) => price.ticketTypeId === t.id && price.priceCents !== t.priceCents)) ? `${c.from ?? "From"} ` : ""}{fmt(pricingSessions.reduce((lowest: number, eventSession: any) => {
+                      <div style={{ fontWeight: 700, color: "#c41e3a" }}>{pricingSessions.some((eventSession) => eventSession.ticketPrices?.some((price) => price.ticketTypeId === t.id && price.priceCents !== t.priceCents)) ? `${c.from ?? "From"} ` : ""}{fmt(pricingSessions.reduce((lowest: number, eventSession) => {
                         const override = eventSession.ticketPrices?.find((price: { ticketTypeId: string; priceCents: number }) => price.ticketTypeId === t.id)?.priceCents;
                         return Math.min(lowest, override ?? t.priceCents);
                       }, t.priceCents))}</div>
