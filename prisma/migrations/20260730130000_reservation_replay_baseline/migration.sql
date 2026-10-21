@@ -544,3 +544,37 @@ CREATE TABLE IF NOT EXISTS "CommerceSettings" (
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "CommerceSettings_pkey" PRIMARY KEY ("id")
 );
+
+-- Restore the translation queue table before the tracked retry/backoff
+-- migration extends it. Leave those later columns/index for that migration.
+DO $$ BEGIN
+  CREATE TYPE "ContentTranslationStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'STALE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "ContentTranslation" (
+  "id" TEXT NOT NULL,
+  "entityType" TEXT NOT NULL,
+  "entityId" TEXT NOT NULL,
+  "fieldName" TEXT NOT NULL,
+  "sourceLocale" TEXT NOT NULL DEFAULT 'en',
+  "targetLocale" TEXT NOT NULL,
+  "sourceText" TEXT NOT NULL,
+  "sourceTextHash" TEXT NOT NULL,
+  "translatedText" TEXT NOT NULL,
+  "status" "ContentTranslationStatus" NOT NULL DEFAULT 'PENDING',
+  "provider" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "ContentTranslation_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "ContentTranslation_entityType_entityId_fieldName_targetLocale_key"
+  ON "ContentTranslation" ("entityType", "entityId", "fieldName", "targetLocale");
+CREATE INDEX IF NOT EXISTS "ContentTranslation_entityType_entityId_idx"
+  ON "ContentTranslation" ("entityType", "entityId");
+CREATE INDEX IF NOT EXISTS "ContentTranslation_status_idx"
+  ON "ContentTranslation" ("status");
+CREATE INDEX IF NOT EXISTS "ContentTranslation_targetLocale_idx"
+  ON "ContentTranslation" ("targetLocale");
+CREATE INDEX IF NOT EXISTS "ContentTranslation_entityType_targetLocale_status_idx"
+  ON "ContentTranslation" ("entityType", "targetLocale", "status");
