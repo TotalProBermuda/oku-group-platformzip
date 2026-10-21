@@ -38,10 +38,10 @@ export function validateInvitePayoutDetails(
   const currency = typeof body.currency === "string" ? body.currency.trim().toUpperCase() : "USD";
   const swiftBicInput = typeof body.swiftBic === "string" ? body.swiftBic.trim().toUpperCase() : "";
   const accountNumber = typeof body.bankAccountNumber === "string"
-    ? body.bankAccountNumber.replace(/[\\s-]/g, "")
+    ? body.bankAccountNumber.replace(/[\s-]/g, "")
     : "";
   const confirmation = typeof body.bankAccountNumberConfirmation === "string"
-    ? body.bankAccountNumberConfirmation.replace(/[\\s-]/g, "")
+    ? body.bankAccountNumberConfirmation.replace(/[\s-]/g, "")
     : "";
 
   if (!name || name.length > 120) {
