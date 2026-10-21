@@ -195,6 +195,28 @@ CREATE INDEX IF NOT EXISTS "CommissionSuggestion_referrerId_status_idx"
 CREATE INDEX IF NOT EXISTS "CommissionSuggestion_reservationId_idx"
   ON "CommissionSuggestion" ("reservationId");
 
+-- These attribution enums were also introduced through schema pushes, so
+-- make their canonical Prisma values available before creating the attribution table.
+DO $$ BEGIN
+  CREATE TYPE "CommissionStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'PAID');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "ConversionStage" AS ENUM (
+    'INITIATED', 'REFERRED_UPSTAIRS', 'ARRIVED', 'OFFERED', 'PATRONIZED', 'DECLINED', 'LOST'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "LossReasonType" AS ENUM (
+    'PREFERRED_SEATING_UNAVAILABLE', 'TERRACE_UNAVAILABLE', 'WAIT_TOO_LONG',
+    'TABLE_NOT_READY', 'GROUP_TOO_LARGE', 'NOT_ENOUGH_SEATS', 'NOT_INTERESTED_IN_MENU',
+    'PRICE_CONCERN', 'BAD_SERVICE', 'ELEVATOR_NOT_WORKING', 'CHANGED_MIND',
+    'WENT_ELSEWHERE', 'NO_RESPONSE', 'OTHER'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 -- ReservationAttribution was also provisioned outside the migration chain.
 -- Recreate the Prisma model on a clean database before the anchor-field
 -- migration adds its partial unique index. Existing production rows are kept.
