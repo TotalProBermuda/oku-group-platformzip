@@ -1,3 +1,4 @@
+import { BankReadinessStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, isEncryptionAvailable, maskSecret } from "@/server/security/encryption";
@@ -170,7 +171,7 @@ export async function POST(req: NextRequest) {
       currency: normalizedCurrency,
       swiftBic: normalizedSwift || null,
     };
-    let beneficiaryStatus: string;
+    let beneficiaryStatus: BankReadinessStatus;
     if (!beneficiary) {
       await tx.beneficiaryProfile.create({
         data: {
@@ -195,7 +196,7 @@ export async function POST(req: NextRequest) {
         where: { userId: existingUser.id },
         data: {
           ...submittedBankDetails,
-          bankReadinessStatus: beneficiaryStatus as any,
+          bankReadinessStatus: beneficiaryStatus,
           okuApprovedAt: null,
           okuApprovedById: null,
           bankReadyAt: null,
