@@ -217,6 +217,66 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+-- Restore the referrer and compensation-plan models that were created by
+-- schema pushes but never entered into migration history.
+DO $$ BEGIN
+  CREATE TYPE "ReferrerType" AS ENUM (
+    'STREETSIDE_HOST', 'TAXI_DRIVER', 'TOUR_GUIDE', 'HOTEL_CONCIERGE', 'PARTNER'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "CompensationModelType" AS ENUM (
+    'COMMISSION_ONLY', 'COMMISSION_PLUS_HOURLY', 'HOURLY_ONLY', 'FIXED_SALARY',
+    'FIXED_SALARY_PLUS_COMMISSION', 'FLAT_PER_SEATED_PARTY',
+    'FLAT_PER_SEATED_COVER', 'CUSTOM'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "CompensationPlan" (
+  "id" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "appliesToType" TEXT NOT NULL,
+  "modelType" "CompensationModelType" NOT NULL,
+  "commissionPercent" DECIMAL(6,2),
+  "hourlyRateCents" INTEGER,
+  "fixedSalaryCents" INTEGER,
+  "flatPerPartyCents" INTEGER,
+  "flatPerCoverCents" INTEGER,
+  "notes" TEXT,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "CompensationPlan_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Referrer" (
+  "id" TEXT NOT NULL,
+  "fullName" TEXT NOT NULL,
+  "referrerType" "ReferrerType" NOT NULL,
+  "phone" TEXT,
+  "email" TEXT,
+  "whatsapp" TEXT,
+  "organizationName" TEXT,
+  "referralCode" TEXT NOT NULL,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "userId" TEXT,
+  "compensationPlanId" TEXT,
+  "metadataJson" JSONB,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "Referrer_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "Referrer_userId_fkey" FOREIGN KEY ("userId")
+    REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "Referrer_compensationPlanId_fkey" FOREIGN KEY ("compensationPlanId")
+    REFERENCES "CompensationPlan"("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Referrer_referralCode_key" ON "Referrer" ("referralCode");
+CREATE UNIQUE INDEX IF NOT EXISTS "Referrer_userId_key" ON "Referrer" ("userId");
+CREATE INDEX IF NOT EXISTS "Referrer_referralCode_idx" ON "Referrer" ("referralCode");
+CREATE INDEX IF NOT EXISTS "Referrer_referrerType_idx" ON "Referrer" ("referrerType");
+
 -- ReservationAttribution was also provisioned outside the migration chain.
 -- Recreate the Prisma model on a clean database before the anchor-field
 -- migration adds its partial unique index. Existing production rows are kept.
