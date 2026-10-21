@@ -4,7 +4,7 @@ import { validateInvitePayoutDetails } from "@/server/beneficiaries/invitePayout
 const validInput = {
   name: "Alex Referrer",
   payoutAuthorization: true,
-  bankName: "Banesco",
+  bankName: "Another Supported Bank",
   accountHolderName: "Alex Referrer",
   accountType: "CHECKING",
   currency: "USD",
@@ -14,6 +14,64 @@ const validInput = {
 };
 
 describe("validateInvitePayoutDetails", () => {
+  it("accepts a beneficiary bank separate from OKÜ's Banesco funding account", () => {
+    const result = validateInvitePayoutDetails({
+      ...validInput,
+      bankName: "Another Supported Bank",
+    }, "Invited Name");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.bankName).toBe("Another Supported Bank");
+  });
+
+  it("accepts an opaque bank-provided account identifier without assuming a bank format", () => {
+    const identifier = "AB-12/34 56";
+    const result = validateInvitePayoutDetails({
+      ...validInput,
+      bankAccountNumber: identifier,
+      bankAccountNumberConfirmation: identifier,
+    }, "Invited Name");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.accountNumber).toBe("AB/3456");
+  });
+
+  it("rejects unsupported payout currencies without echoing account data", () => {
+    const secretAccountNumber = "PRIVATE-BANK-ACCOUNT-9988";
+    const result = validateInvitePayoutDetails({
+      ...validInput,
+      currency: "EUR",
+      bankAccountNumber: secretAccountNumber,
+      bankAccountNumberConfirmation: secretAccountNumber,
+    }, "Invited Name");
+    expect(result).toEqual({
+      ok: false,
+      error: "Only USD is currently available. Other payout currencies are pending Finance review.",
+    });
+    expect(JSON.stringify(result)).not.toContain(secretAccountNumber);
+  });
+
+  it("rejects oversized or control-character account identifiers without echoing them", () => {
+    const oversized = "A".repeat(129);
+    const oversizedResult = validateInvitePayoutDetails({
+      ...validInput,
+      bankAccountNumber: oversized,
+      bankAccountNumberConfirmation: oversized,
+    }, "Invited Name");
+    expect(oversizedResult.ok).toBe(false);
+    expect(JSON.stringify(oversizedResult)).not.toContain(oversized);
+
+    const controlChars = "ABCD\u0000EF";
+    const controlResult = validateInvitePayoutDetails({
+      ...validInput,
+      bankAccountNumber: controlChars,
+      bankAccountNumberConfirmation: controlChars,
+    }, "Invited Name");
+    expect(controlResult).toEqual({
+      ok: false,
+      error: "Enter the account identifier exactly as provided by your bank.",
+    });
+    expect(JSON.stringify(controlResult)).not.toContain("ABCD");
+  });
+
   it("normalizes bank coordinates and keeps the invited email outside this input", () => {
     const result = validateInvitePayoutDetails(validInput, "Invited Name");
     expect(result.ok).toBe(true);
