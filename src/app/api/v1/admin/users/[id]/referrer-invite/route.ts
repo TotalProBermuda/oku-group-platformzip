@@ -26,6 +26,20 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Only active referrers can be invited" }, { status: 409 });
     }
 
+    await prisma.beneficiaryProfile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        proofOfAddressStatus: "NOT_REQUIRED",
+        identificationStatus: "NOT_REQUIRED",
+        taxOrRucStatus: "NOT_REQUIRED",
+        sourceOfFundsStatus: "NOT_REQUIRED",
+        bankReadinessStatus: "MISSING_INFO",
+      },
+      // Never overwrite Finance review/hold decisions on an existing profile.
+      update: {},
+    });
+
     const result = await issuePasswordlessToken({
       email: user.email,
       purpose: "REFERRER_INVITE",
