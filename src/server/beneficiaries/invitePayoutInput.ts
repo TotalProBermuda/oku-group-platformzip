@@ -28,7 +28,8 @@ export function validateInvitePayoutDetails(
     return { ok: false, error: "Confirm the bank-details authorization to continue." };
   }
 
-  const name = typeof body.name === "string" ? body.name.trim() : invitedName.trim();
+  const submittedName = typeof body.name === "string" ? body.name.trim() : "";
+  const name = submittedName || invitedName.trim();
   const bankName = typeof body.bankName === "string" ? body.bankName.trim() : "";
   const accountHolderName = typeof body.accountHolderName === "string" ? body.accountHolderName.trim() : "";
   const accountType = body.accountType === "CHECKING" || body.accountType === "SAVINGS"
@@ -37,10 +38,10 @@ export function validateInvitePayoutDetails(
   const currency = typeof body.currency === "string" ? body.currency.trim().toUpperCase() : "USD";
   const swiftBicInput = typeof body.swiftBic === "string" ? body.swiftBic.trim().toUpperCase() : "";
   const accountNumber = typeof body.bankAccountNumber === "string"
-    ? body.bankAccountNumber.replace(/[\s-]/g, "")
+    ? body.bankAccountNumber.replace(/[\\s-]/g, "")
     : "";
   const confirmation = typeof body.bankAccountNumberConfirmation === "string"
-    ? body.bankAccountNumberConfirmation.replace(/[\s-]/g, "")
+    ? body.bankAccountNumberConfirmation.replace(/[\\s-]/g, "")
     : "";
 
   if (!name || name.length > 120) {
