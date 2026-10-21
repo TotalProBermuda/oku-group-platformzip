@@ -98,6 +98,9 @@ export async function POST(req: Request) {
   if (!(await hasActiveCheckoutHold(order.id))) {
     return NextResponse.json({ ok: false, error: "Checkout session expired. Please start again." }, { status: 410 });
   }
+  if (!order.session) {
+    return NextResponse.json({ ok: false, error: "This occurrence is no longer available for checkout." }, { status: 409 });
+  }
   if (!["SCHEDULED", "SOLD_OUT"].includes(order.session.status)) {
     return NextResponse.json({ ok: false, error: "Ticket sales are paused for this occurrence. No payment was attempted." }, { status: 409 });
   }
