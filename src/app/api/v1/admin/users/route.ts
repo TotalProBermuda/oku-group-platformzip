@@ -97,6 +97,24 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // A new referrer may earn OKÜ-paid commissions. Start an empty payout
+        // profile with no document requirement; Finance may require evidence
+        // later only when a documented rule applies. Bank data is still supplied
+        // by the referrer after accepting the invitation.
+        await tx.beneficiaryProfile.upsert({
+          where: { userId: newUser.id },
+          create: {
+            userId: newUser.id,
+            proofOfAddressStatus: "NOT_REQUIRED",
+            identificationStatus: "NOT_REQUIRED",
+            taxOrRucStatus: "NOT_REQUIRED",
+            sourceOfFundsStatus: "NOT_REQUIRED",
+            bankReadinessStatus: "MISSING_INFO",
+          },
+          update: {},
+        });
+
+
         const actorResult = await findOrCreateReferralActor({
           actorType: mapReferrerTypeToActorType(referrerType as ReferrerType),
           displayName: name?.trim() || email.trim(),
