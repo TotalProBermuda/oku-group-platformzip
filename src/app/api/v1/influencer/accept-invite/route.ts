@@ -4,6 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { encryptSecret, isEncryptionAvailable, maskSecret } from "@/server/security/encryption";
 import { validateInvitePayoutDetails } from "@/server/beneficiaries/invitePayoutInput";
 
+class InviteClaimError extends Error {
+  constructor() {
+    super("This invite has already been used, revoked, or expired");
+    this.name = "InviteClaimError";
+  }
+}
+
 function randRefCode(name: string) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = (name.toUpperCase().replace(/[^A-Z0-9]/g, "") || "INF").slice(0, 3);
@@ -95,143 +102,160 @@ export async function POST(req: NextRequest) {
   const encryptedAccountNumber = encryptSecret(normalizedAccountNumber);
   const accountNumberLast4 = maskSecret(normalizedAccountNumber).last4;
 
-  const user = await prisma.$transaction(async (tx) => {
-    let existingUser = await tx.user.findUnique({ where: { email: userEmail } });
-
-    if (!existingUser) {
-      existingUser = await tx.user.create({
-        data: {
-          email: userEmail,
-          name: userName,
-          status: "ACTIVE",
-          roles: { create: [{ roleKey: "INFLUENCER" }] },
+  let user;
+  try {
+    user = await prisma.$transaction(async (tx) => {
+      // Claim the invite before any account, profile, payout, or audit writes.
+      // The conditional write is the concurrency boundary: only one transaction
+      // can move a still-pending, unexpired invite to ACCEPTED.
+      const claimed = await tx.influencerInvite.updateMany({
+        where: {
+          id: invite.id,
+          token,
+          status: "PENDING",
+          expiresAt: { gt: new Date() },
         },
+        data: { status: "ACCEPTED" },
       });
-    } else {
-      const hasRole = await tx.userRole.findUnique({ where: { userId_roleKey: { userId: existingUser.id, roleKey: "INFLUENCER" } } });
-      if (!hasRole) {
-        await tx.userRole.create({ data: { userId: existingUser.id, roleKey: "INFLUENCER" } });
+      if (claimed.count !== 1) throw new InviteClaimError();
+
+      let existingUser = await tx.user.findUnique({ where: { email: userEmail } });
+
+      if (!existingUser) {
+        existingUser = await tx.user.create({
+          data: {
+            email: userEmail,
+            name: userName,
+            status: "ACTIVE",
+            roles: { create: [{ roleKey: "INFLUENCER" }] },
+          },
+        });
+      } else {
+        const hasRole = await tx.userRole.findUnique({ where: { userId_roleKey: { userId: existingUser.id, roleKey: "INFLUENCER" } } });
+        if (!hasRole) {
+          await tx.userRole.create({ data: { userId: existingUser.id, roleKey: "INFLUENCER" } });
+        }
+        if (userName && !existingUser.name) {
+          await tx.user.update({ where: { id: existingUser.id }, data: { name: userName } });
+        }
       }
-      if (userName && !existingUser.name) {
-        await tx.user.update({ where: { id: existingUser.id }, data: { name: userName } });
+
+      let profile = await tx.influencerProfile.findUnique({ where: { userId: existingUser.id } });
+      if (!profile) {
+        let refCode = randRefCode(userName);
+        let attempts = 0;
+        while (await tx.influencerProfile.findUnique({ where: { refCode } }) && attempts++ < 10) {
+          refCode = randRefCode(userName);
+        }
+
+        profile = await tx.influencerProfile.create({
+          data: {
+            userId: existingUser.id,
+            refCode,
+            displayName: userName,
+            commissionRateBps: invite.commissionRateBps,
+            approvalStatus: "APPROVED",
+            approved: true,
+            profileImageUrl: profileImageUrl || null,
+            shortBio: shortBio || null,
+            instagramUrl: instagramUrl || null,
+            tiktokUrl: tiktokUrl || null,
+            websiteUrl: websiteUrl || null,
+            whatsapp: whatsapp || null,
+            preferredLanguage: preferredLanguage || null,
+          },
+        });
+      } else {
+        profile = await tx.influencerProfile.update({
+          where: { id: profile.id },
+          data: {
+            commissionRateBps: invite.commissionRateBps,
+            ...(profileImageUrl ? { profileImageUrl } : {}),
+            ...(shortBio ? { shortBio } : {}),
+            ...(instagramUrl ? { instagramUrl } : {}),
+            ...(tiktokUrl ? { tiktokUrl } : {}),
+            ...(websiteUrl ? { websiteUrl } : {}),
+            ...(whatsapp ? { whatsapp } : {}),
+            ...(preferredLanguage ? { preferredLanguage } : {}),
+          },
+        });
       }
-    }
 
-    let profile = await tx.influencerProfile.findUnique({ where: { userId: existingUser.id } });
-    if (!profile) {
-      let refCode = randRefCode(userName);
-      let attempts = 0;
-      while (await tx.influencerProfile.findUnique({ where: { refCode } }) && attempts++ < 10) {
-        refCode = randRefCode(userName);
+      // Bank coordinates are stored encrypted and never returned or logged in
+      // plaintext. New referrals start with no extra KYC documents required;
+      // Finance can request evidence later only where a documented rule applies.
+      const beneficiary = await tx.beneficiaryProfile.findUnique({ where: { userId: existingUser.id } });
+      const submittedBankDetails = {
+        banescoAccountNumberEncrypted: encryptedAccountNumber,
+        banescoAccountLast4: accountNumberLast4,
+        bankName: normalizedBankName,
+        accountHolderName: normalizedHolder,
+        accountType: normalizedAccountType,
+        currency: normalizedCurrency,
+        swiftBic: normalizedSwift || null,
+      };
+      let beneficiaryStatus: BankReadinessStatus;
+      if (!beneficiary) {
+        await tx.beneficiaryProfile.create({
+          data: {
+            userId: existingUser.id,
+            ...submittedBankDetails,
+            proofOfAddressStatus: "NOT_REQUIRED",
+            identificationStatus: "NOT_REQUIRED",
+            taxOrRucStatus: "NOT_REQUIRED",
+            sourceOfFundsStatus: "NOT_REQUIRED",
+            bankReadinessStatus: "READY_FOR_REVIEW",
+          },
+        });
+        beneficiaryStatus = "READY_FOR_REVIEW";
+      } else {
+        const docsComplete = [beneficiary.proofOfAddressStatus, beneficiary.identificationStatus,
+          beneficiary.taxOrRucStatus, beneficiary.sourceOfFundsStatus]
+          .every((status) => status === "NOT_REQUIRED" || status === "RECEIVED" || status === "VERIFIED");
+        beneficiaryStatus = beneficiary.bankReadinessStatus === "ON_HOLD" || beneficiary.bankReadinessStatus === "REJECTED"
+          ? beneficiary.bankReadinessStatus
+          : docsComplete ? "READY_FOR_REVIEW" : "MISSING_INFO";
+        await tx.beneficiaryProfile.update({
+          where: { userId: existingUser.id },
+          data: {
+            ...submittedBankDetails,
+            bankReadinessStatus: beneficiaryStatus,
+            okuApprovedAt: null,
+            okuApprovedById: null,
+            bankReadyAt: null,
+            bankReadyById: null,
+          },
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          actorId: existingUser.id,
+          action: "beneficiary.profile.invite_submission",
+          metadata: {
+            source: "influencer_invite",
+            changedFields: ["bankName", "accountHolderName", "accountType", "currency", "swiftBic", "bankAccountNumber"],
+            accountNumberChanged: true,
+            payoutAuthorization: true,
+            payoutAuthorizationAcceptedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      if (invite.seriesId) {
+        await tx.series.update({
+          where: { id: invite.seriesId },
+          data: { influencerId: profile.id },
+        }).catch(() => {});
       }
 
-      profile = await tx.influencerProfile.create({
-        data: {
-          userId: existingUser.id,
-          refCode,
-          displayName: userName,
-          commissionRateBps: invite.commissionRateBps,
-          approvalStatus: "APPROVED",
-          approved: true,
-          profileImageUrl: profileImageUrl || null,
-          shortBio: shortBio || null,
-          instagramUrl: instagramUrl || null,
-          tiktokUrl: tiktokUrl || null,
-          websiteUrl: websiteUrl || null,
-          whatsapp: whatsapp || null,
-          preferredLanguage: preferredLanguage || null,
-        },
-      });
-    } else {
-      profile = await tx.influencerProfile.update({
-        where: { id: profile.id },
-        data: {
-          commissionRateBps: invite.commissionRateBps,
-          ...(profileImageUrl ? { profileImageUrl } : {}),
-          ...(shortBio ? { shortBio } : {}),
-          ...(instagramUrl ? { instagramUrl } : {}),
-          ...(tiktokUrl ? { tiktokUrl } : {}),
-          ...(websiteUrl ? { websiteUrl } : {}),
-          ...(whatsapp ? { whatsapp } : {}),
-          ...(preferredLanguage ? { preferredLanguage } : {}),
-        },
-      });
-    }
-
-    // Bank coordinates are stored encrypted and never returned or logged in
-    // plaintext. New referrals start with no extra KYC documents required;
-    // Finance can request evidence later only where a documented rule applies.
-    const beneficiary = await tx.beneficiaryProfile.findUnique({ where: { userId: existingUser.id } });
-    const submittedBankDetails = {
-      banescoAccountNumberEncrypted: encryptedAccountNumber,
-      banescoAccountLast4: accountNumberLast4,
-      bankName: normalizedBankName,
-      accountHolderName: normalizedHolder,
-      accountType: normalizedAccountType,
-      currency: normalizedCurrency,
-      swiftBic: normalizedSwift || null,
-    };
-    let beneficiaryStatus: BankReadinessStatus;
-    if (!beneficiary) {
-      await tx.beneficiaryProfile.create({
-        data: {
-          userId: existingUser.id,
-          ...submittedBankDetails,
-          proofOfAddressStatus: "NOT_REQUIRED",
-          identificationStatus: "NOT_REQUIRED",
-          taxOrRucStatus: "NOT_REQUIRED",
-          sourceOfFundsStatus: "NOT_REQUIRED",
-          bankReadinessStatus: "READY_FOR_REVIEW",
-        },
-      });
-      beneficiaryStatus = "READY_FOR_REVIEW";
-    } else {
-      const docsComplete = [beneficiary.proofOfAddressStatus, beneficiary.identificationStatus,
-        beneficiary.taxOrRucStatus, beneficiary.sourceOfFundsStatus]
-        .every((status) => status === "NOT_REQUIRED" || status === "RECEIVED" || status === "VERIFIED");
-      beneficiaryStatus = beneficiary.bankReadinessStatus === "ON_HOLD" || beneficiary.bankReadinessStatus === "REJECTED"
-        ? beneficiary.bankReadinessStatus
-        : docsComplete ? "READY_FOR_REVIEW" : "MISSING_INFO";
-      await tx.beneficiaryProfile.update({
-        where: { userId: existingUser.id },
-        data: {
-          ...submittedBankDetails,
-          bankReadinessStatus: beneficiaryStatus,
-          okuApprovedAt: null,
-          okuApprovedById: null,
-          bankReadyAt: null,
-          bankReadyById: null,
-        },
-      });
-    }
-    await tx.auditLog.create({
-      data: {
-        actorId: existingUser.id,
-        action: "beneficiary.profile.invite_submission",
-        metadata: {
-          source: "influencer_invite",
-          changedFields: ["bankName", "accountHolderName", "accountType", "currency", "swiftBic", "bankAccountNumber"],
-          accountNumberChanged: true,
-          payoutAuthorization: true,
-          payoutAuthorizationAcceptedAt: new Date().toISOString(),
-        },
-      },
+      return existingUser;
     });
-
-    if (invite.seriesId) {
-      await tx.series.update({
-        where: { id: invite.seriesId },
-        data: { influencerId: profile.id },
-      }).catch(() => {});
+  } catch (error) {
+    if (error instanceof InviteClaimError) {
+      return NextResponse.json({ error: error.message }, { status: 410 });
     }
-
-    await tx.influencerInvite.update({
-      where: { id: invite.id },
-      data: { status: "ACCEPTED" },
-    });
-
-    return existingUser;
-  });
+    throw error;
+  }
 
   const beneficiary = await prisma.beneficiaryProfile.findUnique({
     where: { userId: user.id },
