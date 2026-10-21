@@ -165,3 +165,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS "CommissionAllocation_one_reversal_per_origina
   ON "CommissionAllocation" ("parentAllocationId")
   WHERE "parentAllocationId" IS NOT NULL AND "status" = 'REVERSED'::"CommissionAllocationStatus";
 
+-- CommissionSuggestion was also created by historical schema pushes without
+-- a committed create-table migration. Keep the baseline additive for existing
+-- deployments; the following attribution migration adds the unique pair key.
+DO $$ BEGIN
+  CREATE TYPE "CommissionSuggestionStatus" AS ENUM (
+    'SUGGESTED', 'APPROVED', 'REJECTED', 'CONVERTED_TO_ENTRY'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "CommissionSuggestion" (
+  "id" TEXT NOT NULL,
+  "reservationId" TEXT NOT NULL,
+  "referrerId" TEXT NOT NULL,
+  "compensationPlanId" TEXT,
+  "suggestedAmountCents" INTEGER NOT NULL,
+  "currency" TEXT NOT NULL DEFAULT 'USD',
+  "rationaleJson" JSONB,
+  "status" "CommissionSuggestionStatus" NOT NULL DEFAULT 'SUGGESTED',
+  "notes" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "CommissionSuggestion_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "CommissionSuggestion_referrerId_status_idx"
+  ON "CommissionSuggestion" ("referrerId", "status");
+CREATE INDEX IF NOT EXISTS "CommissionSuggestion_reservationId_idx"
+  ON "CommissionSuggestion" ("reservationId");
