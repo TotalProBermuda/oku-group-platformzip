@@ -10,7 +10,7 @@ const validInput = {
   currency: "USD",
   swiftBic: "bmscpa22",
   bankAccountNumber: "1234-5678 9012",
-  bankAccountNumberConfirmation: "123456789012",
+  bankAccountNumberConfirmation: "1234-5678 9012",
 };
 
 describe("validateInvitePayoutDetails", () => {
@@ -31,7 +31,7 @@ describe("validateInvitePayoutDetails", () => {
       bankAccountNumberConfirmation: identifier,
     }, "Invited Name");
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data.accountNumber).toBe("AB/3456");
+    if (result.ok) expect(result.data.accountNumber).toBe(identifier);
   });
 
   it("rejects unsupported payout currencies without echoing account data", () => {
@@ -72,19 +72,19 @@ describe("validateInvitePayoutDetails", () => {
     expect(JSON.stringify(controlResult)).not.toContain("ABCD");
   });
 
-  it("normalizes bank coordinates and keeps the invited email outside this input", () => {
+  it("preserves bank coordinates and keeps the invited email outside this input", () => {
     const result = validateInvitePayoutDetails(validInput, "Invited Name");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     expect(result.data).toEqual({
       name: "Alex Referrer",
-      bankName: "Banesco",
+      bankName: "Another Supported Bank",
       accountHolderName: "Alex Referrer",
       accountType: "CHECKING",
       currency: "USD",
       swiftBic: "BMSCPA22",
-      accountNumber: "123456789012",
+      accountNumber: "1234-5678 9012",
     });
   });
 
