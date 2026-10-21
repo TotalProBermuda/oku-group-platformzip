@@ -33,6 +33,7 @@ export default function BeneficiarySelfServiceForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const [payoutAuthorization, setPayoutAuthorization] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm(s => ({ ...s, [k]: v }));
@@ -51,6 +52,10 @@ export default function BeneficiarySelfServiceForm({
   }
 
   async function saveBankInfo() {
+    if (!payoutAuthorization) {
+      setErr("Confirm authorization before saving bank details.");
+      return;
+    }
     setBusy(true); setErr(null); setOk(false);
     try {
       await patch({
@@ -60,7 +65,9 @@ export default function BeneficiarySelfServiceForm({
         currency: form.currency || null,
         swiftBic: form.swiftBic || null,
         statusEmailOptOut: form.statusEmailOptOut,
+        payoutAuthorization: true,
       });
+      setPayoutAuthorization(false);
       setOk(true);
     } catch (e: any) {
       setErr(e.message);
@@ -70,7 +77,11 @@ export default function BeneficiarySelfServiceForm({
   }
 
   async function saveAccountNumber(next: string): Promise<void> {
-    await patch({ banescoAccountNumber: next });
+    if (!payoutAuthorization) {
+      throw new Error("Confirm authorization before saving bank details.");
+    }
+    await patch({ banescoAccountNumber: next, payoutAuthorization: true });
+    setPayoutAuthorization(false);
   }
 
   const status = profile?.status.bankReadinessStatus ?? "MISSING_INFO";
@@ -129,6 +140,15 @@ export default function BeneficiarySelfServiceForm({
       <Field label="SWIFT/BIC (optional)">
         <input value={form.swiftBic} onChange={e => set("swiftBic", e.target.value)} style={inp} />
       </Field>
+
+      <div style={{ marginTop: 18, padding: "12px 14px", background: "#fff9ed", border: "1px solid #ead9b5", borderRadius: 8 }}>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+          <input type="checkbox" checked={payoutAuthorization} onChange={e => setPayoutAuthorization(e.target.checked)} style={{ marginTop: 3 }} />
+          <span style={{ fontSize: 13, color: "#3a332e", lineHeight: 1.5 }}>
+            I confirm I am authorized to provide these details and authorize OKÜ to securely store and use them to administer commission payouts. This is not authorization to pay; Finance review is required first.
+          </span>
+        </label>
+      </div>
 
       <div style={{ marginTop: 18, padding: "12px 14px", background: "#faf7f2", border: "1px solid #ece5dc", borderRadius: 8 }}>
         <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
