@@ -392,6 +392,7 @@ describe("POST /api/v1/admin/users/[id]/referrer-resolution/resolve — dedupe s
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireSession.mockResolvedValue(ADMIN_SESSION);
+    mockRequireAdminRoles.mockResolvedValue(ADMIN_SESSION);
     mockRequirePermission.mockReturnValue(undefined);
     mockPrismaReferralActorFindUnique.mockResolvedValue(null);
     mockPrismaReferrerFindUnique.mockResolvedValue(null);
