@@ -115,8 +115,8 @@ export default function AcceptInvitePage() {
       setPayoutError("Enter your bank and account holder name.");
       return;
     }
-    const accountNumber = form.bankAccountNumber.replace(/[\s-]/g, "");
-    const accountNumberConfirmation = form.bankAccountNumberConfirmation.replace(/[\s-]/g, "");
+    const accountNumber = form.bankAccountNumber.trim();
+    const accountNumberConfirmation = form.bankAccountNumberConfirmation.trim();
     if (!accountNumber.trim() || accountNumber.length > 128 || /[\u0000-\u001f\u007f]/.test(accountNumber)) {
       setPayoutError("Enter the account identifier exactly as provided by your bank.");
       return;
