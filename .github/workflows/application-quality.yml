@@ -55,4 +55,10 @@ jobs:
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - run: npm test -- --reporter=dot
+      - name: Configure ephemeral build-only auth secret
+        run: |
+          node <<'NODE' >> "$GITHUB_ENV"
+          const { randomBytes } = require("node:crypto");
+          process.stdout.write(`NEXTAUTH_SECRET=${randomBytes(32).toString("base64")}\\n`);
+          NODE
       - run: npm run build
