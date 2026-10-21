@@ -45,6 +45,7 @@ interface AccountTicket {
   ticketStatus: string;
   checkedInAt: string | null;
   session: {
+    id: string;
     startsAt: string;
     title: string | null;
     series: { title: string; slug: string; venue: string | null };
