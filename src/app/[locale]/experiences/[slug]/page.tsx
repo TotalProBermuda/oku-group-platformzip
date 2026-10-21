@@ -169,7 +169,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
   const focusSessionId = sessions.some((event) => event.id === query.sessionId) ? query.sessionId ?? null : null;
-  const focusSession = focusSessionId ? sessions.find((event: any) => event.id === focusSessionId) : null;
+  const focusSession = focusSessionId ? sessions.find((event) => event.id === focusSessionId) : null;
   if (query.sessionId && !focusSession) notFound();
   const heroArtwork = focusSession ? sessionArtworkCandidates(focusSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
   const displayedTicketTypes = focusSession
