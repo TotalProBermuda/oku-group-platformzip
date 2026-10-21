@@ -5,6 +5,77 @@
 -- the ledger/payment migrations add foreign keys. Do not remove or replace
 -- existing reservation data.
 
+-- Restore schema-push-era dining location tables before migrations add their FKs.
+DO $$ BEGIN
+  CREATE TYPE "CommissionValidationMode" AS ENUM ('ON_SEATED', 'ON_COMPLETED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "ServiceChargePolicy" AS ENUM ('ABSENT', 'INCLUDED_UNKNOWN', 'EXCLUDED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "ZoneType" AS ENUM ('FINE_DINING', 'NIGHTLIFE', 'TERRACE', 'PRIVATE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "Venue" (
+  "id" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "slug" TEXT NOT NULL,
+  "addressLine" TEXT,
+  "city" TEXT,
+  "country" TEXT,
+  "description" TEXT,
+  "commissionValidationMode" "CommissionValidationMode" NOT NULL DEFAULT 'ON_SEATED',
+  "serviceChargePolicy" "ServiceChargePolicy" NOT NULL DEFAULT 'ABSENT',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "Venue_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Venue_slug_key" ON "Venue" ("slug");
+
+CREATE TABLE IF NOT EXISTS "Zone" (
+  "id" TEXT NOT NULL,
+  "venueId" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "slug" TEXT NOT NULL,
+  "zoneType" "ZoneType" NOT NULL,
+  "conceptKey" TEXT NOT NULL,
+  "description" TEXT,
+  "capacityCovers" INTEGER NOT NULL,
+  "sortOrder" INTEGER NOT NULL DEFAULT 0,
+  "isBookable" BOOLEAN NOT NULL DEFAULT true,
+  "currentWaitMinutes" INTEGER,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "Zone_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "Zone_venueId_fkey" FOREIGN KEY ("venueId")
+    REFERENCES "Venue"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Zone_venueId_slug_key" ON "Zone" ("venueId", "slug");
+CREATE INDEX IF NOT EXISTS "Zone_conceptKey_idx" ON "Zone" ("conceptKey");
+
+CREATE TABLE IF NOT EXISTS "VenueTable" (
+  "id" TEXT NOT NULL,
+  "zoneId" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "minPartySize" INTEGER NOT NULL,
+  "maxPartySize" INTEGER NOT NULL,
+  "seats" INTEGER NOT NULL,
+  "mergeable" BOOLEAN NOT NULL DEFAULT false,
+  "isVip" BOOLEAN NOT NULL DEFAULT false,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "positionX" DOUBLE PRECISION,
+  "positionY" DOUBLE PRECISION,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "VenueTable_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "VenueTable_zoneId_fkey" FOREIGN KEY ("zoneId")
+    REFERENCES "Zone"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "VenueTable_zoneId_idx" ON "VenueTable" ("zoneId");
+
 DO $$ BEGIN
   CREATE TYPE "ReservationStatus" AS ENUM (
     'PENDING', 'CONFIRMED', 'WAITLISTED', 'ACKNOWLEDGED', 'ARRIVED',
