@@ -37,11 +37,13 @@ export function validateInvitePayoutDetails(
     : null;
   const currency = typeof body.currency === "string" ? body.currency.trim().toUpperCase() : "USD";
   const swiftBicInput = typeof body.swiftBic === "string" ? body.swiftBic.trim().toUpperCase() : "";
+  // Preserve the beneficiary bank's account identifier exactly (apart from
+  // surrounding whitespace); the receiving-bank format is not established yet.
   const accountNumber = typeof body.bankAccountNumber === "string"
-    ? body.bankAccountNumber.replace(/[\s-]/g, "")
+    ? body.bankAccountNumber.trim()
     : "";
   const confirmation = typeof body.bankAccountNumberConfirmation === "string"
-    ? body.bankAccountNumberConfirmation.replace(/[\s-]/g, "")
+    ? body.bankAccountNumberConfirmation.trim()
     : "";
 
   if (!name || name.length > 120) {
