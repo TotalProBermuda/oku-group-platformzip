@@ -29,7 +29,7 @@ export async function invitePartnerCommerceSeat(input: { seatId: string; invited
       select: { id: true, status: true },
     });
   });
-  const issued = await issuePasswordlessToken({ email, callbackUrl: "/partner/seller", requireExistingUserId: user.id });
+  const issued = await issuePasswordlessToken({ email, callbackUrl: "/my/beneficiary", requireExistingUserId: user.id });
   if (!issued.issued) throw new Error("Secure sign-in email could not be issued");
   await prisma.partnerCommerceSeat.update({ where: { id: seat.id }, data: { status: "INVITED", invitedAt: new Date(), provisionedUserId: user.id } });
   await logAdminAction({ targetUserId: user.id, performedByUserId: input.invitedByUserId, action: "PARTNER_COMMERCE_INVITED", summary: `${isResend ? "Reissued" : "Issued"} Partner Commerce sign-in invitation for ${seat.displayName} under ${seat.partner.name}`, reason: isResend ? "Superadmin-requested seller sign-in recovery" : "Superadmin-approved seller onboarding" });
