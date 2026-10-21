@@ -5,6 +5,10 @@
 -- the ledger/payment migrations add foreign keys. Do not remove or replace
 -- existing reservation data.
 
+-- Restore the payment provider label omitted from clean migration history.
+-- Production already has it; ADD VALUE IF NOT EXISTS is a no-op there.
+ALTER TYPE "PaymentProvider" ADD VALUE IF NOT EXISTS 'CYBERSOURCE';
+
 -- The payment-foundation migration adds RESERVATION_DEPOSIT to this type,
 -- but clean migration history did not include its pre-existing schema-push type.
 DO $$ BEGIN
