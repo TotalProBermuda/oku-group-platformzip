@@ -73,6 +73,7 @@ const {
 
   return {
     mockAuditLogCreate,
+    mockAuditLogFindFirst,
     mockReferralActorFindUnique,
     mockReferralActorFindFirst,
     mockReferralActorFindMany,
