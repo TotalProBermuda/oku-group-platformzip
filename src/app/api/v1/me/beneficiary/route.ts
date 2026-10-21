@@ -14,6 +14,7 @@ const PatchBody = z.object({
   currency: z.string().nullable().optional(),
   swiftBic: z.string().nullable().optional(),
   statusEmailOptOut: z.boolean().optional(),
+  payoutAuthorization: z.boolean().optional(),
 });
 
 export async function GET() {
