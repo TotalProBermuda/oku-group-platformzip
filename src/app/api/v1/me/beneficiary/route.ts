@@ -41,6 +41,6 @@ export async function PATCH(req: Request) {
     const view = await upsertOwnProfile(userId, body);
     return NextResponse.json({ ok: true, data: view });
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: e.status || 500 });
+    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: errorStatus(e) });
   }
 }
