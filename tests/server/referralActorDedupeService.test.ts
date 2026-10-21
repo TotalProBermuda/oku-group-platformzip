@@ -20,6 +20,7 @@ const {
   mockPrisma,
 } = vi.hoisted(() => {
   const mockAuditLogCreate = vi.fn().mockResolvedValue({});
+  const mockAuditLogFindFirst = vi.fn().mockResolvedValue(null);
   const mockReferralActorFindUnique = vi.fn();
   const mockReferralActorFindFirst = vi.fn();
   const mockReferralActorFindMany = vi.fn();
