@@ -383,3 +383,99 @@ CREATE INDEX IF NOT EXISTS "ReservationAttribution_referrerId_idx"
   ON "ReservationAttribution" ("referrerId");
 CREATE INDEX IF NOT EXISTS "ReservationAttribution_conversionStage_idx"
   ON "ReservationAttribution" ("conversionStage");
+
+-- Restore the schema-push-era referral actor foundation before the commission
+-- migrations alter it. Existing production tables and rows are left untouched.
+DO $$ BEGIN
+  CREATE TYPE "ReferralActorType" AS ENUM (
+    'STREETSIDE_HOST', 'TAXI_DRIVER', 'UBER_DRIVER', 'TOUR_GUIDE',
+    'HOTEL_CONCIERGE', 'INFLUENCER_SUB_REFERRER', 'PROMOTER',
+    'PRIVATE_NETWORK', 'OTHER'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "ReferralActorStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'SUSPENDED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "ReferralCompensationMode" AS ENUM (
+    'NONE', 'PERCENT_OF_TRANSACTION', 'PERCENT_OF_PARENT_COMMISSION',
+    'FLAT_PER_COVER', 'FLAT_PER_PARTY'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "ReferralActorTypeDef" (
+  "id" TEXT NOT NULL,
+  "code" TEXT NOT NULL,
+  "label" TEXT NOT NULL,
+  "description" TEXT,
+  "icon" TEXT,
+  "isBuiltin" BOOLEAN NOT NULL DEFAULT false,
+  "legacyEnumValue" "ReferralActorType" NOT NULL,
+  "defaultCompMode" "ReferralCompensationMode" NOT NULL DEFAULT 'PERCENT_OF_TRANSACTION',
+  "defaultRateBps" INTEGER,
+  "defaultFlatCents" INTEGER,
+  "defaultRbacRole" TEXT,
+  "sortOrder" INTEGER NOT NULL DEFAULT 100,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "createdByUserId" TEXT,
+  CONSTRAINT "ReferralActorTypeDef_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "ReferralActorTypeDef_code_key"
+  ON "ReferralActorTypeDef" ("code");
+CREATE INDEX IF NOT EXISTS "ReferralActorTypeDef_isActive_sortOrder_idx"
+  ON "ReferralActorTypeDef" ("isActive", "sortOrder");
+
+CREATE TABLE IF NOT EXISTS "ReferralActor" (
+  "id" TEXT NOT NULL,
+  "actorType" "ReferralActorType" NOT NULL,
+  "actorTypeCode" TEXT,
+  "displayName" TEXT NOT NULL,
+  "organizationName" TEXT,
+  "phone" TEXT,
+  "email" TEXT,
+  "whatsapp" TEXT,
+  "status" "ReferralActorStatus" NOT NULL DEFAULT 'ACTIVE',
+  "metadataJson" JSONB,
+  "userId" TEXT,
+  "legacyReferrerId" TEXT,
+  "legacyEventReferrerAssignmentId" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "ReferralActor_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "ReferralActor_userId_key"
+  ON "ReferralActor" ("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ReferralActor_legacyReferrerId_key"
+  ON "ReferralActor" ("legacyReferrerId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ReferralActor_legacyEventReferrerAssignmentId_key"
+  ON "ReferralActor" ("legacyEventReferrerAssignmentId");
+CREATE INDEX IF NOT EXISTS "ReferralActor_actorType_status_idx"
+  ON "ReferralActor" ("actorType", "status");
+CREATE INDEX IF NOT EXISTS "ReferralActor_userId_idx"
+  ON "ReferralActor" ("userId");
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReferralActor_actorTypeCode_fkey') THEN
+    ALTER TABLE "ReferralActor" ADD CONSTRAINT "ReferralActor_actorTypeCode_fkey"
+      FOREIGN KEY ("actorTypeCode") REFERENCES "ReferralActorTypeDef"("code")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+  IF to_regclass('"User"') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReferralActor_userId_fkey') THEN
+    ALTER TABLE "ReferralActor" ADD CONSTRAINT "ReferralActor_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+  IF to_regclass('"Referrer"') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReferralActor_legacyReferrerId_fkey') THEN
+    ALTER TABLE "ReferralActor" ADD CONSTRAINT "ReferralActor_legacyReferrerId_fkey"
+      FOREIGN KEY ("legacyReferrerId") REFERENCES "Referrer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+  IF to_regclass('"EventReferrerAssignment"') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReferralActor_legacyEventReferrerAssignmentId_fkey') THEN
+    ALTER TABLE "ReferralActor" ADD CONSTRAINT "ReferralActor_legacyEventReferrerAssignmentId_fkey"
+      FOREIGN KEY ("legacyEventReferrerAssignmentId") REFERENCES "EventReferrerAssignment"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
