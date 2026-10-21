@@ -23,7 +23,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   m.order.mockResolvedValue({ id: "order", userId: "user", status: "PENDING", totalCents: 227, currency: "USD", lineItems: [], user: { name: "Test Buyer" }, session: { status: "SCHEDULED" }, payment: null });
   m.hold.mockResolvedValue(true); m.audit.mockResolvedValue({});
-  m.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({ session: { findUnique: vi.fn().mockResolvedValue({ status: "SCHEDULED" }) } }));
+  m.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({ session: { findUnique: vi.fn().mockResolvedValue({ status: "SCHEDULED" }) }, payment: { create: m.create } }));
   m.enroll.mockResolvedValue({ kind: "challenge", challenge });
   m.require.mockResolvedValue({ authenticationTransactionId: "auth", cardType: "002" });
   m.validate.mockResolvedValue({ eciRaw: "02" });
