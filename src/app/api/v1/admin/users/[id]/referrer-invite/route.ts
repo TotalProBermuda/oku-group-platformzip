@@ -50,11 +50,10 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Invitation could not be issued" }, { status: 409 });
     }
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    const status = error?.status || 500;
-    return NextResponse.json(
-      { ok: false, error: status === 500 ? "Failed to send invitation" : error.message },
-      { status },
-    );
+  } catch (error: unknown) {
+    const detail = error && typeof error === "object" ? error as { status?: unknown; message?: unknown } : {};
+    const status = typeof detail.status === "number" && detail.status >= 400 && detail.status <= 599 ? detail.status : 500;
+    const message = status === 500 ? "Failed to send invitation" : typeof detail.message === "string" ? detail.message : "Invitation could not be issued";
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
