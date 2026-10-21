@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import MediaUpload from "@/components/ui/MediaUpload";
 
@@ -144,7 +145,7 @@ export default function AcceptInvitePage() {
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔗</div>
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 28, color: "#1a1614", marginBottom: 12 }}>Invite Link Issue</h1>
           <p style={{ color: "#6b7280", marginBottom: 24 }}>{loadError}</p>
-          <a href="/" style={{ color: "#c41e3a", fontSize: 14 }}>← Return to OKÜ</a>
+          <Link href="/" style={{ color: "#c41e3a", fontSize: 14 }}>← Return to OKÜ</Link>
         </div>
       </div>
     );
@@ -174,12 +175,12 @@ export default function AcceptInvitePage() {
               : "Your bank details were securely saved, but the payout profile still has a requirement or hold to resolve. OKÜ Finance must clear it and verify the account before any payout can be made."} You can sign in to your portal to view your assignments, commission ledger, and referral link.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <a href="/login" style={{ display: "inline-block", background: "#c41e3a", color: "white", padding: "14px 32px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
+            <Link href="/login" style={{ display: "inline-block", background: "#c41e3a", color: "white", padding: "14px 32px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
               Sign In to Your Portal
-            </a>
-            <a href="/account/influencer-profile" style={{ display: "inline-block", background: "white", border: "1px solid #e5e0d8", color: "#1a1614", padding: "14px 32px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
+            </Link>
+            <Link href="/account/influencer-profile" style={{ display: "inline-block", background: "white", border: "1px solid #e5e0d8", color: "#1a1614", padding: "14px 32px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
               Complete Your Profile
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -227,7 +228,7 @@ export default function AcceptInvitePage() {
           {step === "account" && (
             <div>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 6 }}>Your Account</h2>
-              <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28 }}>Confirm or update your name and email. This is how you'll sign in.</p>
+              <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28 }}>Confirm or update your name and email. This is how you&apos;ll sign in.</p>
 
               <div style={{ marginBottom: 20 }}>
                 <label style={labelStyle}>Full Name</label>
@@ -322,13 +323,13 @@ export default function AcceptInvitePage() {
           {step === "profile" && (
             <div>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 6 }}>Profile Photo & Bio</h2>
-              <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28 }}>This is what guests see when you're featured for an event.</p>
+              <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28 }}>This is what guests see when you&apos;re featured for an event.</p>
 
               <div style={{ marginBottom: 20 }}>
                 <MediaUpload
                   label="Profile Photo"
                   value={form.profileImageUrl || ""}
-                  onChange={(url) => setForm((p: any) => ({ ...p, profileImageUrl: url }))}
+                  onChange={(url) => setForm((p) => ({ ...p, profileImageUrl: url }))
                   aspectRatio="square"
                   mediaType="image"
                   maxSizeMB={5}
