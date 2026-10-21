@@ -496,3 +496,51 @@ DO $$ BEGIN
       ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
 END $$;
+
+-- Restore the application settings singleton omitted from committed history.
+-- The service-window and public-content columns are intentionally left for
+-- their later migrations, which add them in order.
+DO $$ BEGIN
+  CREATE TYPE "StoreStatus" AS ENUM ('OPEN', 'CLOSED', 'TEST_MODE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "DebugMode" AS ENUM ('OFF', 'ERRORS_ONLY', 'VERBOSE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE "ActiveCheckoutGateway" AS ENUM ('AUTHORIZE_NET', 'CYBERSOURCE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "CommerceSettings" (
+  "id" TEXT NOT NULL DEFAULT 'global',
+  "businessName" TEXT,
+  "addressLine1" TEXT,
+  "addressLine2" TEXT,
+  "city" TEXT,
+  "countryRegion" TEXT,
+  "currency" TEXT NOT NULL DEFAULT 'USD',
+  "timezone" TEXT NOT NULL DEFAULT 'America/Panama',
+  "storeStatus" "StoreStatus" NOT NULL DEFAULT 'OPEN',
+  "capacityManagementEnabled" BOOLEAN NOT NULL DEFAULT true,
+  "holdMinutes" INTEGER NOT NULL DEFAULT 15,
+  "lowStockThreshold" INTEGER NOT NULL DEFAULT 10,
+  "soldOutThreshold" INTEGER NOT NULL DEFAULT 0,
+  "stockNotificationEmails" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  "hideSoldOutTicketTypes" BOOLEAN NOT NULL DEFAULT false,
+  "allowGuestCheckout" BOOLEAN NOT NULL DEFAULT true,
+  "requireAccountForMemberships" BOOLEAN NOT NULL DEFAULT true,
+  "continueShoppingDestination" TEXT NOT NULL DEFAULT '/series',
+  "emptyCartText" TEXT,
+  "checkoutSupportEmail" TEXT,
+  "cancellationPolicyText" TEXT,
+  "senderName" TEXT,
+  "adminNotificationEmails" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  "debugMode" "DebugMode" NOT NULL DEFAULT 'OFF',
+  "activeCheckoutGateway" "ActiveCheckoutGateway" NOT NULL DEFAULT 'AUTHORIZE_NET',
+  "updatedById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "CommerceSettings_pkey" PRIMARY KEY ("id")
+);
