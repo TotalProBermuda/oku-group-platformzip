@@ -90,3 +90,78 @@ CREATE INDEX IF NOT EXISTS "Reservation_requestedSpaceId_idx"
   ON "Reservation"("requestedSpaceId");
 CREATE INDEX IF NOT EXISTS "Reservation_assignedSpaceId_idx"
   ON "Reservation"("assignedSpaceId");
+
+
+-- CommissionAllocation is also a schema-push-era table. The later rule-engine
+-- migration extends these types and adds trace columns with IF NOT EXISTS; the
+-- complete current type/table shape here makes clean replay deterministic.
+DO $$ BEGIN
+  CREATE TYPE "EarnerType" AS ENUM ('REFERRER', 'HOST', 'PARTNER', 'INFLUENCER', 'OTHER');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "CommissionAllocationStatus" AS ENUM (
+    'PENDING', 'APPROVED', 'PAID', 'DISPUTED', 'REVERSED',
+    'PROCESSING', 'HELD_FOR_REVIEW', 'HELD_FOR_BENEFICIARY_MAPPING'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "CommissionRevenueBasis" AS ENUM (
+    'COMMISSIONABLE_CENTS', 'GROSS_MINUS_TAX',
+    'GROSS_MINUS_TAX_MINUS_TIP',
+    'GROSS_MINUS_TAX_MINUS_DISCOUNT_REFUND_TIP', 'MANUAL_REVIEW'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "CommissionAllocation" (
+  "id" TEXT NOT NULL,
+  "tableSessionId" TEXT NOT NULL,
+  "earnerType" "EarnerType" NOT NULL,
+  "earnerRefId" TEXT NOT NULL,
+  "amountCents" INTEGER NOT NULL,
+  "currency" TEXT NOT NULL DEFAULT 'USD',
+  "status" "CommissionAllocationStatus" NOT NULL DEFAULT 'PENDING',
+  "commissionRuleSnapshot" JSONB NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "grossCentsSnapshot" INTEGER,
+  "taxCentsSnapshot" INTEGER,
+  "tipCentsSnapshot" INTEGER,
+  "discountCentsSnapshot" INTEGER,
+  "refundCentsSnapshot" INTEGER,
+  "eligibleNetRevenueCents" INTEGER,
+  "guestCount" INTEGER,
+  "percentageComponentCents" INTEGER,
+  "percentageCapAppliedCents" INTEGER,
+  "perPersonComponentCents" INTEGER,
+  "maxTakeRateCapCents" INTEGER,
+  "finalCommissionCents" INTEGER,
+  "revenueBasis" "CommissionRevenueBasis",
+  "ruleVersionId" TEXT,
+  "sourceCheckId" TEXT,
+  "confidenceClass" TEXT,
+  "parentAllocationId" TEXT,
+  CONSTRAINT "CommissionAllocation_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "CommissionAllocation_tableSessionId_idx"
+  ON "CommissionAllocation" ("tableSessionId");
+CREATE INDEX IF NOT EXISTS "CommissionAllocation_parentAllocationId_idx"
+  ON "CommissionAllocation" ("parentAllocationId");
+CREATE INDEX IF NOT EXISTS "CommissionAllocation_earnerType_earnerRefId_idx"
+  ON "CommissionAllocation" ("earnerType", "earnerRefId");
+CREATE INDEX IF NOT EXISTS "CommissionAllocation_status_idx"
+  ON "CommissionAllocation" ("status");
+CREATE INDEX IF NOT EXISTS "CommissionAllocation_ruleVersionId_idx"
+  ON "CommissionAllocation" ("ruleVersionId");
+CREATE UNIQUE INDEX IF NOT EXISTS "CommissionAllocation_live_earner_unique"
+  ON "CommissionAllocation" ("tableSessionId", "earnerType", "earnerRefId")
+  WHERE "status" != 'REVERSED'::"CommissionAllocationStatus";
+CREATE UNIQUE INDEX IF NOT EXISTS "CommissionAllocation_one_reversal_per_original"
+  ON "CommissionAllocation" ("parentAllocationId")
+  WHERE "parentAllocationId" IS NOT NULL AND "status" = 'REVERSED'::"CommissionAllocationStatus";
+
