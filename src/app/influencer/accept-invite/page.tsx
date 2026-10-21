@@ -35,6 +35,7 @@ export default function AcceptInvitePage() {
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [payoutError, setPayoutError] = useState("");
+  const [payoutStatus, setPayoutStatus] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -91,6 +92,7 @@ export default function AcceptInvitePage() {
     });
     const data = await res.json();
     if (data.ok) {
+      setPayoutStatus(data.payoutSetup?.status ?? "MISSING_INFO");
       setStep("done");
     } else {
       setSubmitError(data.error ?? "Something went wrong. Please try again.");
@@ -167,7 +169,9 @@ export default function AcceptInvitePage() {
             Welcome to OKÜ, {form.name.split(" ")[0]}!
           </h1>
           <p style={{ color: "#6b7280", fontSize: 16, lineHeight: 1.7, marginBottom: 32 }}>
-            Your OKÜ referrer profile is set up. Your bank details are now in the Finance review queue; payouts stay blocked until Finance verifies the account. You can sign in to your portal to view your assignments, commission ledger, and referral link.
+            {payoutStatus === "READY_FOR_REVIEW"
+              ? "Your bank details were securely saved and submitted to OKÜ Finance for review. Commission payouts remain blocked until Finance verifies the account."
+              : "Your bank details were securely saved, but the payout profile still has a requirement or hold to resolve. OKÜ Finance must clear it and verify the account before any payout can be made."} You can sign in to your portal to view your assignments, commission ledger, and referral link.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <a href="/login" style={{ display: "inline-block", background: "#c41e3a", color: "white", padding: "14px 32px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
