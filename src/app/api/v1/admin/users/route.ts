@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           purpose: "REFERRER_INVITE",
           requireExistingUserId: user.id,
-          callbackUrl: "/referrer/dashboard",
+          callbackUrl: "/my/beneficiary",
         })).issued;
       } catch {
         invitationSent = false;
