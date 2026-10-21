@@ -1,3 +1,20 @@
+-- The original user/admin-audit enum was present in schema-pushed production
+-- but missing from clean migration history. Include current labels so later
+-- migrations can safely add their labels with IF NOT EXISTS.
+DO $$ BEGIN
+  CREATE TYPE "UserAdminAction" AS ENUM (
+    'USER_CREATED', 'USER_UPDATED', 'USER_SUSPENDED', 'USER_UNSUSPENDED',
+    'USER_LOCKED', 'USER_UNLOCKED', 'USER_ARCHIVED', 'USER_UNARCHIVED',
+    'USER_BANNED', 'PASSWORD_RESET_TRIGGERED', 'ROLE_ASSIGNED', 'ROLE_REMOVED',
+    'FORCE_LOGOUT', 'EMAIL_CHANGED', 'NOTES_UPDATED', 'STATUS_CHANGED',
+    'SEAT_INVITED', 'SEAT_REINVITED', 'SEAT_ACCEPTED', 'SEAT_REVOKED',
+    'SEAT_REMOVED', 'SEAT_COMMISSION_UPDATED', 'REFERRER_COMMISSION_PROGRAM_UPDATED',
+    'PARTNER_SUPPORT_VIEWED', 'PARTNER_COMMERCE_INVITED', 'PARTNER_CHANNEL_ACTIVATED',
+    'PARTNER_CHANNEL_PAUSED', 'PARTNER_CHANNEL_ROTATED', 'PARTNER_SELLER_CHANNEL_ACTIVATED'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 -- Restore the Reservation prerequisites that were created in production by
 -- historical schema pushes but never recorded in the committed migration
 -- chain. This migration is intentionally additive and idempotent: production
