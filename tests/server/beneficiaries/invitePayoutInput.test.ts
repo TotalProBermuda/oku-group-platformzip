@@ -112,7 +112,7 @@ describe("validateInvitePayoutDetails", () => {
 
   it("rejects malformed account and SWIFT/BIC values", () => {
     expect(validateInvitePayoutDetails(
-      { ...validInput, bankAccountNumber: "1234", bankAccountNumberConfirmation: "1234" },
+      { ...validInput, bankAccountNumber: "123\u00004", bankAccountNumberConfirmation: "123\u00004" },
       "Invited Name",
     ).ok).toBe(false);
 

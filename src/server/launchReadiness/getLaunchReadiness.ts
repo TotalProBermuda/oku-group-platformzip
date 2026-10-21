@@ -173,13 +173,13 @@ async function checkSuperadminExists(): Promise<ReadinessGate> {
 async function checkNoDemoUsers(): Promise<ReadinessGate> {
   try {
     const demoCount = await prisma.user.count({
-      where: { email: { endsWith: "@oku.local" } },
+      where: { email: { endsWith: "@oku.local" }, status: "ACTIVE" },
     });
     if (demoCount === 0) {
       return gate({
         name: "users.demo_absent",
         category: "users",
-        label: "No demo users (@oku.local) present",
+        label: "No active demo users (@oku.local)",
         status: "pass",
         severity: "blocking",
         remediation: "OK",
@@ -188,18 +188,18 @@ async function checkNoDemoUsers(): Promise<ReadinessGate> {
     return gate({
       name: "users.demo_absent",
       category: "users",
-      label: "No demo users (@oku.local) present",
+      label: "No active demo users (@oku.local)",
       status: "fail",
       severity: "blocking",
       remediation:
-        `Found ${demoCount} demo user(s) with @oku.local emails. Remove them before launch.`,
-      details: `${demoCount} demo user(s) present`,
+        `Found ${demoCount} demo user(s) with @oku.local emails. Disable active demo access before launch; preserve linked business records.`,
+      details: `${demoCount} active demo user(s) present`,
     });
   } catch (err) {
     return gate({
       name: "users.demo_absent",
       category: "users",
-      label: "No demo users (@oku.local) present",
+      label: "No active demo users (@oku.local)",
       status: "fail",
       severity: "blocking",
       remediation: "Could not query users. Resolve the database connection first.",
