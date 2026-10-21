@@ -40,9 +40,11 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: users });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (error: unknown) {
+    const detail = error && typeof error === "object" ? error as { status?: unknown; message?: unknown } : {};
+    const status = typeof detail.status === "number" && detail.status >= 400 && detail.status <= 599 ? detail.status : 500;
+    const message = status === 500 ? "Failed to process referrer account request" : typeof detail.message === "string" ? detail.message : "Request could not be completed";
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
 
