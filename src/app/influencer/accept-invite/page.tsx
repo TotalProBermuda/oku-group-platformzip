@@ -329,7 +329,7 @@ export default function AcceptInvitePage() {
                 <MediaUpload
                   label="Profile Photo"
                   value={form.profileImageUrl || ""}
-                  onChange={(url) => setForm((p) => ({ ...p, profileImageUrl: url }))
+                  onChange={(url) => setForm((p) => ({ ...p, profileImageUrl: url }))}
                   aspectRatio="square"
                   mediaType="image"
                   maxSizeMB={5}
