@@ -280,7 +280,7 @@ it("all PR132 authoring entrypoints await request processing, with normal startu
     expect(["POST", "PATCH"]).toContain(methods[0]);
   }
   expect(readFileSync("scripts/deploy-prisma-with-rate-limit-repair.sh", "utf8"))
-    .toContain('exec npm run start:next -- -p "${PORT:-5000}"');
+    .toContain('exec "$NODE_BIN" node_modules/next/dist/bin/next start -p "${PORT:-5000}"');
   expect(readFileSync("worker/index.ts", "utf8")).not.toMatch(/translationQueue|translationWorker|startTranslationPolling/);
   expect(readFileSync("src/server/i18n/translationProcessor.ts", "utf8")).not.toContain("setInterval");
 });
