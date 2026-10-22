@@ -14,6 +14,7 @@ import {
   submitForApproval,
   approve,
   assertBeneficiaryReadinessForInfluencers,
+  markExported,
 } from "@/server/payouts/payoutBatchService";
 
 beforeEach(() => {
@@ -40,13 +41,27 @@ describe("previewBatch — beneficiary blocking reasons", () => {
   beforeEach(() => {
     // Three influencers, all otherwise eligible (ACTIVE), each with one
     // earned commission line in range. They differ only by beneficiary state.
-    mp.seedInfluencer({ id: "inf_missing", userId: "user_missing", displayName: "No Profile" });
-    mp.seedInfluencer({ id: "inf_notready", userId: "user_notready", displayName: "Not Bank Ready" });
-    mp.seedInfluencer({ id: "inf_hold", userId: "user_hold", displayName: "Compliance Hold" });
+    mp.seedInfluencer({
+      id: "inf_missing",
+      userId: "user_missing",
+      displayName: "No Profile",
+    });
+    mp.seedInfluencer({
+      id: "inf_notready",
+      userId: "user_notready",
+      displayName: "Not Bank Ready",
+    });
+    mp.seedInfluencer({
+      id: "inf_hold",
+      userId: "user_hold",
+      displayName: "Compliance Hold",
+    });
 
     // user_missing has no BeneficiaryProfile.
     // user_notready has a profile but only READY_FOR_REVIEW.
-    mp.seedProfile("user_notready", { bankReadinessStatus: "READY_FOR_REVIEW" });
+    mp.seedProfile("user_notready", {
+      bankReadinessStatus: "READY_FOR_REVIEW",
+    });
     // user_hold is ON_HOLD.
     mp.seedProfile("user_hold", {
       bankReadinessStatus: "ON_HOLD",
@@ -54,9 +69,24 @@ describe("previewBatch — beneficiary blocking reasons", () => {
     });
 
     const inRange = new Date("2025-06-15");
-    mp.seedLedgerEntry({ id: "le_1", influencerId: "inf_missing", amountCents: 1000, createdAt: inRange });
-    mp.seedLedgerEntry({ id: "le_2", influencerId: "inf_notready", amountCents: 2000, createdAt: inRange });
-    mp.seedLedgerEntry({ id: "le_3", influencerId: "inf_hold", amountCents: 3000, createdAt: inRange });
+    mp.seedLedgerEntry({
+      id: "le_1",
+      influencerId: "inf_missing",
+      amountCents: 1000,
+      createdAt: inRange,
+    });
+    mp.seedLedgerEntry({
+      id: "le_2",
+      influencerId: "inf_notready",
+      amountCents: 2000,
+      createdAt: inRange,
+    });
+    mp.seedLedgerEntry({
+      id: "le_3",
+      influencerId: "inf_hold",
+      amountCents: 3000,
+      createdAt: inRange,
+    });
   });
 
   it("surfaces BENEFICIARY_PROFILE_MISSING / BANK_NOT_READY / COMPLIANCE_HOLD", async () => {
@@ -65,7 +95,9 @@ describe("previewBatch — beneficiary blocking reasons", () => {
       to: new Date("2025-06-30"),
     });
 
-    const reasons = new Map(preview.byInfluencer.map(b => [b.influencerId, b.blockReason]));
+    const reasons = new Map(
+      preview.byInfluencer.map((b) => [b.influencerId, b.blockReason]),
+    );
     expect(reasons.get("inf_missing")).toBe("BENEFICIARY_PROFILE_MISSING");
     expect(reasons.get("inf_notready")).toBe("BANK_NOT_READY");
     expect(reasons.get("inf_hold")).toBe("COMPLIANCE_HOLD");
@@ -77,7 +109,11 @@ describe("previewBatch — beneficiary blocking reasons", () => {
   });
 
   it("classifies a fully BANK_READY influencer as eligible", async () => {
-    mp.seedInfluencer({ id: "inf_ok", userId: "user_ok", displayName: "All Good" });
+    mp.seedInfluencer({
+      id: "inf_ok",
+      userId: "user_ok",
+      displayName: "All Good",
+    });
     bankReadyProfile("user_ok");
     mp.seedLedgerEntry({
       id: "le_ok",
@@ -91,18 +127,32 @@ describe("previewBatch — beneficiary blocking reasons", () => {
       to: new Date("2025-06-30"),
     });
 
-    const ok = preview.byInfluencer.find(b => b.influencerId === "inf_ok");
+    const ok = preview.byInfluencer.find((b) => b.influencerId === "inf_ok");
     expect(ok?.isBlocked).toBe(false);
     expect(ok?.blockReason).toBeUndefined();
-    expect(preview.eligibleLines.some(l => l.ledgerEntryId === "le_ok")).toBe(true);
+    expect(preview.eligibleLines.some((l) => l.ledgerEntryId === "le_ok")).toBe(
+      true,
+    );
   });
 });
 
 describe("payout-batch gating — createDraft / submitForApproval / approve", () => {
   it("createDraft refuses and lists every blocked beneficiary by display name", async () => {
-    mp.seedInfluencer({ id: "inf_a", userId: "user_a", displayName: "Alice Star" });
-    mp.seedInfluencer({ id: "inf_b", userId: "user_b", displayName: "Bob Hold" });
-    mp.seedInfluencer({ id: "inf_c", userId: "user_c", displayName: "Carol Ready" });
+    mp.seedInfluencer({
+      id: "inf_a",
+      userId: "user_a",
+      displayName: "Alice Star",
+    });
+    mp.seedInfluencer({
+      id: "inf_b",
+      userId: "user_b",
+      displayName: "Bob Hold",
+    });
+    mp.seedInfluencer({
+      id: "inf_c",
+      userId: "user_c",
+      displayName: "Carol Ready",
+    });
     bankReadyProfile("user_c");
     mp.seedProfile("user_b", {
       bankReadinessStatus: "ON_HOLD",
@@ -110,9 +160,24 @@ describe("payout-batch gating — createDraft / submitForApproval / approve", ()
     });
     // inf_a has no profile at all → BENEFICIARY_PROFILE_MISSING.
 
-    const lA = mp.seedLedgerEntry({ id: "le_a", influencerId: "inf_a", amountCents: 100 });
-    const lB = mp.seedLedgerEntry({ id: "le_b", influencerId: "inf_b", amountCents: 200 });
-    const lC = mp.seedLedgerEntry({ id: "le_c", influencerId: "inf_c", amountCents: 300 });
+    const lA = mp.seedLedgerEntry({
+      id: "le_a",
+      influencerId: "inf_a",
+      amountCents: 100,
+        createdAt: new Date("2025-06-15"),
+    });
+    const lB = mp.seedLedgerEntry({
+      id: "le_b",
+      influencerId: "inf_b",
+      amountCents: 200,
+        createdAt: new Date("2025-06-15"),
+    });
+    const lC = mp.seedLedgerEntry({
+      id: "le_c",
+      influencerId: "inf_c",
+      amountCents: 300,
+        createdAt: new Date("2025-06-15"),
+    });
 
     await expect(
       createDraft({
@@ -130,7 +195,12 @@ describe("payout-batch gating — createDraft / submitForApproval / approve", ()
   it("createDraft succeeds when all beneficiaries are BANK_READY", async () => {
     mp.seedInfluencer({ id: "inf_x", userId: "user_x", displayName: "X" });
     bankReadyProfile("user_x");
-    const le = mp.seedLedgerEntry({ id: "le_x", influencerId: "inf_x", amountCents: 1500 });
+    const le = mp.seedLedgerEntry({
+      id: "le_x",
+      influencerId: "inf_x",
+      amountCents: 1500,
+        createdAt: new Date("2025-06-15"),
+    });
 
     const result = await createDraft({
       name: "June",
@@ -145,10 +215,41 @@ describe("payout-batch gating — createDraft / submitForApproval / approve", ()
     expect(mp.store.batches.size).toBe(1);
   });
 
-  it("submitForApproval re-checks readiness and refuses if a beneficiary was demoted after draft", async () => {
-    mp.seedInfluencer({ id: "inf_y", userId: "user_y", displayName: "Yvonne Demoted" });
+  it("createDraft rejects ledger entries outside the requested payout period", async () => {
+    mp.seedInfluencer({ id: "inf_old", userId: "user_old", displayName: "Outside Period" });
+    bankReadyProfile("user_old");
+    const le = mp.seedLedgerEntry({
+      id: "le_old",
+      influencerId: "inf_old",
+      amountCents: 1200,
+      createdAt: new Date("2025-05-31T23:59:59.999Z"),
+    });
+
+    await expect(
+      createDraft({
+        name: "June",
+        from: new Date("2025-06-01T00:00:00.000Z"),
+        to: new Date("2025-06-30T23:59:59.999Z"),
+        ledgerEntryIds: [le.id],
+        createdById: "admin",
+      }),
+    ).rejects.toThrow(/No eligible ledger entries selected/);
+    expect(mp.store.batches.size).toBe(0);
+          });
+
+          it("submitForApproval re-checks readiness and refuses if a beneficiary was demoted after draft", async () => {
+    mp.seedInfluencer({
+      id: "inf_y",
+      userId: "user_y",
+      displayName: "Yvonne Demoted",
+    });
     bankReadyProfile("user_y");
-    const le = mp.seedLedgerEntry({ id: "le_y", influencerId: "inf_y", amountCents: 2000 });
+    const le = mp.seedLedgerEntry({
+      id: "le_y",
+      influencerId: "inf_y",
+      amountCents: 2000,
+        createdAt: new Date("2025-06-15"),
+    });
 
     const { batchId } = await createDraft({
       name: "Test",
@@ -170,9 +271,18 @@ describe("payout-batch gating — createDraft / submitForApproval / approve", ()
   });
 
   it("approve refuses when beneficiary slipped to ON_HOLD between submit and approve", async () => {
-    mp.seedInfluencer({ id: "inf_z", userId: "user_z", displayName: "Zane Slipped" });
+    mp.seedInfluencer({
+      id: "inf_z",
+      userId: "user_z",
+      displayName: "Zane Slipped",
+    });
     bankReadyProfile("user_z");
-    const le = mp.seedLedgerEntry({ id: "le_z", influencerId: "inf_z", amountCents: 4000 });
+    const le = mp.seedLedgerEntry({
+      id: "le_z",
+      influencerId: "inf_z",
+      amountCents: 4000,
+        createdAt: new Date("2025-06-15"),
+    });
 
     const { batchId } = await createDraft({
       name: "Test",
@@ -189,9 +299,9 @@ describe("payout-batch gating — createDraft / submitForApproval / approve", ()
     p.complianceHoldReason = "AML";
     mp.store.profiles.set("user_z", p);
 
-    await expect(
-      approve({ batchId, userId: "checker" }),
-    ).rejects.toThrow(/Zane Slipped.*COMPLIANCE_HOLD/);
+    await expect(approve({ batchId, userId: "checker" })).rejects.toThrow(
+      /Zane Slipped.*COMPLIANCE_HOLD/,
+    );
   });
 
   it("assertBeneficiaryReadinessForInfluencers lists every blocked influencer by name and reason", async () => {
@@ -217,10 +327,40 @@ describe("payout-batch gating — createDraft / submitForApproval / approve", ()
   });
 
   it("assertBeneficiaryReadinessForInfluencers passes when all are BANK_READY", async () => {
-    mp.seedInfluencer({ id: "i_all", userId: "u_all", displayName: "All Ready" });
+    mp.seedInfluencer({
+      id: "i_all",
+      userId: "u_all",
+      displayName: "All Ready",
+    });
     bankReadyProfile("u_all");
     await expect(
       assertBeneficiaryReadinessForInfluencers(["i_all"]),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("markExported bank format gate", () => {
+  it("rejects generic and pending Banesco formats before mutating a batch", async () => {
+    await expect(
+      markExported({
+        batchId: "batch_test",
+        userId: "finance_admin",
+        format: "CSV_GENERIC",
+      }),
+    ).rejects.toThrow(
+      /confirmed Banesco transfer specification and renderer are not ready/i,
+    );
+
+    await expect(
+      markExported({
+        batchId: "batch_test",
+        userId: "finance_admin",
+        format: "BANESCO_PANAMA_PENDING_SPEC",
+      }),
+    ).rejects.toThrow(
+      /confirmed Banesco transfer specification and renderer are not ready/i,
+    );
+
+    expect(mp.store.batches.size).toBe(0);
   });
 });

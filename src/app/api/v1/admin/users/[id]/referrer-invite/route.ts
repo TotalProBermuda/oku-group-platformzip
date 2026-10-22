@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { issuePasswordlessToken } from "@/server/auth/passwordless";
@@ -27,22 +26,34 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Only active referrers can be invited" }, { status: 409 });
     }
 
+    await prisma.beneficiaryProfile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        proofOfAddressStatus: "NOT_REQUIRED",
+        identificationStatus: "NOT_REQUIRED",
+        taxOrRucStatus: "NOT_REQUIRED",
+        sourceOfFundsStatus: "NOT_REQUIRED",
+        bankReadinessStatus: "MISSING_INFO",
+      },
+      // Never overwrite Finance review/hold decisions on an existing profile.
+      update: {},
+    });
+
     const result = await issuePasswordlessToken({
       email: user.email,
       purpose: "REFERRER_INVITE",
       requireExistingUserId: user.id,
-      callbackUrl: "/referrer/dashboard",
+      callbackUrl: "/my/beneficiary",
     });
     if (!result.issued) {
       return NextResponse.json({ ok: false, error: "Invitation could not be issued" }, { status: 409 });
     }
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const details = getAdminApiErrorDetails(error);
-    const status = details.status;
-    return NextResponse.json(
-      { ok: false, error: status === 500 ? "Failed to send invitation" : details.message },
-      { status },
-    );
+    const detail = error && typeof error === "object" ? error as { status?: unknown; message?: unknown } : {};
+    const status = typeof detail.status === "number" && detail.status >= 400 && detail.status <= 599 ? detail.status : 500;
+    const message = status === 500 ? "Failed to send invitation" : typeof detail.message === "string" ? detail.message : "Invitation could not be issued";
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
