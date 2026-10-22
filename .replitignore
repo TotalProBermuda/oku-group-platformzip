@@ -1,5 +1,5 @@
 .git/
-.local/
+.local/share/pnpm/
 
 # Local/generated build state. Publishing runs a fresh production build, but
 # the resulting .next runtime output must remain in the image.

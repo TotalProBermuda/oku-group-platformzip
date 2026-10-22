@@ -52,7 +52,7 @@ describe("deployment image cleanup", () => {
     expect(run().status).toBe(1);
     expect(existsSync(join(root, ".git/objects/fixture"))).toBe(true);
   });
-  it.each([".cache", ".local", "artifacts"])("rejects symlink target or ancestor %s before any removal", name => {
+  it.each([".next-dev", ".local", "artifacts"])("rejects symlink target or ancestor %s before any removal", name => {
     symlinkSync(tmpdir(), join(root, name));
     expect(run().status).toBe(1);
     expect(existsSync(join(root, ".git/objects/fixture"))).toBe(true);
@@ -66,10 +66,11 @@ describe("deployment image cleanup", () => {
     expect(existsSync(join(root, ".local/share/pnpm/package/index.js"))).toBe(true);
   });
   it("removes only allowlisted build-copy files and preserves runtime and original media", () => {
-    const removed = [".git/objects/fixture", ".next/cache/x", ".next-dev/x", ".cache/x", ".local/share/pnpm/x",
+    const removed = [".git/objects/fixture", ".next/cache/x", ".next-dev/x", ".local/share/pnpm/x",
       "catch-starter-kit/node_modules/x", "artifacts/mockup-sandbox/node_modules/x", "artifacts/mockup-sandbox/dist/x", ".release-staging-partial-20261022/x"];
     const kept = [".next/BUILD_ID", ".next/server/page.js", ".next/static/app.js", "node_modules/next/index.js", "public/food.jpg",
-      "attached_assets/original.jpg", "src/app/page.tsx", ".local/important.txt", "catch-starter-kit/source.ts", "artifacts/mockup-sandbox/source.ts"];
+      "attached_assets/original.jpg", "src/app/page.tsx", ".local/important.txt", "catch-starter-kit/source.ts", "artifacts/mockup-sandbox/source.ts",
+      ".cache/replit/nix/env.json", ".cache/nix/metadata", ".local/state/replit/runtime"];
     removed.forEach(name => put(name));
     kept.forEach(name => put(name));
     const result = run();
