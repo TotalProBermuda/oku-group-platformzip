@@ -10,8 +10,8 @@ const put = (name: string, value = "preserve") => {
   mkdirSync(join(file, ".."), { recursive: true });
   writeFileSync(file, value);
 };
-const run = (env: Record<string, string | undefined> = {}, cwd = root) => spawnSync(process.execPath, [join(root, "scripts/prune-replit-build.cjs")], {
-  cwd, env: { ...process.env, REPLIT_DEPLOYMENT: "1", REPLIT_DEV_DOMAIN: "", ...env }, encoding: "utf8",
+const run = (args = ["--prune-isolated-build-copy"], cwd = root) => spawnSync(process.execPath, [join(root, "scripts/prune-replit-build.cjs"), ...args], {
+  cwd, env: { ...process.env, REPLIT_DEPLOYMENT: undefined, REPLIT_DEV_DOMAIN: "editor.replit.dev" }, encoding: "utf8",
 });
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "oku-packaging-test-"));
@@ -27,20 +27,22 @@ describe("deployment image cleanup", () => {
   it("runs only after the deployment build, not ordinary build or install hooks", () => {
     const config = readFileSync(".replit", "utf8");
     const deployment = config.split("[deployment]")[1].split("[postMerge]")[0];
-    expect(deployment).toContain('npm run build && node scripts/prune-replit-build.cjs');
+    expect(deployment).toContain('npm run build && node scripts/prune-replit-build.cjs --prune-isolated-build-copy');
+    expect(config.split("[deployment]")[0]).not.toContain("prune-replit-build");
+    expect(readFileSync("scripts/post-merge.sh", "utf8")).not.toContain("prune-replit-build");
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
     expect(Object.values(pkg.scripts).join("\n")).not.toContain("prune-replit-build");
   });
   it.each([
-    { REPLIT_DEPLOYMENT: undefined },
-    { REPLIT_DEPLOYMENT: "0" },
-    { REPLIT_DEV_DOMAIN: "editor.replit.dev" },
-  ])("rejects workspace environment before mutation %j", env => {
-    expect(run(env).status).toBe(1);
+    { args: [] },
+    { args: ["--unknown"] },
+    { args: ["--prune-isolated-build-copy", "extra"] },
+  ])("rejects implicit or malformed cleanup invocation before mutation %j", ({ args }) => {
+    expect(run(args).status).toBe(1);
     expect(existsSync(join(root, ".git/objects/fixture"))).toBe(true);
   });
   it("rejects an unexpected cwd or package", () => {
-    expect(run({}, tmpdir()).status).toBe(1);
+    expect(run(undefined, tmpdir()).status).toBe(1);
     put("package.json", '{"name":"other"}');
     expect(run().status).toBe(1);
     expect(existsSync(join(root, ".git/objects/fixture"))).toBe(true);
