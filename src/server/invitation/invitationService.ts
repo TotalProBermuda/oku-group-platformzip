@@ -121,12 +121,8 @@ export async function sendInvitationEmails(
   try {
     emailClient = await getResendClient();
   } catch {
-    await prisma.eventLog?.create?.({
-      data: {
-        eventType: "invitation_email_skipped",
-        payload: { reason: "RESEND_NOT_CONFIGURED", seriesId, count: invitations.length },
-      } as any,
-    }).catch(() => {});
+    // EventLog has no invitation-email event type; report the skipped delivery
+    // through this service result instead of attempting an invalid write.
     return { sent: 0, skipped: invitations.length, error: "RESEND_NOT_CONFIGURED" };
   }
 
@@ -167,14 +163,14 @@ export async function sendInvitationEmails(
         html,
         text: buildInvitationEmailText({
           recipientName: inv.recipientName,
-          series: series as any,
+          series,
           rsvpUrl,
           declineUrl,
         }),
       });
       sent++;
-    } catch (e: any) {
-      errors.push(`${inv.recipientEmail}: ${e.message}`);
+    } catch (e: unknown) {
+      errors.push(`${inv.recipientEmail}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 

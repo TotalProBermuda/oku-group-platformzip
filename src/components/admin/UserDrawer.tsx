@@ -72,6 +72,54 @@ const STATUS_OPTIONS = [
 ];
 
 type Tab = "overview" | "roles" | "personas" | "compensation" | "security" | "audit" | "notes";
+type UserRole = { roleKey: string };
+type UserReferrer = {
+  id: string;
+  fullName: string;
+  referrerType: string;
+  isActive: boolean;
+  referralCode: string;
+  _count?: { commissions?: number; attributions?: number };
+};
+type DrawerUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  status: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  internalNotes: string | null;
+  tags: string[];
+  roles: UserRole[];
+  referrer: UserReferrer | null;
+  suspendedAt: string | null;
+  suspensionReason: string | null;
+  lockedAt: string | null;
+};
+type ReferrerOption = {
+  id: string;
+  userId: string | null;
+  referrerType: string;
+  referralCode: string;
+  user?: { name: string | null; email: string | null } | null;
+};
+type DrawerCommission = { id: string; createdAt: string; covers: number | null; amountCents: number; status: string };
+type InfluencerLedgerEntry = { id: string; createdAt: string; type: string; amountCents: number };
+type DrawerCompensation = {
+  referrer: { commissions?: DrawerCommission[] } | null;
+  influencerProfile: { _count?: { ledger?: number }; ledger?: InfluencerLedgerEntry[] } | null;
+  commissionTotals: { count?: number; pending: number; approved: number; paid: number };
+  ledgerTotals: { earned: number; paid: number };
+};
+type DrawerAuditLog = {
+  id: string;
+  summary: string;
+  createdAt: string;
+  action: string;
+  reason: string | null;
+  performedBy: { name: string | null; email: string | null } | null;
+};
 const TABS: { key: Tab; label: string }[] = [
   { key: "overview",      label: "Overview" },
   { key: "roles",         label: "Roles" },
@@ -91,9 +139,9 @@ export default function UserDrawer({
   onClose: () => void;
   onUserUpdated: () => void;
 }) {
-  const [user, setUser]               = useState<any>(null);
-  const [audit, setAudit]             = useState<any[]>([]);
-  const [compensation, setCompensation] = useState<any>(null);
+  const [user, setUser]               = useState<DrawerUser | null>(null);
+  const [audit, setAudit]             = useState<DrawerAuditLog[]>([]);
+  const [compensation, setCompensation] = useState<DrawerCompensation | null>(null);
   const [tab, setTab]                 = useState<Tab>("overview");
   const [loading, setLoading]         = useState(true);
   const [compLoading, setCompLoading] = useState(false);
@@ -109,7 +157,7 @@ export default function UserDrawer({
   const [addRole, setAddRole]               = useState("");
   const [linkReferrerId, setLinkReferrerId] = useState("");
   const { canEditUsers } = useCurrentUserRoles();
-  const [availableReferrers, setAvailableReferrers] = useState<any[]>([]);
+  const [availableReferrers, setAvailableReferrers] = useState<ReferrerOption[]>([]);
   const [refLoading, setRefLoading] = useState(false);
 
   const flash = (text: string, error = false) => {
@@ -322,7 +370,7 @@ export default function UserDrawer({
                     <Stat label="Joined"     value={user.createdAt ? fmtDate(user.createdAt) : "—"} />
                     <Stat label="Last Login" value={user.lastLoginAt ? fmtDate(user.lastLoginAt) : "Never"} />
                     <Stat label="Status"     value={user.status} />
-                    <Stat label="Roles"      value={user.roles?.map((r: any) => ROLE_LABELS[r.roleKey] ?? r.roleKey).join(", ") || "None"} />
+                    <Stat label="Roles"      value={user.roles?.map((r) => ROLE_LABELS[r.roleKey] ?? r.roleKey).join(", ") || "None"} />
                     <Stat label="Persona"    value={user.referrer ? (REFERRER_TYPE_LABELS[user.referrer.referrerType] || user.referrer.referrerType) : "None"} />
                     {user.suspendedAt && <Stat label="Suspended"  value={fmtDate(user.suspendedAt)} />}
                     {user.suspensionReason && <Stat label="Reason" value={user.suspensionReason} />}
@@ -340,7 +388,7 @@ export default function UserDrawer({
                     </p>
                     {user.roles?.length === 0 && <p style={{ color: "#9ca3af", fontSize: 14 }}>No roles assigned.</p>}
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {user.roles?.map((r: any) => {
+                      {user.roles?.map((r) => {
                         const tint = ROLE_TINTS[r.roleKey] ?? { bg: "#e5e7eb", fg: "#374151" };
                         const label = ROLE_LABELS[r.roleKey] ?? r.roleKey;
                         return (
@@ -360,7 +408,7 @@ export default function UserDrawer({
                     <div style={{ display: "flex", gap: 8 }}>
                       <select className="form-input" value={addRole} onChange={(e) => setAddRole(e.target.value)} style={{ flex: 1 }}>
                         <option value="">Select role…</option>
-                        {ALL_ROLES.filter((rk) => !user.roles?.find((r: any) => r.roleKey === rk)).map((rk) => (
+                        {ALL_ROLES.filter((rk) => !user.roles?.find((r) => r.roleKey === rk)).map((rk) => (
                           <option key={rk} value={rk}>{ROLE_LABELS[rk] ?? rk}</option>
                         ))}
                       </select>
@@ -457,7 +505,7 @@ export default function UserDrawer({
                             disabled={refLoading}
                           >
                             <option value="">{refLoading ? "Loading profiles…" : availableReferrers.length === 0 ? "No referrer profiles available" : "Select a referrer profile…"}</option>
-                            {availableReferrers.map((r: any) => (
+                            {availableReferrers.map((r) => (
                               <option key={r.id} value={r.id}>
                                 {r.user?.name || r.user?.email || "Unnamed"} — {r.referrerType?.replace(/_/g, " ")} ({r.referralCode})
                               </option>
@@ -492,7 +540,7 @@ export default function UserDrawer({
                     <p style={{ color: "#9ca3af", fontSize: 14 }}>No compensation data found.</p>
                   ) : (
                     <>
-                      {compensation.referrer?.commissions?.length > 0 ? (
+                      {(compensation.referrer?.commissions?.length ?? 0) > 0 ? (
                         <>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 8 }}>
                             <Stat label="Pending" value={fmtMoney(compensation.commissionTotals?.pending ?? 0)} />
@@ -510,7 +558,7 @@ export default function UserDrawer({
                                 </tr>
                               </thead>
                               <tbody>
-                                {compensation.referrer.commissions.map((c: any) => (
+                                {(compensation.referrer?.commissions ?? []).map((c) => (
                                   <tr key={c.id}>
                                     <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{fmtDate(c.createdAt)}</td>
                                     <td>{c.covers ?? "—"}</td>
@@ -530,7 +578,7 @@ export default function UserDrawer({
                         <p style={{ fontSize: 14, color: "#9ca3af" }}>No referrer commissions recorded.</p>
                       )}
 
-                      {compensation.influencerProfile?.ledger?.length > 0 && (
+                      {(compensation.influencerProfile?.ledger?.length ?? 0) > 0 && (
                         <>
                           <SectionTitle>Influencer Ledger</SectionTitle>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
@@ -543,7 +591,7 @@ export default function UserDrawer({
                                 <tr><th>Date</th><th>Type</th><th>Amount</th></tr>
                               </thead>
                               <tbody>
-                                {compensation.influencerProfile.ledger.map((l: any) => (
+                                {(compensation.influencerProfile?.ledger ?? []).map((l) => (
                                   <tr key={l.id}>
                                     <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{fmtDate(l.createdAt)}</td>
                                     <td><span className="badge badge-neutral" style={{ fontSize: 10 }}>{l.type}</span></td>
@@ -602,7 +650,7 @@ export default function UserDrawer({
                   <SectionTitle>Audit Trail ({audit.length} events)</SectionTitle>
                   {audit.length === 0 && <p style={{ color: "#9ca3af", fontSize: 14 }}>No admin actions recorded yet.</p>}
                   <div style={{ display: "flex", flexDirection: "column" }}>
-                    {audit.map((log: any, i) => (
+                    {audit.map((log, i) => (
                       <div key={log.id} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: i < audit.length - 1 ? "1px solid var(--color-border)" : "none" }}>
                         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#c9a96e", marginTop: 5, flexShrink: 0 }} />
                         <div style={{ flex: 1 }}>

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
-const m = vi.hoisted(() => ({ order: vi.fn(), create: vi.fn(), update: vi.fn(), audit: vi.fn(), enroll: vi.fn(), validate: vi.fn(), bind: vi.fn(), require: vi.fn(), charge: vi.fn(), hold: vi.fn() }));
-vi.mock("@/lib/prisma", () => ({ prisma: { order: { findUnique: m.order }, payment: { create: m.create, update: m.update }, auditLog: { create: m.audit } } }));
+const m = vi.hoisted(() => ({ order: vi.fn(), create: vi.fn(), update: vi.fn(), audit: vi.fn(), enroll: vi.fn(), validate: vi.fn(), bind: vi.fn(), require: vi.fn(), charge: vi.fn(), hold: vi.fn(), transaction: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({ prisma: { order: { findUnique: m.order }, payment: { create: m.create, update: m.update }, auditLog: { create: m.audit }, $transaction: m.transaction } }));
 vi.mock("@/server/auth/session", () => ({ getOptionalSession: async () => ({ userId: "user" }) }));
 vi.mock("@/server/commerce/commissions", () => ({ createCommissionIfAttributed: vi.fn() }));
 vi.mock("@/server/commerce/capacity", () => ({ releaseCatalogCapacity: vi.fn() }));
+vi.mock("@/server/commerce/sessionInventory", () => ({ lockSessionInventory: vi.fn() }));
 vi.mock("@/server/queue/queue", () => ({ safeEnqueue: vi.fn() }));
 vi.mock("@/server/events/eventReferrerService", () => ({ writeTicketAttributionSession: vi.fn() }));
 vi.mock("@/server/payments/activeGateway", () => ({ assertActiveGatewayReady: async () => null }));
@@ -20,8 +21,9 @@ function request(resume = false) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
-  m.order.mockResolvedValue({ id: "order", userId: "user", status: "PENDING", totalCents: 227, currency: "USD", lineItems: [], user: { name: "Test Buyer" }, payment: null });
+  m.order.mockResolvedValue({ id: "order", userId: "user", status: "PENDING", totalCents: 227, currency: "USD", lineItems: [], user: { name: "Test Buyer" }, session: { status: "SCHEDULED" }, payment: null });
   m.hold.mockResolvedValue(true); m.audit.mockResolvedValue({});
+  m.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({ session: { findUnique: vi.fn().mockResolvedValue({ status: "SCHEDULED" }) }, payment: { create: m.create } }));
   m.enroll.mockResolvedValue({ kind: "challenge", challenge });
   m.require.mockResolvedValue({ authenticationTransactionId: "auth", cardType: "002" });
   m.validate.mockResolvedValue({ eciRaw: "02" });

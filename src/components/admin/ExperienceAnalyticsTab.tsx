@@ -52,6 +52,12 @@ interface GiftBagData {
   totals: { givenCount: number; ticketGiven: number; blockGiven: number; eligibleTickets: number };
 }
 
+interface CommissionTotals {
+  revenueUsd: number;
+  commissionOwedCents: number;
+  ticketsSold: number;
+}
+
 export default function ExperienceAnalyticsTab({ seriesId }: { seriesId: string }) {
   const t = useTranslation();
   const locale = useLocale();
@@ -60,7 +66,7 @@ export default function ExperienceAnalyticsTab({ seriesId }: { seriesId: string 
   const [performers, setPerformers] = useState<CommissionPerformer[]>([]);
   const [dropoff, setDropoff] = useState<DropoffData | null>(null);
   const [giftBags, setGiftBags] = useState<GiftBagData | null>(null);
-  const [totals, setTotals] = useState<any>(null);
+  const [totals, setTotals] = useState<CommissionTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [subtab, setSubtab] = useState<"funnel" | "dropoff" | "commission" | "giftbags">("funnel");
 

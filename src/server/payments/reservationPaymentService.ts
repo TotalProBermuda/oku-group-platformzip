@@ -21,7 +21,7 @@
  *     key gates the *intent* not the attempt.
  */
 import { prisma } from "@/lib/prisma";
-import type { PaymentIntentStatus, PaymentAttemptStatus } from "@prisma/client";
+import { Prisma, type PaymentIntentStatus, type PaymentAttemptStatus } from "@prisma/client";
 import {
   cybersourceAuthorize,
   cybersourceCapture,
@@ -98,9 +98,35 @@ function centsToAmount(c: number): string {
   return (c / 100).toFixed(2);
 }
 
-function authorizeOk(httpStatus: number | null, body: any): boolean {
+function safeJsonInput(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  const serialized = JSON.stringify(safeTruncate(value));
+  return serialized === undefined
+    ? Prisma.JsonNull
+    : (JSON.parse(serialized) as Prisma.InputJsonValue);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stringProperty(value: unknown, key: string): string | null {
+  const property = asRecord(value)?.[key];
+  return typeof property === "string" ? property : null;
+}
+
+function errorText(value: unknown, fallback: string): string {
+  return value instanceof Error && value.message ? value.message : fallback;
+}
+
+function responseStatus(body: unknown): unknown {
+  return asRecord(body)?.status;
+}
+
+function authorizeOk(httpStatus: number | null, body: unknown): boolean {
   if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
-  const s = body?.status;
+  const s = responseStatus(body);
   return (
     s === "AUTHORIZED" ||
     s === "AUTHORIZED_PENDING_REVIEW" ||
@@ -108,21 +134,16 @@ function authorizeOk(httpStatus: number | null, body: any): boolean {
   );
 }
 
-function captureOk(httpStatus: number | null, body: any): boolean {
+function captureOk(httpStatus: number | null, body: unknown): boolean {
   if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
-  const s = body?.status;
+  const s = responseStatus(body);
   return s === "PENDING" || s === "TRANSMITTED" || s === "ACCEPTED";
 }
 
-function refundOk(httpStatus: number | null, body: any): boolean {
+function refundOk(httpStatus: number | null, body: unknown): boolean {
   if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
-  const s = body?.status;
+  const s = responseStatus(body);
   return s === "PENDING" || s === "TRANSMITTED" || s === "ACCEPTED";
-}
-
-function voidOk(httpStatus: number | null, body: any): boolean {
-  if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
-  return body?.status === "VOIDED";
 }
 
 /**
@@ -131,7 +152,7 @@ function voidOk(httpStatus: number | null, body: any): boolean {
  */
 export function normalizeCybersourceError(
   httpStatus: number | null,
-  body: any,
+  body: unknown,
 ): { code: string; message: string } {
   if (!httpStatus || !body) {
     return { code: "NETWORK_ERROR", message: "Could not contact the payment gateway. Please try again." };
@@ -139,15 +160,12 @@ export function normalizeCybersourceError(
   if (httpStatus === 401 || httpStatus === 403) {
     return { code: "AUTH_FAILURE", message: "Payment gateway authentication failed. Contact support." };
   }
-  const reason =
-    body?.errorInformation?.reason ??
-    body?.reason ??
-    body?.errorCode ??
-    null;
-  const gatewayMsg =
-    body?.errorInformation?.message ??
-    body?.message ??
-    null;
+  const record = asRecord(body);
+  const errorInformation = asRecord(record?.errorInformation);
+  const rawReason = errorInformation?.reason ?? record?.reason ?? record?.errorCode;
+  const reason = typeof rawReason === "string" ? rawReason : null;
+  const rawGatewayMsg = errorInformation?.message ?? record?.message;
+  const gatewayMsg = typeof rawGatewayMsg === "string" ? rawGatewayMsg : null;
 
   if (reason === "PROCESSOR_DECLINED" || reason === "INVALID_DATA") {
     return {
@@ -241,18 +259,20 @@ export async function authorizePayment(
       customerEmail: input.customerEmail,
       billing: input.billing,
     });
-  } catch (e: any) {
-    callResult = { httpStatus: null, body: null, networkError: e?.message || "unknown" };
+  } catch (error: unknown) {
+    callResult = { httpStatus: null, body: null, networkError: errorText(error, "unknown") };
   }
 
   const ok = authorizeOk(callResult.httpStatus, callResult.body);
-  const transactionId = callResult.body?.id ?? null;
-  const requestId = callResult.body?.reconciliationId ?? null;
+  const response = asRecord(callResult.body);
+  const processorInformation = asRecord(response?.processorInformation);
+  const transactionId = typeof response?.id === "string" ? response.id : null;
+  const requestId = typeof response?.reconciliationId === "string" ? response.reconciliationId : null;
   const authCode =
-    callResult.body?.processorInformation?.approvalCode ??
-    callResult.body?.processorInformation?.authIndicator ?? null;
+    (typeof processorInformation?.approvalCode === "string" ? processorInformation.approvalCode : null) ??
+    (typeof processorInformation?.authIndicator === "string" ? processorInformation.authIndicator : null);
   const responseCode =
-    callResult.body?.processorInformation?.responseCode ??
+    (typeof processorInformation?.responseCode === "string" ? processorInformation.responseCode : null) ??
     String(callResult.httpStatus ?? "");
   const normalized = ok
     ? { code: null, message: null }
@@ -269,7 +289,7 @@ export async function authorizePayment(
       cybersourceRequestId: requestId,
       cybersourceAuthCode: authCode,
       cybersourceResponseCode: responseCode,
-      cybersourceRawSafeJson: safeTruncate(callResult.body) as any,
+      cybersourceRawSafeJson: safeJsonInput(callResult.body),
       failureCode: normalized.code,
       failureMessage: normalized.message,
     },
@@ -343,8 +363,8 @@ export async function capturePayment(
       amount: centsToAmount(intent.amountCents),
       currency: intent.currency,
     });
-  } catch (e: any) {
-    callResult = { httpStatus: null, body: null, networkError: e?.message || "unknown" };
+  } catch (error: unknown) {
+    callResult = { httpStatus: null, body: null, networkError: errorText(error, "unknown") };
   }
 
   const ok = captureOk(callResult.httpStatus, callResult.body);
@@ -358,9 +378,10 @@ export async function capturePayment(
       status: ok ? "CAPTURED" : "FAILED",
       amountCents: intent.amountCents,
       currency: intent.currency,
-      cybersourceTransactionId: callResult.body?.id ?? intent.cybersourceTransactionId,
+      cybersourceTransactionId:
+        stringProperty(callResult.body, "id") ?? intent.cybersourceTransactionId,
       cybersourceResponseCode: String(callResult.httpStatus ?? ""),
-      cybersourceRawSafeJson: safeTruncate(callResult.body) as any,
+      cybersourceRawSafeJson: safeJsonInput(callResult.body),
       failureCode: normalized.code,
       failureMessage: normalized.message,
     },
@@ -412,8 +433,8 @@ export async function voidPayment(
   let callResult;
   try {
     callResult = await cybersourceVoid({ originalTransactionId: intent.cybersourceTransactionId });
-  } catch (e: any) {
-    callResult = { httpStatus: null, body: null, networkError: e?.message || "unknown" };
+  } catch (error: unknown) {
+    callResult = { httpStatus: null, body: null, networkError: errorText(error, "unknown") };
   }
 
   const ok = callResult.httpStatus !== null && callResult.httpStatus >= 200 && callResult.httpStatus < 300;
@@ -428,7 +449,7 @@ export async function voidPayment(
       amountCents: intent.amountCents,
       currency: intent.currency,
       cybersourceTransactionId: intent.cybersourceTransactionId,
-      cybersourceRawSafeJson: safeTruncate(callResult.body) as any,
+      cybersourceRawSafeJson: safeJsonInput(callResult.body),
       failureCode: normalized.code,
       failureMessage: normalized.message,
     },
@@ -489,8 +510,8 @@ export async function refundPayment(
       amount: centsToAmount(refundCents),
       currency: intent.currency,
     });
-  } catch (e: any) {
-    callResult = { httpStatus: null, body: null, networkError: e?.message || "unknown" };
+  } catch (error: unknown) {
+    callResult = { httpStatus: null, body: null, networkError: errorText(error, "unknown") };
   }
 
   const ok = refundOk(callResult.httpStatus, callResult.body);
@@ -506,8 +527,8 @@ export async function refundPayment(
       status: ok ? "REFUNDED" : "FAILED",
       amountCents: refundCents,
       currency: intent.currency,
-      cybersourceTransactionId: callResult.body?.id ?? null,
-      cybersourceRawSafeJson: safeTruncate(callResult.body) as any,
+      cybersourceTransactionId: stringProperty(callResult.body, "id"),
+      cybersourceRawSafeJson: safeJsonInput(callResult.body),
       failureCode: normalized.code,
       failureMessage: normalized.message,
     },

@@ -6,6 +6,33 @@ import StatusBadge from "@/components/entities/StatusBadge";
 import EntityLink from "@/components/entities/EntityLink";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import type { DrawerTab } from "./RightDetailDrawer";
+
+interface PayoutEntry {
+  id: string;
+  type: string;
+  amountCents: number;
+  createdAt: string;
+  note: string | null;
+  influencer: { id: string; userId: string; user: { name: string | null; email: string | null } } | null;
+  order: { id: string } | null;
+}
+
+interface PayoutSummary {
+  totalEarnedCents: number;
+  totalPaidCents: number;
+  outstandingCents: number;
+}
+
+interface PayoutData {
+  entries: PayoutEntry[];
+  summary: PayoutSummary;
+}
+
+interface PayoutApiResponse {
+  ok: boolean;
+  data?: PayoutData;
+}
 
 type Tab = "overview" | "entries";
 
@@ -27,7 +54,7 @@ export default function PayoutDrawer({
   const dateLocale =
     locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
 
-  const [data, setData] = useState<{ entries: any[]; summary: any } | null>(null);
+  const [data, setData] = useState<PayoutData | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
 
@@ -35,27 +62,27 @@ export default function PayoutDrawer({
     setLoading(true);
     try {
       const r = await fetch("/api/v1/admin/payouts");
-      const d = await r.json();
-      if (d.ok) {
+      const d = await r.json() as PayoutApiResponse;
+      if (d.ok && d.data) {
         const filtered = influencerId
           ? {
               ...d.data,
               entries: d.data.entries.filter(
-                (e: any) => e.influencer?.id === influencerId
+                (e) => e.influencer?.id === influencerId
               ),
             }
           : d.data;
 
         if (influencerId) {
           const earned = filtered.entries
-            .filter((e: any) => e.type === "COMMISSION_EARNED")
-            .reduce((s: number, e: any) => s + e.amountCents, 0);
+            .filter((e) => e.type === "COMMISSION_EARNED")
+            .reduce((s, e) => s + e.amountCents, 0);
           const paid = filtered.entries
-            .filter((e: any) => e.type === "COMMISSION_PAID")
-            .reduce((s: number, e: any) => s + Math.abs(e.amountCents), 0);
+            .filter((e) => e.type === "COMMISSION_PAID")
+            .reduce((s, e) => s + Math.abs(e.amountCents), 0);
           const reversed = filtered.entries
-            .filter((e: any) => e.type === "COMMISSION_REVERSED")
-            .reduce((s: number, e: any) => s + Math.abs(e.amountCents), 0);
+            .filter((e) => e.type === "COMMISSION_REVERSED")
+            .reduce((s, e) => s + Math.abs(e.amountCents), 0);
           filtered.summary = {
             totalEarnedCents: earned,
             totalPaidCents: paid,
@@ -63,7 +90,7 @@ export default function PayoutDrawer({
           };
         }
 
-        setData(filtered);
+        setData(filtered as PayoutData);
       }
     } finally {
       setLoading(false);
@@ -93,7 +120,7 @@ export default function PayoutDrawer({
   const influencer = data?.entries?.[0]?.influencer;
   const userName = influencer?.user?.name || influencer?.user?.email || t("admin", "influencer");
 
-  const TABS = [
+  const TABS: DrawerTab[] = [
     { key: "overview", label: t("admin", "overview") },
     { key: "entries",  label: t("admin", "ledgerEntries"), badge: data?.entries?.length },
   ];
@@ -105,7 +132,7 @@ export default function PayoutDrawer({
       title={userName}
       subtitle={influencer?.user?.email ?? undefined}
       width={500}
-      tabs={TABS as any}
+      tabs={TABS}
       activeTab={tab}
       onTabChange={(k) => setTab(k as Tab)}
       loading={loading}
@@ -116,9 +143,9 @@ export default function PayoutDrawer({
             <Section title={t("admin", "influencer")}>
               <EntityLink
                 entityType="user"
-                entityId={influencer.user.id}
-                label={influencer.user.name || influencer.user.email}
-                sublabel={influencer.user.email}
+                entityId={influencer.userId}
+                label={influencer.user.name || influencer.user.email || userName}
+                sublabel={influencer.user.email ?? undefined}
                 variant="card"
                 onOpen={(_, id) => onUserOpen?.(id)}
               />
@@ -158,7 +185,9 @@ export default function PayoutDrawer({
               {t("admin", "noPayoutsFound")}
             </div>
           ) : (
-            data.entries.map((entry: any) => (
+            data.entries.map((entry) => {
+              const orderId = entry.order?.id;
+              return (
               <div
                 key={entry.id}
                 style={{
@@ -171,9 +200,9 @@ export default function PayoutDrawer({
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
                     <StatusBadge status={entry.type} size="xs" />
-                    {entry.order && (
+                    {orderId && (
                       <button
-                        onClick={() => onOrderOpen?.(entry.order.id)}
+                        onClick={() => onOrderOpen?.(orderId)}
                         style={{
                           background: "none",
                           border: "none",
@@ -186,7 +215,7 @@ export default function PayoutDrawer({
                           fontFamily: "monospace",
                         }}
                       >
-                        ···{entry.order.id.slice(-8)}
+                        ···{orderId.slice(-8)}
                       </button>
                     )}
                     {entry.note && (
@@ -214,7 +243,8 @@ export default function PayoutDrawer({
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       )}

@@ -4,11 +4,10 @@ import type { Locale } from "@/types/i18n";
 import { localizeSessions } from "@/server/series/localizeSessions";
 import { localizeEventCatalog } from "@/server/i18n/eventTranslations";
 
-const TRANSLATABLE_SERIES_FIELDS = ["title", "subtitle", "description"] as const;
-
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const venue = url.searchParams.get("venue") as any;
+  const venueParam = url.searchParams.get("venue");
+  const venue = venueParam === "OKU" || venueParam === "CATCH" ? venueParam : undefined;
   const q = url.searchParams.get("q") || undefined;
   const locale = (url.searchParams.get("locale") || "en") as Locale;
 

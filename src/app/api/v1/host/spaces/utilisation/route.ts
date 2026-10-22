@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getVenueSpaceUtilisation } from "@/server/spaces/capacityService";
 import { findBlockingOccupancy } from "@/server/events/eventOccupancyService";
 import { getCurrentRoles } from "@/server/auth/currentRoles";
+import type { RoleKey } from "@/types/roles";
 
 /**
  * GET /api/v1/host/spaces/utilisation
@@ -20,12 +21,12 @@ import { getCurrentRoles } from "@/server/auth/currentRoles";
  */
 export async function GET(req: NextRequest) {
   let userId: string;
-  let roles: string[];
+  let roles: RoleKey[];
   try {
     const s = await requireSession();
     userId = s.userId;
     roles = await getCurrentRoles(userId);
-    requirePermission(roles as any, "host:reservations:checkin");
+    requirePermission(roles, "host:reservations:checkin");
   } catch (e) {
     const err = e as { message?: string; status?: number };
     return NextResponse.json({ ok: false, error: err.message ?? "Unauthorized" }, { status: err.status ?? 401 });

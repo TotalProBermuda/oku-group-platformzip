@@ -22,7 +22,7 @@ export async function GET(
         "Cache-Control": "public, max-age=3000, s-maxage=3000",
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Media serve error:", err);
     return NextResponse.json({ error: "Media not found" }, { status: 404 });
   }

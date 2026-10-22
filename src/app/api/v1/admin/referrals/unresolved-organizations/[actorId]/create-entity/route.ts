@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logReferralOrgAction } from "@/server/referrals/organizationAudit";
@@ -109,10 +110,11 @@ export async function POST(
     });
 
     return NextResponse.json({ ok: true, ...result });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "unknown error" },
-      { status: e?.status ?? 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

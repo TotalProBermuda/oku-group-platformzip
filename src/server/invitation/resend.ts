@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const RESEND_TEST_SENDER = "onboarding@resend.dev";
-let _fromEmail = "events@oku.group";
+const _fromEmail = "events@oku.group";
 
 function sanitizeFromEmail(email: string | undefined): string {
   if (!email) return RESEND_TEST_SENDER;

@@ -15,7 +15,7 @@ export async function GET(
 
     const orders = await prisma.order.findMany({
       where: {
-        sessions: { some: { id: { in: sessionIds } } },
+        session: { id: { in: sessionIds } },
         status: "PAID",
       },
       include: {
@@ -56,7 +56,7 @@ export async function GET(
 
     for (const order of orders) {
       if (!order.attributedInfluencerId) {
-        unattributedRevenueCents += order.amountCents;
+        unattributedRevenueCents += order.totalCents;
         unattributedOrders++;
         continue;
       }
@@ -79,9 +79,9 @@ export async function GET(
 
       const entry = influencerMap[iid];
       entry.ordersCount++;
-      entry.revenueUsd += order.amountCents / 100;
+      entry.revenueUsd += order.totalCents / 100;
       entry.ticketsSold += order.tickets.length;
-      entry.commissionOwedCents += Math.round(order.amountCents * COMMISSION_RATE);
+      entry.commissionOwedCents += Math.round(order.totalCents * COMMISSION_RATE);
 
       for (const t of order.tickets) {
         if (t.ticketStatus === "CHECKED_IN" || t.attendanceEvent) entry.checkedInCount++;
@@ -123,8 +123,8 @@ export async function GET(
         ticketsSold: performers.reduce((s, p) => s + p.ticketsSold, 0),
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load commission performance" }, { status: 500 });
   }
 }
 

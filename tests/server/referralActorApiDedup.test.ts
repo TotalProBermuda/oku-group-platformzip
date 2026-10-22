@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   mockFindOrLinkReferralActor,
   mockRequireSession,
+  mockRequireAdminRoles,
   mockRequirePermission,
   mockPrismaTransaction,
   mockPrismaUserFindUnique,
@@ -36,6 +37,7 @@ const {
 } = vi.hoisted(() => {
   const mockFindOrLinkReferralActor = vi.fn();
   const mockRequireSession = vi.fn();
+  const mockRequireAdminRoles = vi.fn();
   const mockRequirePermission = vi.fn();
   const mockPrismaAuditLogCreate = vi.fn().mockResolvedValue({});
   const mockPrismaUserAuditLogCreate = vi.fn().mockResolvedValue({});
@@ -78,7 +80,7 @@ const {
       findFirst: mockPrismaReferralAssignmentFindFirst,
       create: mockPrismaReferralAssignmentCreate,
     },
-    auditLog: { create: mockPrismaAuditLogCreate },
+    auditLog: { create: mockPrismaAuditLogCreate, findFirst: vi.fn().mockResolvedValue(null) },
     userAuditLog: { create: mockPrismaUserAuditLogCreate },
   };
 
@@ -103,7 +105,7 @@ const {
       findFirst: mockPrismaReferralAssignmentFindFirst,
       create: mockPrismaReferralAssignmentCreate,
     },
-    auditLog: { create: mockPrismaAuditLogCreate },
+    auditLog: { create: mockPrismaAuditLogCreate, findFirst: vi.fn().mockResolvedValue(null) },
     userAuditLog: { create: mockPrismaUserAuditLogCreate },
     $transaction: mockPrismaTransaction,
   };
@@ -111,6 +113,7 @@ const {
   return {
     mockFindOrLinkReferralActor,
     mockRequireSession,
+    mockRequireAdminRoles,
     mockRequirePermission,
     mockPrismaTransaction,
     mockPrismaUserFindUnique,
@@ -131,6 +134,7 @@ const {
 
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/server/auth/session", () => ({ requireSession: mockRequireSession }));
+vi.mock("@/server/auth/adminGuard", () => ({ requireAdminRoles: mockRequireAdminRoles }));
 vi.mock("@/lib/rbac", () => ({ requirePermission: mockRequirePermission }));
 vi.mock("nanoid", () => ({ nanoid: () => "TESTCODE1" }));
 vi.mock("@/server/referrals/referralActorDedupeService", () => ({
@@ -196,6 +200,7 @@ describe("POST /api/v1/operators/create — dedupe scenarios", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireSession.mockResolvedValue(ADMIN_SESSION);
+    mockRequireAdminRoles.mockResolvedValue(ADMIN_SESSION);
     mockRequirePermission.mockReturnValue(undefined);
     // No existing user by email (new provisioning)
     mockPrismaUserFindUnique.mockResolvedValue(null);
@@ -387,6 +392,7 @@ describe("POST /api/v1/admin/users/[id]/referrer-resolution/resolve — dedupe s
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireSession.mockResolvedValue(ADMIN_SESSION);
+    mockRequireAdminRoles.mockResolvedValue(ADMIN_SESSION);
     mockRequirePermission.mockReturnValue(undefined);
     mockPrismaReferralActorFindUnique.mockResolvedValue(null);
     mockPrismaReferrerFindUnique.mockResolvedValue(null);

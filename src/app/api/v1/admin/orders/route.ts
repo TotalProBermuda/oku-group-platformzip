@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { OrderChannel, OrderStatus, OrderType } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
@@ -10,16 +13,22 @@ export async function GET(req: NextRequest) {
     const isOwner = roles.includes("SUPERADMIN");
 
     const { searchParams } = req.nextUrl;
-    const status    = searchParams.get("status") || undefined;
-    const orderType = searchParams.get("orderType") || undefined;
-    const channel   = searchParams.get("channel") || undefined;
+    const statusRaw = searchParams.get("status");
+    const orderTypeRaw = searchParams.get("orderType");
+    const channelRaw = searchParams.get("channel");
+    const status = statusRaw ? Object.values(OrderStatus).find((value) => value === statusRaw) : undefined;
+    const orderType = orderTypeRaw ? Object.values(OrderType).find((value) => value === orderTypeRaw) : undefined;
+    const channel = channelRaw ? Object.values(OrderChannel).find((value) => value === channelRaw) : undefined;
     const dateFrom  = searchParams.get("dateFrom") || undefined;
     const dateTo    = searchParams.get("dateTo") || undefined;
     const q         = searchParams.get("q") || undefined;
+    if ((statusRaw && !status) || (orderTypeRaw && !orderType) || (channelRaw && !channel)) {
+      return NextResponse.json({ ok: false, error: "Invalid order filter." }, { status: 400 });
+    }
     const page      = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize  = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "50", 10)));
 
-    const where: any = {};
+    const where: Prisma.OrderWhereInput = {};
     if (status)    where.status    = status;
     if (orderType) where.orderType = orderType;
     if (channel)   where.channel   = channel;
@@ -106,8 +115,8 @@ export async function GET(req: NextRequest) {
       data,
       meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
     });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

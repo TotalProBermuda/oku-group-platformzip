@@ -1,10 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, getOptionalSession } from "@/server/auth/session";
+import { getOptionalSession } from "@/server/auth/session";
 import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";
 import { purchasedEntitlements } from "@/server/commerce/sessionProducts";
+import { z } from "zod";
+import { isDemoModeEnabled, DEMO_DISABLED_MESSAGE } from "@/lib/demoMode";
+
+const demoOrderInputSchema = z.object({
+  seriesId: z.string().min(1),
+  sessionId: z.string().min(1),
+  lineItems: z.array(z.object({
+    ticketTypeId: z.string().min(1).optional(),
+    addonId: z.string().min(1).optional(),
+    nameSnapshot: z.string().min(1),
+    itemType: z.enum(["ticket", "addon"]).default("ticket"),
+    qty: z.number().int().positive(),
+    unitPriceCents: z.number().int().nonnegative(),
+    totalCents: z.number().int().nonnegative(),
+  }).refine((item) => Boolean(item.ticketTypeId) !== Boolean(item.addonId), {
+    message: "Each line item must identify exactly one ticket type or add-on",
+  } )).min(1),
+  subtotalCents: z.number().int().nonnegative().optional(),
+  feesCents: z.number().int().nonnegative().optional(),
+  taxCents: z.number().int().nonnegative().optional(),
+  totalCents: z.number().int().nonnegative().optional(),
+  currency: z.string().min(1).optional(),
+});
 
 export async function GET(_req: NextRequest) {
+  void _req;
   const auth = await getOptionalSession();
   if (!auth) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
@@ -25,6 +49,9 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isDemoModeEnabled()) {
+    return NextResponse.json({ error: DEMO_DISABLED_MESSAGE }, { status: 403 });
+  }
   const auth = await getOptionalSession();
   if (!auth) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
@@ -36,12 +63,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const { seriesId, sessionId, lineItems, subtotalCents, feesCents, taxCents, totalCents, currency } = body;
-
-  if (!seriesId || !sessionId || !lineItems?.length) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
+  const body = await req.json().catch(() => null);
+  const parsed = demoOrderInputSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid demo order payload" }, { status: 400 });
+  const { seriesId, sessionId, lineItems, subtotalCents, feesCents, taxCents, totalCents, currency } = parsed.data;
 
   const series = await prisma.series.findUnique({ where: { id: seriesId } });
   if (!series) return NextResponse.json({ error: "Experience not found" }, { status: 404 });
@@ -49,8 +74,8 @@ export async function POST(req: NextRequest) {
   const order = await prisma.$transaction(async (tx) => {
     const current = await reserveCatalogCapacityInTransaction(tx, {
       sessionId,
-      ticketItems: lineItems.filter((li: { ticketTypeId?: string }) => li.ticketTypeId).map((li: { ticketTypeId: string; qty: number }) => ({ id: li.ticketTypeId, qty: li.qty })),
-      addonItems: lineItems.filter((li: { addonId?: string }) => li.addonId).map((li: { addonId: string; qty: number }) => ({ id: li.addonId, qty: li.qty })),
+      ticketItems: lineItems.flatMap((li) => li.ticketTypeId ? [{ id: li.ticketTypeId, qty: li.qty }] : []),
+      addonItems: lineItems.flatMap((li) => li.addonId ? [{ id: li.addonId, qty: li.qty }] : []),
     });
     if (current.seriesId !== seriesId) throw new Error("Session does not belong to this experience");
     const rights = purchasedEntitlements(current);
@@ -67,7 +92,7 @@ export async function POST(req: NextRequest) {
         totalCents: totalCents ?? 0,
         currency: currency ?? "USD",
         lineItems: {
-          create: lineItems.map((li: any) => ({
+          create: lineItems.map((li) => ({
             ticketTypeId: li.ticketTypeId ?? null,
             addonId: li.addonId ?? null,
             nameSnapshot: li.nameSnapshot,
@@ -91,7 +116,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const ticketLines = lineItems.filter((li: any) => li.itemType === "ticket" && li.ticketTypeId);
+    const ticketLines = lineItems.filter((li) => li.itemType === "ticket" && li.ticketTypeId);
     for (const li of ticketLines) {
       for (let i = 0; i < li.qty; i++) {
         await tx.ticket.create({
@@ -111,7 +136,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const ticketCount = ticketLines.reduce((sum: number, li: any) => sum + li.qty, 0);
+    const ticketCount = ticketLines.reduce((sum, li) => sum + li.qty, 0);
     await tx.series.update({
       where: { id: seriesId },
       data: { capacitySold: { increment: ticketCount } },

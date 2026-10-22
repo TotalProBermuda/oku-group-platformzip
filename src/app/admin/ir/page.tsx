@@ -8,12 +8,20 @@ const visBadge: Record<string, string> = {
   APPROVED_INVESTORS: "badge badge-success",
 };
 
+interface IRDocumentRow {
+  id: string;
+  title: string;
+  description: string | null;
+  visibility: string;
+  versions: Array<{ createdAt: string }>;
+}
+
 export default function AdminIRPage() {
   const t = useTranslation();
   const locale = useLocale();
   const dateLocale = locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
 
-  const [docs, setDocs] = useState<any[]>([]);
+  const [docs, setDocs] = useState<IRDocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", visibility: "APPROVED_INVESTORS" });

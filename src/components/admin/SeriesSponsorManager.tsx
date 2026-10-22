@@ -7,6 +7,7 @@ import SponsorPlacementPreview from "@/components/sponsors/SponsorPlacementPrevi
 import { resolveSponsors } from "@/lib/sponsor-render";
 import MediaUpload from "@/components/ui/MediaUpload";
 import type { ResolvedSponsors } from "@/lib/sponsor-render";
+import type { Prisma } from "@prisma/client";
 
 interface Props {
   seriesId: string;
@@ -25,13 +26,27 @@ const PLACEMENT_TOGGLES = [
   { key: "showOnTicket",    label: "Ticket" },
   { key: "showOnEmail",     label: "Email" },
   { key: "showOnCheckInView", label: "Check-In" },
-];
+] as const;
+
+type SponsorAssignmentView = Prisma.SponsorAssignmentGetPayload<{
+  include: {
+    tier: true;
+    entity: { select: { id: true; displayName: true; logoUrl: true; websiteUrl: true } };
+  };
+}>;
+type SponsorTierOption = { id: string; label: string; displayOrder: number };
+type SponsorEntityOption = { id: string; displayName: string };
+type SponsorForm = {
+  entityId: string; tierId: string; sortOrder: number; logoUrl: string; websiteUrl: string;
+  displayNameOverride: string; showOnEventPage: boolean; showOnTicket: boolean;
+  showOnEmail: boolean; showOnCheckInView: boolean; notes: string;
+};
 
 export default function SeriesSponsorManager({ seriesId }: Props) {
   const t = useTranslation();
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [tiers, setTiers] = useState<any[]>([]);
-  const [entities, setEntities] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<SponsorAssignmentView[]>([]);
+  const [tiers, setTiers] = useState<SponsorTierOption[]>([]);
+  const [entities, setEntities] = useState<SponsorEntityOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -39,7 +54,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
   const [previewData, setPreviewData] = useState<ResolvedSponsors | null>(null);
   const [showPreview, setShowPreview] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<any>({
+  const [form, setForm] = useState<SponsorForm>({
     entityId: "", tierId: "", sortOrder: 0, logoUrl: "", websiteUrl: "",
     displayNameOverride: "", showOnEventPage: true, showOnTicket: true,
     showOnEmail: true, showOnCheckInView: false, notes: "",
@@ -102,7 +117,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
     load();
   }
 
-  async function toggleActive(a: any) {
+  async function toggleActive(a: SponsorAssignmentView) {
     await fetch(`/api/v1/admin/series/${seriesId}/sponsors/${a.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -115,7 +130,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
     setForm({ entityId: "", tierId: "", sortOrder: 0, logoUrl: "", websiteUrl: "", displayNameOverride: "", showOnEventPage: true, showOnTicket: true, showOnEmail: true, showOnCheckInView: false, notes: "" });
   }
 
-  function startEdit(a: any) {
+  function startEdit(a: SponsorAssignmentView) {
     setEditId(a.id);
     setForm({
       entityId: a.entityId,
@@ -194,22 +209,22 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>Brand / Entity</label>
-              <select value={form.entityId} onChange={(e) => setForm((p: any) => ({ ...p, entityId: e.target.value }))} style={inpStyle}>
+              <select value={form.entityId} onChange={(e) => setForm((p) => ({ ...p, entityId: e.target.value }))} style={inpStyle}>
                 <option value="">Select entity…</option>
-                {entities.map((e: any) => <option key={e.id} value={e.id}>{e.displayName}</option>)}
+                {entities.map((e) => <option key={e.id} value={e.id}>{e.displayName}</option>)}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Sponsor Tier</label>
-              <select value={form.tierId} onChange={(e) => setForm((p: any) => ({ ...p, tierId: e.target.value }))} style={inpStyle}>
+              <select value={form.tierId} onChange={(e) => setForm((p) => ({ ...p, tierId: e.target.value }))} style={inpStyle}>
                 <option value="">Select tier…</option>
-                {tiers.map((t: any) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                {tiers.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <div style={{ marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <label style={labelStyle}>Logo Override</label>
-                <span style={{ fontSize: 11, color: "#9ca3af" }}>Optional — uses entity's logo by default</span>
+                <span style={{ fontSize: 11, color: "#9ca3af" }}>Optional — uses entity&apos;s logo by default</span>
               </div>
               {form.entityId && !form.logoUrl && (
                 <div style={{ marginBottom: 8, padding: "8px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 12, color: "#16a34a" }}>
@@ -218,7 +233,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
               )}
               <MediaUpload
                 value={form.logoUrl ?? ""}
-                onChange={(url) => setForm((p: any) => ({ ...p, logoUrl: url }))}
+                onChange={(url) => setForm((p) => ({ ...p, logoUrl: url }))}
                 mediaType="icon"
                 aspectRatio="wide"
                 maxSizeMB={5}
@@ -237,15 +252,15 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
             </div>
             <div>
               <label style={labelStyle}>Website URL</label>
-              <input value={form.websiteUrl} onChange={(e) => setForm((p: any) => ({ ...p, websiteUrl: e.target.value }))} placeholder="https://…" style={inpStyle} />
+              <input value={form.websiteUrl} onChange={(e) => setForm((p) => ({ ...p, websiteUrl: e.target.value }))} placeholder="https://…" style={inpStyle} />
             </div>
             <div>
               <label style={labelStyle}>Display Name Override</label>
-              <input value={form.displayNameOverride} onChange={(e) => setForm((p: any) => ({ ...p, displayNameOverride: e.target.value }))} placeholder="Leave blank to use entity name" style={inpStyle} />
+              <input value={form.displayNameOverride} onChange={(e) => setForm((p) => ({ ...p, displayNameOverride: e.target.value }))} placeholder="Leave blank to use entity name" style={inpStyle} />
             </div>
             <div>
               <label style={labelStyle}>Sort Order</label>
-              <input type="number" value={form.sortOrder} onChange={(e) => setForm((p: any) => ({ ...p, sortOrder: +e.target.value }))} style={inpStyle} />
+              <input type="number" value={form.sortOrder} onChange={(e) => setForm((p) => ({ ...p, sortOrder: +e.target.value }))} style={inpStyle} />
             </div>
           </div>
 
@@ -254,7 +269,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
               {PLACEMENT_TOGGLES.map(({ key, label }) => (
                 <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#374151", cursor: "pointer" }}>
-                  <input type="checkbox" checked={!!form[key]} onChange={(e) => setForm((p: any) => ({ ...p, [key]: e.target.checked }))} />
+                  <input type="checkbox" checked={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.checked }))} />
                   {label}
                 </label>
               ))}
@@ -263,7 +278,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
 
           <div style={{ marginBottom: 20 }}>
             <label style={labelStyle}>Internal Notes</label>
-            <textarea value={form.notes} onChange={(e) => setForm((p: any) => ({ ...p, notes: e.target.value }))} rows={2} style={{ ...inpStyle, resize: "vertical", fontFamily: "inherit" }} />
+            <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={2} style={{ ...inpStyle, resize: "vertical", fontFamily: "inherit" }} />
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -325,7 +340,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
                 <span style={{ fontSize: 11, color: "#d1cdc7" }}>Order {tier.displayOrder}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {items.map((a: any) => (
+                {items.map((a) => (
                   <div key={a.id} style={{
                     background: "white",
                     border: "1px solid #e5e0d8",
@@ -339,7 +354,7 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
                     {/* Logo preview */}
                     <div style={{ width: 48, height: 36, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fafaf9", borderRadius: 6, border: "1px solid #f0ede8" }}>
                       {a.logoUrl || a.entity?.logoUrl
-                        ? <img src={a.logoUrl || a.entity?.logoUrl} alt="" style={{ maxHeight: 28, maxWidth: 44, objectFit: "contain" }} />
+                        ? <img src={a.logoUrl ?? a.entity?.logoUrl ?? undefined} alt="" style={{ maxHeight: 28, maxWidth: 44, objectFit: "contain" }} />
                         : <span style={{ fontSize: 9, color: "#9ca3af", fontWeight: 600 }}>LOGO</span>}
                     </div>
                     {/* Info */}
@@ -378,9 +393,9 @@ export default function SeriesSponsorManager({ seriesId }: Props) {
           ))}
 
           {/* Unassigned tier slots */}
-          {tiers.filter((t: any) => !assignments.some((a) => a.tierId === t.id)).length > 0 && (
+          {tiers.filter((t) => !assignments.some((a) => a.tierId === t.id)).length > 0 && (
             <div style={{ padding: "16px 20px", border: "1px dashed #e5e0d8", borderRadius: 10, color: "#9ca3af", fontSize: 13 }}>
-              Empty tiers: {tiers.filter((t: any) => !assignments.some((a) => a.tierId === t.id)).map((t: any) => t.label).join(" · ")}
+              Empty tiers: {tiers.filter((t) => !assignments.some((a) => a.tierId === t.id)).map((t) => t.label).join(" · ")}
             </div>
           )}
         </div>

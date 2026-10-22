@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminPermission } from "@/server/auth/adminGuard";
 import { adminListProfileSummaries, type BankReadinessStatusValue } from "@/server/beneficiaries/beneficiaryService";
 import { scrubErrorMessage } from "@/server/security/logScrub";
+import { getBeneficiaryApiErrorStatus } from "@/app/api/v1/me/beneficiary/errorDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
       .catch(() => {});
 
     return NextResponse.json({ ok: true, data: rows });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: getBeneficiaryApiErrorStatus(e) });
   }
 }

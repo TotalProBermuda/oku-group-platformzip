@@ -37,7 +37,7 @@ export default async function MyTicketsPage() {
             : null,
         }
       : null,
-    ticketType: tk.ticketType ?? null,
+    ticketType: tk.ticketType ? { ...tk.ticketType, tierCode: tk.ticketType.tierCode ?? "" } : null,
   }));
 
   return <MyTicketsContent tickets={serialized} userName={auth.session.user.name ?? null} />;

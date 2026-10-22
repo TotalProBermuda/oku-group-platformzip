@@ -11,6 +11,7 @@ import { assertNoBlockingOccupancy, EventOccupancyConflictError } from "@/server
 import { getCommerceSettings } from "@/server/commerce/commerceSettings";
 import { getWebsiteContent } from "@/server/content/websiteContent";
 import { reservationIsWithinOperatingHours } from "@/server/reservations/serviceWindow";
+import { ReservationAddonType } from "@prisma/client";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -30,6 +31,14 @@ export async function POST(req: NextRequest) {
     if (!gate.ok) return gate.response as NextResponse;
 
     const { conceptKey, reservationDate, partySize, occasion, seatingPreference, notes, addons, contactName, contactEmail, contactPhone, referralCode, requestedSpaceId, source, locale } = body;
+
+    const validAddonTypes = new Set<string>(Object.values(ReservationAddonType));
+    const addonTypes: ReservationAddonType[] = Array.isArray(addons)
+      ? addons.filter((key): key is ReservationAddonType => typeof key === "string" && validAddonTypes.has(key))
+      : [];
+    if (addons !== undefined && (!Array.isArray(addons) || addonTypes.length !== addons.length)) {
+      return NextResponse.json({ error: "One or more reservation add-ons are invalid." }, { status: 400 });
+    }
 
     if (!contactName || !contactEmail || !contactPhone || !conceptKey || !reservationDate || !partySize) {
       return NextResponse.json({ error: "Name, email, phone, experience, date, and party size are required." }, { status: 400 });
@@ -227,10 +236,10 @@ export async function POST(req: NextRequest) {
             confirmationCode,
             requestedSpaceId: requestedSpaceId || null,
             estimatedRevenueCents: parsedPartySize * 4500,
-            addons: addons?.length
+            addons: addonTypes.length
               ? {
-                  create: (addons as string[]).map((key: string) => ({
-                    addonType: key as any,
+                  create: addonTypes.map((key) => ({
+                    addonType: key,
                     label: key.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase()),
                   })),
                 }

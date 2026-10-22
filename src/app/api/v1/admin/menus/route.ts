@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { logAdminAction } from "@/lib/adminAudit";
@@ -29,8 +31,9 @@ export async function GET() {
     requirePermission(roles, "admin:menus:read");
     const data = await listMenuHeadersForAdmin();
     return NextResponse.json({ ok: true, data });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -86,8 +89,8 @@ export async function POST(req: NextRequest) {
         data: {
           venueSlug:   body.venueSlug,
           menuType:    body.menuType,
-          menuTitle:   body.menuTitle as any,
-          intro:       (body.intro ?? null) as any,
+          menuTitle:   body.menuTitle as Prisma.InputJsonValue,
+          intro:       body.intro == null ? Prisma.DbNull : body.intro as Prisma.InputJsonValue,
           pdfUrl:      body.pdfUrl ?? null,
           isPublished: body.isPublished ?? true,
           isHouseMenu: isHouse,
@@ -121,7 +124,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: { ...created, eventMenuLinkId: eventLinkId } });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message ?? "Failed" }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message || "Failed" }, { status: error.status });
   }
 }

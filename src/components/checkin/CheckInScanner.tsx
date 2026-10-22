@@ -1,6 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import type { CameraDevice, Html5Qrcode } from "html5-qrcode";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isTicketPayload(value: unknown): value is TicketPayload {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.code !== "string") return false;
+  if (!isNullableString(value.attendeeName) || !isNullableString(value.checkedInAt)) return false;
+  if (value.ticketType !== null && (!isRecord(value.ticketType) || typeof value.ticketType.name !== "string" || !isNullableString(value.ticketType.tierCode))) return false;
+  if (!isRecord(value.user) || typeof value.user.id !== "string" || !isNullableString(value.user.name) || !isNullableString(value.user.email)) return false;
+  if (value.user.membership !== null && (!isRecord(value.user.membership) || typeof value.user.membership.tier !== "string" || typeof value.user.membership.status !== "string")) return false;
+  if (value.session !== null && (!isRecord(value.session) || typeof value.session.id !== "string" || !isNullableString(value.session.title) || typeof value.session.startsAt !== "string")) return false;
+  if (value.attendanceEvent !== null && (!isRecord(value.attendanceEvent) || typeof value.attendanceEvent.id !== "string" || typeof value.attendanceEvent.status !== "string")) return false;
+  return true;
+}
 
 interface TicketPayload {
   id: string;
@@ -117,23 +137,23 @@ export default function CheckInScanner() {
 
   // Normalize anything we receive into a safe CheckInResponse shape so the
   // render path can never trip on undefined/unknown `result`.
-  const normalizeResponse = useCallback((raw: any, fallbackMsg = "Unexpected response"): CheckInResponse => {
+  const normalizeResponse = useCallback((raw: unknown, fallbackMsg = "Unexpected response"): CheckInResponse => {
     const knownResults: CheckInResponse["result"][] = ["VALID", "ALREADY_CHECKED_IN", "INVALID", "EXPIRED"];
-    if (raw && typeof raw === "object" && knownResults.includes(raw.result)) {
+    if (isRecord(raw) && typeof raw.result === "string" && knownResults.includes(raw.result as CheckInResponse["result"])) {
       return {
-        ok: !!raw.ok,
-        result: raw.result,
+        ok: raw.ok === true,
+        result: raw.result as CheckInResponse["result"],
         message: typeof raw.message === "string" ? raw.message : fallbackMsg,
-        ticket: raw.ticket,
+        ticket: isTicketPayload(raw.ticket) ? raw.ticket : undefined,
       };
     }
-    const errMsg = typeof raw?.error === "string" ? raw.error
-                  : typeof raw?.message === "string" ? raw.message
+    const errMsg = isRecord(raw) && typeof raw.error === "string" ? raw.error
+                  : isRecord(raw) && typeof raw.message === "string" ? raw.message
                   : fallbackMsg;
     return { ok: false, result: "INVALID", message: errMsg };
   }, []);
 
-  const recordResult = useCallback((raw: any) => {
+  const recordResult = useCallback((raw: unknown) => {
     const data = normalizeResponse(raw);
     setLastResult(data);
     const guest =
@@ -188,8 +208,8 @@ export default function CheckInScanner() {
   const [cameraDevices, setCameraDevices] = useState<{ id: string; label: string }[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
-  const scannerRef = useRef<any>(null);
-  const Html5QrcodeRef = useRef<any>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const Html5QrcodeRef = useRef<typeof Html5Qrcode | null>(null);
   const lastQrRef = useRef<{ code: string; ts: number } | null>(null);
   // Monotonic request token — every startCamera() captures the value at call
   // time. After each await we bail if the captured token is no longer current
@@ -251,7 +271,7 @@ export default function CheckInScanner() {
       return;
     }
 
-    let inst: any;
+    let inst: Html5Qrcode;
     try {
       // verbose=false; no file-upload UI ever rendered (we use core class, not Html5QrcodeScanner)
       inst = new Ctor(SCANNER_CONTAINER_ID, { verbose: false });
@@ -267,7 +287,7 @@ export default function CheckInScanner() {
 
     try {
       await inst.start(
-        cameraConfig as any,
+        cameraConfig,
         { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0, disableFlip: false },
         async (decodedText: string) => {
           const now = Date.now();
@@ -292,22 +312,22 @@ export default function CheckInScanner() {
       try {
         const devices = await Ctor.getCameras();
         if (isStale()) return;
-        if (Array.isArray(devices) && devices.length) {
-          setCameraDevices(devices.map((d: any, i: number) => ({
+        if (devices.length) {
+          setCameraDevices(devices.map((d: CameraDevice, i: number) => ({
             id: d.id,
             label: d.label || `Camera ${i + 1}`,
           })));
           const stream: MediaStream | undefined =
             (document.querySelector(`#${SCANNER_CONTAINER_ID} video`) as HTMLVideoElement | null)?.srcObject as MediaStream | undefined;
           const trackLabel = stream?.getVideoTracks?.()?.[0]?.label;
-          const matched = trackLabel ? devices.find((d: any) => d.label === trackLabel) : null;
+          const matched = trackLabel ? devices.find((d) => d.label === trackLabel) : null;
           if (matched) setActiveCameraId(matched.id);
           else if (typeof cameraConfig === "string") setActiveCameraId(cameraConfig);
         }
       } catch { /* ignore — picker just won't show device names */ }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isStale()) return;
-      const name = err?.name ?? "";
+      const name = err instanceof DOMException ? err.name : isRecord(err) && typeof err.name === "string" ? err.name : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") setCameraState("denied");
       else if (name === "NotFoundError" || name === "OverconstrainedError") setCameraState("unsupported");
       else setCameraState("error");

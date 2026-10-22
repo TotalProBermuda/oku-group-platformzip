@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -13,10 +14,11 @@ export async function GET(req: Request) {
     await requireAdminRoles(req, ["SUPERADMIN"]);
     const snap = await getActiveCheckoutGateway();
     return NextResponse.json({ ok: true, data: snap });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }
@@ -152,10 +154,11 @@ export async function PATCH(req: Request) {
       .catch(() => {});
 
     return NextResponse.json({ ok: true, data: snap });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

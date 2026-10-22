@@ -13,7 +13,16 @@ export default async function MembershipPage() {
 
   return (
     <MembershipPageClient
-      plans={plans as any}
+      plans={plans.map(({ tier, displayName, tagline, priceAnnualCents, currency, avacaContributionBps, isInviteOnly, maxActiveMembers }) => ({
+        tier,
+        displayName,
+        tagline: tagline ?? "",
+        priceAnnualCents,
+        currency,
+        avacaContributionBps,
+        isInviteOnly,
+        maxActiveMembers,
+      }))}
       isLoggedIn={!!session?.user?.id}
     />
   );

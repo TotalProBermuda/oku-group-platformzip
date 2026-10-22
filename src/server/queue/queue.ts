@@ -190,7 +190,7 @@ export async function safeEnqueue(
       // four operational reservation recipients.
       await sendNewReservationOperationalAlerts((data as { reservationId: string }).reservationId);
     } else if (name === "post_payment_event") {
-      console.log("[inline-job] post_payment_event (stub) for order:", (data as any).orderId);
+      console.log("[inline-job] post_payment_event (stub) for order:", (data as { orderId?: string | null }).orderId);
     } else if (name === "sync_monday_lead") {
       console.log("[inline-job] sync_monday_lead (stub):", data);
     }

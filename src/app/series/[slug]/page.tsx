@@ -2,11 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { seriesLocationLabel } from "@/lib/locations";
 
+interface PublicSeries {
+  id: string; slug: string; title: string; description: string | null; venue: string | null; hostType: string | null;
+  ticketTypes: Array<{ id: string; name: string; description: string | null; priceCents: number; maxPerOrder: number }>;
+  sessions: Array<{ id: string; title: string | null; startsAt: string; endsAt: string; capacity: number; soldCount: number }>;
+  operationalVenue?: { name: string; slug: string } | null;
+  eventSpace?: { name: string; conceptKey: string | null } | null;
+}
+
 async function getSeries(slug: string) {
   const base = process.env.APP_BASE_URL || "http://localhost:5000";
   const res = await fetch(`${base}/api/v1/series`, { cache: "no-store" });
-  const json = await res.json();
-  return (json.data || []).find((s: any) => s.slug === slug);
+  const json = await res.json() as { data?: PublicSeries[] };
+  return (json.data || []).find((series) => series.slug === slug);
 }
 
 const dateFmt = new Intl.DateTimeFormat("en-US", {
@@ -38,7 +46,7 @@ export default async function SeriesDetail({ params }: { params: Promise<{ slug:
   }
 
   const minPrice = series.ticketTypes?.length
-    ? Math.min(...series.ticketTypes.map((t: any) => t.priceCents))
+    ? Math.min(...series.ticketTypes.map((ticketType) => ticketType.priceCents))
     : null;
   const locationLabel = seriesLocationLabel(series);
 
@@ -116,7 +124,7 @@ export default async function SeriesDetail({ params }: { params: Promise<{ slug:
               </div>
             ) : (
               <div className="card-grid">
-                {series.sessions.map((sess: any, idx: number) => {
+                {series.sessions.map((sess, idx) => {
                   const remaining = sess.capacity - sess.soldCount;
                   const pctFull = Math.round((sess.soldCount / sess.capacity) * 100);
                   return (
@@ -182,7 +190,7 @@ export default async function SeriesDetail({ params }: { params: Promise<{ slug:
                     </tr>
                   </thead>
                   <tbody>
-                    {series.ticketTypes.map((tt: any) => (
+                    {series.ticketTypes.map((tt) => (
                       <tr key={tt.id}>
                         <td>
                           <span style={{ fontWeight: 600, fontFamily: "var(--font-heading)", fontSize: 16 }}>{tt.name}</span>

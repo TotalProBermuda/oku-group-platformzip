@@ -50,8 +50,8 @@ export async function PATCH(
   await prisma.reservationStatusLog.create({
     data: {
       reservationId: params.id,
-      fromStatus: reservation.status as any,
-      toStatus: reservation.status as any,
+      fromStatus: reservation.status,
+      toStatus: reservation.status,
       changedByUserId: userId,
       changedByLabel: "PARTY_SIZE_CHANGE",
       notes: `Party size updated: ${prevSize} → ${size}${notes ? ` (${notes})` : ""}`,

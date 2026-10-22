@@ -29,8 +29,8 @@ export async function GET() {
     });
 
     return NextResponse.json({ ok: true, data: orders });
-  } catch (err: any) {
-    if (err.message === "Unauthorized") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "Unauthorized") {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });

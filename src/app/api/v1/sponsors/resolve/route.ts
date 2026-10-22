@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { mergeSponsors, resolveSponsors } from "@/lib/sponsor-render";
+import { mergeSponsors, resolveSponsors, type SponsorSurface } from "@/lib/sponsor-render";
 import { effectiveSeriesSponsors } from "@/server/series/effectiveAssignments";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const scopeType = searchParams.get("scopeType") as "SERIES" | "EVENT" | null;
+  const scopeTypeValue = searchParams.get("scopeType");
+  const scopeType = scopeTypeValue === "SERIES" || scopeTypeValue === "EVENT" ? scopeTypeValue : null;
   const scopeId = searchParams.get("scopeId");
-  const surface = (searchParams.get("surface") ?? "event_page") as any;
+  const requestedSurface = searchParams.get("surface");
+  const surfaces: readonly SponsorSurface[] = ["event_page", "ticket", "email", "check_in"];
+  const surface: SponsorSurface = surfaces.includes(requestedSurface as SponsorSurface)
+    ? requestedSurface as SponsorSurface
+    : "event_page";
 
   if (!scopeType || !scopeId) {
     return NextResponse.json({ error: "scopeType and scopeId required" }, { status: 400 });

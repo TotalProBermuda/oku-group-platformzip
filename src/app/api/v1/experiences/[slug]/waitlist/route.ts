@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { gatePublicPostAsync, parseRequestBody } from "@/server/rateLimit";
+import { WaitlistSource } from "@prisma/client";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -21,10 +22,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   const user = session?.user?.id ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true } }) : null;
 
+  const validSources = Object.values(WaitlistSource);
+  const source = typeof body.source === "string" && validSources.includes(body.source as WaitlistSource)
+    ? body.source as WaitlistSource
+    : WaitlistSource.EVENT_PAGE;
+
   await prisma.experienceWaitlist.upsert({
     where: { seriesId_email: { seriesId: series.id, email } },
     update: { status: "ACTIVE" },
-    create: { seriesId: series.id, email, userId: user?.id ?? null, source: (body.source as string | undefined) ?? "EVENT_PAGE" },
+    create: { seriesId: series.id, email, userId: user?.id ?? null, source },
   });
 
   return NextResponse.json({ ok: true });

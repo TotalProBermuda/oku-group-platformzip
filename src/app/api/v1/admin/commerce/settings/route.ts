@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { CommerceSettings } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { requireSession } from "@/server/auth/session";
 import {
   COMMERCE_SETTINGS_ID,
@@ -61,19 +63,22 @@ export async function GET() {
     requireSuperadmin(roles);
     const settings = await getCommerceSettings();
     return NextResponse.json({ ok: true, data: settings });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }
 
-function diff(prev: Record<string, any>, next: Record<string, any>) {
-  const out: Record<string, { from: unknown; to: unknown }> = {};
-  for (const k of Object.keys(next)) {
-    const a = prev[k];
-    const b = next[k];
+type AuditSettingValue = string | number | boolean | string[] | null;
+
+function diff(prev: CommerceSettings, next: CommerceSettings) {
+  const out: Record<string, { from: AuditSettingValue; to: AuditSettingValue }> = {};
+  for (const k of Object.keys(PatchBody.shape) as Array<keyof typeof PatchBody.shape>) {
+    const a = prev[k] as AuditSettingValue;
+    const b = next[k] as AuditSettingValue;
     if (JSON.stringify(a) !== JSON.stringify(b)) out[k] = { from: a, to: b };
   }
   return out;
@@ -109,7 +114,7 @@ export async function PATCH(req: Request) {
       data: { ...body, updatedById: userId },
     });
 
-    const changes = diff(before as any, updated as any);
+    const changes = diff(before, updated);
     if (Object.keys(changes).length > 0) {
       await prisma.auditLog
         .create({
@@ -128,10 +133,11 @@ export async function PATCH(req: Request) {
     }
 
     return NextResponse.json({ ok: true, data: updated });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

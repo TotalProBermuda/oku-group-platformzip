@@ -117,8 +117,8 @@ export default function ReferralLandingPage() {
               ? (body?.eventConflict?.message || tt("errorEventUnavailable", "This area is unavailable because of an event. Please choose another dining area."))
             : body?.error || "Failed to submit reservation";
       return { ok: false, error: errorMsg };
-    } catch (e: any) {
-      return { ok: false, error: e?.message || "Network error" };
+    } catch (error: unknown) {
+      return { ok: false, error: error instanceof Error ? error.message : "Network error" };
     }
   }
 

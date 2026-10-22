@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 export default function StaffCheckInError({
   error,
@@ -45,12 +46,12 @@ export default function StaffCheckInError({
           >
             Retry
           </button>
-          <a
+          <Link
             href="/staff"
             style={{ padding: "8px 14px", background: "white", color: "#991b1b", border: "1px solid #fca5a5", borderRadius: 8, textDecoration: "none", fontSize: 14 }}
           >
             Back to staff portal
-          </a>
+          </Link>
         </div>
       </div>
 

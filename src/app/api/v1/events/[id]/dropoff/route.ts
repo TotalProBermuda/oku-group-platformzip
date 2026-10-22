@@ -85,8 +85,8 @@ export async function GET(
       durationDistribution: durationCounts,
       tierDropoff,
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load event drop-off analytics" }, { status: 500 });
   }
 }
 

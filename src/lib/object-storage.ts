@@ -33,7 +33,7 @@ export const gcsClient = new Storage({
     universe_domain: "googleapis.com",
   },
   projectId: "",
-} as any);
+});
 
 async function signUrl({
   bucket,
@@ -67,8 +67,9 @@ async function signUrl({
  */
 export async function getUploadPresignUrl(
   filename: string,
-  contentType: string
+  _contentType: string
 ): Promise<{ uploadUrl: string; objectPath: string; mediaUrl: string }> {
+  void _contentType;
   const ext = path.extname(filename).toLowerCase() || "";
   const uuid = randomUUID();
   const objectName = `public/uploads/${uuid}${ext}`;
@@ -117,8 +118,9 @@ export async function objectExists(objectPath: string): Promise<boolean> {
 export async function getPrivateUploadPresignUrl(
   pathPrefix: string,
   filename: string,
-  contentType: string,
+  _contentType: string,
 ): Promise<{ uploadUrl: string; objectPath: string }> {
+  void _contentType;
   const ext = path.extname(filename).toLowerCase() || "";
   const uuid = randomUUID();
   const cleanPrefix = pathPrefix.replace(/^\/+|\/+$/g, "");

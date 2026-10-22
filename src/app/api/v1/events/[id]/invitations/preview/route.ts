@@ -7,7 +7,7 @@ import { InviteAudienceMode } from "@prisma/client";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await params;
   const session = await getServerSession(authOptions);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
   const isAdmin = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"].includes(r));
   if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

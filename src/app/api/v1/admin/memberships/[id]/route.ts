@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
+import { MembershipStatus, MembershipTier, Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { handleMembershipWelcomeEmail } from "@/server/jobs/commerceHandlers";
 
-function isAdmin(roles: string[]) {
-  return roles.some((r) => ["SUPERADMIN"].includes(r));
+function isAdmin(session: Session | null) {
+  return session?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -13,15 +14,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const roles = (session.user as any).roles ?? [];
-  if (!isAdmin(roles)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const { tier, status, renewsAt, cancelAtPeriodEnd } = body;
 
-  const data: any = {};
-  if (tier) data.tier = tier;
-  if (status) data.status = status;
+  const parsedTier = tier ? Object.values(MembershipTier).find((value) => value === tier) : undefined;
+  const parsedStatus = status ? Object.values(MembershipStatus).find((value) => value === status) : undefined;
+  if ((tier && !parsedTier) || (status && !parsedStatus)) return NextResponse.json({ error: "Invalid membership update" }, { status: 400 });
+  const data: Prisma.MembershipUpdateInput = {};
+  if (parsedTier) data.tier = parsedTier;
+  if (parsedStatus) data.status = parsedStatus;
   if (renewsAt) data.renewsAt = new Date(renewsAt);
   if (typeof cancelAtPeriodEnd === "boolean") data.cancelAtPeriodEnd = cancelAtPeriodEnd;
 
@@ -54,8 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const roles = (session.user as any).roles ?? [];
-  if (!isAdmin(roles)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const { action, userId, tier } = body;
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const existing = await prisma.membership.findUnique({ where: { userId } });
     const plan = await prisma.membershipPlanConfig.findUnique({ where: { tier } });
-    const benefits = (plan?.benefitsJson as any) ?? {};
+    const benefits = plan?.benefitsJson ? plan.benefitsJson as Prisma.InputJsonValue : {};
     const now = new Date();
     const renewsAt = new Date(now.getTime() + 365 * 86400000);
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Brandmark from "@/components/Brandmark";
+import Link from "next/link";
 import { reservationPhone, panamaDateTimeInput, panamaInputToDate } from "@/lib/hostReservationDisplay";
 import LiveAttendanceFeed from "./LiveAttendanceFeed";
 import ReservationReviewPanel from "./ReservationReviewPanel";
@@ -1063,7 +1064,7 @@ export default function HostOperationsBoard({
               {t("host", "operations.boardTitle")}
             </span>
           </div>
-          <a href="/host/dashboard" style={{
+          <Link href="/host/dashboard" style={{
             display: "flex", alignItems: "center", gap: 6,
             fontSize: 12, fontWeight: 600, color: "#9ca3af",
             textDecoration: "none", padding: "6px 12px",
@@ -1071,7 +1072,7 @@ export default function HostOperationsBoard({
             background: "rgba(255,255,255,0.04)",
           }}>
             ← Host dashboard
-          </a>
+          </Link>
         </div>
       </header>
 
@@ -1111,7 +1112,7 @@ export default function HostOperationsBoard({
         <label>Reservation date (Panama)<input aria-label="Reservation date (Panama)" type="date" name="date" defaultValue={selectedDate} style={{ display: "block", minHeight: 44, maxWidth: "100%" }} /></label>
         <strong style={{ width: "100%" }}>{selectedDate ? `Service date: ${selectedDate} (Panama)` : "All upcoming & unresolved reservations"}</strong>
         <button type="submit" style={{ minHeight: 44 }}>Show date / history</button>
-        <a href="/host/operations" style={{ padding: 12 }}>All upcoming & unresolved</a>
+        <Link href="/host/operations" style={{ padding: 12 }}>All upcoming & unresolved</Link>
         <p style={{ margin: 0, width: "100%", fontSize: 12 }}>Default: all future bookings and unresolved requests, plus recent service. Date search includes closed and cancelled bookings. Space utilisation below is live now; confirmation checks the booking’s selected time.</p>
         {queueError && <div role="alert">{queueError} <button type="button" onClick={() => void refresh()}>Retry</button></div>}
       </form>

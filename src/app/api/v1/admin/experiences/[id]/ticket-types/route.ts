@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import type { Session } from "next-auth";
+import { TicketTypeStatus, TicketVisibilityMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-function isAdmin(session: any) {
+function isAdmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) =>
     ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(r)
   );
@@ -76,10 +79,10 @@ export async function POST(
       displayOrder: Number(displayOrder),
       saleStartsAt: saleStartsAt ? new Date(saleStartsAt) : null,
       saleEndsAt: saleEndsAt ? new Date(saleEndsAt) : null,
-      visibilityMode: visibilityMode as any,
+      visibilityMode: z.nativeEnum(TicketVisibilityMode).parse(visibilityMode),
       requiresMembership: Boolean(requiresMembership),
       earlyAccessOnly: Boolean(earlyAccessOnly),
-      ticketStatus: ticketStatus as any,
+      ticketStatus: z.nativeEnum(TicketTypeStatus).parse(ticketStatus),
     },
   });
 

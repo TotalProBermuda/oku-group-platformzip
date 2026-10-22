@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
   mockAuditLogCreate,
+  mockAuditLogFindFirst,
   mockReferralActorFindUnique,
   mockReferralActorFindFirst,
   mockReferralActorFindMany,
@@ -19,6 +20,7 @@ const {
   mockPrisma,
 } = vi.hoisted(() => {
   const mockAuditLogCreate = vi.fn().mockResolvedValue({});
+  const mockAuditLogFindFirst = vi.fn().mockResolvedValue(null);
   const mockReferralActorFindUnique = vi.fn();
   const mockReferralActorFindFirst = vi.fn();
   const mockReferralActorFindMany = vi.fn();
@@ -31,7 +33,7 @@ const {
   const mockEventReferrerAssignmentFindFirst = vi.fn();
 
   const mockTxClient = {
-    auditLog: { create: mockAuditLogCreate },
+    auditLog: { create: mockAuditLogCreate, findFirst: mockAuditLogFindFirst },
     referralActor: {
       findUnique: mockReferralActorFindUnique,
       findFirst: mockReferralActorFindFirst,
@@ -51,7 +53,7 @@ const {
   );
 
   const mockPrisma = {
-    auditLog: { create: mockAuditLogCreate },
+    auditLog: { create: mockAuditLogCreate, findFirst: mockAuditLogFindFirst },
     referralActor: {
       findUnique: mockReferralActorFindUnique,
       findFirst: mockReferralActorFindFirst,
@@ -71,6 +73,7 @@ const {
 
   return {
     mockAuditLogCreate,
+    mockAuditLogFindFirst,
     mockReferralActorFindUnique,
     mockReferralActorFindFirst,
     mockReferralActorFindMany,

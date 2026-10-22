@@ -25,9 +25,8 @@ const NOW = new Date("2026-05-16T12:00:00.000Z");
 // (A→F); we route based on the where.action shape.
 function installRows(rowsByAction: Record<string, Row[]>) {
   vi.mocked(prisma.auditLog.findMany).mockImplementation(
-    async (args: unknown) => {
-      const where = (args as { where: { action?: unknown } }).where;
-      const action = where?.action;
+    (args) => {
+      const action: unknown = args?.where?.action;
       let key: string | null = null;
       if (typeof action === "string") {
         key = action;
@@ -42,7 +41,7 @@ function installRows(rowsByAction: Record<string, Row[]>) {
       }
       const rows = (key && rowsByAction[key]) || [];
       // Mimic Prisma's projection well enough for the detector.
-      return rows as never;
+      return Promise.resolve(rows as never) as ReturnType<typeof prisma.auditLog.findMany>;
     },
   );
 }

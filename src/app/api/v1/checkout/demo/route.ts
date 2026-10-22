@@ -167,11 +167,12 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, data: order });
-  } catch (err: any) {
-    if (err.message === "Unauthorized") {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "Unauthorized") {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
-    if (err.message === "Not enough capacity") {
+    if (message === "Not enough capacity") {
       return NextResponse.json({ ok: false, error: "Not enough capacity" }, { status: 400 });
     }
     return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });

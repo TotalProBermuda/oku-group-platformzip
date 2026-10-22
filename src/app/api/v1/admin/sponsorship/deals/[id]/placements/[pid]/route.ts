@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
+import type { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 
-function isAdmin(s: any) {
-  return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
+function isAdmin(s: Session | null) {
+  return s?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; pid: string }> }) {
@@ -14,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { pid } = await params;
   const body = await req.json().catch(() => ({}));
 
-  const data: any = {};
+  const data: Prisma.SponsorPlacementUpdateInput = {};
   const fields = ["label", "assetUrl", "altText", "linkUrl", "isActive", "impressions", "clicks", "notes", "activatedAt", "expiresAt"] as const;
   for (const key of fields) {
     if (key in body) {

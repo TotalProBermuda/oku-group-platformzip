@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   X, Users, Building2, Star, Activity, DollarSign, ShieldCheck, ShieldOff,
   Calendar, ExternalLink, Mail, Phone, Hash, Briefcase, Award, Plus, Trash2, Loader,
@@ -19,6 +20,82 @@ interface ProfileDrawerProps {
 }
 
 type Tab = "overview" | "roles" | "personas" | "compensation" | "activity" | "subhosts";
+
+type CommissionRow = {
+  id?: string;
+  status: string;
+  amountCents: number;
+  createdAt?: string | null;
+  reservation?: { partySize: number; conceptRequested?: string | null } | null;
+};
+type AttributionRow = { conversionStage: string };
+type CompensationPlanSummary = {
+  id: string;
+  name: string;
+  modelType: string;
+  commissionPercent: number | null;
+  hourlyRateCents: number;
+  flatPerCoverCents: number;
+  flatPerPartyCents?: number | null;
+};
+type ProfileDrawerUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  lastLoginAt?: string | null;
+  internalNotes?: string | null;
+  tags?: string[];
+  roles?: Array<string | { roleKey: string }>;
+  referrer: {
+    id: string;
+    fullName: string;
+    isActive: boolean;
+    referralCode: string;
+    commissions?: CommissionRow[];
+    attributions?: AttributionRow[];
+    _count?: { commissions?: number; attributions?: number };
+    referrerType: string;
+    compensationPlan: CompensationPlanSummary | null;
+  } | null;
+  influencer?: {
+    id: string;
+    approved?: boolean;
+    commissionRateBps?: number | null;
+    payoutCycle?: string | null;
+    minPayoutThresholdCents?: number | null;
+  } | null;
+};
+type ProfileAuditLog = {
+  action?: string;
+  label?: string;
+  createdAt?: string | null;
+  notes?: string | null;
+  performedBy?: { name?: string | null; email?: string | null } | null;
+};
+type CompensationData = {
+  compensationPlan?: CompensationPlanSummary | null;
+  plans?: CompensationPlanSummary[];
+  commissions?: CommissionRow[];
+  attributions?: AttributionRow[];
+};
+type SubHost = {
+  id: string;
+  displayName: string;
+  isActive: boolean;
+  userId: string;
+  user?: { name?: string | null; email?: string | null } | null;
+  referrerAssignments?: Array<{
+    referralCode: string;
+    commissionPayer: string;
+    commissionMode: string;
+    series?: { title: string } | null;
+  }>;
+};
+type UserSearchResult = { id: string; name?: string | null; email: string };
+
+function errorText(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -86,11 +163,11 @@ export default function ProfileDrawer({ profile, onClose, onRefresh }: ProfileDr
   const locale     = useLocale();
   const dateLocale = locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
   const [tab, setTab] = useState<Tab>("overview");
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<ProfileAuditLog[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [extUser, setExtUser] = useState<any>(null);
+  const [extUser, setExtUser] = useState<ProfileDrawerUser | null>(null);
   const [extUserVersion, setExtUserVersion] = useState(0);
-  const [compData, setCompData] = useState<any>(null);
+  const [compData, setCompData] = useState<CompensationData | null>(null);
   const [compLoading, setCompLoading] = useState(false);
   const { canEditUsers } = useCurrentUserRoles();
 
@@ -149,7 +226,7 @@ export default function ProfileDrawer({ profile, onClose, onRefresh }: ProfileDr
     return "visitor";
   }
 
-  const liveRoles: string[] = extUser?.roles?.map((r: any) => r.roleKey ?? r) ?? [];
+  const liveRoles: string[] = extUser?.roles?.map((role) => typeof role === "string" ? role : role.roleKey) ?? [];
   const effectiveCategory =
     profile.sourceType === "USER" && liveRoles.length > 0
       ? roleToCategory(liveRoles)
@@ -294,22 +371,22 @@ export default function ProfileDrawer({ profile, onClose, onRefresh }: ProfileDr
           <span style={{ fontSize: 11, color: "#9ca3af" }}>Created {fmt(profile.createdAt)}</span>
           <div style={{ display: "flex", gap: 8 }}>
             {profile.sourceType === "USER" && (
-              <a href={`/admin/users`} target="_blank" rel="noreferrer"
+              <Link href="/admin/users" target="_blank" rel="noreferrer"
                 style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#c41e3a", textDecoration: "none" }}>
                 <ExternalLink size={12} /> User Admin
-              </a>
+              </Link>
             )}
             {profile.sourceType === "REFERRER" && (
-              <a href={`/admin/compensation`} target="_blank" rel="noreferrer"
+              <Link href="/admin/compensation" target="_blank" rel="noreferrer"
                 style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#c41e3a", textDecoration: "none" }}>
                 <ExternalLink size={12} /> Compensation
-              </a>
+              </Link>
             )}
             {profile.sourceType === "ENTITY" && (
-              <a href={`/admin/entities`} target="_blank" rel="noreferrer"
+              <Link href="/admin/entities" target="_blank" rel="noreferrer"
                 style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#c41e3a", textDecoration: "none" }}>
                 <ExternalLink size={12} /> Entities Admin
-              </a>
+              </Link>
             )}
           </div>
         </div>
@@ -318,7 +395,7 @@ export default function ProfileDrawer({ profile, onClose, onRefresh }: ProfileDr
   );
 }
 
-function OverviewTab({ profile, extUser, fmt }: { profile: UnifiedProfile; extUser: any; fmt: (d?: string | null) => string }) {
+function OverviewTab({ profile, extUser, fmt }: { profile: UnifiedProfile; extUser: ProfileDrawerUser | null; fmt: (d?: string | null) => string }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: 8 }}>Contact</div>
@@ -358,10 +435,10 @@ function OverviewTab({ profile, extUser, fmt }: { profile: UnifiedProfile; extUs
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginTop: 18, marginBottom: 8 }}>Platform</div>
           {extUser.lastLoginAt && <InfoRow label="Last Login" value={fmt(extUser.lastLoginAt)} />}
           {extUser.internalNotes && <InfoRow label="Internal Notes" value={extUser.internalNotes} />}
-          {extUser.tags?.length > 0 && (
+          {(extUser.tags?.length ?? 0) > 0 && (
             <InfoRow label="Tags" value={
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                {extUser.tags.map((tag: string) => (
+                {extUser.tags?.map((tag) => (
                   <span key={tag} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#f3f4f6", color: "#374151" }}>{tag}</span>
                 ))}
               </div>
@@ -394,7 +471,7 @@ const ALL_ROLES: { key: string; label: string; group: string }[] = [
   { key: "VISITOR",          label: "Visitor",             group: "Guest" },
 ];
 
-function RolesTab({ profile, extUser, onRefresh, onRolesChanged }: { profile: UnifiedProfile; extUser: any; onRefresh?: () => void; onRolesChanged?: () => void }) {
+function RolesTab({ profile, extUser, onRefresh, onRolesChanged }: { profile: UnifiedProfile; extUser: ProfileDrawerUser | null; onRefresh?: () => void; onRolesChanged?: () => void }) {
   const [roles, setRoles] = useState<string[]>(profile.roles ?? []);
   const [saving, setSaving] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -413,7 +490,7 @@ function RolesTab({ profile, extUser, onRefresh, onRolesChanged }: { profile: Un
       setRoles(prev => prev.filter(r => r !== roleKey));
       onRolesChanged?.();
       onRefresh?.();
-    } catch (e: any) { setError(e.message); }
+    } catch (error: unknown) { setError(errorText(error, "Could not remove role")); }
     finally { setSaving(null); }
   }
 
@@ -431,7 +508,7 @@ function RolesTab({ profile, extUser, onRefresh, onRolesChanged }: { profile: Un
       setShowAdd(false); setSelectedAdd("");
       onRolesChanged?.();
       onRefresh?.();
-    } catch (e: any) { setError(e.message); }
+    } catch (error: unknown) { setError(errorText(error, "Could not add role")); }
     finally { setSaving(null); }
   }
 
@@ -525,7 +602,7 @@ function RolesTab({ profile, extUser, onRefresh, onRolesChanged }: { profile: Un
           <>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginTop: 22, marginBottom: 12 }}>Referrer Profile</div>
             <InfoRow label="Referral Code" value={<span style={{ fontFamily: "monospace" }}>{extUser.referrer.referralCode}</span>} />
-            <InfoRow label="Type" value={REFERRER_TYPE_LABEL[extUser.referrer.referrerType] ?? extUser.referrer.referrerType} />
+            <InfoRow label="Type" value={REFERRER_TYPE_LABEL[extUser.referrer.referrerType ?? ""] ?? extUser.referrer.referrerType} />
             <InfoRow label="Active" value={extUser.referrer.isActive ? "Yes" : "No"} />
             <InfoRow label="Commissions" value={extUser.referrer._count?.commissions ?? 0} />
             <InfoRow label="Attributions" value={extUser.referrer._count?.attributions ?? 0} />
@@ -579,7 +656,7 @@ const COMMISSION_MODE_LABEL: Record<string, string> = {
 };
 
 function SubHostsTab({ profileId }: { profileId: string }) {
-  const [hosts, setHosts] = useState<any[]>([]);
+  const [hosts, setHosts] = useState<SubHost[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -593,7 +670,7 @@ function SubHostsTab({ profileId }: { profileId: string }) {
   });
 
   const [userSearch, setUserSearch] = useState("");
-  const [userResults, setUserResults] = useState<any[]>([]);
+  const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
@@ -640,7 +717,7 @@ function SubHostsTab({ profileId }: { profileId: string }) {
       setShowAdd(false);
       setForm({ userId: "", displayName: "", asReferrer: false, commissionPayer: "OKU", commissionMode: "NONE", commissionShareBps: "", seriesId: "" });
       setUserSearch(""); setUserResults([]);
-    } catch (e: any) { setError(e.message); }
+    } catch (error: unknown) { setError(errorText(error, "Could not add sub-host")); }
     finally { setSaving(false); }
   }
 
@@ -688,7 +765,7 @@ function SubHostsTab({ profileId }: { profileId: string }) {
             {searchLoading && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Searching…</div>}
             {userResults.length > 0 && !form.userId && (
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 7, marginTop: 4, background: "#fff", maxHeight: 160, overflowY: "auto" }}>
-                {userResults.map((u: any) => (
+                {userResults.map((u) => (
                   <button key={u.id} onClick={() => {
                     setForm(f => ({ ...f, userId: u.id, displayName: u.name ?? f.displayName }));
                     setUserSearch(u.name ?? u.email);
@@ -860,8 +937,8 @@ function CompensationTab({
   profile, extUser, compData, compLoading, fmt, canEdit, onCompDataInvalidated,
 }: {
   profile: UnifiedProfile;
-  extUser: any;
-  compData: any;
+  extUser: ProfileDrawerUser | null;
+  compData: CompensationData | null;
   compLoading: boolean;
   fmt: (d?: string | null) => string;
   canEdit: boolean;
@@ -905,20 +982,20 @@ function CompensationTab({
       setCycleForm(null);
       setCycleSaved(true);
       setTimeout(() => setCycleSaved(false), 2500);
-    } catch (e: any) {
-      setCycleError(e.message);
+    } catch (error: unknown) {
+      setCycleError(errorText(error, "Could not save payout settings"));
     } finally {
       setCycleSaving(false);
     }
   };
 
   const plan = compData?.compensationPlan ?? extUser?.referrer?.compensationPlan ?? null;
-  const commissions: any[] = compData?.commissions ?? extUser?.referrer?.commissions ?? [];
-  const attributions: any[] = compData?.attributions ?? extUser?.referrer?.attributions ?? [];
+  const commissions: CommissionRow[] = compData?.commissions ?? extUser?.referrer?.commissions ?? [];
+  const attributions: AttributionRow[] = compData?.attributions ?? extUser?.referrer?.attributions ?? [];
 
-  const totalPaid    = commissions.filter((c: any) => c.status === "PAID").reduce((s: number, c: any) => s + c.amountCents, 0);
-  const totalPending = commissions.filter((c: any) => c.status === "PENDING").reduce((s: number, c: any) => s + c.amountCents, 0);
-  const patronized   = attributions.filter((a: any) => a.conversionStage === "PATRONIZED").length;
+  const totalPaid    = commissions.filter((commission) => commission.status === "PAID").reduce((sum, commission) => sum + commission.amountCents, 0);
+  const totalPending = commissions.filter((commission) => commission.status === "PENDING").reduce((sum, commission) => sum + commission.amountCents, 0);
+  const patronized   = attributions.filter((attribution) => attribution.conversionStage === "PATRONIZED").length;
   const conv         = attributions.length > 0 ? Math.round((patronized / attributions.length) * 100) : 0;
 
   if (compLoading) {
@@ -1019,9 +1096,9 @@ function CompensationTab({
           </div>
 
           <div style={{ marginTop: 20 }}>
-            <a href="/admin/compensation" style={{ fontSize: 13, color: "#c41e3a", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+            <Link href="/admin/compensation" style={{ fontSize: 13, color: "#c41e3a", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
               <ExternalLink size={13} /> View in Compensation Admin
-            </a>
+            </Link>
           </div>
         </>
       )}
@@ -1101,7 +1178,7 @@ function CompensationTab({
             <>
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: 10 }}>Commission History</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {commissions.slice(0, 8).map((c: any, i: number) => {
+                {commissions.slice(0, 8).map((c, i) => {
                   const cs = STATUS_COMM_COLOR[c.status] ?? STATUS_COMM_COLOR.PENDING;
                   return (
                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", background: "#fafaf9", borderRadius: 8, border: "1px solid #f3f4f6" }}>
@@ -1125,9 +1202,9 @@ function CompensationTab({
           )}
 
           <div style={{ marginTop: 20 }}>
-            <a href="/admin/compensation" style={{ fontSize: 13, color: "#c41e3a", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+            <Link href="/admin/compensation" style={{ fontSize: 13, color: "#c41e3a", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
               <ExternalLink size={13} /> View in Compensation Admin
-            </a>
+            </Link>
           </div>
         </>
       )}
@@ -1135,14 +1212,14 @@ function CompensationTab({
   );
 }
 
-function ActivityTab({ auditLogs, loading, fmt }: { auditLogs: any[]; loading: boolean; fmt: (d?: string | null) => string }) {
+function ActivityTab({ auditLogs, loading, fmt }: { auditLogs: ProfileAuditLog[]; loading: boolean; fmt: (d?: string | null) => string }) {
   if (loading) return <div style={{ textAlign: "center", padding: "40px 0", color: "#9ca3af" }}>Loading activity…</div>;
   if (auditLogs.length === 0) return <div style={{ color: "#9ca3af", fontSize: 13 }}>No activity logged.</div>;
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: 12 }}>Audit Log</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-        {auditLogs.map((log: any, i: number) => (
+        {auditLogs.map((log, i) => (
           <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", borderBottom: "1px solid #f3f4f6", alignItems: "flex-start" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#c41e3a", marginTop: 4, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>

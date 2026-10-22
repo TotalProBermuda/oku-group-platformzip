@@ -236,7 +236,7 @@ export async function issuePasswordlessToken(input: {
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
   const callbackUrl = sanitizePasswordlessCallback(input.callbackUrl);
   const recipient = await prisma.$transaction(async (tx) => {
-    let candidate = await findActiveUserByEmail(tx, email);
+    const candidate = await findActiveUserByEmail(tx, email);
     let evidence: Awaited<ReturnType<typeof findKnownCustomerEvidence>> | null = null;
     if (input.requireExistingUserId && candidate?.id !== input.requireExistingUserId) {
       return null;

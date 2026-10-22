@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { partnerIdFromSearch } from "@/app/admin/partner-support/page";
+import { partnerIdFromSearch } from "@/lib/partnerSupportSearch";
 
 describe("partnerIdFromSearch", () => {
   it("returns the selected partner id from a support deep link", () => {

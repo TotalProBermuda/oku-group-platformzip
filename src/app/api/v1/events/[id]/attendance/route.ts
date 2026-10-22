@@ -33,7 +33,7 @@ export async function GET(
     );
 
     return NextResponse.json({ ok: true, seriesId: id, sessions: allEvents });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load attendance" }, { status: 500 });
   }
 }

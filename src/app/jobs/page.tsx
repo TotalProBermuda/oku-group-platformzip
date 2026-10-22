@@ -85,7 +85,7 @@ export default async function JobsPage() {
           <div className="empty-state">
             <div className="empty-state-icon">💼</div>
             <div className="empty-state-title">No open positions</div>
-            <p>Check back soon — we're always growing.</p>
+            <p>Check back soon — we&apos;re always growing.</p>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>

@@ -67,7 +67,7 @@ export default function UnlinkedRevenueSection() {
     <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #e2e8f0" }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>Unlinked Revenue Audit</div>
       <div style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>
-        Closed table sessions that aren't tied to a reservation (Unmatched) or aren't tied to an attribution chain (Unlinked) — surfaced so revenue isn't silently dropped.
+        Closed table sessions that aren&apos;t tied to a reservation (Unmatched) or aren&apos;t tied to an attribution chain (Unlinked) — surfaced so revenue isn&apos;t silently dropped.
       </div>
 
       <Bucket title="Unmatched Sessions" subtitle="No reservation linked — likely walk-in or orphan POS close" bucket={data.unmatched} />

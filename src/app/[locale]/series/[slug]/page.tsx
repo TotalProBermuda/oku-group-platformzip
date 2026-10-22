@@ -8,10 +8,23 @@ import { seriesLocationLabel } from "@/lib/locations";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
+interface PublicSeries {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  venue: string | null;
+  hostType: string | null;
+  ticketTypes: Array<{ id: string; name: string; description: string | null; priceCents: number; maxPerOrder: number }>;
+  sessions: Array<{ id: string; title: string | null; startsAt: string; endsAt: string; capacity: number; soldCount: number }>;
+  operationalVenue?: { name: string; slug: string } | null;
+  eventSpace?: { name: string; conceptKey: string | null } | null;
+}
+
 async function getSeries(slug: string) {
   const res = await fetch(`${BASE}/api/v1/series`, { cache: "no-store" });
-  const json = await res.json();
-  return (json.data || []).find((s: any) => s.slug === slug);
+  const json: { data?: PublicSeries[] } = await res.json();
+  return (json.data ?? []).find((series) => series.slug === slug);
 }
 
 const venueGradients: Record<string, string> = {
@@ -51,7 +64,7 @@ export default async function SeriesDetailPage({ params }: Props) {
   const description = content?.description ?? series.description;
 
   const minPrice = series.ticketTypes?.length
-    ? Math.min(...series.ticketTypes.map((t: any) => t.priceCents))
+    ? Math.min(...series.ticketTypes.map((ticketType) => ticketType.priceCents))
     : null;
   const locationLabel = seriesLocationLabel(series);
 
@@ -137,7 +150,7 @@ export default async function SeriesDetailPage({ params }: Props) {
               </div>
             ) : (
               <div className="card-grid">
-                {series.sessions.map((sess: any, idx: number) => {
+                {series.sessions.map((sess, idx) => {
                   const remaining = sess.capacity - sess.soldCount;
                   const pctFull = Math.round((sess.soldCount / sess.capacity) * 100);
                   const sessionTitle = getSessionTitle(sess.title || `${c.sessionLabel} ${idx + 1}`, safeLocale);
@@ -194,7 +207,7 @@ export default async function SeriesDetailPage({ params }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {series.ticketTypes.map((tt: any) => (
+                    {series.ticketTypes.map((tt) => (
                       <tr key={tt.id}>
                         <td><span style={{ fontWeight: 600, fontFamily: "var(--font-heading)", fontSize: 16 }}>{getTicketTypeName(tt.name, safeLocale)}</span></td>
                         <td className="text-secondary text-sm">{tt.description || "—"}</td>

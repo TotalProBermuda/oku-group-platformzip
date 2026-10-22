@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   checkRateLimitAsync,
   rateLimitedResponse,
 } from "@/server/rateLimit";
 
 describe("rate limiting", () => {
+  afterEach(() => vi.unstubAllEnvs());
   it("blocks requests after the configured limit and supplies Retry-After", async () => {
     const key = `test:${crypto.randomUUID()}`;
     expect(await checkRateLimitAsync({ key, limit: 1, windowMs: 60_000 })).toMatchObject({
@@ -21,9 +22,8 @@ describe("rate limiting", () => {
   });
 
   it("keeps an explicitly local-limited production flow available when Redis is absent", async () => {
-    const previousNodeEnv = process.env.NODE_ENV;
     const previousRedisUrl = process.env.REDIS_URL;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     delete process.env.REDIS_URL;
     try {
       const result = await checkRateLimitAsync({
@@ -35,16 +35,15 @@ describe("rate limiting", () => {
       expect(result).toMatchObject({ ok: true, remaining: 0 });
       expect(result.unavailable).toBeUndefined();
     } finally {
-      process.env.NODE_ENV = previousNodeEnv;
+      vi.unstubAllEnvs();
       if (previousRedisUrl === undefined) delete process.env.REDIS_URL;
       else process.env.REDIS_URL = previousRedisUrl;
     }
   });
 
   it("fails closed for a protected production flow when Redis is absent", async () => {
-    const previousNodeEnv = process.env.NODE_ENV;
     const previousRedisUrl = process.env.REDIS_URL;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     delete process.env.REDIS_URL;
     try {
       const result = await checkRateLimitAsync({
@@ -56,7 +55,7 @@ describe("rate limiting", () => {
       expect(result).toMatchObject({ ok: false, unavailable: true });
       expect(rateLimitedResponse(result).status).toBe(503);
     } finally {
-      process.env.NODE_ENV = previousNodeEnv;
+      vi.unstubAllEnvs();
       if (previousRedisUrl === undefined) delete process.env.REDIS_URL;
       else process.env.REDIS_URL = previousRedisUrl;
     }

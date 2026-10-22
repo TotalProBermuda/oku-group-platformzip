@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import type { Session } from "next-auth";
+import { EntityType } from "@prisma/client";
+import { z } from "zod";
 
-function isAdmin(session: any) {
+function isAdmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(r));
 }
 
@@ -13,12 +16,14 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const q    = searchParams.get("q")    ?? "";
-  const type = searchParams.get("type") ?? "";
+  const typeValue = searchParams.get("type");
+  const parsedType = typeValue ? z.nativeEnum(EntityType).safeParse(typeValue) : null;
+  if (parsedType && !parsedType.success) return NextResponse.json({ error: "type must be PERSON or COMPANY" }, { status: 400 });
 
   const entities = await prisma.entity.findMany({
     where: {
       ...(q ? { displayName: { contains: q, mode: "insensitive" } } : {}),
-      ...(type ? { type: type as any } : {}),
+      ...(parsedType?.success ? { type: parsedType.data } : {}),
     },
     include: {
       linkedInfluencerProfile: { select: { id: true, handle: true, refCode: true, commissionRateBps: true } },

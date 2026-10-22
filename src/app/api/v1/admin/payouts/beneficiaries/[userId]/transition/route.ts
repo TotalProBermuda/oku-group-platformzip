@@ -4,6 +4,7 @@ import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { transitionStatus, TransitionError } from "@/server/beneficiaries/beneficiaryService";
 import { scrubErrorMessage } from "@/server/security/logScrub";
+import { getBeneficiaryApiErrorStatus } from "@/app/api/v1/me/beneficiary/errorDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ userId: string
       reason: body.reason ?? null,
     });
     return NextResponse.json({ ok: true, data: view });
-  } catch (e: any) {
-    const status = e instanceof TransitionError ? 400 : (e.status || 500);
+  } catch (e: unknown) {
+    const status = e instanceof TransitionError ? 400 : getBeneficiaryApiErrorStatus(e);
     return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status });
   }
 }

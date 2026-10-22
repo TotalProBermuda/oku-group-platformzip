@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
+import { z } from "zod";
+import type { HandoffStatus, ReservationStatus } from "@prisma/client";
+
+const HandoffUpdateBody = z.object({
+  handoffStatus: z.enum(["PENDING", "ACKNOWLEDGED", "GUEST_EN_ROUTE", "GUEST_ARRIVED", "SEATED", "CLOSED", "CANCELLED"]),
+  notes: z.string().nullable().optional(),
+});
 
 export async function PATCH(
   req: NextRequest,
@@ -19,7 +26,9 @@ export async function PATCH(
   }
   try {
     const { id } = await params;
-    const { handoffStatus, notes } = await req.json();
+    const parsed = HandoffUpdateBody.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ error: "Invalid handoff update." }, { status: 400 });
+    const { handoffStatus, notes } = parsed.data;
     const handoff = await prisma.reservationHandoff.update({
       where: { id },
       data: {
@@ -30,7 +39,7 @@ export async function PATCH(
     });
 
     // Sync reservation status based on handoff status
-    const statusMap: Record<string, string> = {
+    const statusMap: Partial<Record<HandoffStatus, ReservationStatus>> = {
       ACKNOWLEDGED: "ACKNOWLEDGED",
       GUEST_EN_ROUTE: "CONFIRMED",
       GUEST_ARRIVED: "ARRIVED",
@@ -40,7 +49,7 @@ export async function PATCH(
     if (resStatus) {
       await prisma.reservation.update({
         where: { id: handoff.reservationId },
-        data: { status: resStatus as any },
+        data: { status: resStatus },
       });
     }
 

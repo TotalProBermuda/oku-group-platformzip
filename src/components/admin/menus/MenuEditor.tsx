@@ -68,7 +68,7 @@ function TrInput({
               key={loc}
               placeholder={loc.toUpperCase()}
               value={tr[loc]}
-              onChange={(e: any) => onChange({ ...tr, [loc]: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange({ ...tr, [loc]: e.target.value })}
               style={{
                 padding: "8px 10px",
                 fontSize: 13,
@@ -184,8 +184,8 @@ export default function MenuEditor({ initial, canEdit }: { initial: MenuShape; c
       if (!data.ok) throw new Error(data.error || "Save failed");
       setMsg("Saved.");
       setTimeout(() => setMsg(null), 2500);
-    } catch (e: any) {
-      setMsg(`Error: ${e.message}`);
+    } catch (e: unknown) {
+      setMsg(`Error: ${e instanceof Error ? e.message : "Could not save menu"}`);
     } finally {
       setSaving(false);
     }

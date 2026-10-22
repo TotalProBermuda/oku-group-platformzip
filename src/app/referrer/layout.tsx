@@ -13,7 +13,7 @@ import { hasLinkedReferrerIdentity } from "@/server/referrals/referrerDashboardA
 
 export default async function ReferrerLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
   const userId = (session?.user as { id?: string } | undefined)?.id;
 
   if (!session || !userId) {

@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     include: { roles: true },
   });
 
-  if (!user) return NextResponse.redirect(loginUrl);
+  if (!user || user.status !== "ACTIVE") return NextResponse.redirect(loginUrl);
 
   const roles = user.roles.map((r) => r.roleKey);
   const secret = resolveAuthSecret();
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     secret,
     maxAge,
     salt: COOKIE_NAME,
-  } as any);
+  });
 
   // Build destination using the public base — never localhost.
   // If a stale callback points to a portal this persona cannot access, land on

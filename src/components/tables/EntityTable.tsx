@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 
-export interface EntityColumn<T = any> {
+export interface EntityColumn<T extends object = Record<string, unknown>> {
   key: string;
   header: string;
   width?: string;
@@ -11,7 +11,7 @@ export interface EntityColumn<T = any> {
   render: (row: T, index: number) => React.ReactNode;
 }
 
-interface EntityTableProps<T = any> {
+interface EntityTableProps<T extends object = Record<string, unknown>> {
   rows: T[];
   columns: EntityColumn<T>[];
   rowKey: (row: T) => string;
@@ -24,7 +24,7 @@ interface EntityTableProps<T = any> {
 
 type SortDir = "asc" | "desc" | null;
 
-export default function EntityTable<T = any>({
+export default function EntityTable<T extends object = Record<string, unknown>>({
   rows,
   columns,
   rowKey,
@@ -50,14 +50,14 @@ export default function EntityTable<T = any>({
   };
 
   const sorted = sortKey && sortDir
-    ? [...rows].sort((a: any, b: any) => {
-        const av = a[sortKey];
-        const bv = b[sortKey];
+    ? [...rows].sort((a, b) => {
+        const av = Reflect.get(a, sortKey);
+        const bv = Reflect.get(b, sortKey);
         if (av == null && bv == null) return 0;
         if (av == null) return 1;
         if (bv == null) return -1;
         const cmp =
-          typeof av === "number"
+          typeof av === "number" && typeof bv === "number"
             ? av - bv
             : String(av).localeCompare(String(bv));
         return sortDir === "asc" ? cmp : -cmp;

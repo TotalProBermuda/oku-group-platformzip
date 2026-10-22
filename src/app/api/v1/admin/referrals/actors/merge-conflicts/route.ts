@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 
@@ -168,10 +169,11 @@ export async function GET() {
     }));
 
     return NextResponse.json({ ok: true, groups });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "unknown error" },
-      { status: e?.status ?? 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

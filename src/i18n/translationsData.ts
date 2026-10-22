@@ -129,30 +129,40 @@ export interface AdminLaunchReadinessTranslations {
   testAlertsUnknownActor: string;
 }
 
-export type AdminTranslations = Record<string, string> & {
+type WidenTranslation<T> = T extends string
+  ? string
+  : T extends number | boolean | null
+    ? T
+    : T extends readonly (infer Item)[]
+      ? WidenTranslation<Item>[]
+      : T extends object
+        ? { [Key in keyof T]: WidenTranslation<T[Key]> }
+        : T;
+
+export type AdminTranslations = WidenTranslation<typeof enAdmin> & {
   launchReadiness?: AdminLaunchReadinessTranslations;
 };
 
 export type Translations = {
-  common: Record<string, string>;
-  navigation: Record<string, string>;
-  footer: Record<string, string>;
-  home: Record<string, string>;
-  venues: Record<string, string>;
-  booking: Record<string, string>;
-  forms: Record<string, string>;
-  validation: Record<string, string>;
-  seo: Record<string, string>;
-  auth: Record<string, string>;
-  membership: Record<string, string>;
-  events: Record<string, string>;
-  dashboard: Record<string, string>;
+  common: WidenTranslation<typeof enCommon>;
+  navigation: WidenTranslation<typeof enNavigation>;
+  footer: WidenTranslation<typeof enFooter>;
+  home: WidenTranslation<typeof enHome>;
+  venues: WidenTranslation<typeof enVenues>;
+  booking: WidenTranslation<typeof enBooking>;
+  forms: WidenTranslation<typeof enForms>;
+  validation: WidenTranslation<typeof enValidation>;
+  seo: WidenTranslation<typeof enSeo>;
+  auth: WidenTranslation<typeof enAuth>;
+  membership: WidenTranslation<typeof enMembership>;
+  events: WidenTranslation<typeof enEvents>;
+  dashboard: WidenTranslation<typeof enDashboard>;
   admin: AdminTranslations;
-  errors: Record<string, string>;
-  tickets: Record<string, string>;
-  referrals: Record<string, string>;
+  errors: WidenTranslation<typeof enErrors>;
+  tickets: WidenTranslation<typeof enTickets>;
+  referrals: WidenTranslation<typeof enReferrals>;
   emails: Record<string, unknown>;
-  checkin: Record<string, string>;
+  checkin: WidenTranslation<typeof enCheckin>;
   host: Record<string, unknown>;
   privacy: Record<string, string>;
 };

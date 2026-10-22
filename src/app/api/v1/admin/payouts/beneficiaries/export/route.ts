@@ -12,6 +12,7 @@ import {
   buildBeneficiaryAuditMetadata,
 } from "@/server/audit/buildBeneficiaryAuditMetadata";
 import { scrubErrorMessage } from "@/server/security/logScrub";
+import { getBeneficiaryApiErrorStatus } from "@/app/api/v1/me/beneficiary/errorDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -136,8 +137,8 @@ export async function GET(req: Request) {
         "cache-control": "no-store",
       },
     });
-  } catch (e: any) {
-    const status = e instanceof RBACError ? 403 : (e.status || 500);
+  } catch (e: unknown) {
+    const status = e instanceof RBACError ? 403 : getBeneficiaryApiErrorStatus(e);
     return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status });
   }
 }

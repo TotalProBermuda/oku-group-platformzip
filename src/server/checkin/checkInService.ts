@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { claimAdmission } from "./claimAdmission";
 import { checkInEmitter } from "@/lib/checkInEmitter";
 
@@ -163,9 +164,9 @@ export async function validateAndCheckIn(
         data: { ...logBase, valid: true, result: "VALID" },
       });
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // P2002 = unique violation; treat as best-effort — the claim has already succeeded.
-    if (err?.code !== "P2002") throw err;
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") throw err;
     try {
       await prisma.checkInLog.create({
         data: { ...logBase, valid: true, result: "VALID" },
@@ -205,11 +206,11 @@ export async function validateAndCheckIn(
     ticketId: ticket.id,
     ticketCode: ticket.code,
     sessionId: ticket.sessionId ?? null,
-    seriesId: (ticket as any).order?.seriesId ?? null,
+    seriesId: ticket.order?.seriesId ?? null,
     userId: ticket.userId,
-    orderId: (ticket as any).order?.id ?? null,
+    orderId: ticket.order?.id ?? null,
     attendeeName: ticket.attendeeName ?? null,
-    attendeeEmail: (ticket as any).attendeeEmail ?? null,
+    attendeeEmail: ticket.attendeeEmail ?? null,
     checkedInAt: now,
     result: "VALID",
   });
@@ -222,7 +223,7 @@ export async function validateAndCheckIn(
 }
 
 export async function searchTickets(query: string, sessionId?: string) {
-  const where: any = {
+  const where: Prisma.TicketWhereInput = {
     order: { status: "PAID" },
     ticketStatus: { in: ["ISSUED", "CHECKED_IN"] },
   };
@@ -269,7 +270,26 @@ export async function searchTickets(query: string, sessionId?: string) {
   });
 }
 
-function buildTicketPayload(ticket: any) {
+function buildTicketPayload(ticket: {
+  id: string;
+  code: string;
+  attendeeName: string | null;
+  ticketType: { name: string; tierCode: string | null } | null;
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    membership: { tier: string; status: string } | null;
+  };
+  session: {
+    id: string;
+    title: string | null;
+    startsAt: Date;
+    series: { title: string; venue: string | null } | null;
+  } | null;
+  attendanceEvent: { id: string; status: string } | null;
+  checkedInAt: Date | null;
+}) {
   return {
     id: ticket.id,
     code: ticket.code,

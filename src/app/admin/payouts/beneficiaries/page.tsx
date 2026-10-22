@@ -5,13 +5,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/permissions";
-import type { RoleKey } from "@/types/roles";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminBeneficiariesPage() {
   const session = await getServerSession(authOptions);
-  const roles = ((session?.user as any)?.roles ?? []) as RoleKey[];
+  const roles = session?.user?.roles ?? [];
   // Page entry requires only the broader summary permission. Restricted
   // bank/document detail is gated separately on the per-user GET, the
   // signed-URL GET, the documents GET, and the queue CSV export — each

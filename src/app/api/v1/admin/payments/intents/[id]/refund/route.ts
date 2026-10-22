@@ -5,6 +5,7 @@
  * SUPERADMIN and ADMIN_FINANCE only.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { z } from "zod";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { refundPayment } from "@/server/payments/reservationPaymentService";
@@ -34,10 +35,11 @@ export async function POST(
       amountCents: body.amountCents,
     });
     return NextResponse.json({ ok: result.ok, data: result });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const error = getAdminApiErrorDetails(err);
     return NextResponse.json(
-      { ok: false, error: err.message },
-      { status: err.status ?? 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

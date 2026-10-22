@@ -8,6 +8,7 @@ import MediaUpload from "@/components/ui/MediaUpload";
 import CurrencyAmountInput from "@/components/admin/CurrencyAmountInput";
 import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
 import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
+import { sponsorValue } from "@/server/series/sessionFields";
 
 type Mode = "inherit" | "override" | "clear";
 type Effective = { value: unknown; source: string; mode: Mode };
@@ -26,6 +27,8 @@ type Options = {
 };
 type Payload = { fields: string[]; sessions: Session[]; defaults: Record<string, Effective>; options: Options };
 type Edit = { mode: Mode; value: unknown };
+type ScheduleTemplate = { localStart: string; durationMinutes: number };
+type SponsorEdit = import("zod").infer<typeof sponsorValue>[number];
 type Preview = {
   previewId: string; requestId: string; targets: Array<{
     id: string; title: string; inventory: Session["inventory"];
@@ -148,9 +151,12 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
     const currentValue = edit.value;
     const update = (value: unknown) => setEdit(key, { mode: "override", value });
     if (key === "schedule") {
+      const currentSchedule = currentValue && typeof currentValue === "object" && !Array.isArray(currentValue)
+        ? currentValue as Partial<ScheduleTemplate>
+        : {};
       return <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-        <label>{tr("session_local_start", "Local start time")}<input type="time" value={(currentValue as any)?.localStart ?? template.localStart} onChange={(e) => update({ ...(currentValue as object), localStart: e.target.value })} style={textStyle} /></label>
-        <label>{tr("session_duration", "Duration in minutes")}<input type="number" min="1" max="10080" value={(currentValue as any)?.durationMinutes ?? template.durationMinutes} onChange={(e) => update({ ...(currentValue as object), durationMinutes: Number(e.target.value) })} style={textStyle} /></label>
+        <label>{tr("session_local_start", "Local start time")}<input type="time" value={currentSchedule.localStart ?? template.localStart} onChange={(e) => update({ ...currentSchedule, localStart: e.target.value })} style={textStyle} /></label>
+        <label>{tr("session_duration", "Duration in minutes")}<input type="number" min="1" max="10080" value={currentSchedule.durationMinutes ?? template.durationMinutes} onChange={(e) => update({ ...currentSchedule, durationMinutes: Number(e.target.value) })} style={textStyle} /></label>
         <p style={{ margin: 0, color: "#756a61", fontSize: 12 }}>{tr("session_schedule_template_note", "This is a time template only. Set occurrence dates below; no dates are inferred.")}</p>
       </div>;
     }
@@ -163,7 +169,10 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
         {options.map((option) => <option key={option.id} value={option.id}>{option.displayName}</option>)}
       </select><small>{tr("session_multi_select_hint", "Use Ctrl or Command to select multiple.")}</small></label>;
     }
-    if (key === "sponsors") return <SponsorEditor value={Array.isArray(currentValue) ? currentValue : []} data={data} onChange={update} t={tr} />;
+    if (key === "sponsors") {
+      const parsedSponsors = sponsorValue.safeParse(currentValue);
+      return <SponsorEditor value={parsedSponsors.success ? parsedSponsors.data : []} data={data} onChange={update} t={tr} />;
+    }
     if (key.startsWith("content.")) return key.includes("description")
       ? <textarea aria-label={fieldLabel(key, tr, data?.options.referrals)} rows={3} maxLength={5000} value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />
       : <input aria-label={fieldLabel(key, tr, data?.options.referrals)} maxLength={key.includes("subtitle") ? 240 : 160} value={String(currentValue ?? "")} onChange={(e) => update(e.target.value)} style={textStyle} />;
@@ -409,7 +418,7 @@ export default function SessionManagementEditor({ seriesId, onSaved, canManageRe
   </section>;
 }
 
-function SponsorEditor({ value, data, onChange, t }: { value: any[]; data: Payload | null; onChange: (value: unknown) => void; t: (key: string, fallback: string) => string }) {
+function SponsorEditor({ value, data, onChange, t }: { value: SponsorEdit[]; data: Payload | null; onChange: (value: unknown) => void; t: (key: string, fallback: string) => string }) {
   const sponsors = value;
   const entities = data?.options.entities ?? [];
   const tiers = data?.options.sponsorTiers ?? [];

@@ -33,6 +33,73 @@ interface SessionRow {
   grossCents: number;
 }
 
+interface PartnerAttendee {
+  id: string;
+  code: string;
+  attendeeName: string | null;
+  attendeeEmail: string | null;
+  user?: { name: string | null; email: string | null } | null;
+  ticketType?: { name: string } | null;
+  ticketStatus: string;
+  checkedInAt: string | null;
+}
+
+interface PartnerInvitation {
+  id: string;
+  recipientEmail: string;
+  recipientName: string | null;
+  isCompInvite: boolean;
+  intendedTicketType?: { name: string } | null;
+  status: string;
+  sentAt: string | null;
+}
+
+interface PartnerSeat {
+  id: string;
+  status: string;
+  invitedName: string | null;
+  acceptedBy?: { name: string | null } | null;
+  invitedEmail: string;
+  roleCode: string;
+  sessionId: string | null;
+  session?: { title: string | null } | null;
+  lastInvitedAt: string | null;
+  acceptedAt: string | null;
+  isReferrerEnabled: boolean;
+  commissionMode: SalesMode;
+  flatAmountCents: number | null;
+  perSeatAmountCents: number | null;
+  percentageBps: number | null;
+}
+
+interface PartnerSeatSalesSummary {
+  seatId: string;
+  name: string;
+  commissionMode: string;
+  referralCode: string | null;
+  ticketsSold: number;
+  grossSalesCents: number;
+  owedCents: number;
+}
+
+interface PartnerTeamSummary {
+  perSeat: PartnerSeatSalesSummary[];
+}
+
+interface PartnerEarnings {
+  commissionLabel: string | null;
+  partnerShareBps: number | null;
+  totals: { ticketsSold: number; grossCents: number; partnerShareCents: number | null };
+  bySession: Array<{
+    sessionId: string | null;
+    sessionTitle: string | null;
+    sessionStartsAt: string | null;
+    ticketsSold: number;
+    grossCents: number;
+    partnerShareCents: number | null;
+  }>;
+}
+
 function fmt(cents: number) {
   return "$" + (cents / 100).toLocaleString("en-US");
 }
@@ -192,7 +259,7 @@ function DetailsTab({ session, series }: { session: SessionRow; series: SeriesDe
 }
 
 function AttendeesTab({ seriesId, sessionId }: { seriesId: string; sessionId: string }) {
-  const [tickets, setTickets] = useState<any[] | null>(null);
+  const [tickets, setTickets] = useState<PartnerAttendee[] | null>(null);
   useEffect(() => {
     fetch(`/api/v1/partner/series/${seriesId}/attendees?sessionId=${sessionId}`)
       .then((r) => r.json())
@@ -261,7 +328,7 @@ function InviteTab({ seriesId }: { seriesId: string }) {
   const [comp, setComp] = useState(false);
   const [ticketTypeId, setTicketTypeId] = useState<string>("");
   const [ticketTypes, setTicketTypes] = useState<{ id: string; name: string }[] | null>(null);
-  const [invitations, setInvitations] = useState<any[] | null>(null);
+  const [invitations, setInvitations] = useState<PartnerInvitation[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -438,8 +505,8 @@ type SalesMode =
   | "PARTNER_FLAT_PLUS_PERCENT";
 
 function DelegatesTab({ seriesId, sessionId }: { seriesId: string; sessionId: string }) {
-  const [seats, setSeats] = useState<any[] | null>(null);
-  const [teamSummary, setTeamSummary] = useState<any | null>(null);
+  const [seats, setSeats] = useState<PartnerSeat[] | null>(null);
+  const [teamSummary, setTeamSummary] = useState<PartnerTeamSummary | null>(null);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -698,7 +765,7 @@ function DelegatesTab({ seriesId, sessionId }: { seriesId: string; sessionId: st
                 </tr>
               </thead>
               <tbody>
-                {teamSummary.perSeat.map((s: any) => (
+                {teamSummary.perSeat.map((s) => (
                   <tr key={s.seatId} style={{ borderBottom: "1px solid var(--color-border)" }}>
                     <td style={{ padding: "8px 6px" }}>{s.name}</td>
                     <td style={{ padding: "8px 6px", fontSize: 11 }}>{s.commissionMode.replace("PARTNER_", "").replace(/_/g, " ").toLowerCase()}</td>
@@ -742,7 +809,7 @@ function SeatCommissionEditor({
   onSaved,
 }: {
   seriesId: string;
-  seat: any;
+  seat: PartnerSeat;
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -873,10 +940,10 @@ function SeatList({
   extra,
 }: {
   title: string;
-  seats: any[];
-  actions: (s: any) => React.ReactNode;
+  seats: PartnerSeat[];
+  actions: (s: PartnerSeat) => React.ReactNode;
   emptyText: string;
-  extra?: (s: any) => React.ReactNode;
+  extra?: (s: PartnerSeat) => React.ReactNode;
 }) {
   return (
     <div className="panel" style={{ marginTop: 16 }}>
@@ -908,6 +975,7 @@ function SeatList({
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {actions(s)}
               </div>
+              {extra?.(s)}
             </div>
           ))}
         </div>
@@ -917,7 +985,7 @@ function SeatList({
 }
 
 function EarningsTab({ seriesId, sessionId }: { seriesId: string; sessionId: string }) {
-  const [data, setData] = useState<any | null>(null);
+  const [data, setData] = useState<PartnerEarnings | null>(null);
   const [scope, setScope] = useState<"session" | "series">("session");
 
   useEffect(() => {
@@ -987,7 +1055,7 @@ function EarningsTab({ seriesId, sessionId }: { seriesId: string; sessionId: str
                 </tr>
               </thead>
               <tbody>
-                {data.bySession.map((row: any) => (
+                {data.bySession.map((row) => (
                   <tr key={row.sessionId ?? "_"} style={{ borderBottom: "1px solid var(--color-border)" }}>
                     <td style={{ padding: "10px 8px" }}>{row.sessionTitle ?? "—"}</td>
                     <td style={{ padding: "10px 8px" }}>{fmtDate(row.sessionStartsAt)}</td>

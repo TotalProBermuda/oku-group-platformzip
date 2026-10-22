@@ -80,13 +80,13 @@ export async function getResolvedAuthNetConfig(): Promise<ResolvedAuthNetConfig>
   return { apiLoginId, transactionKey, env, source: "env" };
 }
 
-async function postToAuthNet(payload: any, env: AuthNetEnv) {
+async function postToAuthNet(payload: unknown, env: AuthNetEnv): Promise<unknown> {
   const res = await fetch(authNetEndpoint(env), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return res.json();
+  return (await res.json()) as unknown;
 }
 
 export async function createTransactionCapture(params: {

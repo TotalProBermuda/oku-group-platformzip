@@ -112,20 +112,20 @@ async function checkSchemaInSync(): Promise<ReadinessGate> {
     return gate({
       name: "database.schema_in_sync",
       category: "database",
-      label: "Prisma schema in sync",
+      label: "Checkout schema probe",
       status: "pass",
       severity: "blocking",
-      remediation: "OK",
+      remediation: "Checkout column probe passed; verify the full migration ledger and upgrade separately before release.",
     });
   } catch (err) {
     return gate({
       name: "database.schema_in_sync",
       category: "database",
-      label: "Prisma schema in sync",
+      label: "Checkout schema probe",
       status: "fail",
       severity: "blocking",
       remediation:
-        "Schema drift detected. Run `npx prisma db push` against this environment.",
+        "Schema drift detected. Inspect the migration ledger and actual schema, verify a backup restore, and rehearse reviewed migrations on an isolated database before applying them. Do not use schema push or reset in production.",
       details: err instanceof Error ? err.message : String(err),
     });
   }
@@ -134,13 +134,13 @@ async function checkSchemaInSync(): Promise<ReadinessGate> {
 async function checkSuperadminExists(): Promise<ReadinessGate> {
   try {
     const count = await prisma.userRole.count({
-      where: { roleKey: "SUPERADMIN" },
+      where: { roleKey: "SUPERADMIN", user: { status: "ACTIVE", NOT: { email: { endsWith: "@oku.local", mode: "insensitive" } } } },
     });
     if (count > 0) {
       return gate({
         name: "superadmin.exists",
         category: "users",
-        label: "At least one SUPERADMIN user exists",
+        label: "At least one active non-demo SUPERADMIN exists",
         status: "pass",
         severity: "blocking",
         remediation: "OK",
@@ -150,17 +150,17 @@ async function checkSuperadminExists(): Promise<ReadinessGate> {
     return gate({
       name: "superadmin.exists",
       category: "users",
-      label: "At least one SUPERADMIN user exists",
+      label: "At least one active non-demo SUPERADMIN exists",
       status: "fail",
       severity: "blocking",
       remediation:
-        "No SUPERADMIN exists. Run `npm run prod:bootstrap` to create the first one.",
+        "No active non-demo SUPERADMIN exists. Verify a controlled company administrator account before launch.",
     });
   } catch (err) {
     return gate({
       name: "superadmin.exists",
       category: "users",
-      label: "At least one SUPERADMIN user exists",
+      label: "At least one active non-demo SUPERADMIN exists",
       status: "fail",
       severity: "blocking",
       remediation:
@@ -172,34 +172,36 @@ async function checkSuperadminExists(): Promise<ReadinessGate> {
 
 async function checkNoDemoUsers(): Promise<ReadinessGate> {
   try {
-    const demoCount = await prisma.user.count({
-      where: { email: { endsWith: "@oku.local" } },
-    });
+    const [demoCount, retainedCount] = await Promise.all([
+      prisma.user.count({ where: { email: { endsWith: "@oku.local", mode: "insensitive" }, status: "ACTIVE" } }),
+      prisma.user.count({ where: { email: { endsWith: "@oku.local", mode: "insensitive" }, status: { not: "ACTIVE" } } }),
+    ]);
     if (demoCount === 0) {
       return gate({
         name: "users.demo_absent",
         category: "users",
-        label: "No demo users (@oku.local) present",
+        label: "No active demo accounts (@oku.local)",
         status: "pass",
         severity: "blocking",
         remediation: "OK",
+        details: `${retainedCount} inactive demo account(s) retained for historical records; session enforcement denies inactive accounts.`,
       });
     }
     return gate({
       name: "users.demo_absent",
       category: "users",
-      label: "No demo users (@oku.local) present",
+      label: "No active demo accounts (@oku.local)",
       status: "fail",
       severity: "blocking",
       remediation:
-        `Found ${demoCount} demo user(s) with @oku.local emails. Remove them before launch.`,
-      details: `${demoCount} demo user(s) present`,
+        `Review and deactivate ${demoCount} active demo account(s) before launch. Preserve linked business records and verify existing sessions are denied.`,
+      details: `${demoCount} active; ${retainedCount} inactive demo account(s) retained`,
     });
   } catch (err) {
     return gate({
       name: "users.demo_absent",
       category: "users",
-      label: "No demo users (@oku.local) present",
+      label: "No active demo accounts (@oku.local)",
       status: "fail",
       severity: "blocking",
       remediation: "Could not query users. Resolve the database connection first.",

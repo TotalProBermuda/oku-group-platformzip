@@ -8,10 +8,17 @@ export const dynamic = "force-dynamic";
 
 const VENUE_LABEL: Record<string, string> = { oku: "OKÜ", catch: "CATCH", terrace: "TERRACE" };
 
-function titleOf(t: any): string {
+function titleOf(t: unknown): string {
   if (!t) return "(Untitled)";
   if (typeof t === "string") return t;
-  return t.en || Object.values(t).find(Boolean) || "(Untitled)";
+  if (typeof t === "object" && !Array.isArray(t)) {
+    const localized = t as Record<string, unknown>;
+    const english = localized.en;
+    if (typeof english === "string" && english) return english;
+    const first = Object.values(localized).find((value): value is string => typeof value === "string" && value.length > 0);
+    return first ?? "(Untitled)";
+  }
+  return "(Untitled)";
 }
 
 export default async function AdminMenusListPage() {
@@ -34,7 +41,7 @@ export default async function AdminMenusListPage() {
             Menus
           </h1>
           <p style={{ fontSize: 14, color: "#6b7280", maxWidth: 600, lineHeight: 1.5 }}>
-            House menus are the standing menus shown on each venue's public page. Event-only menus are
+            House menus are the standing menus shown on each venue&apos;s public page. Event-only menus are
             attached to a specific event and never appear on venue pages.
           </p>
         </div>
@@ -97,7 +104,7 @@ export default async function AdminMenusListPage() {
         </h2>
         {eventMenus.length === 0 ? (
           <div style={{ padding: 24, background: "#fafaf9", border: "1px dashed #e5e0d8", borderRadius: 10, color: "#7d7269", fontSize: 14 }}>
-            No event-only menus yet. Create one from an event's "Menus" tab, or use "+ New Menu" above and uncheck "House menu".
+            No event-only menus yet. Create one from an event&apos;s &quot;Menus&quot; tab, or use &quot;+ New Menu&quot; above and uncheck &quot;House menu&quot;.
           </div>
         ) : (
           <div style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, overflow: "hidden" }}>
@@ -119,7 +126,7 @@ export default async function AdminMenusListPage() {
                     <td style={{ padding: "12px 16px", color: "#6b7280" }}>{m.menuType === "FOOD" ? "Food" : "Drinks"}</td>
                     <td style={{ padding: "12px 16px", color: "#1a1614" }}>{titleOf(m.menuTitle)}</td>
                     <td style={{ padding: "12px 16px", color: "#6b7280" }}>
-                      {(m._count as any).eventLinks ?? 0} event{((m._count as any).eventLinks ?? 0) === 1 ? "" : "s"}
+                      {m._count.eventLinks ?? 0} event{(m._count.eventLinks ?? 0) === 1 ? "" : "s"}
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: m.isPublished ? "#dcfce7" : "#fef3c7", color: m.isPublished ? "#15803d" : "#92400e" }}>

@@ -13,9 +13,30 @@ const SOCIAL_FIELDS = [
 
 const LANGUAGES = ["English", "Spanish", "French", "Portuguese", "Other"];
 
+interface InfluencerProfile {
+  displayName: string | null;
+  handle: string | null;
+  isVerified: boolean;
+  profileImageUrl: string | null;
+  coverImageUrl: string | null;
+  headline: string | null;
+  location: string | null;
+  shortBio: string | null;
+  longBio: string | null;
+  refCode: string;
+  commissionRateBps: number;
+}
+
+type InfluencerProfileForm = Record<string, string>;
+
+function toForm(profile: InfluencerProfile | null): InfluencerProfileForm {
+  if (!profile) return {};
+  return Object.fromEntries(Object.entries(profile).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
 export default function InfluencerProfileEditorPage() {
-  const [profile, setProfile] = useState<any>(null);
-  const [form,    setForm]    = useState<any>({});
+  const [profile, setProfile] = useState<InfluencerProfile | null>(null);
+  const [form,    setForm]    = useState<InfluencerProfileForm>({});
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [success, setSuccess] = useState("");
@@ -25,8 +46,9 @@ export default function InfluencerProfileEditorPage() {
     fetch("/api/v1/me/influencer-profile")
       .then((r) => r.json())
       .then((d) => {
-        setProfile(d.profile);
-        setForm(d.profile ?? {});
+        const data = d as { profile: InfluencerProfile | null };
+        setProfile(data.profile);
+        setForm(toForm(data.profile));
       })
       .catch(() => setError("Unable to load profile"))
       .finally(() => setLoading(false));
@@ -40,7 +62,7 @@ export default function InfluencerProfileEditorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    const data = await res.json();
+    const data = await res.json() as { error?: string; profile: InfluencerProfile };
     if (!res.ok) { setError(data.error ?? "Save failed"); }
     else         { setSuccess("Profile saved successfully"); setProfile(data.profile); }
     setSaving(false);
@@ -49,7 +71,7 @@ export default function InfluencerProfileEditorPage() {
   function f(key: string) {
     return {
       value: form[key] ?? "",
-      onChange: (e: any) => setForm((p: any) => ({ ...p, [key]: e.target.value })),
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((previous) => ({ ...previous, [key]: e.target.value })),
     };
   }
 
@@ -65,7 +87,7 @@ export default function InfluencerProfileEditorPage() {
   if (!profile) return (
     <div className="page-container" style={{ padding: "80px 24px", textAlign: "center" }}>
       <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 28, color: "#1a1614" }}>Influencer profile not found</h2>
-      <p style={{ color: "#9ca3af" }}>You don't have an influencer profile set up yet. Please contact the OKÜ team.</p>
+      <p style={{ color: "#9ca3af" }}>You don&apos;t have an influencer profile set up yet. Please contact the OKÜ team.</p>
     </div>
   );
 
@@ -155,7 +177,7 @@ export default function InfluencerProfileEditorPage() {
                 <MediaUpload
                   label="Profile Photo"
                   value={form.profileImageUrl || ""}
-                  onChange={(url) => setForm((p: any) => ({ ...p, profileImageUrl: url }))}
+                  onChange={(url) => setForm((previous) => ({ ...previous, profileImageUrl: url }))}
                   aspectRatio="square"
                   mediaType="image"
                   maxSizeMB={5}
@@ -165,7 +187,7 @@ export default function InfluencerProfileEditorPage() {
                 <MediaUpload
                   label="Cover Image"
                   value={form.coverImageUrl || ""}
-                  onChange={(url) => setForm((p: any) => ({ ...p, coverImageUrl: url }))}
+                  onChange={(url) => setForm((previous) => ({ ...previous, coverImageUrl: url }))}
                   aspectRatio="wide"
                   mediaType="image"
                   maxSizeMB={10}
@@ -195,7 +217,7 @@ export default function InfluencerProfileEditorPage() {
                 </div>
                 <div>
                   <label style={labelStyle}>Preferred Language</label>
-                  <select value={form.preferredLanguage ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, preferredLanguage: e.target.value }))} style={{ ...inputStyle, cursor: "pointer" }}>
+                  <select value={form.preferredLanguage ?? ""} onChange={(e) => setForm((previous) => ({ ...previous, preferredLanguage: e.target.value }))} style={{ ...inputStyle, cursor: "pointer" }}>
                     <option value="">Select language</option>
                     {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
                   </select>

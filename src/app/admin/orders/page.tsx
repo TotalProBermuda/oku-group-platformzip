@@ -80,6 +80,14 @@ function CopyButton({ text }: { text: string }) {
 
 // ─── Summary bar ─────────────────────────────────────────────────────────────
 
+interface OrderRow {
+  id: string; orderNumber: string | null; status: string; orderType: string | null;
+  channel: string | null; user: { id: string; name: string | null; email: string | null } | null;
+  series: { id: string; title: string } | null; sourceName: string | null;
+  totalCents: number; currency: string; commissionCents: number;
+  createdAt: string; placedAt: string | null;
+}
+
 interface SummaryData {
   total: number;
   paid: number;
@@ -141,7 +149,7 @@ function OrdersPageContent() {
 
   const { drawerType, drawerId, openDrawer, closeDrawer } = useEntityDrawer();
 
-  const [orders, setOrders]     = useState<any[]>([]);
+  const [orders, setOrders]     = useState<OrderRow[]>([]);
   const [summary, setSummary]   = useState<SummaryData | null>(null);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
@@ -182,7 +190,7 @@ function OrdersPageContent() {
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(load, 180_000);
 
-  const buildActions = (order: any): ActionItem[] => {
+  const buildActions = (order: OrderRow): ActionItem[] => {
     const items: ActionItem[] = [
       {
         key: "open",
@@ -239,7 +247,7 @@ function OrdersPageContent() {
     return items;
   };
 
-  const columns: EntityColumn<any>[] = [
+  const columns: EntityColumn<OrderRow>[] = [
     {
       key: "orderNumber",
       header: "Order #",
@@ -261,8 +269,8 @@ function OrdersPageContent() {
           <EntityLink
             entityType="user"
             entityId={o.user.id}
-            label={o.user.name || o.user.email}
-            sublabel={o.user.name ? o.user.email : undefined}
+            label={o.user.name || o.user.email || "User"}
+            sublabel={o.user.name ? o.user.email ?? undefined : undefined}
             onOpen={(_, id) => openDrawer("user", id)}
           />
         ) : (

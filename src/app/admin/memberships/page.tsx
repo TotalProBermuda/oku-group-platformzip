@@ -82,7 +82,7 @@ export default function AdminMembershipsPage() {
       .finally(() => setLoadingApps(false));
   }, []);
 
-  async function updateMembership(id: string, data: any) {
+  async function updateMembership(id: string, data: { status?: string; tier?: string }) {
     setPatchState((s) => ({ ...s, [id]: "loading" }));
     const res = await fetch(`/api/v1/admin/memberships/${id}`, {
       method: "PATCH",

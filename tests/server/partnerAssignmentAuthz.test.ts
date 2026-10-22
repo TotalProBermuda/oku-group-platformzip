@@ -52,11 +52,10 @@ const seriesB = { id: "series-B", partnerId: "partner-2", sessions: [{ id: "sess
 
 beforeEach(() => {
   vi.mocked(prisma.series.findUnique).mockReset();
-  vi.mocked(prisma.series.findUnique).mockImplementation(async (args: unknown) => {
-    const id = (args as { where: { id: string } }).where.id;
-    if (id === "series-A") return seriesA as never;
-    if (id === "series-B") return seriesB as never;
-    return null;
+  vi.mocked(prisma.series.findUnique).mockImplementation((args) => {
+    const id = args?.where.id;
+    const result = id === "series-A" ? seriesA : id === "series-B" ? seriesB : null;
+    return Promise.resolve(result as never) as unknown as ReturnType<typeof prisma.series.findUnique>;
   });
 });
 

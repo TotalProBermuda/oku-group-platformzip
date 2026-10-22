@@ -6,12 +6,34 @@ import StatusBadge from "@/components/entities/StatusBadge";
 import EntityLink from "@/components/entities/EntityLink";
 import ActionMenu, { ActionItem } from "@/components/entities/ActionMenu";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
+import type { Prisma } from "@prisma/client";
 import {
   RefreshCw, Mail, XCircle, RotateCcw, ShoppingBag, CreditCard,
   Package, Copy, Check, StickyNote, Tag, Zap, ExternalLink, AlertTriangle,
 } from "lucide-react";
 
 type Tab = "overview" | "attribution" | "items" | "payment" | "timeline";
+
+const orderDrawerInclude = {
+  user: { select: { id: true, name: true, email: true, status: true, roles: { select: { roleKey: true } }, membership: { select: { tier: true, status: true } }, orders: { select: { id: true } } } },
+  series: { select: { id: true, title: true, slug: true, status: true, venue: true, hostType: true, influencer: { select: { id: true, displayName: true, handle: true } } } },
+  session: { select: { id: true, startsAt: true, endsAt: true, status: true } },
+  payment: true,
+  lineItems: { include: { ticketType: { select: { id: true, name: true, priceCents: true } } } },
+  tickets: { select: { id: true, ticketStatus: true, checkedInAt: true, code: true, checkins: { select: { id: true, createdAt: true } } } },
+  attribution: { select: { id: true, refCode: true, influencerId: true } },
+  attributedInfluencer: { include: { user: { select: { id: true, name: true, email: true } } } },
+  attributedEventReferrerAssignment: { select: { id: true, displayName: true, referralCode: true, assignedUser: { select: { id: true, name: true, email: true } } } },
+  LedgerEntry: { select: { id: true, type: true, amountCents: true, currency: true, note: true, createdAt: true }, orderBy: { createdAt: "desc" as const } },
+} satisfies Prisma.OrderInclude;
+
+type OrderDrawerRecord = Prisma.OrderGetPayload<{ include: typeof orderDrawerInclude }> & {
+  sourceName?: string | null;
+  sourceType?: string | null;
+  userOrderCount: number;
+};
+type OrderCommission = Prisma.LedgerEntryGetPayload<{ include: { influencer: { select: { id: true; displayName: true; handle: true; commissionRateBps: true; user: { select: { id: true; name: true; email: true } } } } } }>;
+type OrderTimelineEvent = Prisma.OrderEventGetPayload<Record<string, never>>;
 
 interface OrderDrawerProps {
   orderId: string | null;
@@ -119,14 +141,14 @@ export default function OrderDrawer({
   const locale = useLocale();
   const dateLocale = locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
 
-  const [order, setOrder]         = useState<any>(null);
+  const [order, setOrder]         = useState<OrderDrawerRecord | null>(null);
   const [loading, setLoading]     = useState(false);
   const [tab, setTab]             = useState<Tab>("overview");
   const [actionMsg, setActionMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [showNote, setShowNote]   = useState(false);
 
-  const [commissions, setCommissions]   = useState<any[] | null>(null);
-  const [events, setEvents]             = useState<any[] | null>(null);
+  const [commissions, setCommissions]   = useState<OrderCommission[] | null>(null);
+  const [events, setEvents]             = useState<OrderTimelineEvent[] | null>(null);
   const [loadingAttr, setLoadingAttr]   = useState(false);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
 
@@ -271,10 +293,10 @@ export default function OrderDrawer({
     return items;
   };
 
-  const fmtDate = (d: string) =>
+  const fmtDate = (d: Date | string) =>
     new Date(d).toLocaleDateString(dateLocale, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
-  const fmtDateShort = (d: string) =>
+  const fmtDateShort = (d: Date | string) =>
     new Date(d).toLocaleDateString(dateLocale, { month: "short", day: "numeric", year: "numeric" });
 
   const fmtMoney = (cents: number, currency = "USD") =>
@@ -318,7 +340,7 @@ export default function OrderDrawer({
         title={drawerTitle}
         subtitle={order?.id ?? undefined}
         badge={drawerBadge}
-        tabs={TABS as any}
+      tabs={TABS}
         activeTab={tab}
         onTabChange={(k) => setTab(k as Tab)}
         width={580}
@@ -467,7 +489,7 @@ export default function OrderDrawer({
                 {commissions.length === 0 ? (
                   <EmptyState icon={<Zap size={24} />} text="No commission records for this order" />
                 ) : (
-                  commissions.map((c: any) => (
+                  commissions.map((c) => (
                     <div key={c.id} style={{ padding: "12px 14px", background: "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border-light)" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                         <StatusBadge status={c.type} />
@@ -495,7 +517,7 @@ export default function OrderDrawer({
                 <EmptyState icon={<Package size={24} />} text={t("admin", "noLineItems")} />
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {order.lineItems.map((item: any) => (
+                  {order.lineItems.map((item) => (
                     <div key={item.id} style={{
                       display: "flex", justifyContent: "space-between", alignItems: "flex-start",
                       padding: "12px 14px", background: "var(--color-bg)",
@@ -530,7 +552,7 @@ export default function OrderDrawer({
             {order.tickets && order.tickets.length > 0 && (
               <Section title={`Issued Tickets (${order.tickets.length})`}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {order.tickets.map((ticket: any) => (
+                  {order.tickets.map((ticket) => (
                     <div key={ticket.id} style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                       padding: "10px 14px", background: "var(--color-bg)",
@@ -579,7 +601,7 @@ export default function OrderDrawer({
               : isAuthNet && p.status !== "SUCCEEDED"
               ? `Payment status is ${p.status}`
               : null;
-          const refundFailedEvent = (events ?? []).find((e: any) =>
+          const refundFailedEvent = (events ?? []).find((e) =>
             ["PAYMENT_FAILED", "ORDER_REFUNDED"].includes(e.eventType) &&
             (e.eventLabel || "").toLowerCase().includes("fail")
           );
@@ -696,12 +718,12 @@ export default function OrderDrawer({
             {!loadingTimeline && events !== null && events.length === 0 && (
               <EmptyState icon={<ShoppingBag size={24} />} text="No events recorded yet" />
             )}
-            {!loadingTimeline && events !== null && events.length > 0 && events.map((ev: any, i: number) => (
+            {!loadingTimeline && events !== null && events.length > 0 && events.map((ev, i) => (
               <TimelineEvent
                 key={ev.id}
                 icon={getEventIcon(ev.eventType)}
-                label={ev.eventLabel}
-                actor={ev.performedBy}
+                label={ev.eventLabel ?? ev.eventType}
+                actor={ev.performedBy ?? "System"}
                 date={fmtDate(ev.createdAt)}
                 color={getEventColor(ev.eventType)}
                 isLast={i === events.length - 1}
