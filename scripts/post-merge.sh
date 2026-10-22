@@ -2,15 +2,14 @@
 set -e
 
 echo "==> Installing dependencies..."
-npm install --legacy-peer-deps
+npm ci
 
 echo "==> Generating Prisma client..."
 npx prisma generate
 
-echo "==> Applying database migrations..."
-# Apply reviewed migration files only. With set -e, any failure stops setup;
-# never fall back to schema push/reset or silently accept data loss.
-npx prisma migrate deploy
+# Pulling source must not mutate the connected database. Apply reviewed
+# migrations separately after verifying the target, backup, and rollback plan.
+echo "==> Database migrations require a separate reviewed release step."
 
 echo "==> Verifying i18n parity across en/es/pt..."
 npm run i18n:check

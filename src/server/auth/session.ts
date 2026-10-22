@@ -2,37 +2,31 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { RoleKey } from "@/types/roles";
-
-/**
- * Resolves the real DB userId from a JWT session.
- * JWT tokens can become stale after a seed re-run (the user record is deleted
- * and recreated with a new CUID). We verify the raw id exists; if not, we fall
- * back to an email lookup so callers always receive a valid DB primary key.
- */
-async function resolveDbUserId(rawId: string, email?: string | null): Promise<string> {
-  const exists = await prisma.user.findUnique({ where: { id: rawId }, select: { id: true } });
-  if (exists) return rawId;
-  if (!email) return rawId;
-  const byEmail = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  return byEmail?.id ?? rawId;
-}
+import { isDemoModeEnabled } from "@/lib/demoMode";
 
 export async function requireSession() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const current = await getOptionalSession();
+  if (!current) {
     const err = new Error("Unauthorized") as Error & { status: number };
     err.status = 401;
     throw err;
   }
-  const roles = (session.user.roles || []) as RoleKey[];
-  const userId = await resolveDbUserId(session.user.id as string, session.user.email);
-  return { session: { ...session, user: session.user }, userId, roles };
+  return current;
 }
 
 export async function getOptionalSession() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
-  const roles = (session.user.roles || []) as RoleKey[];
-  const userId = await resolveDbUserId(session.user.id as string, session.user.email);
-  return { session: { ...session, user: session.user }, userId, roles };
+  const current = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, email: true, status: true, roles: { select: { roleKey: true } } },
+  });
+  if (!current || current.status !== "ACTIVE" ||
+    (current.email.toLowerCase().endsWith("@oku.local") && !isDemoModeEnabled())) return null;
+  const roles = current.roles.map((role) => role.roleKey) as RoleKey[];
+  return {
+    session: { ...session, user: { ...session.user, id: current.id, email: current.email, roles } },
+    userId: current.id,
+    roles,
+  };
 }

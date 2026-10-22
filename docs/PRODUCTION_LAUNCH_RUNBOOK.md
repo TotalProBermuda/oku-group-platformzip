@@ -14,6 +14,14 @@ production by changing its environment variables.
    production payment credentials.
 5. Do not promote until the validation checklist below has passed.
 
+The Replit post-merge hook installs the lockfile and generates Prisma only; it
+does not migrate the connected database. Before a release that needs schema
+changes, inspect the target database's schema and migration ledger, restore a
+backup into an isolated database, and rehearse the reviewed migration chain
+there. Apply the verified migration plan separately before application
+promotion. Never resolve migration history or use schema push just to clear a
+release error.
+
 ## 2. Production configuration
 
 Set these in the production secret manager; never put their values in source,
@@ -32,7 +40,9 @@ browser-visible configuration, command arguments, screenshots, or logs.
 | `REDIS_URL` | Production Redis endpoint so rate limits and job coordination work across instances |
 | Cybersource credential row | Production credentials encrypted in the production database; never a preview credential |
 
-Use a separate production database with no `@oku.local` demo accounts. Retain a
+Production must have no active `@oku.local` demo accounts. Retain suspended
+historical accounts and their linked business records; verify existing sessions
+are rejected as well as fresh logins. Retain a
 break-glass SUPERADMIN account under a controlled company mailbox, and verify at
 least two named humans have emergency access through the normal identity path.
 

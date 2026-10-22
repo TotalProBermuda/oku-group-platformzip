@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     include: { roles: true },
   });
 
-  if (!user) return NextResponse.redirect(loginUrl);
+  if (!user || user.status !== "ACTIVE") return NextResponse.redirect(loginUrl);
 
   const roles = user.roles.map((r) => r.roleKey);
   const secret = resolveAuthSecret();

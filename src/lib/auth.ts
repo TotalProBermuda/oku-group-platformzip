@@ -38,7 +38,7 @@ const demoCredentialsProvider = CredentialsProvider({
       where: { email },
       include: { roles: true },
     });
-    if (!user) return null;
+    if (!user || user.status !== "ACTIVE") return null;
     return Object.assign({
       id: user.id,
       email: user.email,
@@ -165,6 +165,19 @@ export const authOptions: NextAuthOptions = {
           token.passwordlessDestination = appUser.passwordlessDestination;
         }
       }
+      // Revalidate existing cookies as well as fresh sign-ins. Suspension and
+      // role removal must take effect without waiting for a JWT to expire.
+      const userId = typeof token.userId === "string" ? token.userId : token.sub;
+      if (!userId) return {};
+      const current = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, status: true, roles: { select: { roleKey: true } } },
+      });
+      if (!current || current.status !== "ACTIVE" ||
+        (current.email.toLowerCase().endsWith("@oku.local") && !isDemoModeEnabled())) return {};
+      token.userId = current.id;
+      token.email = current.email;
+      token.roles = current.roles.map((role) => role.roleKey).filter(isRoleKey);
       return token;
     },
     async session({ session, token }) {
@@ -174,6 +187,8 @@ export const authOptions: NextAuthOptions = {
         if (typeof token.passwordlessDestination === "string") {
           session.user.passwordlessDestination = token.passwordlessDestination;
         }
+      } else {
+        session.user = undefined;
       }
       return session;
     },
