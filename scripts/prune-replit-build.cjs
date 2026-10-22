@@ -9,6 +9,16 @@ const ALLOWED = Object.freeze([
   '.git', '.next/cache', '.next-dev', '.local/share/pnpm',
   'catch-starter-kit/node_modules', 'artifacts/mockup-sandbox/node_modules',
   'artifacts/mockup-sandbox/dist', '.release-staging-partial-20261022',
+  // Source delivery archives stay in the editor; public media is served from
+  // object storage/public. Never remove extracted media or arbitrary uploads.
+  'attached_assets/Sesion_1-20261019T162022Z-1-001_1792589791025.zip',
+  'attached_assets/Sesion_2-20261019T162025Z-1-001_1792589791026.zip',
+  'attached_assets/Sesion_3-20261019T162027Z-1-001_1792589791026.zip',
+  'attached_assets/Sesion_4-20261019T162030Z-1-001_1792589791026.zip',
+  'attached_assets/Sesion_5-20261019T162032Z-1-001_1792589791026.zip',
+  'attached_assets/Sesion_6-20261019T162035Z-1-001_1792589791026.zip',
+  'attached_assets/Sesion_7-20261019T162038Z-1-001_1792589791026.zip',
+  'attached_assets/septiembre_1792589791025.zip',
 ]);
 const inside = (file, directory) => file === directory || file.startsWith(directory + path.sep);
 // Preserve .cache and .local/state: Replit stores runtime metadata there.

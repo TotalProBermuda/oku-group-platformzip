@@ -67,10 +67,12 @@ describe("deployment image cleanup", () => {
   });
   it("removes only allowlisted build-copy files and preserves runtime and original media", () => {
     const removed = [".git/objects/fixture", ".next/cache/x", ".next-dev/x", ".local/share/pnpm/x",
+      "attached_assets/Sesion_4-20261019T162030Z-1-001_1792589791026.zip",
       "catch-starter-kit/node_modules/x", "artifacts/mockup-sandbox/node_modules/x", "artifacts/mockup-sandbox/dist/x", ".release-staging-partial-20261022/x"];
     const kept = [".next/BUILD_ID", ".next/server/page.js", ".next/static/app.js", "node_modules/next/index.js", "public/food.jpg",
       "attached_assets/original.jpg", "src/app/page.tsx", ".local/important.txt", "catch-starter-kit/source.ts", "artifacts/mockup-sandbox/source.ts",
-      ".cache/replit/nix/env.json", ".cache/nix/metadata", ".local/state/replit/runtime"];
+      ".cache/replit/nix/env.json", ".cache/nix/metadata", ".local/state/replit/runtime",
+      "attached_assets/unpacked-media/photo.jpg", "attached_assets/unrelated.zip"];
     removed.forEach(name => put(name));
     kept.forEach(name => put(name));
     const result = run();
