@@ -6,11 +6,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ALLOWED = Object.freeze([
-  '.git', '.next/cache', '.next-dev', '.cache', '.local/share/pnpm',
+  '.git', '.next/cache', '.next-dev', '.local/share/pnpm',
   'catch-starter-kit/node_modules', 'artifacts/mockup-sandbox/node_modules',
   'artifacts/mockup-sandbox/dist', '.release-staging-partial-20261022',
 ]);
 const inside = (file, directory) => file === directory || file.startsWith(directory + path.sep);
+// Preserve .cache and .local/state: Replit stores runtime metadata there.
 
 function inspectPath(root, relative) {
   let current = root;

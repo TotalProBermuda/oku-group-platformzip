@@ -15,6 +15,13 @@ if [ -z "$NODE_BIN" ]; then
   fi
 fi
 if [ -z "$NODE_BIN" ]; then
+  marker_present=false
+  candidate_executable=false
+  if [ -f .next/oku-node-runtime-path ]; then marker_present=true; fi
+  case "${candidate:-}" in
+    /nix/store/*/bin/node) if [ -x "$candidate" ]; then candidate_executable=true; fi ;;
+  esac
+  printf 'Runtime diagnostic: cwd=%s marker_present=%s candidate_executable=%s\n' "$PWD" "$marker_present" "$candidate_executable" >&2
   echo 'Production startup failed: Node.js runtime is unavailable.' >&2
   exit 127
 fi
