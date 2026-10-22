@@ -23,7 +23,7 @@ describe("production startup is schema-neutral", () => {
       copyFileSync("scripts/deploy-prisma-with-rate-limit-repair.sh", join(dir, "start.sh"));
       if (recorded) writeFileSync(join(dir, ".next/oku-node-runtime-path"), `${recorded}\n`);
       const result = spawnSync("/bin/sh", [join(dir, "start.sh")], {
-        cwd: dir, env: { PATH: join(dir, "empty-bin") }, encoding: "utf8",
+        cwd: dir, env: { NODE_ENV: "test", PATH: join(dir, "empty-bin") }, encoding: "utf8",
       });
       expect(result.status).toBe(127);
       expect(result.stderr).toContain("Node.js runtime is unavailable");
