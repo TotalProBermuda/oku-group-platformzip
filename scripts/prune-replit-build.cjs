@@ -46,8 +46,12 @@ function checkDependencyLinks(directory, targets) {
 }
 
 function planCleanup() {
-  if (process.env.REPLIT_DEPLOYMENT !== '1' || process.env.REPLIT_DEV_DOMAIN) {
-    throw new Error('Cleanup requires an isolated Replit deployment with no development domain.');
+  // Replit's build snapshot inherits DEV_DOMAIN and has no DEPLOYMENT flag.
+  // An isolated canary build verified that writes do not reach the editor.
+  // Keep this explicit destructive mode exclusive to [deployment].build;
+  // never invoke it from npm build, install, postMerge, or the editor shell.
+  if (process.argv.length !== 3 || process.argv[2] !== '--prune-isolated-build-copy') {
+    throw new Error('Cleanup requires explicit --prune-isolated-build-copy deployment-build mode. Do not run in the editor.');
   }
   const root = fs.realpathSync(path.join(__dirname, '..'));
   if (root === path.parse(root).root || fs.realpathSync(process.cwd()) !== root) {

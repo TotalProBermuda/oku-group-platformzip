@@ -104,7 +104,7 @@ externalPort = 4200
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["bash", "-c", "npm run build && node scripts/prune-replit-build.cjs"]
+build = ["bash", "-c", "npm run build && node scripts/prune-replit-build.cjs --prune-isolated-build-copy"]
 run = ["sh", "scripts/deploy-prisma-with-rate-limit-repair.sh"] # Start only; migrations are a separate reviewed release step
 
 [postMerge]
