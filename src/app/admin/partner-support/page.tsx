@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import styles from "./page.module.css";
+import { partnerIdFromSearch } from "@/lib/partnerSupportSearch";
 
 type LinkData = { code: string; url: string | null; isActive: boolean; clickCount: number };
 type Partner = { id: string; name: string; approved: boolean; user: { email: string; name: string | null } };
@@ -20,10 +21,6 @@ function QRCard({ link }: { link: LinkData }) {
     <div style={{ background: "white", padding: 8, borderRadius: 10 }}><QRCodeSVG value={link.url} size={80} style={{ display: "block" }} /></div>
     <div style={{ minWidth: 0 }}><strong>{link.code}</strong><div style={{ fontSize: 12, overflowWrap: "anywhere", color: "var(--color-text-secondary)" }}>{link.url}</div><small>{link.clickCount} scans</small></div>
   </div>;
-}
-
-export function partnerIdFromSearch(search: string): string | null {
-  return new URLSearchParams(search).get("partnerId");
 }
 
 export default function PartnerSupportPage() {

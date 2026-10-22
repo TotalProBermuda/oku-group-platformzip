@@ -1,10 +1,17 @@
 import { getServerSession } from "next-auth";
+import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { RoleKey } from "@/types/roles";
 import { isDemoModeEnabled } from "@/lib/demoMode";
 
-export async function requireSession() {
+type AuthenticatedContext = {
+  session: Omit<Session, "expires"> & { expires?: string; user: NonNullable<Session["user"]> };
+  userId: string;
+  roles: RoleKey[];
+};
+
+export async function requireSession(): Promise<AuthenticatedContext> {
   const current = await getOptionalSession();
   if (!current) {
     const err = new Error("Unauthorized") as Error & { status: number };
@@ -14,7 +21,7 @@ export async function requireSession() {
   return current;
 }
 
-export async function getOptionalSession() {
+export async function getOptionalSession(): Promise<AuthenticatedContext | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
   const current = await prisma.user.findUnique({

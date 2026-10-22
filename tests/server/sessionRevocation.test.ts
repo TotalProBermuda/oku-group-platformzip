@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextAuthOptions, Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
+
+type JwtInput = Parameters<NonNullable<NonNullable<NextAuthOptions["callbacks"]>["jwt"]>>[0];
+// NextAuth invokes JWT callbacks without user/account when reading an existing
+// cookie, although its callback declaration marks those sign-in fields required.
+const existingCookie = (token: JWT): JwtInput => ({ token } as unknown as JwtInput);
 
 const mocks = vi.hoisted(() => ({ findUnique: vi.fn(), getServerSession: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: mocks.findUnique } } }));
@@ -22,7 +28,7 @@ describe("existing session revocation", () => {
     mocks.findUnique.mockResolvedValue({ id: "user-1", email: "owner@example.com", status, roles: [{ roleKey: "SUPERADMIN" }] });
     const { authOptions } = await import("@/lib/auth");
     const jwt = authOptions.callbacks!.jwt!;
-    expect(await jwt({ token: { userId: "user-1", roles: ["SUPERADMIN"] } } as Parameters<typeof jwt>[0])).toEqual({});
+    expect(await jwt(existingCookie({ userId: "user-1", roles: ["SUPERADMIN"] }))).toEqual({});
     const { getOptionalSession, requireSession } = await import("@/server/auth/session");
     expect(await getOptionalSession()).toBeNull();
     await expect(requireSession()).rejects.toMatchObject({ status: 401 });
@@ -33,7 +39,7 @@ describe("existing session revocation", () => {
     mocks.findUnique.mockResolvedValue({ id: "user-1", email: "ADMIN@OKU.LOCAL", status: "ACTIVE", roles: [{ roleKey: "SUPERADMIN" }] });
     const { authOptions } = await import("@/lib/auth");
     const jwt = authOptions.callbacks!.jwt!;
-    expect(await jwt({ token: { userId: "user-1" } } as Parameters<typeof jwt>[0])).toEqual({});
+    expect(await jwt(existingCookie({ userId: "user-1" }))).toEqual({});
     expect(await (await import("@/server/auth/session")).getOptionalSession()).toBeNull();
   });
 
@@ -48,7 +54,7 @@ describe("existing session revocation", () => {
   it("refreshes stale elevated roles and preserves passwordless destinations", async () => {
     const { authOptions } = await import("@/lib/auth");
     const jwt = authOptions.callbacks!.jwt!;
-    const token = await jwt({ token: { userId: "user-1", roles: ["SUPERADMIN"], passwordlessDestination: "/account" } } as Parameters<typeof jwt>[0]);
+    const token = await jwt(existingCookie({ userId: "user-1", roles: ["SUPERADMIN"], passwordlessDestination: "/account" }));
     expect(token).toMatchObject({ roles: ["ATTENDEE"], passwordlessDestination: "/account" });
     const current = await (await import("@/server/auth/session")).requireSession();
     expect(current.roles).toEqual(["ATTENDEE"]);
