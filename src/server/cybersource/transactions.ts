@@ -22,10 +22,11 @@ import {
   type ResolvedCybersourceConfig,
 } from "@/server/cybersource/client";
 import type { PayerAuthenticationData } from "@/server/cybersource/payerAuthentication";
+import { errorMessage } from "@/server/payments/providers/types";
 
 export type CybersourceCallResult = {
   httpStatus: number | null;
-  body: any;
+  body: unknown;
   networkError: string | null;
 };
 
@@ -57,18 +58,18 @@ async function postSigned(
       body: json,
     });
     const text = await res.text();
-    let parsed: any = null;
+    let parsed: unknown = null;
     try {
       parsed = text ? JSON.parse(text) : null;
     } catch {
       parsed = { rawText: text.slice(0, 1000) };
     }
     return { httpStatus: res.status, body: parsed, networkError: null };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return {
       httpStatus: null,
       body: null,
-      networkError: e?.message || "network error",
+      networkError: errorMessage(e, "network error"),
     };
   }
 }
@@ -111,7 +112,13 @@ export async function cybersourceCharge(
   // Body shape per Cybersource Payments REST. With a transient token from
   // Microform, paymentInformation.tokenizedCard.transientTokenJwt is set;
   // for sandbox testing we accept raw card data via paymentInformation.card.
-  const body: any = {
+  const orderInformation: Record<string, unknown> = {
+    amountDetails: {
+      totalAmount: input.amount,
+      currency: input.currency || "USD",
+    },
+  };
+  const body: Record<string, unknown> = {
     clientReferenceInformation: {
       code: input.invoiceNumber,
       transactionId: input.transactionId,
@@ -122,12 +129,7 @@ export async function cybersourceCharge(
       // example `vbv`) rather than `internet` when 3-D Secure succeeds.
       commerceIndicator: input.payerAuthentication?.indicator || "internet",
     },
-    orderInformation: {
-      amountDetails: {
-        totalAmount: input.amount,
-        currency: input.currency || "USD",
-      },
-    },
+    orderInformation,
   };
 
   if (input.payerAuthentication) {
@@ -148,7 +150,7 @@ export async function cybersourceCharge(
   // failures and make reconciliation unreliable. Checkout validates and
   // supplies this data before a charge is attempted.
   if (input.billing && input.customerEmail) {
-    body.orderInformation.billTo = {
+    orderInformation.billTo = {
       firstName: input.billing.firstName,
       lastName: input.billing.lastName,
       address1: input.billing.address1,

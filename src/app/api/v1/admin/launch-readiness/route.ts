@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { z } from "zod";
 import { requireSession } from "@/server/auth/session";
 import { authenticateTest } from "@/server/authorizeNet/client";
@@ -299,10 +300,11 @@ export async function GET() {
     const readiness = await getLaunchReadiness();
     const status = await buildStatus(readiness);
     return NextResponse.json({ ok: true, data: { ...status, readiness } });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }
@@ -435,10 +437,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

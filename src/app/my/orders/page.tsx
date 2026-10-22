@@ -23,7 +23,7 @@ export default async function MyOrdersPage() {
     status: o.status,
     totalCents: o.totalCents,
     createdAt: o.createdAt.toISOString(),
-    series: o.series ?? null,
+    series: o.series ? { ...o.series, venue: o.series.venue ?? "" } : null,
     session: o.session
       ? { title: o.session.title, startsAt: o.session.startsAt.toISOString() }
       : null,

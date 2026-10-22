@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { hasPermission } from "@/lib/permissions";
@@ -36,9 +38,9 @@ export async function POST(req: Request) {
     let body: z.infer<typeof IssueBody>;
     try {
       body = IssueBody.parse(await req.json());
-    } catch (zerr: any) {
+    } catch (zerr: unknown) {
       return NextResponse.json(
-        { ok: false, error: "Invalid request", issues: zerr.issues ?? [] },
+        { ok: false, error: "Invalid request", issues: zerr instanceof z.ZodError ? zerr.issues : [] },
         { status: 400 }
       );
     }
@@ -88,7 +90,7 @@ export async function POST(req: Request) {
     let attempts = 0;
     const MAX_ATTEMPTS = 4;
     let created: { ticket: { id: string; code: string }; order: { id: string; orderNumber: string | null } } | null = null;
-    let lastErr: any = null;
+    let lastErr: unknown = null;
 
     while (attempts < MAX_ATTEMPTS && !created) {
       attempts += 1;
@@ -96,8 +98,8 @@ export async function POST(req: Request) {
       const orderNumber = generateOrderNumber();
       try {
         created = await issueOnce({ code, orderNumber });
-      } catch (e: any) {
-        if (e?.code === "P2002") {
+      } catch (e: unknown) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
           lastErr = e;
           continue;
         }
@@ -204,7 +206,8 @@ export async function POST(req: Request) {
         return { ticket, order };
       });
     }
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     secret,
     maxAge,
     salt: COOKIE_NAME,
-  } as any);
+  });
 
   // Build destination using the public base — never localhost.
   // If a stale callback points to a portal this persona cannot access, land on

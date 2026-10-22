@@ -56,7 +56,7 @@ export default async function BrandPartnersPage({ params }: { params: Promise<{ 
             Why Brand Partners Choose OKÜ
           </h2>
           <p style={{ textAlign: "center", color: "#7c7168", fontSize: 16, marginBottom: 56, maxWidth: 580, margin: "0 auto 56px" }}>
-            Our audience is not mass-market. It's curated, high-trust, and highly engaged.
+            Our audience is not mass-market. It&apos;s curated, high-trust, and highly engaged.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 24 }}>
             {[
@@ -85,7 +85,7 @@ export default async function BrandPartnersPage({ params }: { params: Promise<{ 
               Current Opportunities
             </h2>
             <p style={{ color: "#7c7168", fontSize: 16, textAlign: "center", marginBottom: 56, maxWidth: 540, margin: "0 auto 56px" }}>
-              Each slot is exclusive. Once filled, it's closed. Inquire early.
+              Each slot is exclusive. Once filled, it&apos;s closed. Inquire early.
             </p>
 
             {Object.entries(byCategory).map(([cat, catSlots]) => (
@@ -150,14 +150,14 @@ export default async function BrandPartnersPage({ params }: { params: Promise<{ 
       <section style={{ background: "#1a1614", color: "white", padding: "80px 24px", textAlign: "center" }}>
         <div style={{ maxWidth: 560, margin: "0 auto" }}>
           <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 36, fontWeight: 400, margin: "0 0 16px", color: "white" }}>
-            Don't see the right fit?
+            Don&apos;t see the right fit?
           </h2>
           <p style={{ color: "#c9bfb5", fontSize: 16, lineHeight: 1.7, margin: "0 0 32px" }}>
-            We build custom partnership packages for brands that align with OKÜ's values. Reach out and we'll design something together.
+            We build custom partnership packages for brands that align with OKÜ&apos;s values. Reach out and we&apos;ll design something together.
           </p>
-          <a href="/brand-partners/apply" style={{ display: "inline-block", background: "#c41e3a", color: "white", padding: "14px 36px", borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: "none" }}>
+          <Link href={`/${locale}/brand-partners/apply`} style={{ display: "inline-block", background: "#c41e3a", color: "white", padding: "14px 36px", borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: "none" }}>
             Submit a Brand Inquiry →
-          </a>
+          </Link>
         </div>
       </section>
     </div>

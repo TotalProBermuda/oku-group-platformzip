@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminPermission } from "@/server/auth/adminGuard";
 
@@ -29,7 +31,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const where: any = {};
+    const where: Prisma.TicketWhereInput = {};
     if (sessionId) where.sessionId = sessionId;
     if (seriesId) where.session = { seriesId };
 
@@ -117,7 +119,8 @@ export async function GET(req: Request) {
         "Cache-Control": "no-store",
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

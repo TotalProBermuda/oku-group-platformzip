@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { checkInEmitter } from "@/lib/checkInEmitter";
 import { claimAdmission } from "@/server/checkin/claimAdmission";
 
-function isAdmin(session: any) {
+function isAdmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR"].includes(r));
 }
 
@@ -17,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
 
-  const where: any = { order: { seriesId: id, status: "PAID" } };
+  const where: Prisma.TicketWhereInput = { order: { seriesId: id, status: "PAID" } };
   if (sessionId) where.sessionId = sessionId;
 
   const tickets = await prisma.ticket.findMany({

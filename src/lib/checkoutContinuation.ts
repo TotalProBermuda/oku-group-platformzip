@@ -18,6 +18,10 @@ export function isVerificationReturn(event: { origin: string; source: unknown; d
     (event.data as { type?: string } | null)?.type === "oku-3ds-complete";
 }
 
-export function isConfirmedCheckout(status: number, body: any): boolean {
-  return status === 200 && body?.ok === true && typeof body?.data?.orderId === "string" && Boolean(body.data.orderId);
+export function isConfirmedCheckout(status: number, body: unknown): boolean {
+  if (status !== 200 || !body || typeof body !== "object") return false;
+  const response = body as { ok?: unknown; data?: unknown };
+  if (response.ok !== true || !response.data || typeof response.data !== "object") return false;
+  const data = response.data as { orderId?: unknown };
+  return typeof data.orderId === "string" && data.orderId.length > 0;
 }

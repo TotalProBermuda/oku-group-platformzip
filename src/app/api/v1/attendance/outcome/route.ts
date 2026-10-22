@@ -13,14 +13,22 @@ export async function POST(req: Request) {
     if (!attendanceEventId || !outcomeType) {
       return NextResponse.json({ ok: false, error: "attendanceEventId and outcomeType required" }, { status: 400 });
     }
-    if (!VALID_OUTCOMES.includes(outcomeType)) {
+    if (typeof outcomeType !== "string" || !VALID_OUTCOMES.includes(outcomeType as (typeof VALID_OUTCOMES)[number])) {
       return NextResponse.json({ ok: false, error: "Invalid outcomeType" }, { status: 400 });
     }
+    if (reasonCode !== undefined && (typeof reasonCode !== "string" || !VALID_REASONS.includes(reasonCode as (typeof VALID_REASONS)[number]))) {
+      return NextResponse.json({ ok: false, error: "Invalid reasonCode" }, { status: 400 });
+    }
 
-    await recordOutcome(attendanceEventId, outcomeType, reasonCode ?? "UNKNOWN", notes);
+    await recordOutcome(
+      attendanceEventId,
+      outcomeType as (typeof VALID_OUTCOMES)[number],
+      (reasonCode as (typeof VALID_REASONS)[number] | undefined) ?? "UNKNOWN",
+      typeof notes === "string" ? notes : undefined
+    );
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (error: unknown) {
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to record attendance outcome" }, { status });
   }
 }

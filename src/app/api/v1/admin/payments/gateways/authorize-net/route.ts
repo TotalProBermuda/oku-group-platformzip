@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
@@ -81,17 +83,18 @@ export async function PATCH(req: Request) {
               provider: PROVIDER_AUTHORIZE_NET,
               changes: auditDiff,
               timestamp: new Date().toISOString(),
-            },
+            } as Prisma.InputJsonObject,
           },
         })
         .catch(() => {});
     }
 
     return NextResponse.json({ ok: true, data: toSafeView(updated) });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

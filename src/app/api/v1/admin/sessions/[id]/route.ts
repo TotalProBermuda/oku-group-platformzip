@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { sessionTicketPriceInputSchema, updateSessionContentSchema } from "@/server/series/createSessionInput";
 import { legacySessionWriteBlocked, managedWriteMessage } from "@/server/series/legacySessionGuard";
 import { lockSessionInventory } from "@/server/commerce/sessionInventory";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,8 +27,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     return NextResponse.json({ ok: true, data: session });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    const details = getAdminApiErrorDetails(error);
+    return NextResponse.json({ ok: false, error: details.message }, { status: details.status });
   }
 }
 
@@ -99,7 +101,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { seriesId, ...data } = session;
     return finishEventSave(seriesId, { ok: true, data }, req);
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    const details = getAdminApiErrorDetails(error);
+    return NextResponse.json({ ok: false, error: details.message }, { status: details.status });
   }
 }

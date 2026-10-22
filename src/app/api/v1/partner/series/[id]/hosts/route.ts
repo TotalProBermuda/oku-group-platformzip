@@ -21,10 +21,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       },
     });
     return NextResponse.json({ ok: true, hosts });
-  } catch (e: any) {
-    if (e.status === 409) return NextResponse.json({ error: e.message }, { status: 409 });
+  } catch (e: unknown) {
+    if (typeof e === "object" && e !== null && "status" in e && e.status === 409) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Conflict" }, { status: 409 });
+    }
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (e instanceof Error && e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/hosts] GET", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
@@ -120,9 +122,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }));
 
     return NextResponse.json({ ok: true, host }, { status: 201 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (e instanceof Error && e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/hosts] POST", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

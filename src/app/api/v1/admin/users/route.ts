@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { issuePasswordlessToken } from "@/server/auth/passwordless";
@@ -40,9 +41,9 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: users });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -144,8 +145,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, data: user, meta: { invitationSent } }, { status: 201 });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

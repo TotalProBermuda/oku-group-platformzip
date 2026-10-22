@@ -20,7 +20,11 @@ const request = (body: string) => new Request("http://localhost/api/v1/admin/ord
 describe("ticket refund boundary — isolated, no gateway", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireSession).mockResolvedValue({ userId: "test_admin", roles: ["SUPERADMIN"] });
+    vi.mocked(requireSession).mockResolvedValue({
+      session: { expires: new Date(Date.now() + 60_000).toISOString(), user: { id: "test_admin", roles: ["SUPERADMIN"] } },
+      userId: "test_admin",
+      roles: ["SUPERADMIN"],
+    });
     vi.mocked(prisma.order.findUnique).mockResolvedValue(null);
   });
 

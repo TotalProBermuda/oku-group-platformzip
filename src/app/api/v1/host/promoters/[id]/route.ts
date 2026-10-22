@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { HostPaymentMethod } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
+import { getHostApiErrorDetails } from "@/app/api/v1/host/errorDetails";
+
+const PatchBody = z.object({
+  isPaid: z.boolean().optional(),
+  notes: z.string().nullable().optional(),
+  contactInfo: z.string().nullable().optional(),
+  agreedAmount: z.number().finite().nonnegative().optional(),
+  paymentMethod: z.nativeEnum(HostPaymentMethod).optional(),
+}).strict();
 
 function isHost(roles: string[]) {
   return roles.some((r) => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "STREETSIDE_HOST", "SUPERADMIN"].includes(r));
@@ -15,18 +26,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const contact = await prisma.hostInfluencerContact.findUnique({ where: { id } });
     if (!contact || contact.hostUserId !== userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const body = await req.json().catch(() => ({}));
-    const data: any = {};
-    if ("isPaid" in body) data.isPaid = Boolean(body.isPaid);
-    if ("notes" in body) data.notes = body.notes;
-    if ("contactInfo" in body) data.contactInfo = body.contactInfo;
-    if ("agreedAmount" in body) data.agreedAmountCents = Math.round(Number(body.agreedAmount) * 100);
-    if ("paymentMethod" in body) data.paymentMethod = body.paymentMethod;
+    const parsed = PatchBody.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return NextResponse.json({ error: "Invalid promoter update" }, { status: 400 });
+    const body = parsed.data;
+    const data = {
+      ...(body.isPaid !== undefined && { isPaid: body.isPaid }),
+      ...(body.notes !== undefined && { notes: body.notes }),
+      ...(body.contactInfo !== undefined && { contactInfo: body.contactInfo }),
+      ...(body.agreedAmount !== undefined && { agreedAmountCents: Math.round(body.agreedAmount * 100) }),
+      ...(body.paymentMethod !== undefined && { paymentMethod: body.paymentMethod }),
+    };
 
     const updated = await prisma.hostInfluencerContact.update({ where: { id }, data });
     return NextResponse.json({ ok: true, contact: updated });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
 }
 
@@ -41,7 +56,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     await prisma.hostInfluencerContact.delete({ where: { id } });
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
 }

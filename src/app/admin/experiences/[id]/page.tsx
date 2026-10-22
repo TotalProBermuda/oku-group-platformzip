@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import type { ComponentProps } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import InvitationPanel from "@/components/invitation/InvitationPanel";
@@ -48,24 +49,54 @@ const SECTION_TABS = [
   { id: "analytics",         label: "Analytics" },
 ];
 
+type SocialLinks = Record<string, string>;
+interface ExperienceForm {
+  [key: string]: unknown;
+  title?: string; subtitle?: string | null; slug?: string; description?: string | null;
+  category?: string | null; city?: string | null; country?: string | null; venueAddress?: string | null;
+  communityUrl?: string | null; startsAt?: string | Date | null; endsAt?: string | Date | null;
+  capacityTotal?: number; availableSeatsMode?: string; attendeeListMode?: string; membershipRuleMode?: string;
+  waitlistEnabled?: boolean; newsletterCaptureEnabled?: boolean; isFeatured?: boolean; showCountdown?: boolean;
+  countdownLabel?: string | null; earlyReleaseAt?: string | Date | null; publicReleaseAt?: string | Date | null;
+  seoTitle?: string | null; seoDescription?: string | null; status?: string;
+  hostType?: string; influencerId?: string | null; partnerId?: string | null; venueId?: string | null; spaceId?: string | null;
+  heroImageUrl?: string | null; socialLinksJson?: SocialLinks | null;
+}
+type ExperienceSession = ComponentProps<typeof EventScheduleManager>["sessions"][number];
+type ExperienceTicketType = NonNullable<ComponentProps<typeof EventScheduleManager>["ticketTypes"]>[number];
+type ExperienceAddon = ComponentProps<typeof AddonTextEditor>["addons"][number];
+interface ExperienceRecord extends ExperienceForm {
+  id: string; title: string; slug: string;
+  sessions?: ExperienceSession[];
+  ticketTypes?: ExperienceTicketType[];
+  addons?: ExperienceAddon[];
+  venueId: string | null; spaceId: string | null;
+}
+interface VenueOption { id: string; name: string }
+interface SpaceOption { id: string; venueId: string; name: string; isActive: boolean }
+interface HostOption {
+  id: string; displayName?: string | null; handle?: string | null; name?: string | null; approved?: boolean;
+  user?: { name?: string | null; email?: string | null } | null;
+}
+
 export default function AdminExperienceEditPage() {
   const { id } = useParams() as { id: string };
   const router  = useRouter();
   const t = useTranslation();
-  const [series, setSeries]   = useState<any>(null);
+  const [series, setSeries]   = useState<ExperienceRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [tab,     setTab]     = useState("basics");
   const [success, setSuccess] = useState("");
   const [error,   setError]   = useState("");
-  const [form,    setForm]    = useState<any>({});
+  const [form,    setForm]    = useState<ExperienceForm>({});
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateTitle, setDuplicateTitle] = useState("");
   const [duplicating, setDuplicating] = useState(false);
-  const [venues, setVenues] = useState<any[]>([]);
-  const [spaces, setSpaces] = useState<any[]>([]);
-  const [hostOptions, setHostOptions] = useState<{ influencers: any[]; partners: any[] }>({ influencers: [], partners: [] });
+  const [venues, setVenues] = useState<VenueOption[]>([]);
+  const [spaces, setSpaces] = useState<SpaceOption[]>([]);
+  const [hostOptions, setHostOptions] = useState<{ influencers: HostOption[]; partners: HostOption[] }>({ influencers: [], partners: [] });
   const translations = useSeriesTranslations(id);
 
   useEffect(() => {
@@ -77,8 +108,8 @@ export default function AdminExperienceEditPage() {
 
   const loadSeries = useCallback(async () => {
     const res = await fetch(`/api/v1/admin/experiences/${id}`);
-    const data = await res.json();
-    setSeries(data.series);
+    const data = await res.json() as { series?: ExperienceRecord | null };
+    setSeries(data.series ?? null);
     setForm(data.series ?? {});
     setLoading(false);
     await translations.refresh();
@@ -120,7 +151,7 @@ export default function AdminExperienceEditPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.fromEntries(Object.entries(form).filter(([key]) => userRoles.includes("SUPERADMIN") || !["heroImageUrlEn", "heroImageUrlEs", "heroImageUrlPt"].includes(key)))),
     });
-    const data = await res.json();
+    const data = await res.json() as { error?: string; issues?: Array<{ message?: string }>; series: ExperienceRecord };
     if (!res.ok) {
       const issues = Array.isArray(data.issues) ? data.issues.map((issue: { message?: string }) => issue.message).filter(Boolean).join(" ") : "";
       setError(issues || data.error || t("admin", "save_failed") || "Save failed");
@@ -175,12 +206,13 @@ export default function AdminExperienceEditPage() {
   }
 
   function field(key: string, label: string, type = "text", opts?: { rows?: number; options?: string[] }) {
-    const val = form[key] ?? "";
+    const raw = form[key];
+    const val = typeof raw === "string" || typeof raw === "number" ? raw : "";
     if (opts?.options) {
       return (
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
-          <select value={val} onChange={(e) => setForm((p: any) => ({ ...p, [key]: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+          <select value={val} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
             {opts.options.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
@@ -190,14 +222,14 @@ export default function AdminExperienceEditPage() {
       return (
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
-          <textarea rows={opts?.rows ?? 4} value={val} onChange={(e) => setForm((p: any) => ({ ...p, [key]: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, resize: "vertical", fontFamily: "inherit" }} />
+          <textarea rows={opts?.rows ?? 4} value={val} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, resize: "vertical", fontFamily: "inherit" }} />
         </div>
       );
     }
     if (type === "checkbox") {
       return (
         <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
-          <input type="checkbox" checked={!!form[key]} onChange={(e) => setForm((p: any) => ({ ...p, [key]: e.target.checked }))} style={{ width: 16, height: 16 }} />
+          <input type="checkbox" checked={form[key] === true} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.checked }))} style={{ width: 16, height: 16 }} />
           <label style={{ fontSize: 14, color: "#374151" }}>{label}</label>
         </div>
       );
@@ -205,7 +237,7 @@ export default function AdminExperienceEditPage() {
     return (
       <div style={{ marginBottom: 20 }}>
         <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
-        <input type={type} value={val} onChange={(e) => setForm((p: any) => ({ ...p, [key]: e.target.value }))}
+        <input type={type} value={val} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.value }))}
           style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14 }} />
       </div>
     );
@@ -296,14 +328,14 @@ export default function AdminExperienceEditPage() {
               {field("category", t("admin", "category") ?? "Category", "text", { options: ["Food & Drink", "Wellness", "Design & Art", "Music", "Business", "Community"] })}
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Host type</label>
-                <select value={form.hostType ?? "OKU"} onChange={(e) => setForm((p: any) => ({ ...p, hostType: e.target.value, influencerId: null, partnerId: null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                <select value={form.hostType ?? "OKU"} onChange={(e) => setForm((previous) => ({ ...previous, hostType: e.target.value, influencerId: null, partnerId: null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
                   <option value="OKU">OKÜ</option><option value="CATCH">CATCH</option><option value="INFLUENCER">Influencer</option><option value="PARTNER">Partner</option>
                 </select>
               </div>
               {form.hostType === "INFLUENCER" && (
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Influencer host</label>
-                  <select value={form.influencerId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, influencerId: e.target.value || null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                  <select value={form.influencerId ?? ""} onChange={(e) => setForm((previous) => ({ ...previous, influencerId: e.target.value || null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
                     <option value="">Select an influencer</option>
                     {hostOptions.influencers.map((profile) => <option key={profile.id} value={profile.id}>{profile.displayName || profile.user?.name || profile.handle || profile.user?.email}{profile.approved ? "" : " (not approved)"}</option>)}
                   </select>
@@ -312,7 +344,7 @@ export default function AdminExperienceEditPage() {
               {form.hostType === "PARTNER" && (
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Partner host</label>
-                  <select value={form.partnerId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, partnerId: e.target.value || null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                  <select value={form.partnerId ?? ""} onChange={(e) => setForm((previous) => ({ ...previous, partnerId: e.target.value || null }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
                     <option value="">Select a partner</option>
                     {hostOptions.partners.map((profile) => <option key={profile.id} value={profile.id}>{profile.name || profile.user?.name || profile.user?.email}{profile.approved ? "" : " (not approved)"}</option>)}
                   </select>
@@ -320,14 +352,14 @@ export default function AdminExperienceEditPage() {
               )}
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Operational venue</label>
-                <select value={form.venueId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, venueId: e.target.value, spaceId: "" }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                <select value={form.venueId ?? ""} onChange={(e) => setForm((previous) => ({ ...previous, venueId: e.target.value, spaceId: "" }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
                   <option value="">Select a venue</option>
                   {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Physical space (optional)</label>
-                <select value={form.spaceId ?? ""} onChange={(e) => setForm((p: any) => ({ ...p, spaceId: e.target.value || null }))} disabled={!form.venueId} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
+                <select value={form.spaceId ?? ""} onChange={(e) => setForm((previous) => ({ ...previous, spaceId: e.target.value || null }))} disabled={!form.venueId} style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" }}>
                   <option value="">Entire venue — no physical space assigned</option>
                   {spaces.filter((space) => space.venueId === form.venueId && space.isActive).map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
                 </select>
@@ -339,13 +371,13 @@ export default function AdminExperienceEditPage() {
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("admin", "hero_image") ?? "Hero Image"}</label>
                 <MediaUpload
                   value={form.heroImageUrl ?? ""}
-                  onChange={(url) => setForm((p: any) => ({ ...p, heroImageUrl: url }))}
+                  onChange={(url) => setForm((previous) => ({ ...previous, heroImageUrl: url }))}
                   mediaType="image"
                   aspectRatio="wide"
                   maxSizeMB={10}
                 />
               </div>
-              {userRoles.includes("SUPERADMIN") && <LocalizedArtworkEditor kind="series" value={form} onChange={(field, url) => setForm((current: any) => ({ ...current, [field]: url }))} />}
+              {userRoles.includes("SUPERADMIN") && <LocalizedArtworkEditor kind="series" value={form} onChange={(field, url) => setForm((current) => ({ ...current, [field]: url }))} />}
               {field("communityUrl", t("admin", "community_url") ?? "Community/Discord URL")}
               <div style={{ borderTop: "1px solid #e5e0d8", margin: "24px 0" }} />
               <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 20, fontWeight: 400, color: "#1a1614", margin: "0 0 8px" }}>Series social links</h3>
@@ -359,7 +391,7 @@ export default function AdminExperienceEditPage() {
                       inputMode="url"
                       placeholder="https://"
                       value={(form.socialLinksJson && typeof form.socialLinksJson === "object" ? form.socialLinksJson[key] : "") ?? ""}
-                      onChange={(event) => setForm((current: any) => ({ ...current, socialLinksJson: { ...(current.socialLinksJson ?? {}), [key]: event.target.value } }))}
+                      onChange={(event) => setForm((current) => ({ ...current, socialLinksJson: { ...(current.socialLinksJson ?? {}), [key]: event.target.value } }))}
                       style={{ width: "100%", boxSizing: "border-box", marginTop: 6, padding: "10px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14 }}
                     />
                   </label>
@@ -515,7 +547,11 @@ export default function AdminExperienceEditPage() {
               </p>
               <ReservationBlocksPanel
                 seriesId={id}
-                sessions={series.sessions ?? []}
+                sessions={(series.sessions ?? []).map((session) => ({
+                  id: session.id,
+                  title: session.title ?? null,
+                  startsAt: session.startsAt,
+                }))}
               />
             </div>
           )}

@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
 import { sendInfluencerInviteEmail } from "@/server/influencer/inviteEmail";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { z } from "zod";
 
-function randRefCode(prefix: string) {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = (prefix.toUpperCase().replace(/[^A-Z0-9]/g, "") || "INF").slice(0, 3);
-  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
+const InviteBody = z.object({
+  invitedEmail: z.string().trim().email(),
+  invitedName: z.string().trim().min(1),
+  commissionPct: z.coerce.number().finite().min(0).max(100).optional(),
+  seriesId: z.string().trim().min(1).nullable().optional(),
+});
 
 export async function GET(req: NextRequest) {
   await requireAdminRoles(req, ["SUPERADMIN"]);
@@ -30,13 +31,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { session } = await requireAdminRoles(req, ["SUPERADMIN"]);
+  const { userId } = await requireAdminRoles(req, ["SUPERADMIN"]);
 
-  const body = await req.json().catch(() => ({}));
-  const { invitedEmail, invitedName, commissionPct, seriesId } = body;
-
-  if (!invitedEmail?.trim()) return NextResponse.json({ error: "Email is required" }, { status: 400 });
-  if (!invitedName?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  const parsed = InviteBody.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) return NextResponse.json({ error: "Valid email and name are required" }, { status: 400 });
+  const { invitedEmail, invitedName, commissionPct, seriesId } = parsed.data;
 
   const commissionRateBps = Math.round(Number(commissionPct ?? 10) * 100);
   const token = randomBytes(32).toString("hex");
@@ -53,7 +52,7 @@ export async function POST(req: NextRequest) {
       invitedName: invitedName.trim(),
       commissionRateBps,
       seriesId: series?.id ?? null,
-      createdByUserId: session.user.id,
+      createdByUserId: userId,
       expiresAt,
     },
   });

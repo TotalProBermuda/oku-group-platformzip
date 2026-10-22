@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { SponsorshipSlotCategory, SponsorshipSlotStatus } from "@prisma/client";
 
-function isAdmin(s: any) {
-  return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
+function isAdmin(s: Session | null) {
+  return s?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function GET(req: NextRequest) {
@@ -12,14 +13,17 @@ export async function GET(req: NextRequest) {
   if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
-  const status   = searchParams.get("status")   ?? "";
-  const category = searchParams.get("category") ?? "";
+  const statusRaw   = searchParams.get("status")   ?? "";
+  const categoryRaw = searchParams.get("category") ?? "";
+  const status = statusRaw ? Object.values(SponsorshipSlotStatus).find((value) => value === statusRaw) : undefined;
+  const category = categoryRaw ? Object.values(SponsorshipSlotCategory).find((value) => value === categoryRaw) : undefined;
+  if ((statusRaw && !status) || (categoryRaw && !category)) return NextResponse.json({ ok: false, error: "Invalid sponsorship filter" }, { status: 400 });
   const seriesId = searchParams.get("seriesId") ?? "";
 
   const slots = await prisma.sponsorshipSlot.findMany({
     where: {
-      ...(status   ? { status:   status   as any } : {}),
-      ...(category ? { category: category as any } : {}),
+      ...(status   ? { status } : {}),
+      ...(category ? { category } : {}),
       ...(seriesId ? { seriesId } : {}),
     },
     include: {

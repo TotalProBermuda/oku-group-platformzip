@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
+import { Prisma } from "@prisma/client";
 
 export async function GET() {
   try {
@@ -16,7 +17,7 @@ export async function GET() {
 
     const isSuperAdmin = roles.includes("SUPERADMIN");
 
-    const visibilityFilter: any[] = [{ visibility: "APPROVED_INVESTORS" }];
+    const visibilityFilter: Prisma.IRDocumentWhereInput[] = [{ visibility: "APPROVED_INVESTORS" }];
     if (isSuperAdmin) {
       visibilityFilter.push({ visibility: "PRIVATE" });
     }
@@ -38,10 +39,10 @@ export async function GET() {
         documents,
       },
     });
-  } catch (e: any) {
-    if (e.message === "Unauthorized") {
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message === "Unauthorized") {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Internal server error" }, { status: 500 });
   }
 }

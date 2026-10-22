@@ -34,7 +34,13 @@ const ROLE_LABELS: Record<string, string> = {
 
 type Props = {
   onClose: () => void;
-  onCreated: (user: any) => void;
+  onCreated: (user: CreatedUser) => void;
+};
+
+type CreatedUser = {
+  id: string;
+  name: string | null;
+  email: string | null;
 };
 
 const fieldStyle: React.CSSProperties = {
@@ -79,8 +85,8 @@ export default function NewUserModal({ onClose, onCreated }: Props) {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "Failed to create user");
       onCreated(json.data);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to create user");
     } finally {
       setSaving(false);
     }
@@ -153,7 +159,7 @@ export default function NewUserModal({ onClose, onCreated }: Props) {
             </div>
 
             <div style={{ marginTop: 12, padding: "8px 12px", background: "#fff", borderRadius: 8, border: "1px solid #e8e2dd", fontSize: 12, color: "#7d7269" }}>
-              A unique referral code will be generated automatically and a secure invitation will be emailed. You can assign a compensation plan from the user's profile after creation.
+              A unique referral code will be generated automatically and a secure invitation will be emailed. You can assign a compensation plan from the user&apos;s profile after creation.
             </div>
           </div>
         )}

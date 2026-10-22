@@ -6,6 +6,7 @@ import {
   getResolvedCybersourceConfig,
   type ResolvedCybersourceConfig,
 } from "@/server/cybersource/client";
+import { asRecord, errorMessage } from "@/server/payments/providers/types";
 
 type Billing = {
   firstName: string;
@@ -52,17 +53,19 @@ export type PayerAuthenticationChallenge = {
   cardType?: string;
 };
 
-type Call = { httpStatus: number | null; body: any; networkError: string | null };
+type Call = { httpStatus: number | null; body: unknown; networkError: string | null };
 
 // Explicit allowlist only: never log request bodies, tokens, billing, or raw
 // provider messages (which can contain payment data).
 function logAuthenticationFailure(stage: "setup" | "enrollment" | "validation", result: Call) {
   const code = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(value) ? value : undefined;
+  const body = asRecord(result.body);
+  const errorInformation = asRecord(body?.errorInformation);
   console.warn(JSON.stringify({
     type: "checkout_authentication_failed", stage,
     httpStatus: result.httpStatus,
-    status: code(result.body?.status),
-    reason: code(result.body?.errorInformation?.reason),
+    status: code(body?.status),
+    reason: code(errorInformation?.reason),
     networkFailure: Boolean(result.networkError),
   }));
 }
@@ -101,26 +104,31 @@ async function postSigned(cfg: ResolvedCybersourceConfig, path: string, body: un
       body: json,
     });
     const text = await response.text();
-    let parsed: any = null;
+    let parsed: unknown = null;
     try { parsed = text ? JSON.parse(text) : null; } catch { parsed = { rawText: text.slice(0, 1000) }; }
     return { httpStatus: response.status, body: parsed, networkError: null };
-  } catch (error: any) {
-    return { httpStatus: null, body: null, networkError: error?.message ?? "network error" };
+  } catch (error: unknown) {
+    return { httpStatus: null, body: null, networkError: errorMessage(error, "network error") };
   }
 }
 
-function toAuthenticationData(info: any): PayerAuthenticationData {
+function toAuthenticationData(value: unknown): PayerAuthenticationData {
+  const info = asRecord(value);
+  const stringValue = (key: string, fallback?: string): string | undefined => {
+    const candidate = info?.[key] ?? (fallback ? info?.[fallback] : undefined);
+    return typeof candidate === "string" ? candidate : undefined;
+  };
   return {
-    indicator: info?.indicator ?? info?.ecommerceIndicator,
-    eciRaw: info?.eciRaw ?? info?.eci,
-    cavv: info?.cavv,
-    ucafCollectionIndicator: info?.ucafCollectionIndicator,
-    ucafAuthenticationData: info?.ucafAuthenticationData,
-    xid: info?.xid,
-    directoryServerTransactionId: info?.directoryServerTransactionId,
-    threeDSServerTransactionId: info?.threeDSServerTransactionId,
-    specificationVersion: info?.specificationVersion,
-    paresStatus: info?.paresStatus,
+    indicator: stringValue("indicator", "ecommerceIndicator"),
+    eciRaw: stringValue("eciRaw", "eci"),
+    cavv: stringValue("cavv"),
+    ucafCollectionIndicator: stringValue("ucafCollectionIndicator"),
+    ucafAuthenticationData: stringValue("ucafAuthenticationData"),
+    xid: stringValue("xid"),
+    directoryServerTransactionId: stringValue("directoryServerTransactionId"),
+    threeDSServerTransactionId: stringValue("threeDSServerTransactionId"),
+    specificationVersion: stringValue("specificationVersion"),
+    paresStatus: stringValue("paresStatus"),
   };
 }
 
@@ -130,12 +138,14 @@ export async function setupPayerAuthentication(transientTokenJwt: string) {
   const result = await postSigned(cfg, "/risk/v1/authentication-setups", {
     tokenInformation: { transientToken: payerAuthenticationTransientToken(transientTokenJwt) },
   });
-  const info = result.body?.consumerAuthenticationInformation;
-  if (!result.httpStatus || result.httpStatus >= 300 || !info?.referenceId || !info?.accessToken || !info?.deviceDataCollectionUrl) {
+  const body = asRecord(result.body);
+  const info = asRecord(body?.consumerAuthenticationInformation);
+  const errorInformation = asRecord(body?.errorInformation);
+  if (!result.httpStatus || result.httpStatus >= 300 || typeof info?.referenceId !== "string" || typeof info.accessToken !== "string" || typeof info.deviceDataCollectionUrl !== "string") {
     logAuthenticationFailure("setup", result);
-    throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Unable to initialize cardholder verification.");
+    throw new Error((typeof errorInformation?.message === "string" ? errorInformation.message : null) ?? result.networkError ?? "Unable to initialize cardholder verification.");
   }
-  return { referenceId: info.referenceId as string, accessToken: info.accessToken as string, deviceDataCollectionUrl: info.deviceDataCollectionUrl as string };
+  return { referenceId: info.referenceId, accessToken: info.accessToken, deviceDataCollectionUrl: info.deviceDataCollectionUrl };
 }
 
 /** Check enrollment after browser device collection. The caller may then either
@@ -179,16 +189,20 @@ export async function checkPayerAuthentication(input: {
     },
     tokenInformation: { transientToken: payerAuthenticationTransientToken(input.transientTokenJwt) },
   });
-  const info = result.body?.consumerAuthenticationInformation;
-  if (result.httpStatus && result.httpStatus < 300 && result.body?.status === "PENDING_AUTHENTICATION" && info?.authenticationTransactionId && info?.stepUpUrl && info?.accessToken) {
+  const body = asRecord(result.body);
+  const info = asRecord(body?.consumerAuthenticationInformation);
+  const paymentInformation = asRecord(body?.paymentInformation);
+  const card = asRecord(paymentInformation?.card);
+  const errorInformation = asRecord(body?.errorInformation);
+  if (result.httpStatus && result.httpStatus < 300 && body?.status === "PENDING_AUTHENTICATION" && typeof info?.authenticationTransactionId === "string" && typeof info.stepUpUrl === "string" && typeof info.accessToken === "string") {
     const url = new URL(info.stepUpUrl);
     const expectedHost = cfg.env === "production" ? "centinelapi.cardinalcommerce.com" : "centinelapistag.cardinalcommerce.com";
     if (url.protocol !== "https:" || url.hostname !== expectedHost || url.username || url.password) throw new Error("Invalid verification destination.");
-    return { kind: "challenge" as const, challenge: { authenticationTransactionId: info.authenticationTransactionId, stepUpUrl: info.stepUpUrl, token: info.accessToken, cardType: result.body?.paymentInformation?.card?.type } };
+    return { kind: "challenge" as const, challenge: { authenticationTransactionId: info.authenticationTransactionId, stepUpUrl: info.stepUpUrl, token: info.accessToken, cardType: typeof card?.type === "string" ? card.type : undefined } };
   }
-  if (result.httpStatus && result.httpStatus < 300 && result.body?.status === "AUTHENTICATION_SUCCESSFUL") return { kind: "authenticated" as const, authentication: toAuthenticationData(info) };
+  if (result.httpStatus && result.httpStatus < 300 && body?.status === "AUTHENTICATION_SUCCESSFUL") return { kind: "authenticated" as const, authentication: toAuthenticationData(info) };
   logAuthenticationFailure("enrollment", result);
-  throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
+  throw new Error((typeof errorInformation?.message === "string" ? errorInformation.message : null) ?? result.networkError ?? "Cardholder verification was not completed.");
 }
 
 /** Complete a required 3-D Secure challenge, then return fields safe to send
@@ -199,9 +213,11 @@ export async function validatePayerAuthentication(input: { authenticationTransac
     paymentInformation: input.cardType ? { card: { type: input.cardType } } : undefined,
     consumerAuthenticationInformation: { authenticationTransactionId: input.authenticationTransactionId },
   });
-  if (!result.httpStatus || result.httpStatus >= 300 || result.body?.status !== "AUTHENTICATION_SUCCESSFUL") {
+  const body = asRecord(result.body);
+  const errorInformation = asRecord(body?.errorInformation);
+  if (!result.httpStatus || result.httpStatus >= 300 || body?.status !== "AUTHENTICATION_SUCCESSFUL") {
     logAuthenticationFailure("validation", result);
-    throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
+    throw new Error((typeof errorInformation?.message === "string" ? errorInformation.message : null) ?? result.networkError ?? "Cardholder verification was not completed.");
   }
-  return toAuthenticationData(result.body?.consumerAuthenticationInformation);
+  return toAuthenticationData(asRecord(body?.consumerAuthenticationInformation));
 }

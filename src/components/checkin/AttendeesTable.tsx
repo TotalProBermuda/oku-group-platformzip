@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { QrCode, X, Scan, ScanLine } from "lucide-react";
 import type { CheckInEvent } from "@/lib/checkInEmitter";
+import type { Html5Qrcode } from "html5-qrcode";
 
 interface Ticket {
   id: string;
@@ -66,8 +67,8 @@ function QRScannerModal({ seriesId, onClose }: QRScannerModalProps) {
   const [manualCode, setManualCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string; result?: string } | null>(null);
-  const scannerRef = useRef<any>(null);
-  const instanceRef = useRef<any>(null);
+  const scannerRef = useRef<typeof Html5Qrcode | null>(null);
+  const instanceRef = useRef<Html5Qrcode | null>(null);
   const isRunningRef = useRef(false);
   const cooldownRef = useRef(false);
   const activeRef = useRef(true);

@@ -1,8 +1,25 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import type { VenueMenu, MenuSection, MenuItem } from "@/data/venues/menus";
 import type { LocalizedText } from "@/types/i18n";
 
 type LocalizedOrString = string | LocalizedText | null;
+
+function cloneJsonInput(value: Prisma.JsonValue): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (value === null) return Prisma.JsonNull;
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function menuTitleInput(value: unknown, fallback: Prisma.JsonValue): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const candidate = value as Record<string, unknown>;
+    if (["en", "es", "pt"].every((locale) => typeof candidate[locale] === "string")) {
+      return { en: candidate.en as string, es: candidate.es as string, pt: candidate.pt as string };
+    }
+  }
+  return cloneJsonInput(fallback);
+}
 
 function asLocalized(v: unknown): LocalizedOrString {
   if (v === null || v === undefined) return null;
@@ -184,8 +201,8 @@ export async function duplicateMenuRecord(sourceMenuId: string, opts?: { newTitl
     data: {
       venueSlug:    source.venueSlug,
       menuType:     source.menuType,
-      menuTitle:    (opts?.newTitle ?? source.menuTitle) as any,
-      intro:        source.intro as any,
+      menuTitle:    menuTitleInput(opts?.newTitle, source.menuTitle),
+      intro:        source.intro === null ? Prisma.JsonNull : cloneJsonInput(source.intro),
       pdfUrl:       source.pdfUrl,
       sortOrder:    source.sortOrder,
       isPublished:  source.isPublished,
@@ -193,14 +210,14 @@ export async function duplicateMenuRecord(sourceMenuId: string, opts?: { newTitl
       parentMenuId: source.id,
       sections: {
         create: source.sections.map((s) => ({
-          title:       s.title as any,
-          subtitle:    s.subtitle as any,
-          description: s.description as any,
+          title:       cloneJsonInput(s.title),
+          subtitle:    s.subtitle === null ? Prisma.JsonNull : cloneJsonInput(s.subtitle),
+          description: s.description === null ? Prisma.JsonNull : cloneJsonInput(s.description),
           sortOrder:   s.sortOrder,
           items: {
             create: s.items.map((it) => ({
-              name:        it.name as any,
-              description: it.description as any,
+              name:        cloneJsonInput(it.name),
+              description: it.description === null ? Prisma.JsonNull : cloneJsonInput(it.description),
               price:       it.price,
               dietary:     it.dietary,
               tags:        it.tags,

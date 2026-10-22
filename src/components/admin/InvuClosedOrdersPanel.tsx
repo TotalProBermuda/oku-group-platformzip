@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 interface Venue {
   id: string;
@@ -227,9 +228,9 @@ export default function InvuClosedOrdersPanel({ venues }: { venues: Venue[] }) {
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur">
             <p className="text-white/60">
               No venues with a connected INVU integration.{" "}
-              <a href="/admin/integrations/invu" className="text-amber-300 hover:underline">
+              <Link href="/admin/integrations/invu" className="text-amber-300 hover:underline">
                 Connect INVU
-              </a>{" "}
+              </Link>{" "}
               first.
             </p>
           </div>

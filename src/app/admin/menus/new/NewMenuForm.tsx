@@ -46,8 +46,8 @@ export default function NewMenuForm() {
       if (!data.ok) { setError(data.error ?? "Failed to create menu"); setBusy(false); return; }
       // After creating, jump to the editor to add sections + items.
       router.push(`/admin/menus/${data.data.id}?created=1`);
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to create menu");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to create menu");
       setBusy(false);
     }
   }
@@ -64,7 +64,7 @@ export default function NewMenuForm() {
       <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28, lineHeight: 1.5 }}>
         {seriesId
           ? <>Creating a menu attached to <strong>{seriesTitle || "this event"}</strong>. It will only show on the event page, not on the venue page.</>
-          : <>Pick a venue and type, give the menu a title, then you'll be able to add sections and items in the editor.</>
+          : <>Pick a venue and type, give the menu a title, then you&apos;ll be able to add sections and items in the editor.</>
         }
       </p>
 
@@ -105,7 +105,7 @@ export default function NewMenuForm() {
           <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", border: "1px solid #e5e0d8", borderRadius: 8, background: "#fafaf9", cursor: "pointer" }}>
             <input type="checkbox" checked={isHouseMenu} onChange={(e) => setIsHouseMenu(e.target.checked)} style={{ marginTop: 3 }} />
             <span style={{ fontSize: 13, color: "#1a1614" }}>
-              <strong>House menu</strong> — show on the venue's public page as the standing menu.
+              <strong>House menu</strong> — show on the venue&apos;s public page as the standing menu.
               Uncheck to create an event-only menu you can attach to events later.
             </span>
           </label>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getHostApiErrorDetails } from "@/app/api/v1/host/errorDetails";
 import { requireSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
 import { provisionHostPersonalReferrer } from "@/server/events/eventReferrerService";
@@ -470,7 +471,8 @@ export async function GET() {
         venue: venue ? { id: venue.id, name: venue.name } : null,
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

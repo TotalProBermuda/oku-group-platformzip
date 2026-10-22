@@ -5,6 +5,7 @@ import {
   DocumentError,
 } from "@/server/beneficiaries/beneficiaryDocumentService";
 import { scrubErrorMessage } from "@/server/security/logScrub";
+import { getBeneficiaryApiErrorStatus } from "@/app/api/v1/me/beneficiary/errorDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,8 @@ export async function GET(
     const { id } = await ctx.params;
     const out = await getOwnDocumentSignedUrl(userId, id);
     return NextResponse.json({ ok: true, data: out });
-  } catch (e: any) {
-    const status = e instanceof DocumentError ? e.status : (e.status || 500);
+  } catch (e: unknown) {
+    const status = e instanceof DocumentError ? e.status : getBeneficiaryApiErrorStatus(e);
     return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status });
   }
 }

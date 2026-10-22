@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface TrustKpis {
   sessionCount: number;
@@ -111,9 +112,9 @@ export default function TrustKpiStrip({ venueId, dateFrom, dateTo }: Props) {
             Trust KPIs appear after the first INVU sync run.
           </div>
         </div>
-        <a href="/admin/integrations/invu" className="btn btn-primary" style={{ fontSize: 12 }}>
+        <Link href="/admin/integrations/invu" className="btn btn-primary" style={{ fontSize: 12 }}>
           Open INVU Integration →
-        </a>
+        </Link>
       </div>
     );
   }

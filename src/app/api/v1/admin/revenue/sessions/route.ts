@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { getSessionsLedger } from "@/lib/revenue/trustDashboard";
@@ -30,7 +31,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

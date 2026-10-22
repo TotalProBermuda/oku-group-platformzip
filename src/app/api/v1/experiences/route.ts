@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { localizeSessions } from "@/server/series/localizeSessions";
 import { localizeEventCatalog } from "@/server/i18n/eventTranslations";
@@ -11,11 +12,11 @@ export async function GET(req: NextRequest) {
   const slug      = searchParams.get("slug");
   const now       = new Date();
 
-  const where: any = {
+  const where: Prisma.SeriesWhereInput = {
     status: { in: ["PUBLISHED", "SOLD_OUT"] },
   };
   if (category) where.category = category;
-  if (venue)    where.venue    = venue;
+  if (venue === "OKU" || venue === "CATCH") where.venue = venue;
   if (featured === "true") where.isFeatured = true;
   if (slug)     where.slug     = slug;
 

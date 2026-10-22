@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
@@ -36,11 +37,24 @@ const Body = z.object({
   sections: z.array(SectionSchema).default([]),
 });
 
-export async function GET(_req: Request, ctx: any) {
+type RouteContext = { params: Promise<{ id: string }> };
+
+function errorResponse(error: unknown) {
+  const details = typeof error === "object" && error !== null
+    ? error as { message?: unknown; status?: unknown }
+    : undefined;
+  const status = typeof details?.status === "number" && details.status >= 400 && details.status <= 599
+    ? details.status
+    : 500;
+  const message = typeof details?.message === "string" ? details.message : "Internal server error";
+  return NextResponse.json({ ok: false, error: message }, { status });
+}
+
+export async function GET(_req: Request, ctx: RouteContext) {
   try {
     const { roles } = await requireSession();
     requirePermission(roles, "admin:menus:read");
-    const id = ctx?.params?.id ?? (await ctx.params).id;
+    const { id } = await ctx.params;
     const menu = await prisma.venueMenuRecord.findUnique({
       where: { id },
       include: {
@@ -52,16 +66,16 @@ export async function GET(_req: Request, ctx: any) {
     });
     if (!menu) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     return NextResponse.json({ ok: true, data: menu });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    return errorResponse(error);
   }
 }
 
-export async function PUT(req: Request, ctx: any) {
+export async function PUT(req: Request, ctx: RouteContext) {
   try {
     const { roles, userId } = await requireSession();
     requirePermission(roles, "admin:menus:edit");
-    const id = ctx?.params?.id ?? (await ctx.params).id;
+    const { id } = await ctx.params;
     const body = Body.parse(await req.json());
 
     const before = await prisma.venueMenuRecord.findUnique({ where: { id } });
@@ -71,8 +85,8 @@ export async function PUT(req: Request, ctx: any) {
       await tx.venueMenuRecord.update({
         where: { id },
         data: {
-          menuTitle: body.menuTitle as any,
-          intro: (body.intro ?? null) as any,
+          menuTitle: body.menuTitle as Prisma.InputJsonValue,
+          intro: body.intro == null ? Prisma.DbNull : body.intro as Prisma.InputJsonValue,
           pdfUrl: body.pdfUrl ?? null,
           isPublished: body.isPublished ?? before.isPublished,
         },
@@ -83,9 +97,9 @@ export async function PUT(req: Request, ctx: any) {
         const section = await tx.menuSectionRecord.create({
           data: {
             menuId: id,
-            title: s.title as any,
-            subtitle: (s.subtitle ?? null) as any,
-            description: (s.description ?? null) as any,
+            title: s.title as Prisma.InputJsonValue,
+            subtitle: s.subtitle == null ? Prisma.DbNull : s.subtitle as Prisma.InputJsonValue,
+            description: s.description == null ? Prisma.DbNull : s.description as Prisma.InputJsonValue,
             sortOrder: s.sortOrder,
           },
         });
@@ -93,8 +107,8 @@ export async function PUT(req: Request, ctx: any) {
           await tx.menuItemRecord.create({
             data: {
               sectionId: section.id,
-              name: it.name as any,
-              description: (it.description ?? null) as any,
+              name: it.name as Prisma.InputJsonValue,
+              description: it.description == null ? Prisma.DbNull : it.description as Prisma.InputJsonValue,
               price: it.price ?? null,
               dietary: it.dietary,
               tags: it.tags,
@@ -109,7 +123,7 @@ export async function PUT(req: Request, ctx: any) {
     console.log(`[admin:menus:edit] user=${userId} updated menu=${id} venue=${before.venueSlug} type=${before.menuType} sections=${body.sections.length}`);
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    return errorResponse(error);
   }
 }

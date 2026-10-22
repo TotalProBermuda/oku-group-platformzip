@@ -37,6 +37,9 @@
   ],
   "exclude": [
     "node_modules",
-    "catch-starter-kit"
+    "catch-starter-kit",
+    "artifacts/mockup-sandbox",
+    "attached_assets/**/*.ts",
+    "attached_assets/**/*.tsx"
   ]
 }

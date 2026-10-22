@@ -20,8 +20,9 @@ export async function GET(req: Request) {
 
     const tickets = await searchTickets(query.trim(), sessionId);
     return NextResponse.json({ ok: true, tickets });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to search tickets" }, { status });
   }
 }
 
@@ -43,8 +44,8 @@ export async function POST(req: Request) {
       expectedSessionId: sessionId?.trim() || undefined,
     });
     return NextResponse.json({ ok: true, ...result });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (error: unknown) {
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to check in ticket" }, { status });
   }
 }

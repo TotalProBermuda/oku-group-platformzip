@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
+import { RoleKey } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
@@ -16,8 +18,10 @@ export async function DELETE(
       throw Object.assign(new Error("The primary owner must retain the SUPERADMIN role"), { status: 403 });
     }
 
+    const validRole = Object.values(RoleKey).find((value) => value === roleKey);
+    if (!validRole) return NextResponse.json({ ok: false, error: "Unknown role" }, { status: 400 });
     await prisma.userRole.deleteMany({
-      where: { userId: id, roleKey: roleKey as any },
+      where: { userId: id, roleKey: validRole },
     });
 
     await logAdminAction({
@@ -34,7 +38,8 @@ export async function DELETE(
     });
 
     return NextResponse.json({ ok: true, data: updated });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

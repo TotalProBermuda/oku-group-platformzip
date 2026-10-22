@@ -9,6 +9,17 @@ import UserDrawer from "@/components/admin/UserDrawer";
 import NewUserModal from "@/components/admin/NewUserModal";
 import { Search, UserPlus } from "lucide-react";
 
+interface AdminUserRow {
+  id: string;
+  name: string | null;
+  email: string;
+  status: string;
+  createdAt: string;
+  tags?: string[];
+  roles?: Array<{ roleKey: string }>;
+  referrer?: { referrerType: string } | null;
+}
+
 function UsersPageContent() {
   const t = useTranslation();
   const locale = useLocale();
@@ -57,7 +68,7 @@ function UsersPageContent() {
     ADMIN_HR:              { bg: "#1a161410", fg: "#1a1614" },
   };
 
-  const [users, setUsers]               = useState<any[]>([]);
+  const [users, setUsers]               = useState<AdminUserRow[]>([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState("");
   const [roleFilter, setRoleFilter]     = useState("");
@@ -68,7 +79,7 @@ function UsersPageContent() {
   const fetchUsers = async () => {
     setLoading(true);
     const r = await fetch("/api/v1/admin/users");
-    const d = await r.json();
+    const d = await r.json() as { ok: boolean; data: AdminUserRow[] };
     if (d.ok) setUsers(d.data);
     setLoading(false);
   };
@@ -83,13 +94,13 @@ function UsersPageContent() {
         u.name?.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q);
       const matchRole =
-        !roleFilter || u.roles?.some((r: any) => r.roleKey === roleFilter);
+        !roleFilter || u.roles?.some((role) => role.roleKey === roleFilter);
       const matchStatus = !statusFilter || u.status === statusFilter;
       return matchQ && matchRole && matchStatus;
     });
   }, [users, search, roleFilter, statusFilter]);
 
-  const buildActions = (u: any): ActionItem[] => [
+  const buildActions = (u: AdminUserRow): ActionItem[] => [
     {
       key: "open",
       label: t("admin", "openProfile"),
@@ -98,7 +109,7 @@ function UsersPageContent() {
     {
       key: "referrer-invite",
       label: t("admin", "resendReferrerInvite"),
-      hidden: u.status !== "ACTIVE" || !u.roles?.some((role: any) => role.roleKey === "REFERRER"),
+      hidden: u.status !== "ACTIVE" || !u.roles?.some((role) => role.roleKey === "REFERRER"),
       onClick: async () => {
         const response = await fetch(`/api/v1/admin/users/${u.id}/referrer-invite`, {
           method: "POST",
@@ -156,7 +167,7 @@ function UsersPageContent() {
       year: "numeric",
     });
 
-  const columns: EntityColumn<any>[] = [
+  const columns: EntityColumn<AdminUserRow>[] = [
     {
       key: "name",
       header: t("admin", "name"),
@@ -164,7 +175,7 @@ function UsersPageContent() {
       render: (u) => (
         <div>
           <div style={{ fontWeight: 600, fontSize: 13 }}>{u.name || "—"}</div>
-          {u.tags?.length > 0 && (
+          {u.tags && u.tags.length > 0 && (
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
               {u.tags.slice(0, 3).map((tag: string) => (
                 <span
@@ -200,7 +211,7 @@ function UsersPageContent() {
       header: t("admin", "role"),
       render: (u) => (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {u.roles?.slice(0, 2).map((r: any) => {
+          {u.roles?.slice(0, 2).map((r) => {
             const tint = ROLE_TINTS[r.roleKey] ?? {
               bg: "var(--color-border-light)",
               fg: "var(--color-text-secondary)",
@@ -223,7 +234,7 @@ function UsersPageContent() {
               </span>
             );
           })}
-          {u.roles?.length > 2 && (
+          {u.roles && u.roles.length > 2 && (
             <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
               +{u.roles.length - 2}
             </span>
@@ -369,7 +380,7 @@ function UsersPageContent() {
         <NewUserModal
           onClose={() => setShowNewUser(false)}
           onCreated={(newUser) => {
-            setUsers((prev) => [newUser, ...prev]);
+            void fetchUsers();
             setShowNewUser(false);
             setSelectedId(newUser.id);
           }}

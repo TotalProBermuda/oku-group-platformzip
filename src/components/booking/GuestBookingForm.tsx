@@ -312,7 +312,7 @@ export function GuestBookingForm({
         // Use the API's pendingApproval flag as the source of truth — avoids
         // a stale-client-state mismatch where local requiresApproval was true
         // but the server created CONFIRMED for some other reason (or vice versa).
-        const needsApproval = (result as any)?.pendingApproval === true;
+        const needsApproval = result?.pendingApproval === true;
         const defaultMsg = needsApproval
           ? (t("host", "streetForm.pendingApprovalMessage") as string) ||
             "Request received — your booking is pending host confirmation."
@@ -323,8 +323,8 @@ export function GuestBookingForm({
           setSpaces([]);
         }
       }
-    } catch (err: any) {
-      setError(err?.message || "Submission failed");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Submission failed");
     }
     setSubmitting(false);
   }

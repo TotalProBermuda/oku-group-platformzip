@@ -167,7 +167,7 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
   }
 
   const data: Record<string, unknown> = {};
-  const nonSecretKeys: Array<keyof CybersourcePatchBody> = [
+  const nonSecretKeys = [
     "enabled",
     "environment",
     "checkoutTitle",
@@ -175,7 +175,7 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
     "cardSecurityCodeEnabled",
     "detailedDeclineMessagesEnabled",
     "debugMode",
-  ];
+  ] as const;
   for (const k of nonSecretKeys) {
     if (body[k] !== undefined) data[k as string] = body[k];
   }
@@ -262,7 +262,7 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
     "detailedDeclineMessagesEnabled",
     "debugMode",
   ] as const) {
-    if (body[k] !== undefined && (prev as any)[k] !== body[k]) {
+    if (body[k] !== undefined && prev[k] !== body[k]) {
       publicSettingsChanged = true;
     }
   }

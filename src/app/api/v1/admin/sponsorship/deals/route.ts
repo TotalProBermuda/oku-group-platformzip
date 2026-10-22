@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { SponsorDealPaymentStatus } from "@prisma/client";
 
-function isAdmin(s: any) {
-  return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
+function isAdmin(s: Session | null) {
+  return s?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function GET(req: NextRequest) {
@@ -12,11 +13,13 @@ export async function GET(req: NextRequest) {
   if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
-  const paymentStatus = searchParams.get("paymentStatus") ?? "";
+  const paymentStatusRaw = searchParams.get("paymentStatus") ?? "";
+  const paymentStatus = paymentStatusRaw ? Object.values(SponsorDealPaymentStatus).find((value) => value === paymentStatusRaw) : undefined;
+  if (paymentStatusRaw && !paymentStatus) return NextResponse.json({ ok: false, error: "Invalid payment status" }, { status: 400 });
 
   const deals = await prisma.sponsorDeal.findMany({
     where: {
-      ...(paymentStatus ? { paymentStatus: paymentStatus as any } : {}),
+      ...(paymentStatus ? { paymentStatus } : {}),
     },
     include: {
       entity:      { select: { id: true, displayName: true, logoUrl: true, type: true } },

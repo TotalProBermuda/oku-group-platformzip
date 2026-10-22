@@ -7,17 +7,31 @@ import { authOptions } from "@/lib/auth";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
-async function getSeries(slug: string) {
+interface ExperienceDetail {
+  id: string; slug: string; title: string; subtitle: string | null; description: string | null;
+  venue: string; venueAddress: string | null; city: string | null; category: string | null;
+  showCountdown: boolean; earlyReleaseAt: string | null; countdownLabel: string | null;
+  newsletterCaptureEnabled: boolean; waitlistEnabled: boolean;
+  heroImageUrl?: string | null; heroImageUrlEn?: string | null; heroImageUrlEs?: string | null; heroImageUrlPt?: string | null; sessionDefaults?: unknown;
+  experienceInfluencer: Array<{ id: string; roleLabel: string; influencer: { displayName: string | null; handle: string | null; isVerified: boolean } }>;
+  addons: Array<{ id: string; name: string; description: string | null; requiresMembership: boolean; priceCents: number }>;
+  sessions: Array<{ id: string; title: string | null; startsAt: string; endsAt: string; capacity: number; soldCount: number; status: string }>;
+  ticketTypes: Array<{ id: string; name: string; description: string | null; priceCents: number; requiresMembership: boolean; earlyAccessOnly: boolean }>;
+}
+
+interface ExperienceAvailability { label: string | null; remaining: number }
+
+async function getSeries(slug: string): Promise<ExperienceDetail | null> {
   const res = await fetch(`${BASE}/api/v1/experiences?slug=${slug}`, { cache: "no-store" });
   if (!res.ok) return null;
-  const data = await res.json();
+  const data = await res.json() as { series?: ExperienceDetail[] };
   return data.series?.[0] ?? null;
 }
 
-async function getAvailability(slug: string) {
+async function getAvailability(slug: string): Promise<ExperienceAvailability | null> {
   const res = await fetch(`${BASE}/api/v1/experiences/${slug}/availability`, { cache: "no-store" });
   if (!res.ok) return null;
-  return res.json();
+  return res.json() as Promise<ExperienceAvailability>;
 }
 
 function fmt(cents: number) { return `$${(cents / 100).toFixed(0)}`; }
@@ -96,7 +110,7 @@ export default async function ExperienceDetailPage({ params }: { params: Promise
             <section style={{ marginBottom: 48 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>Sessions</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {sessions.map((s: any) => (
+                {sessions.map((s) => (
                   <div key={s.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 600, color: "#1a1614", marginBottom: 4 }}>{s.title ?? "Session"}</div>
@@ -117,7 +131,7 @@ export default async function ExperienceDetailPage({ params }: { params: Promise
             <section style={{ marginBottom: 48 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>Your Hosts</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {influencers.map((ei: any) => {
+                {influencers.map((ei) => {
                   const inf = ei.influencer;
                   return (
                     <div key={ei.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "20px 24px", display: "flex", gap: 20, alignItems: "center" }}>
@@ -144,7 +158,7 @@ export default async function ExperienceDetailPage({ params }: { params: Promise
             <section style={{ marginBottom: 48 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>Add-Ons</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {addons.map((a: any) => (
+                {addons.map((a) => (
                   <div key={a.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 600, color: "#1a1614" }}>{a.name}</div>
@@ -188,7 +202,7 @@ export default async function ExperienceDetailPage({ params }: { params: Promise
               <p style={{ fontSize: 14, color: "#9ca3af" }}>No tickets available at this time.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
-                {ticketTypes.map((t: any) => (
+                {ticketTypes.map((t) => (
                   <div key={t.id} style={{ border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <div style={{ fontWeight: 600, color: "#1a1614", fontSize: 14 }}>{t.name}</div>

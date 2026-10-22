@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   try {
     const result = await getUploadPresignUrl(filename, contentType);
     return NextResponse.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Upload presign error:", err);
     return NextResponse.json({ error: "Storage unavailable" }, { status: 503 });
   }

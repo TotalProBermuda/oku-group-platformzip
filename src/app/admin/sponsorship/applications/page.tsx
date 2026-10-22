@@ -15,12 +15,30 @@ const CAT_ICONS: Record<string, string> = {
   EXPERIENCE: "✨", OTHER: "📦",
 };
 
+interface SponsorshipApplication {
+  id: string;
+  brandName: string;
+  status: string;
+  createdAt: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string | null;
+  websiteUrl: string | null;
+  brandStatement: string | null;
+  campaignGoals: string | null;
+  budgetCents: number | null;
+  entity: { logoUrl: string | null } | null;
+  slot: { id: string; title: string; category: string; askPriceCents: number | null; series: { title: string } | null } | null;
+  deal: { agreedPriceCents: number; paymentStatus: string } | null;
+  reviewNotes: string | null;
+}
+
 export default function AdminSponsorshipApplicationsPage() {
   const t = useTranslation();
-  const [apps, setApps]       = useState<any[]>([]);
+  const [apps, setApps]       = useState<SponsorshipApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState("PENDING");
-  const [selected, setSelected] = useState<any | null>(null);
+  const [selected, setSelected] = useState<SponsorshipApplication | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [reviewForm, setReviewForm] = useState({ status: "", reviewNotes: "", agreedPriceCents: "" });
   const [error, setError]     = useState("");
@@ -29,7 +47,7 @@ export default function AdminSponsorshipApplicationsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const r = await fetch(`/api/v1/admin/sponsorship/applications?status=${filter}`);
-    const d = await r.json();
+    const d = await r.json() as { ok: boolean; applications: SponsorshipApplication[] };
     if (d.ok) setApps(d.applications);
     setLoading(false);
   }, [filter]);
@@ -38,7 +56,7 @@ export default function AdminSponsorshipApplicationsPage() {
 
   async function loadDetail(id: string) {
     const r = await fetch(`/api/v1/admin/sponsorship/applications/${id}`);
-    const d = await r.json();
+    const d = await r.json() as { ok: boolean; application: SponsorshipApplication };
     if (d.ok) {
       setSelected(d.application);
       setReviewForm({ status: d.application.status, reviewNotes: d.application.reviewNotes ?? "", agreedPriceCents: "" });
@@ -48,7 +66,7 @@ export default function AdminSponsorshipApplicationsPage() {
   async function submitReview() {
     if (!selected) return;
     setReviewing(true); setError(""); setSuccess("");
-    const body: any = {
+    const body: { status: string; reviewNotes: string; agreedPriceCents?: number } = {
       status:      reviewForm.status,
       reviewNotes: reviewForm.reviewNotes,
     };

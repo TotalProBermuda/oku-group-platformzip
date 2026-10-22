@@ -25,6 +25,8 @@ import {
   type NormalizedVoidResult,
   type PaymentProviderAdapter,
   type ProviderStatus,
+  asRecord,
+  errorMessage,
   safeTruncate,
 } from "./types";
 
@@ -33,31 +35,31 @@ function centsToAmount(c: number): string {
 }
 
 /** Refund acceptance is distinct from settlement; reconciliation remains required. */
-function refundOk(httpStatus: number | null, body: any): boolean {
+function refundOk(httpStatus: number | null, body: unknown): boolean {
   if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
-  const s = body?.status;
+  const s = asRecord(body)?.status;
   return s === "PENDING" || s === "TRANSMITTED" || s === "ACCEPTED";
 }
-function voidOk(httpStatus: number | null, body: any): boolean {
+function voidOk(httpStatus: number | null, body: unknown): boolean {
   if (!httpStatus || httpStatus < 200 || httpStatus >= 300) return false;
-  return body?.status === "VOIDED";
+  return asRecord(body)?.status === "VOIDED";
 }
 
-function extractMessage(httpStatus: number | null, body: any): string {
-  if (body?.message) return String(body.message);
-  if (body?.errorInformation?.message) return String(body.errorInformation.message);
-  if (body?.errorInformation?.reason) return String(body.errorInformation.reason);
-  if (body?.reason) return String(body.reason);
+function extractMessage(httpStatus: number | null, body: unknown): string {
+  const record = asRecord(body);
+  const errorInformation = asRecord(record?.errorInformation);
+  if (record?.message) return String(record.message);
+  if (errorInformation?.message) return String(errorInformation.message);
+  if (errorInformation?.reason) return String(errorInformation.reason);
+  if (record?.reason) return String(record.reason);
   if (httpStatus) return `HTTP ${httpStatus}`;
   return "no response";
 }
-function extractFailureCode(body: any): string | null {
-  return (
-    body?.errorInformation?.reason ??
-    body?.reason ??
-    body?.errorCode ??
-    null
-  );
+function extractFailureCode(body: unknown): string | null {
+  const record = asRecord(body);
+  const errorInformation = asRecord(record?.errorInformation);
+  const value = errorInformation?.reason ?? record?.reason ?? record?.errorCode;
+  return typeof value === "string" ? value : null;
 }
 
 class CybersourceAdapter implements PaymentProviderAdapter {
@@ -124,8 +126,8 @@ class CybersourceAdapter implements PaymentProviderAdapter {
     try {
       const r = await testCybersourceConnection();
       return { ok: r.ok, message: r.message, status: r.status };
-    } catch (e: any) {
-      return { ok: false, message: e?.message || "Cybersource test failed", status: null };
+    } catch (error: unknown) {
+      return { ok: false, message: errorMessage(error, "Cybersource test failed"), status: null };
     }
   }
 
@@ -158,7 +160,8 @@ class CybersourceAdapter implements PaymentProviderAdapter {
         transientToken: inst.cybersourceTransientToken,
         card: inst.cybersourceCard,
       });
-    } catch (e: any) {
+    } catch (error: unknown) {
+      const message = errorMessage(error, "Cybersource charge failed");
       return {
         ok: false,
         provider: this.provider,
@@ -166,28 +169,34 @@ class CybersourceAdapter implements PaymentProviderAdapter {
         referenceId: null,
         authCode: null,
         responseCode: null,
-        message: e?.message || "Cybersource charge failed",
+        message,
         rawSafeResponse: null,
         failureCode: "ADAPTER_ERROR",
-        failureMessage: e?.message || "Cybersource charge failed",
+        failureMessage: message,
       };
     }
-    const outcome = classifyCharge(result.httpStatus, result.body);
+    const body = asRecord(result.body);
+    const clientReferenceInformation = asRecord(body?.clientReferenceInformation);
+    const processorInformation = asRecord(body?.processorInformation);
+    const outcome = classifyCharge(result.httpStatus, {
+      status: typeof body?.status === "string" ? body.status : undefined,
+      id: typeof body?.id === "string" ? body.id : undefined,
+    });
     const ok = outcome === "approved";
     return {
       ok,
       provider: this.provider,
-      transactionId: result.body?.id ?? null,
+      transactionId: typeof body?.id === "string" ? body.id : null,
       referenceId:
-        result.body?.clientReferenceInformation?.code ??
-        result.body?.reconciliationId ??
+        (typeof clientReferenceInformation?.code === "string" ? clientReferenceInformation.code : null) ??
+        (typeof body?.reconciliationId === "string" ? body.reconciliationId : null) ??
         null,
       authCode:
-        result.body?.processorInformation?.approvalCode ??
-        result.body?.processorInformation?.authIndicator ??
+        (typeof processorInformation?.approvalCode === "string" ? processorInformation.approvalCode : null) ??
+        (typeof processorInformation?.authIndicator === "string" ? processorInformation.authIndicator : null) ??
         null,
       responseCode:
-        result.body?.processorInformation?.responseCode ??
+        (typeof processorInformation?.responseCode === "string" ? processorInformation.responseCode : null) ??
         String(result.httpStatus ?? ""),
       message: extractMessage(result.httpStatus, result.body),
       rawSafeResponse: safeTruncate(result.body),
@@ -204,24 +213,26 @@ class CybersourceAdapter implements PaymentProviderAdapter {
         amount: centsToAmount(input.amountCents),
         currency: input.currency || "USD",
       });
-    } catch (e: any) {
+    } catch (error: unknown) {
+      const message = errorMessage(error, "Cybersource refund failed");
       return {
         ok: false,
         provider: this.provider,
         refundTransactionId: null,
         originalTransactionId: input.originalTransactionId,
         amountCents: input.amountCents,
-        message: e?.message || "Cybersource refund failed",
+        message,
         failureCode: "ADAPTER_ERROR",
-        failureMessage: e?.message || "Cybersource refund failed",
+        failureMessage: message,
         rawSafeResponse: null,
       };
     }
+    const body = asRecord(result.body);
     const ok = refundOk(result.httpStatus, result.body);
     return {
       ok,
       provider: this.provider,
-      refundTransactionId: result.body?.id ?? null,
+      refundTransactionId: typeof body?.id === "string" ? body.id : null,
       originalTransactionId: input.originalTransactionId,
       amountCents: input.amountCents,
       message: extractMessage(result.httpStatus, result.body),
@@ -237,23 +248,25 @@ class CybersourceAdapter implements PaymentProviderAdapter {
       result = await cybersourceVoid({
         originalTransactionId: input.originalTransactionId,
       });
-    } catch (e: any) {
+    } catch (error: unknown) {
+      const message = errorMessage(error, "Cybersource void failed");
       return {
         ok: false,
         provider: this.provider,
         voidTransactionId: null,
         originalTransactionId: input.originalTransactionId,
-        message: e?.message || "Cybersource void failed",
+        message,
         failureCode: "ADAPTER_ERROR",
-        failureMessage: e?.message || "Cybersource void failed",
+        failureMessage: message,
         rawSafeResponse: null,
       };
     }
+    const body = asRecord(result.body);
     const ok = voidOk(result.httpStatus, result.body);
     return {
       ok,
       provider: this.provider,
-      voidTransactionId: result.body?.id ?? null,
+      voidTransactionId: typeof body?.id === "string" ? body.id : null,
       originalTransactionId: input.originalTransactionId,
       message: extractMessage(result.httpStatus, result.body),
       failureCode: ok ? null : extractFailureCode(result.body),

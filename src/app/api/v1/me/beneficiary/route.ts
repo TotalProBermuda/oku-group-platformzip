@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSession } from "@/server/auth/session";
 import { getOwnProfile, upsertOwnProfile } from "@/server/beneficiaries/beneficiaryService";
 import { scrubErrorMessage } from "@/server/security/logScrub";
+import { getBeneficiaryApiErrorStatus } from "@/app/api/v1/me/beneficiary/errorDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,8 @@ export async function GET() {
     const { userId } = await requireSession();
     const view = await getOwnProfile(userId);
     return NextResponse.json({ ok: true, data: view });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: getBeneficiaryApiErrorStatus(e) });
   }
 }
 
@@ -32,7 +33,7 @@ export async function PATCH(req: Request) {
     const body = PatchBody.parse(await req.json());
     const view = await upsertOwnProfile(userId, body);
     return NextResponse.json({ ok: true, data: view });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: getBeneficiaryApiErrorStatus(e) });
   }
 }

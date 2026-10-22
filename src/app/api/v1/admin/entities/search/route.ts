@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 
 /**
  * Lightweight typeahead for the Referral Organization Resolver "Link"
@@ -31,10 +32,11 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json({ ok: true, items });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "unknown error" },
-      { status: e?.status ?? 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

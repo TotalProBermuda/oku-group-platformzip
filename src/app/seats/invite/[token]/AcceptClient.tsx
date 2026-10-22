@@ -89,7 +89,7 @@ export function AcceptClient({
   return (
     <div>
       <h1 style={{ fontSize: 22, lineHeight: 1.3, margin: "0 0 12px" }}>
-        You've been invited
+        You&apos;ve been invited
       </h1>
       <p style={{ fontSize: 15, lineHeight: 1.55, color: "var(--color-text-secondary, #6b5e54)", margin: "0 0 18px" }}>
         <strong>{seat.partnerName ?? "An OKÜ partner"}</strong> has invited{" "}
@@ -114,7 +114,7 @@ export function AcceptClient({
             {busy ? "Signing in…" : `Sign in as ${seat.invitedEmail}`}
           </button>
           <p style={{ fontSize: 12, color: "var(--color-text-secondary, #8a7d70)", marginTop: 12, textAlign: "center" }}>
-            If you don't have an account yet, one will be created for you on sign-in.
+            If you don&apos;t have an account yet, one will be created for you on sign-in.
           </p>
         </>
       )}

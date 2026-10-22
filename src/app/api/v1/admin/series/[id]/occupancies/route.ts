@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { createReservationConflictRecords } from "@/server/events/eventOccupancyService";
 
-function isAdmin(session: any) {
+function isAdmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(r));
 }
 
@@ -108,8 +108,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return { occupancy, conflictCount: conflicts.length };
     });
     return NextResponse.json(result, { status: 201 });
-  } catch (err: any) {
-    const code = err?.message;
+  } catch (err: unknown) {
+    const code = err instanceof Error ? err.message : undefined;
     const message = code === "SPACE_REQUIRED" ? "Select a physical space for a space-specific event." : code === "INVALID_SPACE" ? "Space must be active and belong to this restaurant." : code === "INVALID_SESSION" ? "Session does not belong to this series." : code === "SERIES_VENUE_REQUIRED" ? "Select the restaurant before scheduling this event." : "Could not create event occupancy.";
     return NextResponse.json({ error: message }, { status: 400 });
   }

@@ -116,8 +116,8 @@ export default function MediaUpload({
 
       setProgress(100);
       onChange(mediaUrl);
-    } catch (e: any) {
-      setError(e.message ?? "Upload failed");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setUploading(false);
       setTimeout(() => setProgress(0), 800);

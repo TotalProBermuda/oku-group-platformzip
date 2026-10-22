@@ -4,10 +4,18 @@ import { authOptions } from "@/lib/auth";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
+interface ExperienceSummary {
+  id: string; slug: string; title: string; description: string | null; venue: string; hostType: string | null;
+  category: string | null; city: string | null; isFeatured: boolean; showCountdown: boolean;
+  capacitySold: number; capacityTotal: number; availableSeatsMode: string;
+  ticketTypes: Array<{ priceCents: number }>;
+  experienceInfluencer: Array<{ influencer: { displayName: string | null; handle: string | null } }>;
+}
+
 async function getExperiences(params?: string) {
   const res = await fetch(`${BASE}/api/v1/experiences${params ? `?${params}` : ""}`, { cache: "no-store" });
   if (!res.ok) return [];
-  const data = await res.json();
+  const data = await res.json() as { series?: ExperienceSummary[] };
   return data.series ?? [];
 }
 
@@ -18,7 +26,7 @@ const venueGrad: Record<string, string> = {
 
 const categories = ["All", "Food & Drink", "Wellness", "Design & Art"];
 
-function AvailabilityBadge({ series }: { series: any }) {
+function AvailabilityBadge({ series }: { series: ExperienceSummary }) {
   const sold   = series.capacitySold   ?? 0;
   const total  = series.capacityTotal  ?? 0;
   const remaining = Math.max(0, total - sold);
@@ -40,8 +48,8 @@ function AvailabilityBadge({ series }: { series: any }) {
   return <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color, textTransform: "uppercase" }}>{label}</span>;
 }
 
-function ExperienceCard({ s }: { s: any }) {
-  const minPrice = s.ticketTypes?.length ? Math.min(...s.ticketTypes.map((t: any) => t.priceCents)) : null;
+function ExperienceCard({ s }: { s: ExperienceSummary }) {
+  const minPrice = s.ticketTypes?.length ? Math.min(...s.ticketTypes.map((ticketType) => ticketType.priceCents)) : null;
   const inf = s.experienceInfluencer?.[0]?.influencer;
   return (
     <Link href={`/experiences/${s.slug}`} className="series-card" style={{ textDecoration: "none" }}>
@@ -77,7 +85,7 @@ function ExperienceCard({ s }: { s: any }) {
   );
 }
 
-export default async function ExperiencesPage({ searchParams }: { searchParams: Promise<any> }) {
+export default async function ExperiencesPage({ searchParams }: { searchParams: Promise<{ category?: string; venue?: string }> }) {
   const sp  = await searchParams;
   const cat = sp.category ?? "All";
   const ven = sp.venue ?? "";
@@ -86,8 +94,8 @@ export default async function ExperiencesPage({ searchParams }: { searchParams: 
   if (cat && cat !== "All") qp.set("category", cat);
   if (ven) qp.set("venue", ven);
   const series = await getExperiences(qp.toString());
-  const featured = series.filter((s: any) => s.isFeatured);
-  const rest     = series.filter((s: any) => !s.isFeatured);
+  const featured = series.filter((experience) => experience.isFeatured);
+  const rest     = series.filter((experience) => !experience.isFeatured);
 
   return (
     <div>
@@ -120,7 +128,7 @@ export default async function ExperiencesPage({ searchParams }: { searchParams: 
           <section style={{ marginBottom: 56 }}>
             <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 28, fontWeight: 400, color: "#1a1614", letterSpacing: "-0.01em", marginBottom: 24 }}>Featured</h2>
             <div className="card-grid">
-              {featured.map((s: any) => <ExperienceCard key={s.id} s={s} />)}
+              {featured.map((s) => <ExperienceCard key={s.id} s={s} />)}
             </div>
           </section>
         )}
@@ -132,7 +140,7 @@ export default async function ExperiencesPage({ searchParams }: { searchParams: 
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 28, fontWeight: 400, color: "#1a1614", letterSpacing: "-0.01em", marginBottom: 24 }}>All Experiences</h2>
             )}
             <div className="card-grid">
-              {rest.map((s: any) => <ExperienceCard key={s.id} s={s} />)}
+              {rest.map((s) => <ExperienceCard key={s.id} s={s} />)}
             </div>
           </section>
         )}

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-function isSuperadmin(session: any) {
+function isSuperadmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) => r === "SUPERADMIN");
 }
 

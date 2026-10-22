@@ -45,8 +45,8 @@ export async function POST(
   await prisma.reservationStatusLog.create({
     data: {
       reservationId: params.id,
-      fromStatus: reservation.status as any,
-      toStatus: reservation.status as any,
+      fromStatus: reservation.status,
+      toStatus: reservation.status,
       changedByUserId: userId,
       changedByLabel: "COMP_DRINK",
       notes: `Complimentary ${label} offered to waiting guests`,

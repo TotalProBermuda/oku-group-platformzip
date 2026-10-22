@@ -11,6 +11,7 @@ import {
   buildBeneficiaryAuditMetadata,
 } from "@/server/audit/buildBeneficiaryAuditMetadata";
 import { scrubErrorMessage } from "@/server/security/logScrub";
+import { getBeneficiaryApiErrorStatus } from "@/app/api/v1/me/beneficiary/errorDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +49,11 @@ export async function GET(
     // the same allowlist helper.
     const out = await adminGetDocumentSignedUrl(userId, id, actorId);
     return NextResponse.json({ ok: true, data: out });
-  } catch (e: any) {
+  } catch (e: unknown) {
     const status =
       e instanceof RBACError ? 403 :
       e instanceof DocumentError ? e.status :
-      (e.status || 500);
+      getBeneficiaryApiErrorStatus(e);
     return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status });
   }
 }

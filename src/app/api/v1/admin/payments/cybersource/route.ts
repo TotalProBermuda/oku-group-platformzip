@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
@@ -24,10 +26,11 @@ export async function GET(req: Request) {
         gateway: toSafeCybersourceView(cred),
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }
@@ -84,7 +87,7 @@ export async function PATCH(req: Request) {
     // in the same request — those must NOT be allowed to satisfy the gate.
     if (body.enabled === true) {
       const isClear = (v: unknown) =>
-        typeof v === "object" && v !== null && (v as any).clear === true;
+        typeof v === "object" && v !== null && "clear" in v && v.clear === true;
       const isNewValue = (v: unknown) =>
         typeof v === "string" && v.trim().length > 0;
       const willHave = (
@@ -124,7 +127,7 @@ export async function PATCH(req: Request) {
         data: {
           actorId: userId,
           action: "payment.gateway.cybersource.update",
-          metadata: auditDiff as any,
+          metadata: auditDiff as Prisma.InputJsonObject,
         },
       });
     } catch {
@@ -135,10 +138,11 @@ export async function PATCH(req: Request) {
       ok: true,
       data: { gateway: toSafeCybersourceView(updated) },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

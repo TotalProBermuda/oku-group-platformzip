@@ -7,6 +7,7 @@ import SponsorPlacementPreview from "@/components/sponsors/SponsorPlacementPrevi
 import { mergeSponsors, resolveSponsors } from "@/lib/sponsor-render";
 import MediaUpload from "@/components/ui/MediaUpload";
 import type { ResolvedSponsors } from "@/lib/sponsor-render";
+import type { Prisma } from "@prisma/client";
 
 interface Props {
   sessionId: string;
@@ -25,15 +26,29 @@ const PLACEMENT_TOGGLES = [
   { key: "showOnTicket",    label: "Ticket" },
   { key: "showOnEmail",     label: "Email" },
   { key: "showOnCheckInView", label: "Check-In" },
-];
+] as const;
+
+type SponsorAssignmentView = Prisma.SponsorAssignmentGetPayload<{
+  include: {
+    tier: true;
+    entity: { select: { id: true; displayName: true; logoUrl: true; websiteUrl: true } };
+  };
+}>;
+type SponsorTierOption = { id: string; label: string; displayOrder: number };
+type SponsorEntityOption = { id: string; displayName: string };
+type SponsorForm = {
+  entityId: string; tierId: string; sortOrder: number; logoUrl: string; websiteUrl: string;
+  displayNameOverride: string; showOnEventPage: boolean; showOnTicket: boolean;
+  showOnEmail: boolean; showOnCheckInView: boolean; notes: string;
+};
 
 export default function EventSponsorManager({ sessionId }: Props) {
   const t = useTranslation();
-  const [eventAssignments, setEventAssignments] = useState<any[]>([]);
-  const [seriesAssignments, setSeriesAssignments] = useState<any[]>([]);
+  const [eventAssignments, setEventAssignments] = useState<SponsorAssignmentView[]>([]);
+  const [seriesAssignments, setSeriesAssignments] = useState<SponsorAssignmentView[]>([]);
   const [inherits, setInherits] = useState(true);
-  const [tiers, setTiers] = useState<any[]>([]);
-  const [entities, setEntities] = useState<any[]>([]);
+  const [tiers, setTiers] = useState<SponsorTierOption[]>([]);
+  const [entities, setEntities] = useState<SponsorEntityOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -41,7 +56,7 @@ export default function EventSponsorManager({ sessionId }: Props) {
   const [previewData, setPreviewData] = useState<ResolvedSponsors | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<any>({
+  const [form, setForm] = useState<SponsorForm>({
     entityId: "", tierId: "", sortOrder: 0, logoUrl: "", websiteUrl: "",
     displayNameOverride: "", showOnEventPage: true, showOnTicket: true,
     showOnEmail: true, showOnCheckInView: false, notes: "",
@@ -64,7 +79,7 @@ export default function EventSponsorManager({ sessionId }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  const computePreview = useCallback((surface: PreviewSurface, ea: any[], sa: any[], inh: boolean) => {
+  const computePreview = useCallback((surface: PreviewSurface, ea: SponsorAssignmentView[], sa: SponsorAssignmentView[], inh: boolean) => {
     const merged = inh
       ? mergeSponsors(sa, ea, surface)
       : resolveSponsors(ea, surface, false);
@@ -114,7 +129,7 @@ export default function EventSponsorManager({ sessionId }: Props) {
     setForm({ entityId: "", tierId: "", sortOrder: 0, logoUrl: "", websiteUrl: "", displayNameOverride: "", showOnEventPage: true, showOnTicket: true, showOnEmail: true, showOnCheckInView: false, notes: "" });
   }
 
-  function startEdit(a: any) {
+  function startEdit(a: SponsorAssignmentView) {
     setEditId(a.id);
     setForm({
       entityId: a.entityId, tierId: a.tierId, sortOrder: a.sortOrder,
@@ -132,7 +147,7 @@ export default function EventSponsorManager({ sessionId }: Props) {
   const inpStyle: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid #e5e0d8", borderRadius: 8, fontSize: 14, background: "white" };
   const labelStyle: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 };
 
-  const allGrouped = tiers.map((tier: any) => ({
+  const allGrouped = tiers.map((tier) => ({
     tier,
     eventItems: eventAssignments.filter((a) => a.tierId === tier.id),
     seriesItems: seriesAssignments.filter((a) => a.tierId === tier.id),
@@ -179,22 +194,22 @@ export default function EventSponsorManager({ sessionId }: Props) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>Brand / Entity</label>
-              <select value={form.entityId} onChange={(e) => setForm((p: any) => ({ ...p, entityId: e.target.value }))} style={inpStyle}>
+              <select value={form.entityId} onChange={(e) => setForm((p) => ({ ...p, entityId: e.target.value }))} style={inpStyle}>
                 <option value="">Select entity…</option>
-                {entities.map((e: any) => <option key={e.id} value={e.id}>{e.displayName}</option>)}
+                {entities.map((e) => <option key={e.id} value={e.id}>{e.displayName}</option>)}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Sponsor Tier</label>
-              <select value={form.tierId} onChange={(e) => setForm((p: any) => ({ ...p, tierId: e.target.value }))} style={inpStyle}>
+              <select value={form.tierId} onChange={(e) => setForm((p) => ({ ...p, tierId: e.target.value }))} style={inpStyle}>
                 <option value="">Select tier…</option>
-                {tiers.map((t: any) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                {tiers.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <MediaUpload
                 value={form.logoUrl ?? ""}
-                onChange={(url) => setForm((p: any) => ({ ...p, logoUrl: url }))}
+                onChange={(url) => setForm((p) => ({ ...p, logoUrl: url }))}
                 label="Sponsor Logo"
                 mediaType="icon"
                 aspectRatio="wide"
@@ -203,7 +218,7 @@ export default function EventSponsorManager({ sessionId }: Props) {
             </div>
             <div>
               <label style={labelStyle}>Website URL</label>
-              <input value={form.websiteUrl} onChange={(e) => setForm((p: any) => ({ ...p, websiteUrl: e.target.value }))} placeholder="https://…" style={inpStyle} />
+              <input value={form.websiteUrl} onChange={(e) => setForm((p) => ({ ...p, websiteUrl: e.target.value }))} placeholder="https://…" style={inpStyle} />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
@@ -211,7 +226,7 @@ export default function EventSponsorManager({ sessionId }: Props) {
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
               {PLACEMENT_TOGGLES.map(({ key, label }) => (
                 <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#374151", cursor: "pointer" }}>
-                  <input type="checkbox" checked={!!form[key]} onChange={(e) => setForm((p: any) => ({ ...p, [key]: e.target.checked }))} />
+                  <input type="checkbox" checked={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.checked }))} />
                   {label}
                 </label>
               ))}
@@ -262,10 +277,10 @@ export default function EventSponsorManager({ sessionId }: Props) {
               </div>
 
               {/* Inherited series sponsors */}
-              {inherits && seriesItems.map((a: any) => (
+              {inherits && seriesItems.map((a) => (
                 <div key={a.id} style={{ background: "#fafaf9", border: "1px solid #e5e0d8", borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 12, opacity: 0.75 }}>
                   <div style={{ width: 40, height: 30, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", borderRadius: 4, border: "1px solid #f0ede8" }}>
-                    {a.logoUrl || a.entity?.logoUrl ? <img src={a.logoUrl || a.entity?.logoUrl} alt="" style={{ maxHeight: 22, objectFit: "contain" }} /> : <span style={{ fontSize: 8, color: "#9ca3af" }}>LOGO</span>}
+                    {a.logoUrl || a.entity?.logoUrl ? <img src={a.logoUrl ?? a.entity?.logoUrl ?? undefined} alt="" style={{ maxHeight: 22, objectFit: "contain" }} /> : <span style={{ fontSize: 8, color: "#9ca3af" }}>LOGO</span>}
                   </div>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontSize: 13, color: "#6b7280" }}>{a.displayNameOverride || a.entity?.displayName}</span>
@@ -275,10 +290,10 @@ export default function EventSponsorManager({ sessionId }: Props) {
               ))}
 
               {/* Event-specific sponsors */}
-              {eventItems.map((a: any) => (
+              {eventItems.map((a) => (
                 <div key={a.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 10, padding: "14px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{ width: 48, height: 36, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fafaf9", borderRadius: 6, border: "1px solid #f0ede8" }}>
-                    {a.logoUrl || a.entity?.logoUrl ? <img src={a.logoUrl || a.entity?.logoUrl} alt="" style={{ maxHeight: 28, maxWidth: 44, objectFit: "contain" }} /> : <span style={{ fontSize: 9, color: "#9ca3af", fontWeight: 600 }}>LOGO</span>}
+                    {a.logoUrl || a.entity?.logoUrl ? <img src={a.logoUrl ?? a.entity?.logoUrl ?? undefined} alt="" style={{ maxHeight: 28, maxWidth: 44, objectFit: "contain" }} /> : <span style={{ fontSize: 9, color: "#9ca3af", fontWeight: 600 }}>LOGO</span>}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, color: "#1a1614" }}>{a.displayNameOverride || a.entity?.displayName}</div>

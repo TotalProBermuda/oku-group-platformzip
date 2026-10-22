@@ -128,7 +128,7 @@ export function buildAuthNetUpdate(
 
   const data: Record<string, unknown> = {};
   // Non-secret simple fields
-  const nonSecretKeys: Array<keyof AuthNetPatchBody> = [
+  const nonSecretKeys = [
     "enableGateway",
     "environment",
     "connectionType",
@@ -139,7 +139,7 @@ export function buildAuthNetUpdate(
     "detailedDeclines",
     "debugMode",
     "merchantProviderName",
-  ];
+  ] as const;
   for (const k of nonSecretKeys) {
     if (body[k] !== undefined) data[k as string] = body[k];
   }
@@ -194,8 +194,8 @@ export function buildAuthNetUpdate(
   // Build a non-secret diff for AuditLog. Never include raw credential values.
   const auditDiff: Record<string, unknown> = {};
   for (const k of nonSecretKeys) {
-    if (body[k] !== undefined && (prev as any)[k] !== body[k]) {
-      auditDiff[k] = { from: (prev as any)[k], to: body[k] };
+    if (body[k] !== undefined && prev[k] !== body[k]) {
+      auditDiff[k] = { from: prev[k], to: body[k] };
     }
   }
   if (body.acceptedCardLogos !== undefined) {

@@ -39,6 +39,95 @@ function safePaymentFailureMessage(environment: unknown, code: unknown, translat
   return translate("checkoutErrorDeclined");
 }
 
+interface CheckoutSession {
+  id: string;
+  title: string | null;
+  subtitle: string | null;
+  startsAt: string;
+  fieldModes?: unknown;
+  ticketPrices: Array<{ ticketTypeId: string; priceCents: number }>;
+}
+
+interface CheckoutTicketType {
+  id: string;
+  name: string;
+  description: string | null;
+  priceCents: number;
+  maxPerOrder?: number;
+  requiresMembership: boolean;
+  earlyAccessOnly: boolean;
+}
+
+interface CheckoutAddon {
+  id: string;
+  name: string;
+  description: string | null;
+  priceCents: number;
+}
+
+interface CheckoutSeries {
+  title: string;
+  city?: string | null;
+  venueAddress?: string | null;
+  sessionDefaults?: unknown;
+  sessions: CheckoutSession[];
+  ticketTypes: CheckoutTicketType[];
+  addons: CheckoutAddon[];
+}
+
+interface CheckoutItem {
+  ticketTypeId?: string;
+  addonId?: string;
+  qty: number;
+}
+
+interface CheckoutQuote {
+  sessionId: string;
+  lineItems: Array<{ nameSnapshot: string; qty: number; unitPriceCents: number; totalCents: number }>;
+  subtotalCents: number;
+  feesCents: number;
+  taxCents: number;
+  totalCents: number;
+  memberDiscount?: boolean;
+}
+
+interface Microform {
+  createField(type: "number" | "securityCode", options: { placeholder: string }): { load(selector: string): void };
+  createToken(
+    options: { expirationMonth: string; expirationYear: string },
+    callback: (error: Error | null, token: string) => void,
+  ): void;
+}
+
+interface FlexClient {
+  microform(options: { styles: { input: { "font-size": string; color: string } } }): Microform;
+}
+
+declare global {
+  interface Window {
+    Flex?: new (captureContext: string) => FlexClient;
+  }
+}
+
+interface PayerAuthentication {
+  authenticationTransactionId?: string;
+  cardType?: string;
+  referenceId?: string;
+  browser?: {
+    accept: string;
+    language: string;
+    colorDepth: string;
+    javaEnabled: "N";
+    javascriptEnabled: "Y";
+    screenHeight: string;
+    screenWidth: string;
+    timeDifference: string;
+    userAgent: string;
+  };
+  expirationMonth?: string;
+  expirationYear?: string;
+}
+
 export default function CheckoutPage() {
   const locale = useLocale();
   const { t } = useTranslation();
@@ -48,18 +137,18 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
 
-  const [series, setSeries]       = useState<any>(null);
+  const [series, setSeries]       = useState<CheckoutSeries | null>(null);
   const [loading, setLoading]     = useState(true);
   const [quantities, setQty]      = useState<Record<string, number>>({});
   const [addonQty, setAddonQty]   = useState<Record<string, number>>({});
   const [selectedSession, setSession] = useState<string>("");
   const [sessionDeepLinked, setSessionDeepLinked] = useState(false);
-  const [quote, setQuote]         = useState<any>(null);
+  const [quote, setQuote]         = useState<CheckoutQuote | null>(null);
   const [quoting, setQuoting]     = useState(false);
   const [paying, setPaying]       = useState(false);
   const [done, setDone]           = useState(false);
   const [error, setError]         = useState("");
-  const [checkoutItems, setCheckoutItems] = useState<any[]>([]);
+  const [checkoutItems, setCheckoutItems] = useState<CheckoutItem[]>([]);
   const [intentId, setIntentId] = useState<string | null>(null);
   const [secureReady, setSecureReady] = useState(false);
   const [paymentDeclined, setPaymentDeclined] = useState(false);
@@ -76,7 +165,7 @@ export default function CheckoutPage() {
     postalCode: "",
     country: "PA",
   });
-  const microformRef = useRef<any>(null);
+  const microformRef = useRef<Microform | null>(null);
   const [guest, setGuest] = useState({ name: "", email: "", phone: "", marketingEmailConsent: false });
   const [confirmationEmail, setConfirmationEmail] = useState("");
   useEffect(() => {
@@ -121,14 +210,14 @@ export default function CheckoutPage() {
     fetch(`/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${locale}`)
       .then((r) => r.json())
       .then((d) => {
-        const s = d.series?.[0];
-        setSeries(s);
+        const s = d.series?.[0] as CheckoutSeries | undefined;
+        setSeries(s ?? null);
         const requestedSessionId = new URLSearchParams(window.location.search).get("sessionId");
-        const requestedSession = s?.sessions?.find((candidate: any) => candidate.id === requestedSessionId);
+        const requestedSession = s?.sessions?.find((candidate) => candidate.id === requestedSessionId);
         if (requestedSession) {
           setSession(requestedSession.id);
           setSessionDeepLinked(true);
-          const firstPublicTicket = s?.ticketTypes?.find((ticket: any) => sessionProductEnabled(requestedSession, s, ticket.id) && !ticket.requiresMembership && !ticket.earlyAccessOnly);
+          const firstPublicTicket = s?.ticketTypes?.find((ticket) => sessionProductEnabled(requestedSession, s, ticket.id) && !ticket.requiresMembership && !ticket.earlyAccessOnly);
           if (firstPublicTicket) setQty((current) => current[firstPublicTicket.id] ? current : { ...current, [firstPublicTicket.id]: 1 });
         } else {
           setSessionDeepLinked(false);
@@ -145,7 +234,7 @@ export default function CheckoutPage() {
       try {
         await new Promise<void>((resolve, reject) => {
           const existing = document.querySelector(`script[src="${flexConfig.clientLibrary}"]`) as HTMLScriptElement | null;
-          if (existing && (window as any).Flex) return resolve();
+          if (existing && window.Flex) return resolve();
           const script = document.createElement("script");
           script.src = flexConfig.clientLibrary;
           script.crossOrigin = "anonymous";
@@ -155,7 +244,8 @@ export default function CheckoutPage() {
           document.head.appendChild(script);
         });
         if (cancelled) return;
-        const flex = new (window as any).Flex(flexConfig.captureContext);
+        if (!window.Flex) throw new Error("Cybersource secure card library is unavailable.");
+        const flex = new window.Flex(flexConfig.captureContext);
         const microform = flex.microform({ styles: { input: { "font-size": "16px", color: "#1a1614" } } });
         microform.createField("number", { placeholder: checkoutCommon.checkoutCardNumber }).load("#cybersource-card-number");
         microform.createField("securityCode", { placeholder: checkoutCommon.checkoutSecurityCode }).load("#cybersource-security-code");
@@ -170,7 +260,7 @@ export default function CheckoutPage() {
 
   async function getQuote() {
     if (!selectedSession) { setError(t("common", "checkoutErrorSelectSession")); return; }
-    const items: any[] = [];
+    const items: CheckoutItem[] = [];
     for (const [id, qty] of Object.entries(quantities)) {
       if (qty > 0) items.push({ ticketTypeId: id, qty });
     }
@@ -267,10 +357,10 @@ export default function CheckoutPage() {
     setPaying(true); setError("");
     try {
       const nextTransientToken = transientToken ?? await new Promise<string>((resolve, reject) => {
-        microformRef.current.createToken({ expirationMonth: expiryMonth, expirationYear: expiryYear }, (err: any, token: string) => err ? reject(err) : resolve(token));
+        microformRef.current!.createToken({ expirationMonth: expiryMonth, expirationYear: expiryYear }, (err, token) => err ? reject(err) : resolve(token));
       });
       setTransientToken(nextTransientToken);
-      let payerAuthentication: any;
+      let payerAuthentication: PayerAuthentication;
       if (payerChallenge) {
         if (!payerChallengeComplete) {
           setError(t("common", "checkoutErrorBankStep"));
@@ -409,11 +499,11 @@ export default function CheckoutPage() {
   );
 
   const sessions    = series.sessions    ?? [];
-  const activeSession = sessions.find((event: any) => event.id === selectedSession);
-  const ticketPriceForSession = (ticket: any) => activeSession?.ticketPrices?.find((price: any) => price.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents;
+  const activeSession = sessions.find((event) => event.id === selectedSession);
+  const ticketPriceForSession = (ticket: CheckoutTicketType) => activeSession?.ticketPrices?.find((price) => price.ticketTypeId === ticket.id)?.priceCents ?? ticket.priceCents;
   const ticketTypes = series.ticketTypes ?? [];
   const availableTicketTypes = activeSession
-    ? ticketTypes.filter((ticket: any) => sessionProductEnabled(activeSession, series, ticket.id))
+    ? ticketTypes.filter((ticket) => sessionProductEnabled(activeSession, series, ticket.id))
     : ticketTypes;
   const addons      = series.addons      ?? [];
   const checkoutArtwork = checkoutArtworkCandidates(activeSession, locale, series);
@@ -440,11 +530,11 @@ export default function CheckoutPage() {
                 <section style={{ marginBottom: 32 }}>
                   <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>{t("common", "checkoutChooseSession")}</h2>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {sessions.map((s: any) => (
+                    {sessions.map((s) => (
                       <label key={s.id} style={{ display: "flex", gap: 14, alignItems: "center", padding: "14px 16px", border: `1px solid ${selectedSession === s.id ? "#c41e3a" : "#e5e0d8"}`, borderRadius: 10, cursor: "pointer", background: selectedSession === s.id ? "#fff9f9" : "white" }}>
                         <input type="radio" name="session" value={s.id} checked={selectedSession === s.id} onChange={() => {
                           setSession(s.id);
-                          const allowed = new Set(ticketTypes.filter((ticket: any) => sessionProductEnabled(s, series, ticket.id)).map((ticket: any) => ticket.id));
+                          const allowed = new Set(ticketTypes.filter((ticket) => sessionProductEnabled(s, series, ticket.id)).map((ticket) => ticket.id));
                           setQty(current => Object.fromEntries(Object.entries(current).filter(([id]) => allowed.has(id))));
                         }} />
                         <div>
@@ -461,7 +551,7 @@ export default function CheckoutPage() {
               <section style={{ marginBottom: 32 }}>
                 <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>{t("common", "checkoutTickets")}</h2>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {availableTicketTypes.map((t: any) => {
+                  {availableTicketTypes.map((t) => {
                     const qty = quantities[t.id] ?? 0;
                     return (
                       <div key={t.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -487,7 +577,7 @@ export default function CheckoutPage() {
                 <section style={{ marginBottom: 32 }}>
                   <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>{t("common", "addOns")} <span style={{ fontSize: 14, fontWeight: 400, color: "#9ca3af" }}>{t("common", "checkoutOptional")}</span></h2>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {addons.map((a: any) => {
+                    {addons.map((a) => {
                       const qty = addonQty[a.id] ?? 0;
                       return (
                         <div key={a.id} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -518,13 +608,13 @@ export default function CheckoutPage() {
                 <div style={{ fontFamily: "var(--font-heading)", fontSize: 18, color: "#1a1614", marginBottom: 4 }}>{series.title}</div>
                 {activeSession && <div style={{ fontSize: 13, color: "#7c7168", marginBottom: 16 }}>{activeSession.title}{activeSession.subtitle ? ` · ${activeSession.subtitle}` : ""}</div>}
                 <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 20, fontWeight: 400, color: "#1a1614", marginBottom: 20 }}>{t("common", "checkoutOrderSummary")}</h3>
-                {ticketTypes.filter((t: any) => (quantities[t.id] ?? 0) > 0).map((t: any) => (
+                {ticketTypes.filter((t) => (quantities[t.id] ?? 0) > 0).map((t) => (
                   <div key={t.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 10 }}>
                     <span>{t.name} × {quantities[t.id]}</span>
                     <span>${((ticketPriceForSession(t) * quantities[t.id]) / 100).toFixed(2)}</span>
                   </div>
                 ))}
-                {addons.filter((a: any) => (addonQty[a.id] ?? 0) > 0).map((a: any) => (
+                {addons.filter((a) => (addonQty[a.id] ?? 0) > 0).map((a) => (
                   <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 10, color: "#6b7280" }}>
                     <span>{a.name} × {addonQty[a.id]}</span>
                     <span>${((a.priceCents * addonQty[a.id]) / 100).toFixed(2)}</span>
@@ -533,10 +623,10 @@ export default function CheckoutPage() {
                 <div style={{ borderTop: "1px solid #e5e0d8", marginTop: 16, paddingTop: 16, display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
                   <span>{t("common", "checkoutEstimatedTotal")}</span>
                   <span>${Object.entries(quantities).reduce((sum, [id, qty]) => {
-                    const t = ticketTypes.find((tt: any) => tt.id === id);
+                    const t = ticketTypes.find((tt) => tt.id === id);
                     return sum + (t ? ticketPriceForSession(t) * qty : 0);
                   }, Object.entries(addonQty).reduce((sum, [id, qty]) => {
-                    const a = addons.find((aa: any) => aa.id === id);
+                    const a = addons.find((aa) => aa.id === id);
                     return sum + (a ? a.priceCents * qty : 0);
                   }, 0)) / 100 || 0}+</span>
                 </div>
@@ -554,7 +644,7 @@ export default function CheckoutPage() {
               <div style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 16, padding: "28px" }}>
                 <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 24 }}>{t("common", "checkoutOrderDetails")}</h2>
 
-                {quote.lineItems.map((li: any, i: number) => (
+                {quote.lineItems.map((li, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
                     <div>
                       <div style={{ fontWeight: 600, color: "#1a1614" }}>{li.nameSnapshot}</div>

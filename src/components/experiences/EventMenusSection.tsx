@@ -1,7 +1,9 @@
 import { getMenusForSeries } from "@/server/menus/menuService";
+import type { MenuItem, MenuSection, VenueMenu } from "@/data/venues/menus";
+import type { LocalizedText } from "@/types/i18n";
 import type { Locale } from "@/types/i18n";
 
-function pickLocalized(value: any, locale: Locale): string {
+function pickLocalized(value: string | LocalizedText | null | undefined, locale: Locale): string {
   if (!value) return "";
   if (typeof value === "string") return value;
   return value[locale] || value.en || Object.values(value).find(Boolean) || "";
@@ -28,17 +30,17 @@ export default async function EventMenusSection({
         {labels.sectionTitle}
       </h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        {menus.map((menu: any) => {
+        {menus.map((menu: VenueMenu, menuIndex) => {
           const intro = pickLocalized(menu.intro, locale);
           // shapeMenu normalizes menuType to lowercase ("food" | "drinks").
           const typeLabel = String(menu.menuType).toLowerCase() === "drinks" ? labels.drinks : labels.food;
           return (
-            <div key={menu.id ?? menu.title} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 14, padding: "24px 28px" }}>
+            <div key={`${menu.menuType}-${menuIndex}`} style={{ background: "white", border: "1px solid #e5e0d8", borderRadius: 14, padding: "24px 28px" }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9a8f85", marginBottom: 6 }}>
                 {typeLabel}
               </div>
               <h3 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 4 }}>
-                {pickLocalized(menu.title ?? menu.menuTitle, locale)}
+                {pickLocalized(menu.menuTitle, locale)}
               </h3>
               {intro && <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 18, lineHeight: 1.6 }}>{intro}</p>}
 
@@ -54,7 +56,7 @@ export default async function EventMenusSection({
               )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                {(menu.sections ?? []).map((section: any, sIdx: number) => (
+                {(menu.sections ?? []).map((section: MenuSection, sIdx: number) => (
                   <div key={section.id ?? sIdx}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1614", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
                       {pickLocalized(section.title, locale)}
@@ -70,7 +72,7 @@ export default async function EventMenusSection({
                       </p>
                     )}
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {(section.items ?? []).filter((it: any) => it.isAvailable !== false).map((item: any, iIdx: number) => (
+                      {(section.items ?? []).filter((it: MenuItem) => it.isAvailable !== false).map((item: MenuItem, iIdx: number) => (
                         <div key={item.id ?? iIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, paddingBottom: 8, borderBottom: "1px dotted #ece6df" }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1614" }}>

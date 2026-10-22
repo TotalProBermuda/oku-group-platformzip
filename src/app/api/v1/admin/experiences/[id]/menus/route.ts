@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
@@ -41,8 +42,9 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       orderBy: { sortOrder: "asc" },
     });
     return NextResponse.json({ ok: true, data: links });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -94,8 +96,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     });
 
     return NextResponse.json({ ok: true, data: link });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message ?? "Failed" }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message || "Failed" }, { status: error.status });
   }
 }
 
@@ -126,7 +129,8 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
     });
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message ?? "Failed" }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message || "Failed" }, { status: error.status });
   }
 }

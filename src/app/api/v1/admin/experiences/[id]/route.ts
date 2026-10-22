@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
+import type { Prisma } from "@prisma/client";
+import { AvailableSeatsMode, AttendeeListMode, MembershipRuleMode, SeriesHostType, SeriesStatus, VenueKey } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { finishEventSave } from "@/server/i18n/eventTranslationRequest";
@@ -9,9 +13,44 @@ import { seriesSocialLinksSchema } from "@/lib/socialLinks";
 import { parseArtworkEdit } from "@/server/series/artworkInput";
 import { legacySeriesWriteBlocked, managedWriteMessage } from "@/server/series/legacySessionGuard";
 
-function isAdmin(session: any) {
+function isAdmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR"].includes(r));
 }
+
+const SeriesPatchSchema = z.object({
+  title: z.string().min(1).optional(),
+  subtitle: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  venue: z.nativeEnum(VenueKey).nullable().optional(),
+  venueId: z.string().nullable().optional(),
+  spaceId: z.string().nullable().optional(),
+  hostType: z.nativeEnum(SeriesHostType).optional(),
+  influencerId: z.string().nullable().optional(),
+  partnerId: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  venueAddress: z.string().nullable().optional(),
+  heroImageUrl: z.string().nullable().optional(),
+  capacityTotal: z.number().int().nonnegative().optional(),
+  availableSeatsMode: z.nativeEnum(AvailableSeatsMode).optional(),
+  attendeeListMode: z.nativeEnum(AttendeeListMode).optional(),
+  showCountdown: z.boolean().optional(),
+  countdownLabel: z.string().nullable().optional(),
+  publicReleaseAt: z.string().nullable().optional(),
+  earlyReleaseAt: z.string().nullable().optional(),
+  newsletterCaptureEnabled: z.boolean().optional(),
+  waitlistEnabled: z.boolean().optional(),
+  membershipRuleMode: z.nativeEnum(MembershipRuleMode).optional(),
+  isFeatured: z.boolean().optional(),
+  seoTitle: z.string().nullable().optional(),
+  seoDescription: z.string().nullable().optional(),
+  status: z.nativeEnum(SeriesStatus).optional(),
+  startsAt: z.string().nullable().optional(),
+  endsAt: z.string().nullable().optional(),
+  communityUrl: z.string().nullable().optional(),
+  socialLinksJson: z.unknown().optional(),
+}).passthrough();
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -39,47 +78,82 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const actorId = (session!.user as { id: string }).id;
 
   const { id } = await params;
-  const body = await req.json().catch(() => ({}));
-
-  const allowed = ["title","subtitle","description","category","venue","venueId","spaceId","hostType","influencerId","partnerId","city","country","venueAddress",
-    "heroImageUrl","capacityTotal","availableSeatsMode","attendeeListMode","showCountdown","countdownLabel",
-    "publicReleaseAt","earlyReleaseAt","newsletterCaptureEnabled","waitlistEnabled","membershipRuleMode",
-    "isFeatured","seoTitle","seoDescription","status","startsAt","endsAt","communityUrl","socialLinksJson"];
-  const data: any = {};
+  const rawBody: unknown = await req.json().catch(() => ({}));
+  const parsedBody = SeriesPatchSchema.safeParse(rawBody);
+  if (!parsedBody.success) return NextResponse.json({ error: "Invalid series update." }, { status: 400 });
+  const body = parsedBody.data;
+  const data: Prisma.SeriesUncheckedUpdateInput = {
+    title: body.title,
+    subtitle: body.subtitle,
+    description: body.description,
+    category: body.category,
+    venue: body.venue,
+    venueId: body.venueId,
+    spaceId: body.spaceId,
+    hostType: body.hostType,
+    influencerId: body.influencerId,
+    partnerId: body.partnerId,
+    city: body.city,
+    country: body.country,
+    venueAddress: body.venueAddress,
+    heroImageUrl: body.heroImageUrl,
+    capacityTotal: body.capacityTotal,
+    availableSeatsMode: body.availableSeatsMode,
+    attendeeListMode: body.attendeeListMode,
+    showCountdown: body.showCountdown,
+    countdownLabel: body.countdownLabel,
+    publicReleaseAt: body.publicReleaseAt ? new Date(body.publicReleaseAt) : body.publicReleaseAt,
+    earlyReleaseAt: body.earlyReleaseAt ? new Date(body.earlyReleaseAt) : body.earlyReleaseAt,
+    newsletterCaptureEnabled: body.newsletterCaptureEnabled,
+    waitlistEnabled: body.waitlistEnabled,
+    membershipRuleMode: body.membershipRuleMode,
+    isFeatured: body.isFeatured,
+    seoTitle: body.seoTitle,
+    seoDescription: body.seoDescription,
+    status: body.status,
+    startsAt: body.startsAt ? new Date(body.startsAt) : body.startsAt,
+    endsAt: body.endsAt ? new Date(body.endsAt) : body.endsAt,
+    communityUrl: body.communityUrl,
+  };
+  // Preserve PATCH semantics: omitted fields must not appear in the update or
+  // its audit record. Prisma ignores undefined values, but audit metadata
+  // should describe only the fields the editor actually submitted.
+  for (const key of Object.keys(data) as (keyof Prisma.SeriesUncheckedUpdateInput)[]) {
+    if (data[key] === undefined) delete data[key];
+  }
   try {
-    Object.assign(data, parseArtworkEdit(body, session?.user?.roles ?? [], "series"));
+    Object.assign(data, parseArtworkEdit(rawBody as Record<string, unknown>, session?.user?.roles ?? [], "series"));
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: (error as { status: number }).status });
   }
-  for (const k of allowed) if (k in body) data[k] = body[k];
-  if ("socialLinksJson" in data) {
-    const links = seriesSocialLinksSchema.safeParse(data.socialLinksJson ?? {});
+  if (body.socialLinksJson !== undefined) {
+    const links = seriesSocialLinksSchema.safeParse(body.socialLinksJson ?? {});
     if (!links.success) return NextResponse.json({ error: "Enter secure HTTPS links for the series social profiles." }, { status: 400 });
     data.socialLinksJson = links.data;
   }
   const existing = await prisma.series.findUnique({ where: { id }, select: { venueId: true, spaceId: true, hostType: true, influencerId: true, partnerId: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const targetVenueId = data.venueId ?? existing.venueId;
-  if ("venueId" in data) {
-    const venue = await prisma.venue.findUnique({ where: { id: data.venueId }, select: { id: true } });
+  const targetVenueId = body.venueId ?? existing.venueId;
+  if (body.venueId !== undefined && body.venueId !== null) {
+    const venue = await prisma.venue.findUnique({ where: { id: body.venueId }, select: { id: true } });
     if (!venue) return NextResponse.json({ error: "Venue not found" }, { status: 404 });
   }
   // Switching the restaurant must never carry a space from the old venue.
-  if ("venueId" in data && !Object.prototype.hasOwnProperty.call(data, "spaceId")) data.spaceId = null;
+  if (body.venueId !== undefined && body.spaceId === undefined) data.spaceId = null;
   let selectedSpace: { conceptKey: string } | null = null;
-  if (data.spaceId) {
+  if (body.spaceId) {
     if (!targetVenueId) return NextResponse.json({ error: "Select an operational venue first" }, { status: 400 });
-    selectedSpace = await prisma.restaurantSpace.findFirst({ where: { id: data.spaceId, venueId: targetVenueId, isActive: true }, select: { conceptKey: true } });
+    selectedSpace = await prisma.restaurantSpace.findFirst({ where: { id: body.spaceId, venueId: targetVenueId, isActive: true }, select: { conceptKey: true } });
     if (!selectedSpace) return NextResponse.json({ error: "Space must belong to the selected venue" }, { status: 400 });
   }
   // The legacy concept is derived from the selected physical-space data, never
   // trusted from the browser. This prevents a Terrace event being labelled CATCH.
-  if (Object.prototype.hasOwnProperty.call(data, "spaceId")) {
+  if (body.spaceId !== undefined || body.venueId !== undefined) {
     data.venue = selectedSpace?.conceptKey === "OKU" || selectedSpace?.conceptKey === "CATCH" ? selectedSpace.conceptKey : null;
   }
-  const targetHostType = data.hostType ?? existing.hostType;
-  const targetInfluencerId = Object.prototype.hasOwnProperty.call(data, "influencerId") ? data.influencerId : existing.influencerId;
-  const targetPartnerId = Object.prototype.hasOwnProperty.call(data, "partnerId") ? data.partnerId : existing.partnerId;
+  const targetHostType = body.hostType ?? existing.hostType;
+  const targetInfluencerId = body.influencerId !== undefined ? body.influencerId : existing.influencerId;
+  const targetPartnerId = body.partnerId !== undefined ? body.partnerId : existing.partnerId;
   if (targetHostType === "INFLUENCER") {
     if (!targetInfluencerId) return NextResponse.json({ error: "Select an influencer host" }, { status: 400 });
     const influencer = await prisma.influencerProfile.findUnique({ where: { id: targetInfluencerId }, select: { id: true } });
@@ -92,14 +166,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!partner) return NextResponse.json({ error: "Partner host not found" }, { status: 404 });
     data.partnerId = targetPartnerId;
     data.influencerId = null;
-  } else if (Object.prototype.hasOwnProperty.call(data, "hostType")) {
+  } else if (body.hostType !== undefined) {
     data.influencerId = null;
     data.partnerId = null;
   }
-  if (data.publicReleaseAt) data.publicReleaseAt = new Date(data.publicReleaseAt);
-  if (data.earlyReleaseAt)  data.earlyReleaseAt  = new Date(data.earlyReleaseAt);
-  if (data.startsAt)        data.startsAt        = new Date(data.startsAt);
-  if (data.endsAt)          data.endsAt          = new Date(data.endsAt);
 
   // Publishing activates its deliberate occupancy blocks only after the admin
   // has created them. Pausing/postponing immediately releases future public
@@ -111,9 +181,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (defaultFields.some(k => k in data) && await legacySeriesWriteBlocked(id, tx)) throw Object.assign(new Error(managedWriteMessage), { status: 409 });
       const updated = await tx.series.update({ where: { id }, data });
       await syncTranslations(tx, "Series", id, updated);
-      if (data.status === "PUBLISHED") await assertSeriesReadyForPublication(tx, id);
-    if (data.status) {
-      await syncSeriesOccupanciesForStatus(tx, id, data.status);
+      if (body.status === "PUBLISHED") await assertSeriesReadyForPublication(tx, id);
+    if (body.status) {
+      await syncSeriesOccupanciesForStatus(tx, id, body.status);
     }
     await tx.auditLog.create({ data: { actorId, action: "EXPERIENCE_UPDATED", metadata: { seriesId: id, fields: Object.keys(data) } } });
     return updated;

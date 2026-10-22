@@ -113,7 +113,7 @@ async function getSession(req: NextRequest) {
       token: cookieValue,
       secret: SECRET,
       salt: SESSION_COOKIE,
-    } as any);
+    });
   } catch {
     return null;
   }

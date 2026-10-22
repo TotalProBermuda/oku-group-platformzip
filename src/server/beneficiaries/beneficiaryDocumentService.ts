@@ -346,10 +346,10 @@ async function callExternalAv(
       status: "REJECTED",
       message: `av:infected${j.message ? `:${j.message}` : ""}`,
     };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return {
       status: "PENDING",
-      message: `av:unreachable:${e?.name || "error"}`,
+      message: `av:unreachable:${e instanceof Error ? e.name : "error"}`,
     };
   } finally {
     clearTimeout(timer);
@@ -443,10 +443,10 @@ async function callCloudmersiveAv(
       };
     }
     return { status: "CLEAN", message: "cloudmersive:clean" };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return {
       status: "PENDING",
-      message: `cloudmersive:unreachable:${e?.name || "error"}`,
+      message: `cloudmersive:unreachable:${e instanceof Error ? e.name : "error"}`,
     };
   } finally {
     clearTimeout(timer);

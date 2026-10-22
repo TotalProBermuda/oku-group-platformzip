@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { generateReferralLink, getActorLinks, deactivateLink } from "@/server/referrals/referralLinkService";
+import { z } from "zod";
+
+const CreateLinkBody = z.object({
+  referralAssignmentId: z.string().optional(),
+  pathHint: z.string().optional(),
+}).strict();
+const DeleteLinkBody = z.object({ linkId: z.string().min(1) }).strict();
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,8 +18,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
     const links = await getActorLinks(id);
     return NextResponse.json({ ok: true, links });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (e: unknown) {
+    const status = typeof e === "object" && e !== null && "status" in e && typeof e.status === "number" ? e.status : 500;
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Internal error" }, { status });
   }
 }
 
@@ -22,8 +30,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { roles } = await requireSession();
     requirePermission(roles, "admin:audit:read");
 
-    const body = await req.json();
-    const { referralAssignmentId, pathHint } = body;
+    const parsed = CreateLinkBody.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ ok: false, error: "Invalid referral link" }, { status: 400 });
+    const { referralAssignmentId, pathHint } = parsed.data;
 
     const link = await generateReferralLink({
       referralActorId: id,
@@ -32,8 +41,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     return NextResponse.json({ ok: true, link }, { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (e: unknown) {
+    const status = typeof e === "object" && e !== null && "status" in e && typeof e.status === "number" ? e.status : 500;
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Internal error" }, { status });
   }
 }
 
@@ -42,14 +52,13 @@ export async function DELETE(req: NextRequest, { params: _ }: { params: Promise<
     const { roles } = await requireSession();
     requirePermission(roles, "admin:audit:read");
 
-    const body = await req.json();
-    if (!body.linkId) {
-      return NextResponse.json({ ok: false, error: "linkId is required" }, { status: 400 });
-    }
+    const parsed = DeleteLinkBody.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ ok: false, error: "linkId is required" }, { status: 400 });
 
-    await deactivateLink(body.linkId);
+    await deactivateLink(parsed.data.linkId);
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (e: unknown) {
+    const status = typeof e === "object" && e !== null && "status" in e && typeof e.status === "number" ? e.status : 500;
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Internal error" }, { status });
   }
 }

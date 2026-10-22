@@ -11,6 +11,23 @@ import EntityDrawerHost from "@/components/drawers/EntityDrawerHost";
 import { Search, Plus } from "lucide-react";
 import { seriesLocationLabel } from "@/lib/locations";
 
+interface SeriesHostUser { id: string; name: string | null; email: string | null }
+interface SeriesRow {
+  id: string; title: string; slug: string; status: string; hostType: string; createdAt: string;
+  influencer: { user: SeriesHostUser | null } | null;
+  partner: { user: SeriesHostUser | null } | null;
+  sessions: unknown[];
+  operationalVenue?: { name: string; slug: string } | null;
+  eventSpace?: { name: string; conceptKey: string | null } | null;
+  venue?: string | null;
+  venueName?: string | null;
+}
+interface VenueOption { id: string; name: string }
+interface SpaceOption { id: string; name: string; venueId: string; isActive: boolean }
+interface HostOptionUser { name: string | null; email: string | null }
+interface InfluencerOption { id: string; displayName: string | null; handle: string | null; approved: boolean; user: HostOptionUser | null }
+interface PartnerOption { id: string; name: string | null; approved: boolean; user: HostOptionUser | null }
+
 function apiError(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== "object") return fallback;
   const { error, fields } = payload as { error?: unknown; fields?: Record<string, unknown> };
@@ -32,14 +49,14 @@ function SeriesPageContent() {
 
   const { drawerType, drawerId, openDrawer, closeDrawer } = useEntityDrawer();
 
-  const [series, setSeries] = useState<any[]>([]);
+  const [series, setSeries] = useState<SeriesRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [venues, setVenues] = useState<any[]>([]);
-  const [spaces, setSpaces] = useState<any[]>([]);
-  const [hostOptions, setHostOptions] = useState<{ influencers: any[]; partners: any[] }>({ influencers: [], partners: [] });
+  const [venues, setVenues] = useState<VenueOption[]>([]);
+  const [spaces, setSpaces] = useState<SpaceOption[]>([]);
+  const [hostOptions, setHostOptions] = useState<{ influencers: InfluencerOption[]; partners: PartnerOption[] }>({ influencers: [], partners: [] });
   const [form, setForm] = useState({ slug: "", title: "", hostType: "OKU", venueId: "", spaceId: "", influencerId: "", partnerId: "" });
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -129,12 +146,6 @@ function SeriesPageContent() {
       year: "numeric",
     });
 
-  const getHost = (s: any) => {
-    if (s.influencer?.user?.name) return s.influencer.user.name;
-    if (s.partner?.user?.name) return s.partner.user.name;
-    return s.hostType;
-  };
-
   const runSeriesAction = async (seriesId: string, endpoint: "publish" | "unpublish") => {
     setActionError(null);
     try {
@@ -151,7 +162,7 @@ function SeriesPageContent() {
     }
   };
 
-  const buildActions = (s: any): ActionItem[] => {
+  const buildActions = (s: SeriesRow): ActionItem[] => {
     const items: ActionItem[] = [
       {
         key: "open",
@@ -186,7 +197,7 @@ function SeriesPageContent() {
   const STATUSES = ["PUBLISHED", "DRAFT", "ARCHIVED"];
   const publishedCount = series.filter((s) => s.status === "PUBLISHED").length;
 
-  const columns: EntityColumn<any>[] = [
+  const columns: EntityColumn<SeriesRow>[] = [
     {
       key: "title",
       header: t("admin", "title"),
@@ -233,7 +244,7 @@ function SeriesPageContent() {
             <EntityLink
               entityType="user"
               entityId={hostUser.id}
-              label={hostUser.name || hostUser.email}
+              label={hostUser.name || hostUser.email || "User"}
               showIcon={false}
               onOpen={(_, id) => openDrawer("user", id)}
             />

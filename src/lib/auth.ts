@@ -8,6 +8,15 @@ import { sameSiteForEnv } from "@/lib/cookieSecurity";
 import type { NextAuthOptions } from "next-auth";
 import { authorizeProductionAccount } from "@/server/auth/productionAccount";
 import { consumePasswordlessToken } from "@/server/auth/passwordless";
+import type { RoleKey } from "@/types/roles";
+
+const ROLE_KEYS: readonly RoleKey[] = [
+  "VISITOR", "ATTENDEE", "INFLUENCER", "PARTNER", "PARTNER_SELLER", "INVESTOR", "REFERRER",
+  "STAFF_OKU", "STAFF_CATCH", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "ADMIN_FINANCE",
+  "SUPERADMIN", "RESTAURANT_HOST", "STREETSIDE_HOST", "FB_DIRECTOR", "RESTAURANT_SUPERVISOR",
+];
+const isRoleKey = (role: unknown): role is RoleKey =>
+  typeof role === "string" && ROLE_KEYS.includes(role as RoleKey);
 
 const useSecureCookies = !!process.env.REPLIT_DEV_DOMAIN || process.env.NODE_ENV === "production";
 
@@ -30,13 +39,13 @@ const demoCredentialsProvider = CredentialsProvider({
       include: { roles: true },
     });
     if (!user) return null;
-    return {
+    return Object.assign({
       id: user.id,
       email: user.email,
       name: user.name,
       image: user.imageUrl,
       roles: user.roles.map((r) => r.roleKey),
-    } as any;
+    });
   },
 });
 
@@ -53,14 +62,14 @@ const passwordlessCredentialsProvider = CredentialsProvider({
       claimedEmail: credentials?.email ?? "",
     });
     if (!identity) return null;
-    return {
+    return Object.assign({
       id: identity.id,
       email: identity.email,
       name: identity.name,
       roles: identity.roles,
       status: identity.status,
       passwordlessDestination: identity.destination,
-    } as any;
+    });
   },
 });
 
@@ -89,12 +98,12 @@ export const authOptions: NextAuthOptions = {
   jwt: {
     async encode(params) {
       const { encode: jwtEncode } = await import("next-auth/jwt");
-      return jwtEncode({ ...params, salt: "next-auth.session-token" } as any);
+      return jwtEncode({ ...params, salt: "next-auth.session-token" });
     },
     async decode(params) {
       try {
         const { decode: jwtDecode } = await import("next-auth/jwt");
-        return await jwtDecode({ ...params, salt: "next-auth.session-token" } as any);
+        return await jwtDecode({ ...params, salt: "next-auth.session-token" });
       } catch {
         return null;
       }
@@ -150,16 +159,19 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
-        token.roles = (user as any).roles ?? [];
-        token.passwordlessDestination = (user as any).passwordlessDestination;
+        const appUser = user as typeof user & { roles?: unknown; passwordlessDestination?: unknown };
+        token.roles = Array.isArray(appUser.roles) ? appUser.roles.filter(isRoleKey) : [];
+        if (typeof appUser.passwordlessDestination === "string") {
+          token.passwordlessDestination = appUser.passwordlessDestination;
+        }
       }
       return token;
     },
-    async session({ session, token }: any) {
-      if (token?.userId) {
+    async session({ session, token }) {
+      if (session.user && typeof token.userId === "string") {
         session.user.id = token.userId;
-        session.user.roles = token.roles ?? [];
-        if (token.passwordlessDestination) {
+        session.user.roles = Array.isArray(token.roles) ? token.roles.filter(isRoleKey) : [];
+        if (typeof token.passwordlessDestination === "string") {
           session.user.passwordlessDestination = token.passwordlessDestination;
         }
       }

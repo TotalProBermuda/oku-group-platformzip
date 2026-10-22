@@ -65,12 +65,11 @@ describe("runAuditAnomalyScan", () => {
 
     // First create call should carry the source audit ids and signalKey
     // — that's what makes the audit row triage-actionable.
-    const firstCreateArg = vi.mocked(prisma.auditLog.create).mock.calls[0][0] as {
-      data: { action: string; metadata: { signalKey: string; sourceAuditIds: string[] } };
-    };
-    expect(firstCreateArg.data.action).toBe("audit.anomaly.alert");
-    expect(firstCreateArg.data.metadata.signalKey).toBe(sigE.signalKey);
-    expect(firstCreateArg.data.metadata.sourceAuditIds).toEqual(sigE.sourceAuditIds);
+    const firstCreateArg = vi.mocked(prisma.auditLog.create).mock.calls[0][0];
+    expect(firstCreateArg.data).toMatchObject({
+      action: "audit.anomaly.alert",
+      metadata: { signalKey: sigE.signalKey, sourceAuditIds: sigE.sourceAuditIds },
+    });
   });
 
   it("dedupes by signalKey when an alert was paged in the dedupe window", async () => {

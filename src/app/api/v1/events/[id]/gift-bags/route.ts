@@ -96,8 +96,9 @@ export async function GET(
     };
 
     return NextResponse.json({ ok: true, sessions: perSession, totals });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load gift-bag report" }, { status });
   }
 }
 

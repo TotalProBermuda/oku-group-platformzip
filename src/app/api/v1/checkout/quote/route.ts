@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
 import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
+
+type CheckoutQuoteLineItem = {
+  ticketTypeId?: string;
+  addonId?: string;
+  nameSnapshot: string;
+  itemType: "ticket" | "addon";
+  qty: number;
+  unitPriceCents: number;
+  totalCents: number;
+};
+
+function readMembershipBenefits(value: Prisma.JsonValue | null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const discountBps = "discountBps" in value && typeof value.discountBps === "number" ? value.discountBps : undefined;
+  const earlyAccess = "earlyAccess" in value && typeof value.earlyAccess === "boolean" ? value.earlyAccess : undefined;
+  return { discountBps, earlyAccess };
+}
 
 export async function POST(req: NextRequest) {
   const auth = await getOptionalSession();
@@ -38,14 +56,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Load user membership
-  let userMembership: any = null;
+  let userMembership = null;
   if (auth) {
-    userMembership = await prisma.membership.findUnique({
-      where: { userId: auth.userId, status: "ACTIVE" } as any,
+    userMembership = await prisma.membership.findFirst({
+      where: { userId: auth.userId, status: "ACTIVE" },
     });
   }
 
-  const lineItems: any[] = [];
+  const lineItems: CheckoutQuoteLineItem[] = [];
   let subtotalCents = 0;
 
   for (const item of items) {
@@ -92,7 +110,8 @@ export async function POST(req: NextRequest) {
         }, { status: 403 });
       }
 
-      if (tt.saleStartsAt && new Date() < tt.saleStartsAt && !userMembership?.benefitsJson?.earlyAccess) {
+      const membershipBenefits = readMembershipBenefits(userMembership?.benefitsJson ?? null);
+      if (tt.saleStartsAt && new Date() < tt.saleStartsAt && !membershipBenefits.earlyAccess) {
         return NextResponse.json({
           error: "NOT_YET_ON_SALE",
           message: `This ticket is not yet on sale. Members get early access.`,
@@ -104,7 +123,7 @@ export async function POST(req: NextRequest) {
       const unitPrice = calculateTicketUnitPrice({
         ticket: tt,
         sessionPriceCents: sess.ticketPrices.find((price) => price.ticketTypeId === tt.id)?.priceCents,
-        membershipDiscountBps: userMembership?.benefitsJson?.discountBps,
+        membershipDiscountBps: membershipBenefits.discountBps,
         applyMembershipDiscount: series.membershipRuleMode === "MEMBERS_DISCOUNT",
       });
 

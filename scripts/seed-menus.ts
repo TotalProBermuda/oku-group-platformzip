@@ -5,13 +5,13 @@
  * file is removed).
  */
 
-import { PrismaClient, VenueMenuType } from "@prisma/client";
+import { Prisma, PrismaClient, VenueMenuType } from "@prisma/client";
 import { venueMenus } from "../src/data/venues/menus";
 
 const prisma = new PrismaClient();
 
-function toJson(v: unknown): any {
-  return v ?? null;
+function toJson(v: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  return v === null || v === undefined ? Prisma.JsonNull : v as Prisma.InputJsonValue;
 }
 
 async function main() {
@@ -23,22 +23,25 @@ async function main() {
     // Each menu rebuild runs in a single transaction so an interruption can't
     // leave a menu in a half-rebuilt (e.g., empty sections) state.
     await prisma.$transaction(async (tx) => {
-      const record = await tx.venueMenuRecord.upsert({
-        where: { venueSlug_menuType: { venueSlug: menu.venueSlug, menuType } },
-        create: {
+      const existing = await tx.venueMenuRecord.findFirst({
+        where: { venueSlug: menu.venueSlug, menuType, isHouseMenu: true },
+        select: { id: true },
+      });
+      const menuData = {
+        menuTitle: toJson(menu.menuTitle),
+        intro: toJson(menu.intro),
+        pdfUrl: menu.pdfUrl ?? null,
+        sortOrder: menu.order ?? 0,
+      };
+      const record = existing
+        ? await tx.venueMenuRecord.update({ where: { id: existing.id }, data: menuData })
+        : await tx.venueMenuRecord.create({
+        data: {
           venueSlug: menu.venueSlug,
           menuType,
-          menuTitle: toJson(menu.menuTitle),
-          intro: toJson(menu.intro),
-          pdfUrl: menu.pdfUrl ?? null,
-          sortOrder: menu.order ?? 0,
+          ...menuData,
           isPublished: true,
-        },
-        update: {
-          menuTitle: toJson(menu.menuTitle),
-          intro: toJson(menu.intro),
-          pdfUrl: menu.pdfUrl ?? null,
-          sortOrder: menu.order ?? 0,
+          isHouseMenu: true,
         },
       });
 

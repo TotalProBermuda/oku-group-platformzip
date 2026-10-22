@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { InviteAudienceMode, MembershipStatus } from "@prisma/client";
+import { InviteAudienceMode, MembershipStatus, type MembershipTier } from "@prisma/client";
 
 export interface AudienceRecipient {
   userId: string;
@@ -28,7 +28,7 @@ export async function resolveAudience(
     return users.map((u) => ({ userId: u.id, email: u.email, name: u.name }));
   }
 
-  const tierFilter =
+  const tierFilter: MembershipTier[] | null =
     audienceMode === "PATRON_ONLY"
       ? ["PATRON"]
       : audienceMode === "FOUNDER_ONLY"
@@ -41,7 +41,7 @@ export async function resolveAudience(
 
   const memberships = await prisma.membership.findMany({
     where: {
-      tier: { in: tierFilter as any[] },
+      tier: { in: tierFilter },
       status: MembershipStatus.ACTIVE,
       user: { status: "ACTIVE", id: { notIn: [...exclude] } },
     },

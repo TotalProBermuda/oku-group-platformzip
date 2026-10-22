@@ -74,8 +74,8 @@ export default function TicketDetailDrawer({
         if (cancelled) return;
         if (!res.ok) throw new Error(data.error ?? "Failed to load ticket");
         setDetail(data.data);
-      } catch (e: any) {
-        if (!cancelled) setError(e.message);
+      } catch (error: unknown) {
+        if (!cancelled) setError(error instanceof Error ? error.message : "Failed to load ticket");
       } finally {
         if (!cancelled) setLoading(false);
       }

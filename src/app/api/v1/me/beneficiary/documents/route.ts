@@ -11,6 +11,7 @@ import {
   DOC_TYPES_TUPLE,
 } from "@/server/beneficiaries/beneficiaryDocumentService";
 import { scrubErrorMessage } from "@/server/security/logScrub";
+import { getBeneficiaryApiErrorStatus } from "@/app/api/v1/me/beneficiary/errorDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,8 @@ export async function GET() {
       data: docs,
       limits: { maxBytes: MAX_BYTES, allowedMime: ALLOWED_MIME },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status: getBeneficiaryApiErrorStatus(e) });
   }
 }
 
@@ -70,8 +71,8 @@ export async function POST(req: Request) {
       size: body.size,
     });
     return NextResponse.json({ ok: true, data: view });
-  } catch (e: any) {
-    const status = e instanceof DocumentError ? e.status : (e.status || 500);
+  } catch (e: unknown) {
+    const status = e instanceof DocumentError ? e.status : getBeneficiaryApiErrorStatus(e);
     return NextResponse.json({ ok: false, error: scrubErrorMessage(e) }, { status });
   }
 }

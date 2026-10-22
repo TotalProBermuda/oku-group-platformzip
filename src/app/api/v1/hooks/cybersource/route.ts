@@ -25,6 +25,7 @@
  * The endpoint will return 503 until the secret is configured.
  */
 import { NextRequest, NextResponse } from "next/server";
+import type { LedgerEventType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 import { verifyCybersourceWebhookSignature } from "@/server/cybersource/webhookSignature";
@@ -34,7 +35,7 @@ export const dynamic = "force-dynamic";
 const WEBHOOK_SECRET = process.env.CYBERSOURCE_WEBHOOK_SECRET;
 
 /** Map Cybersource webhook eventType strings to our ledger types */
-function mapLedgerEventType(csEventType: string): string | null {
+function mapLedgerEventType(csEventType: string): LedgerEventType | null {
   switch (csEventType) {
     case "payments.payments.authorized":
     case "payments.payments.authorized_pending_review":
@@ -54,6 +55,30 @@ function mapLedgerEventType(csEventType: string): string | null {
     default:
       return null;
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function readStringAtPath(value: unknown, path: readonly string[]): string | undefined {
+  let current: unknown = value;
+  for (const key of path) {
+    const record = asRecord(current);
+    if (!record) return undefined;
+    current = record[key];
+  }
+  return typeof current === "string" ? current : undefined;
+}
+
+function firstStringAtPaths(value: unknown, paths: readonly (readonly string[])[]): string {
+  for (const path of paths) {
+    const candidate = readStringAtPath(value, path);
+    if (candidate !== undefined) return candidate;
+  }
+  return "";
 }
 
 export async function POST(req: NextRequest) {
@@ -98,7 +123,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 4. Parse body
-  let payload: any;
+  let payload: unknown;
   try {
     payload = JSON.parse(rawBody.toString("utf8"));
   } catch {
@@ -106,26 +131,19 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Extract key fields
-  const csEventType: string = payload?.eventType ?? payload?.type ?? "";
-  const csTransactionId: string =
-    payload?.payload?.id ??
-    payload?.data?.object?.id ??
-    payload?.id ??
-    "";
-  const csStatus: string =
-    payload?.payload?.status ??
-    payload?.data?.object?.status ??
-    "";
-  const merchantReference: string =
-    payload?.payload?.clientReferenceInformation?.code ??
-    payload?.data?.object?.clientReferenceInformation?.code ??
-    payload?.clientReferenceInformation?.code ??
-    "";
-  const merchantTransactionId: string =
-    payload?.payload?.clientReferenceInformation?.transactionId ??
-    payload?.data?.object?.clientReferenceInformation?.transactionId ??
-    payload?.clientReferenceInformation?.transactionId ??
-    "";
+  const csEventType = firstStringAtPaths(payload, [["eventType"], ["type"]]);
+  const csTransactionId = firstStringAtPaths(payload, [["payload", "id"], ["data", "object", "id"], ["id"]]);
+  const csStatus = firstStringAtPaths(payload, [["payload", "status"], ["data", "object", "status"]]);
+  const merchantReference = firstStringAtPaths(payload, [
+    ["payload", "clientReferenceInformation", "code"],
+    ["data", "object", "clientReferenceInformation", "code"],
+    ["clientReferenceInformation", "code"],
+  ]);
+  const merchantTransactionId = firstStringAtPaths(payload, [
+    ["payload", "clientReferenceInformation", "transactionId"],
+    ["data", "object", "clientReferenceInformation", "transactionId"],
+    ["clientReferenceInformation", "transactionId"],
+  ]);
 
   if (!csTransactionId) {
     // Not actionable — return 200 so Cybersource stops retrying
@@ -169,7 +187,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await enqueueLedgerEvent(prisma, {
-      eventType: mappedLedgerType as any,
+      eventType: mappedLedgerType,
       source: {
         system: "cybersource_webhook",
         connector: "cybersource_v2",
@@ -185,9 +203,14 @@ export async function POST(req: NextRequest) {
         cybersourceStatus: csStatus,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // P2002 = duplicate — treat as idempotent success
-    if (err?.code !== "P2002") {
+    const errorCode =
+      typeof err === "object" && err !== null && "code" in err
+        ? (err as { code?: unknown }).code
+        : undefined;
+    const isDuplicate = errorCode === "P2002";
+    if (!isDuplicate) {
       console.error("[cybersource-webhook] ledger enqueue failed", err);
       return NextResponse.json({ error: "Unable to record notification" }, { status: 503 });
     }

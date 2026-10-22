@@ -318,8 +318,8 @@ export async function POST(
           });
         }
       });
-    } catch (txErr: any) {
-      if (txErr?.message === "__SPACE_FULL_POST_AUTH__") {
+    } catch (txErr: unknown) {
+      if (txErr instanceof Error && txErr.message === "__SPACE_FULL_POST_AUTH__") {
         spaceFullPostAuth = true;
       } else if (txErr instanceof EventOccupancyConflictError) {
         eventConflictPostAuth = txErr;
@@ -362,9 +362,9 @@ export async function POST(
       paymentIntentId: intent.id,
       cybersourceTransactionId: authTransactionId,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[POST /api/reservations/[id]/payment/confirm]", err);
-    if (err?.name === "ZodError") {
+    if (err instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request body.", details: err.errors },
         { status: 400 },

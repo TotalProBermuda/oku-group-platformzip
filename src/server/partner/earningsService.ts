@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import type { EventReferrerCommissionMode } from "@prisma/client";
 import { calculatePartnerCommission, type CommissionSnapshot } from "@/server/partnerSeats/commissionModel";
 
@@ -102,7 +103,7 @@ export async function getPartnerEarnings(
   const seriesBps = series?.partnerShareBps ?? null;
   const seat = opts.callerSeat && opts.callerSeat.commissionMode !== "NONE" ? opts.callerSeat : null;
 
-  const orderWhere: any = { seriesId, status: "PAID" };
+  const orderWhere: Prisma.OrderWhereInput = { seriesId, status: "PAID" };
   if (opts.restrictToSessionIds && opts.restrictToSessionIds.size > 0) {
     orderWhere.sessionId = { in: Array.from(opts.restrictToSessionIds) };
   }

@@ -5,6 +5,7 @@ import { getHostQueue } from "@/server/host/hostService";
 import { parseQueueSelection, type QueueSelection } from "@/server/host/queueSelection";
 import HostOperationsBoard from "@/components/host/HostOperationsBoard";
 import { getCurrentRoles } from "@/server/auth/currentRoles";
+import type { ComponentProps } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -46,5 +47,19 @@ export default async function HostOperationsPage({ searchParams }: { searchParam
     ? await prisma.reservation.findUnique({ where: { id: selection.reservationId }, select: { venueId: true } })
     : null;
   const data = await getData(profile?.venueId ?? linkedVenue?.venueId ?? null, selection);
-  return <HostOperationsBoard reservations={data.reservations as any} waitlist={data.waitlist as any} zones={data.zones as any} canOverrideCapacity={canOverrideCapacity} selectedDate={selection.date} />;
+  type BoardProps = ComponentProps<typeof HostOperationsBoard>;
+  // Prisma returns Date instances and full relation records here. Normalize the
+  // values at the server/client boundary to the board's serializable DTO shape.
+  const reservations = data.reservations.map((reservation) => ({
+    ...reservation,
+    reservationDate: reservation.reservationDate.toISOString(),
+    statusLogs: reservation.statusLogs.map((log) => ({ ...log, changedAt: log.changedAt.toISOString() })),
+  })) as unknown as BoardProps["reservations"];
+  const waitlist = data.waitlist.map((entry) => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+    contactName: entry.contactName ?? "Guest",
+  })) as unknown as BoardProps["waitlist"];
+  const zones = data.zones as unknown as BoardProps["zones"];
+  return <HostOperationsBoard reservations={reservations} waitlist={waitlist} zones={zones} canOverrideCapacity={canOverrideCapacity} selectedDate={selection.date} />;
 }

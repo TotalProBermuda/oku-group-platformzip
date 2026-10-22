@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, Eye, Save, Zap, Check } from "lucide-react";
+import Link from "next/link";
 import { BuilderTemplate } from "@/lib/hiring/builderTypes";
 
 type Props = {
@@ -50,7 +51,7 @@ export default function BuilderHeader({
         }}
       >
         {/* Back */}
-        <a
+        <Link
           href="/admin/hiring/templates"
           style={{
             display: "flex",
@@ -67,7 +68,7 @@ export default function BuilderHeader({
         >
           <ChevronLeft size={15} />
           Templates
-        </a>
+        </Link>
 
         <div style={{ width: 1, height: 20, background: "#e8e2dd", flexShrink: 0 }} />
 

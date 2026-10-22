@@ -79,7 +79,8 @@ export async function GET(req: Request) {
         checkedInCount: totals.get(s.id)?.checkedIn ?? 0,
       })),
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load check-in sessions" }, { status });
   }
 }

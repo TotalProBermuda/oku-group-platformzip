@@ -22,11 +22,21 @@ const CAT_ICONS: Record<string, string> = {
   EXPERIENCE: "✨", OTHER: "📦",
 };
 
+interface SponsorshipDeal {
+  id: string; agreedPriceCents: number; paymentStatus: string; paidTotalCents: number;
+  entity: { displayName: string; logoUrl?: string | null } | null;
+  application: { brandName: string; contactEmail?: string } | null;
+  slot: { title: string; category: string; series: { title: string } | null } | null;
+  _count: { placements: number; payments: number };
+  payments: Array<{ id: string; amountCents: number; paidAt: string; method: string | null; reference: string | null; notes: string | null }>;
+  placements: Array<{ id: string; placementType: string; label: string; assetUrl: string | null; altText: string | null; linkUrl: string | null; isActive: boolean; notes: string | null; impressions: number; clicks: number }>;
+}
+
 export default function AdminSponsorshipDealsPage() {
   const t = useTranslation();
-  const [deals, setDeals]           = useState<any[]>([]);
+  const [deals, setDeals]           = useState<SponsorshipDeal[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [selected, setSelected]     = useState<any | null>(null);
+  const [selected, setSelected]     = useState<SponsorshipDeal | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [filter, setFilter]         = useState("");
   const [saving, setSaving]         = useState(false);
@@ -41,7 +51,7 @@ export default function AdminSponsorshipDealsPage() {
     setLoading(true);
     const qs = filter ? `?paymentStatus=${filter}` : "";
     const r = await fetch(`/api/v1/admin/sponsorship/deals${qs}`);
-    const d = await r.json();
+    const d = await r.json() as { ok: boolean; deals: SponsorshipDeal[] };
     if (d.ok) setDeals(d.deals);
     setLoading(false);
   }, [filter]);
@@ -51,7 +61,7 @@ export default function AdminSponsorshipDealsPage() {
   async function loadDetail(id: string) {
     setLoadingDetail(true);
     const r = await fetch(`/api/v1/admin/sponsorship/deals/${id}`);
-    const d = await r.json();
+    const d = await r.json() as { ok: boolean; deal: SponsorshipDeal };
     if (d.ok) setSelected(d.deal);
     setLoadingDetail(false);
     setShowAddPayment(false); setShowAddPlacement(false); setError(""); setSuccess("");
@@ -235,7 +245,7 @@ export default function AdminSponsorshipDealsPage() {
                 <div style={{ color: "#9ca3af", fontSize: 13, padding: "12px 0" }}>No payments recorded yet</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {selected.payments.map((p: any) => (
+                  {selected.payments.map((p) => (
                     <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f8f5f3", borderRadius: 8 }}>
                       <div>
                         <span style={{ fontWeight: 700, color: "#1a1614" }}>{fmtMoney(p.amountCents)}</span>
@@ -287,7 +297,7 @@ export default function AdminSponsorshipDealsPage() {
                 <div style={{ color: "#9ca3af", fontSize: 13, padding: "12px 0" }}>No placements activated yet</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {selected.placements.map((p: any) => (
+                  {selected.placements.map((p) => (
                     <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#f8f5f3", borderRadius: 8 }}>
                       <span style={{ fontSize: 20 }}>{PLACEMENT_ICONS[p.placementType] ?? "📌"}</span>
                       <div style={{ flex: 1 }}>

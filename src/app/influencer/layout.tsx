@@ -20,7 +20,7 @@ export default async function InfluencerLayout({ children }: { children: React.R
   }
 
   const session = await getServerSession(authOptions);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
 
   if (!session || (!roles.includes("INFLUENCER") && !roles.includes("SUPERADMIN"))) {
     redirect("/login?callbackUrl=/influencer/dashboard");
