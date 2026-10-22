@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -75,7 +75,14 @@ describe("deployment image cleanup", () => {
     const result = run();
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
+    expect(readFileSync(join(root, '.next/oku-node-runtime-path'), 'utf8').trim()).toBe(realpathSync(process.execPath));
     removed.forEach(name => expect(existsSync(join(root, name)), name).toBe(false));
     kept.forEach(name => expect(readFileSync(join(root, name), "utf8"), name).toBe("preserve"));
+  });
+  it("rejects a runtime-path symlink before any cleanup", () => {
+    symlinkSync(join(root, 'package.json'), join(root, '.next/oku-node-runtime-path'));
+    expect(run().status).toBe(1);
+    expect(existsSync(join(root, '.git/objects/fixture'))).toBe(true);
+    expect(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).name).toBe('oku-group-platform');
   });
 });

@@ -25,13 +25,14 @@ describe("production startup separation from migrations", () => {
     try {
       const log = join(dir, "calls");
       writeFileSync(join(dir, "npx"), '#!/bin/sh\necho "npx $*" >> "$TEST_LOG"\ncase "$*" in\n  "prisma migrate deploy") exit "$TEST_EXIT";;\n  *) exit 1;;\nesac\n', { mode: 0o755 });
-      writeFileSync(join(dir, "npm"), '#!/bin/sh\necho "npm $*" >> "$TEST_LOG"\n', { mode: 0o755 });
+      writeFileSync(join(dir, "node"), '#!/bin/sh\necho "node $*" >> "$TEST_LOG"\n', { mode: 0o755 });
+      writeFileSync(join(dir, "npm"), '#!/bin/sh\necho "UNSAFE npm $*" >> "$TEST_LOG"\nexit 99\n', { mode: 0o755 });
       const result = spawnSync("sh", ["scripts/deploy-prisma-with-rate-limit-repair.sh"], {
         env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, TEST_LOG: log, TEST_EXIT: String(exitCode), PORT: "5000" },
       });
       const calls = readFileSync(log, "utf8");
       expect(calls).not.toContain("npx");
-      expect(calls).toBe("npm run start:next -- -p 5000\n");
+      expect(calls).toBe("node node_modules/next/dist/bin/next start -p 5000\n");
       expect(result.status).toBe(0);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });

@@ -75,6 +75,10 @@ function planCleanup() {
 
 function main() {
   const { root, targets } = planCleanup();
+  // Runtime shells need not inherit the build's Nix PATH. Record the exact
+  // Node binary already used by this successful build; never guess a version.
+  inspectPath(root, '.next/oku-node-runtime-path');
+  fs.writeFileSync(path.join(root, '.next/oku-node-runtime-path'), fs.realpathSync(process.execPath) + '\n');
   for (const target of targets) {
     fs.rmSync(target, { recursive: true, force: false });
     console.log(`[deployment-cleanup] Removed build-copy ${path.relative(root, target)}`);
