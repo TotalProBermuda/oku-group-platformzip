@@ -49,6 +49,8 @@ function shapeMenu(
         name: unknown;
         description: unknown;
         price: string | null;
+        producerName: string | null;
+        imageUrl: string | null;
         dietary: string[];
         tags: string[];
         sortOrder: number;
@@ -83,6 +85,8 @@ function shapeMenu(
             name: (asLocalized(it.name) ?? "") as string | LocalizedText,
             description: (asLocalized(it.description) ?? undefined) as string | LocalizedText | undefined,
             price: it.price ?? undefined,
+            producerName: it.producerName ?? undefined,
+            imageUrl: it.imageUrl ?? undefined,
             dietary: it.dietary,
             tags: it.tags,
             order: it.sortOrder,
@@ -234,6 +238,8 @@ export async function duplicateMenuRecord(sourceMenuId: string, opts?: { newTitl
               name:        cloneJsonInput(it.name),
               description: it.description === null ? Prisma.JsonNull : cloneJsonInput(it.description),
               price:       it.price,
+              producerName: it.producerName,
+              imageUrl:     it.imageUrl,
               dietary:     it.dietary,
               tags:        it.tags,
               sortOrder:   it.sortOrder,
