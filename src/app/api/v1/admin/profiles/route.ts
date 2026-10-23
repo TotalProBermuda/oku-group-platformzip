@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 
 function deriveCategory(roleKeys: string[]): string {
   if (roleKeys.includes("SUPERADMIN") || roleKeys.includes("FB_DIRECTOR")) return "admin";
@@ -259,7 +260,8 @@ export async function POST(req: NextRequest) {
     const dbUser = session?.user?.email
       ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } })
       : null;
-    const profile = await prisma.profile.create({
+    const profile = await prisma.$transaction(async (tx) => {
+      const created = await tx.profile.create({
       data: {
         profileType, displayName, legalName: legalName || null, slug: slug || null,
         primaryCategory: primaryCategory || null, categories: categories ?? [],
@@ -272,7 +274,14 @@ export async function POST(req: NextRequest) {
         status: status ?? "ACTIVE", metadata: metadata ?? {},
         createdByUserId: dbUser?.id ?? null,
       },
-      select: { id: true, displayName: true, profileType: true, status: true, primaryCategory: true },
+      select: { id: true, displayName: true, bio: true, shortDescription: true, profileType: true, status: true, primaryCategory: true },
+      });
+      await syncTranslations(tx, "Profile", created.id, {
+        displayName: created.displayName,
+        bio: created.bio,
+        shortDescription: created.shortDescription,
+      });
+      return created;
     });
     return NextResponse.json({ profile }, { status: 201 });
   } catch (err: unknown) {
