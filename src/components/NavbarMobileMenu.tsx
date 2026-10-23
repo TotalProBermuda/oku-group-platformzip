@@ -14,6 +14,7 @@ interface Props {
   labels: {
     restaurants: string;
     experiences: string;
+    functions: string;
     membership: string;
     careers: string;
     signIn?: string;
@@ -71,6 +72,7 @@ export default function NavbarMobileMenu({ session, locale, labels }: Props) {
           >
             <Link href={localePath(locale, "/restaurants")} className="mobile-nav-link" onClick={close}>{labels.restaurants}</Link>
             <Link href={localePath(locale, "/experiences")} className="mobile-nav-link" onClick={close}>{labels.experiences}</Link>
+            <Link href={localePath(locale, "/functions")} className="mobile-nav-link" onClick={close}>{labels.functions}</Link>
             <Link href={localePath(locale, "/membership")}  className="mobile-nav-link" onClick={close}>{labels.membership}</Link>
             <Link href={localePath(locale, "/careers")}     className="mobile-nav-link" onClick={close}>{labels.careers}</Link>
 
