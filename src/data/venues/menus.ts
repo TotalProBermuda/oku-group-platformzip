@@ -5,6 +5,8 @@ export type MenuItem = {
   name: string | LocalizedText;
   description?: string | LocalizedText;
   price?: string;
+  producerName?: string;
+  imageUrl?: string;
   dietary?: string[];
   tags?: string[];
   order: number;
