@@ -5485,10 +5485,12 @@ model MenuSectionRecord {
 model MenuItemRecord {
   id          String   @id @default(cuid())
   sectionId   String
-  name        Json // { en, es, pt } | string
-  description Json?
-  price       String?
-  dietary     String[] @default([])
+  name         Json // { en, es, pt } | string
+  description  Json?
+  price        String?
+  producerName String?
+  imageUrl     String?
+  dietary      String[] @default([])
   tags        String[] @default([])
   sortOrder   Int      @default(0)
   isAvailable Boolean  @default(true)
