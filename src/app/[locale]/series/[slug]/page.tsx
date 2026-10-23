@@ -13,10 +13,14 @@ interface PublicSeries {
   slug: string;
   title: string;
   description: string | null;
+  heroImageUrl?: string | null;
+  heroImageUrlEn?: string | null;
+  heroImageUrlEs?: string | null;
+  heroImageUrlPt?: string | null;
   venue: string | null;
   hostType: string | null;
   ticketTypes: Array<{ id: string; name: string; description: string | null; priceCents: number; maxPerOrder: number }>;
-  sessions: Array<{ id: string; title: string | null; startsAt: string; endsAt: string; capacity: number; soldCount: number }>;
+  sessions: Array<{ id: string; title: string | null; startsAt: string; endsAt: string; capacity: number; soldCount: number; flyerImageUrl?: string | null; flyerImageUrlEn?: string | null; flyerImageUrlEs?: string | null; flyerImageUrlPt?: string | null; flyerImageUrlMobileEn?: string | null; flyerImageUrlMobileEs?: string | null; flyerImageUrlMobilePt?: string | null }>;
   operationalVenue?: { name: string; slug: string } | null;
   eventSpace?: { name: string; conceptKey: string | null } | null;
 }
@@ -46,7 +50,7 @@ export default async function SeriesDetailPage({ params }: Props) {
 
   const dateFmt = new Intl.DateTimeFormat(
     safeLocale === "es" ? "es-PA" : safeLocale === "pt" ? "pt-BR" : "en-US",
-    { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }
+    { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" }
   );
 
   if (!series) {
@@ -62,6 +66,11 @@ export default async function SeriesDetailPage({ params }: Props) {
   const content = getSeriesContent(series.slug, safeLocale);
   const title = content?.title ?? series.title;
   const description = content?.description ?? series.description;
+  const heroImage = safeLocale === "es"
+    ? series.heroImageUrlEs || series.heroImageUrlEn || series.heroImageUrl
+    : safeLocale === "pt"
+      ? series.heroImageUrlPt || series.heroImageUrlEn || series.heroImageUrl
+      : series.heroImageUrlEn || series.heroImageUrl;
 
   const minPrice = series.ticketTypes?.length
     ? Math.min(...series.ticketTypes.map((ticketType) => ticketType.priceCents))
@@ -72,8 +81,11 @@ export default async function SeriesDetailPage({ params }: Props) {
     <div>
       {/* ── HERO ── */}
       <div style={{
-        background: venueGradients[series.venue || "OKU"],
-        padding: "64px 24px",
+        background: heroImage
+          ? `linear-gradient(90deg, rgba(26,22,20,.88), rgba(26,22,20,.38)), url("${heroImage}") center/cover`
+          : venueGradients[series.venue || "OKU"],
+        minHeight: 360,
+        padding: "72px 24px",
         position: "relative",
         overflow: "hidden",
       }}>
@@ -154,14 +166,25 @@ export default async function SeriesDetailPage({ params }: Props) {
                   const remaining = sess.capacity - sess.soldCount;
                   const pctFull = Math.round((sess.soldCount / sess.capacity) * 100);
                   const sessionTitle = getSessionTitle(sess.title || `${c.sessionLabel} ${idx + 1}`, safeLocale);
+                  const sessionArtwork = safeLocale === "es"
+                    ? sess.flyerImageUrlEs || sess.flyerImageUrl
+                    : safeLocale === "pt"
+                      ? sess.flyerImageUrlPt || sess.flyerImageUrl
+                      : sess.flyerImageUrlEn || sess.flyerImageUrl;
+                  const sessionPageUrl = localePath(safeLocale, `/experiences/${series.slug}/sessions/${sess.id}`);
+                  const sessionCheckoutUrl = localePath(safeLocale, `/checkout/${series.slug}?sessionId=${encodeURIComponent(sess.id)}`);
                   return (
-                    <div key={sess.id} className="card" style={{ position: "relative" }}>
+                    <article key={sess.id} className="card" style={{ position: "relative", overflow: "hidden" }}>
                       <div style={{
                         position: "absolute", top: 0, left: 0, right: 0, height: 3,
                         background: "var(--color-border)", borderRadius: "var(--radius-lg) var(--radius-lg) 0 0", overflow: "hidden",
                       }}>
                         <div style={{ height: "100%", width: `${pctFull}%`, background: remaining === 0 ? "var(--color-danger)" : "var(--color-success)", transition: "width 0.3s" }} />
                       </div>
+                      <Link href={sessionPageUrl} style={{ display: "block", color: "inherit", textDecoration: "none" }}>
+                        {sessionArtwork && (
+                          <div role="img" aria-label={sessionTitle} style={{ width: "100%", aspectRatio: "16 / 9", marginBottom: 16, borderRadius: "var(--radius-md)", backgroundColor: "var(--color-bg-secondary)", backgroundImage: `url("${sessionArtwork}")`, backgroundSize: "contain", backgroundPosition: "center", backgroundRepeat: "no-repeat" }} />
+                        )}
                       <div style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 600, marginBottom: 12, paddingTop: 4 }}>
                         {sessionTitle}
                       </div>
@@ -186,7 +209,12 @@ export default async function SeriesDetailPage({ params }: Props) {
                           )}
                         </div>
                       </div>
-                    </div>
+                      </Link>
+                      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+                        <Link href={sessionPageUrl} className="btn btn-secondary" style={{ flex: 1, textAlign: "center" }}>{c.viewEventLink}</Link>
+                        <Link href={sessionCheckoutUrl} className="btn btn-primary" style={{ flex: 1, textAlign: "center" }}>{c.buyTickets}</Link>
+                      </div>
+                    </article>
                   );
                 })}
               </div>

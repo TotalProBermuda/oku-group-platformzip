@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import MediaUpload from "@/components/ui/MediaUpload";
 
 interface InviteData {
@@ -14,11 +14,12 @@ interface InviteData {
   expiresAt: string;
 }
 
-type Step = "account" | "profile" | "social" | "contact" | "done";
+type Step = "account" | "payout" | "profile" | "social" | "contact" | "done";
 
-const STEPS: Step[] = ["account", "profile", "social", "contact", "done"];
+const STEPS: Step[] = ["account", "payout", "profile", "social", "contact", "done"];
 const STEP_LABELS: Record<Step, string> = {
   account: "Account",
+  payout: "Payout",
   profile: "Profile",
   social: "Social",
   contact: "Contact",
@@ -27,7 +28,6 @@ const STEP_LABELS: Record<Step, string> = {
 
 export default function AcceptInvitePage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const token = searchParams.get("token") ?? "";
 
   const [invite, setInvite] = useState<InviteData | null>(null);
@@ -35,6 +35,8 @@ export default function AcceptInvitePage() {
   const [step, setStep] = useState<Step>("account");
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [payoutError, setPayoutError] = useState("");
+  const [payoutStatus, setPayoutStatus] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -46,6 +48,14 @@ export default function AcceptInvitePage() {
     websiteUrl: "",
     whatsapp: "",
     preferredLanguage: "English",
+    bankName: "",
+    accountHolderName: "",
+    accountType: "CHECKING",
+    currency: "USD",
+    swiftBic: "",
+    bankAccountNumber: "",
+    bankAccountNumberConfirmation: "",
+    payoutAuthorization: false,
   });
 
   useEffect(() => {
@@ -63,7 +73,9 @@ export default function AcceptInvitePage() {
       .catch(() => setLoadError("Failed to load invite."));
   }, [token]);
 
-  function f(key: keyof typeof form) {
+  type TextFormField = Exclude<keyof typeof form, "payoutAuthorization">;
+
+  function f(key: TextFormField) {
     return {
       value: form[key],
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -73,18 +85,47 @@ export default function AcceptInvitePage() {
 
   async function submit() {
     setSaving(true); setSubmitError("");
-    const res = await fetch(`/api/v1/influencer/accept-invite?token=${token}`, {
+    try {
+    const res = await fetch(`/api/v1/influencer/accept-invite?token=${encodeURIComponent(token)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     const data = await res.json();
-    setSaving(false);
     if (data.ok) {
+      setPayoutStatus(data.payoutSetup?.status ?? "MISSING_INFO");
       setStep("done");
     } else {
       setSubmitError(data.error ?? "Something went wrong. Please try again.");
     }
+    } catch {
+      setSubmitError("Could not submit your details. Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function continueToProfile() {
+    setPayoutError("");
+    if (!form.payoutAuthorization) {
+      setPayoutError("Confirm the bank-details authorization to continue.");
+      return;
+    }
+    if (!form.bankName.trim() || !form.accountHolderName.trim()) {
+      setPayoutError("Enter your bank and account holder name.");
+      return;
+    }
+    const accountNumber = form.bankAccountNumber.trim();
+    const accountNumberConfirmation = form.bankAccountNumberConfirmation.trim();
+    if (!accountNumber.trim() || accountNumber.length > 128 || /[\u0000-\u001f\u007f]/.test(accountNumber)) {
+      setPayoutError("Enter the account identifier exactly as provided by your bank.");
+      return;
+    }
+    if (accountNumber !== accountNumberConfirmation) {
+      setPayoutError("The account numbers do not match.");
+      return;
+    }
+    setStep("profile");
   }
 
   const inputStyle: React.CSSProperties = {
@@ -131,7 +172,9 @@ export default function AcceptInvitePage() {
             Welcome to OKÜ, {form.name.split(" ")[0]}!
           </h1>
           <p style={{ color: "#6b7280", fontSize: 16, lineHeight: 1.7, marginBottom: 32 }}>
-            Your creator profile is set up. You can now log in to your influencer portal to view your assigned events, commission ledger, and referral link.
+            {payoutStatus === "READY_FOR_REVIEW"
+              ? "Your bank details were securely saved and submitted to OKÜ Finance for review. Commission payouts remain blocked until Finance verifies the account."
+              : "Your bank details were securely saved, but the payout profile still has a requirement or hold to resolve. OKÜ Finance must clear it and verify the account before any payout can be made."} You can sign in to your portal to view your assignments, commission ledger, and referral link.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <Link href="/login" style={{ display: "inline-block", background: "#c41e3a", color: "white", padding: "14px 32px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
@@ -169,7 +212,7 @@ export default function AcceptInvitePage() {
         </div>
 
         <div style={{ display: "flex", gap: 0, marginBottom: 40, background: "white", border: "1px solid #e5e0d8", borderRadius: 12, overflow: "hidden" }}>
-          {(["account", "profile", "social", "contact"] as Step[]).map((s, idx) => (
+          {STEPS.filter((s) => s !== "done").map((s, idx) => (
             <div key={s} style={{ flex: 1, padding: "14px 0", textAlign: "center", background: currentStepIndex >= idx ? "#1a1614" : "white", borderRight: "1px solid #e5e0d8", cursor: "default" }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: currentStepIndex >= idx ? "#c41e3a" : "#9ca3af" }}>{idx + 1}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: currentStepIndex >= idx ? "white" : "#6b7280" }}>{STEP_LABELS[s]}</div>
@@ -195,8 +238,8 @@ export default function AcceptInvitePage() {
               </div>
               <div style={{ marginBottom: 28 }}>
                 <label style={labelStyle}>Email Address</label>
-                <input type="email" style={inputStyle} {...f("email")} placeholder="your@email.com" />
-                <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 6 }}>Use this email to sign in to OKÜ. It was pre-filled from your invitation.</p>
+                <input type="email" style={inputStyle} {...f("email")} readOnly aria-readonly="true" />
+                <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 6 }}>This invitation is tied to this email address. Use it to sign in to OKÜ.</p>
               </div>
 
               <div style={{ background: "#f8f5f3", borderRadius: 10, padding: "16px 20px", marginBottom: 28 }}>
@@ -205,9 +248,78 @@ export default function AcceptInvitePage() {
                 <p style={{ fontSize: 12, color: "#6b7280", margin: "4px 0 0" }}>Applied to ticket revenue attributed to you.</p>
               </div>
 
-              <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => setStep("profile")}>
-                Continue →
+              <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => setStep("payout")}>
+                Continue to payout setup →
               </button>
+            </div>
+          )}
+
+          {step === "payout" && (
+            <div>
+              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 400, color: "#1a1614", marginBottom: 6 }}>How you receive commission</h2>
+              <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 20, lineHeight: 1.6 }}>
+                OKÜ pays eligible commissions by online bank transfer only. OKÜ funds commission payments from its Banesco account, but your receiving bank can be another bank. Enter the beneficiary account where you want to receive commissions; OKÜ Finance must review the bank and transfer route before it is approved for payment.
+              </p>
+
+              <div style={{ background: "#f8f5f3", border: "1px solid #eee7df", borderRadius: 10, padding: "14px 16px", marginBottom: 24, fontSize: 13, color: "#5b514a", lineHeight: 1.6 }}>
+                Your account number is encrypted in storage and masked after submission. OKÜ’s Banesco account is the funding account; it does not mean your beneficiary account must be at Banesco. Finance will verify whether the receiving bank and transfer route are supported. Only USD bank-transfer details can be submitted at this time; other currencies or unconfirmed transfer routes remain pending review and cannot be paid until approved. We do not ask for ID here; supporting documents will be requested only if a documented bank or legal requirement applies.
+              </div>
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Bank name</label>
+                <input autoComplete="organization" style={inputStyle} {...f("bankName")} placeholder="Name of your bank" />
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Account holder name</label>
+                <input autoComplete="name" style={inputStyle} {...f("accountHolderName")} placeholder="Exactly as registered with your bank" />
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Account type</label>
+                <select style={{ ...inputStyle, cursor: "pointer" }} {...f("accountType")}>
+                  <option value="CHECKING">Checking</option>
+                  <option value="SAVINGS">Savings</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Account currency</label>
+                <p style={{ fontSize: 12, color: "#6b7280", margin: "-2px 0 8px" }}>USD only for now. Other payout currencies are pending review and cannot be paid until OKÜ Finance confirms the transfer route.</p>
+                <select style={{ ...inputStyle, cursor: "pointer" }} {...f("currency")}>
+                  <option value="USD">USD — current OKÜ payout currency</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Bank account number</label>
+                <input type="text" inputMode="text" autoComplete="off" spellCheck={false} style={inputStyle} {...f("bankAccountNumber")} placeholder="Enter account number" />
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Confirm bank account number</label>
+                <input type="text" inputMode="text" autoComplete="off" spellCheck={false} style={inputStyle} {...f("bankAccountNumberConfirmation")} placeholder="Enter the same account number again" />
+              </div>
+              <div style={{ marginBottom: 28 }}>
+                <label style={labelStyle}>SWIFT / BIC <span style={{ fontWeight: 400, textTransform: "none", fontSize: 11, color: "#9ca3af" }}>(optional; provide it if your bank requires it)</span></label>
+                <input autoComplete="off" style={inputStyle} {...f("swiftBic")} placeholder="8 or 11 characters" />
+              </div>
+
+              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "#5b514a", lineHeight: 1.5, marginBottom: 24 }}>
+                <input
+                  type="checkbox"
+                  checked={form.payoutAuthorization}
+                  onChange={(e) => setForm((p) => ({ ...p, payoutAuthorization: e.target.checked }))}
+                  style={{ marginTop: 3 }}
+                />
+                <span>I confirm I am authorized to provide these bank details and authorize OKÜ to securely store and use them to administer commission payouts. I understand that submission does not authorize a payout; Finance review is required first.</span>
+              </label>
+
+              {payoutError && (
+                <div role="alert" style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", color: "#dc2626", marginBottom: 20 }}>
+                  {payoutError}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn btn-ghost" onClick={() => setStep("account")}>← Back</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={continueToProfile}>Continue to profile →</button>
+              </div>
             </div>
           )}
 
@@ -220,7 +332,7 @@ export default function AcceptInvitePage() {
                 <MediaUpload
                   label="Profile Photo"
                   value={form.profileImageUrl || ""}
-                  onChange={(url) => setForm((previous) => ({ ...previous, profileImageUrl: url }))}
+                  onChange={(url) => setForm((p) => ({ ...p, profileImageUrl: url }))}
                   aspectRatio="square"
                   mediaType="image"
                   maxSizeMB={5}

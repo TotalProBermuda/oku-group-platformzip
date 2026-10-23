@@ -90,6 +90,8 @@ export type SelfServiceInput = {
   swiftBic?: string | null;
   /** Beneficiary preference: suppress informational status-change emails. */
   statusEmailOptOut?: boolean;
+  /** Explicit per-submission authorization for processing payout bank details. */
+  payoutAuthorization?: boolean;
 };
 
 // ── Admin override input ───────────────────────────────────────────────────
@@ -524,6 +526,9 @@ export async function upsertOwnProfile(
   userId: string,
   input: SelfServiceInput,
 ): Promise<BeneficiaryProfileView> {
+  if (bankFieldsTouched(input) && input.payoutAuthorization !== true) {
+    throw Object.assign(new Error("Confirm authorization before saving bank details."), { status: 400 });
+  }
   return prisma.$transaction(async tx => {
     const existing = await tx.beneficiaryProfile.findUnique({ where: { userId } });
     const data = buildUpdateData(input);
@@ -541,6 +546,14 @@ export async function upsertOwnProfile(
       // Never log raw values — booleans only.
       accountNumberChanged: input.banescoAccountNumber !== undefined,
     });
+    if (bankFieldsTouched(input)) {
+      await writeAudit(tx, userId, "beneficiary.payout_authorization.accepted", {
+        userId,
+        version: "oku-commission-payouts-v1",
+        acceptedAt: new Date().toISOString(),
+        source: "beneficiary_self_service",
+      });
+    }
 
     return toOwnView(final);
   });

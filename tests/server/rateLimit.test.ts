@@ -1,19 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  checkRateLimitAsync,
-  rateLimitedResponse,
-} from "@/server/rateLimit";
+import { checkRateLimitAsync, rateLimitedResponse } from "@/server/rateLimit";
 
 describe("rate limiting", () => {
   afterEach(() => vi.unstubAllEnvs());
   it("blocks requests after the configured limit and supplies Retry-After", async () => {
     const key = `test:${crypto.randomUUID()}`;
-    expect(await checkRateLimitAsync({ key, limit: 1, windowMs: 60_000 })).toMatchObject({
+    expect(
+      await checkRateLimitAsync({ key, limit: 1, windowMs: 60_000 }),
+    ).toMatchObject({
       ok: true,
       remaining: 0,
     });
 
-    const blocked = await checkRateLimitAsync({ key, limit: 1, windowMs: 60_000 });
+    const blocked = await checkRateLimitAsync({
+      key,
+      limit: 1,
+      windowMs: 60_000,
+    });
     expect(blocked.ok).toBe(false);
 
     const response = rateLimitedResponse(blocked);
@@ -41,11 +44,20 @@ describe("rate limiting", () => {
     }
   });
 
-  it("fails closed for a protected production flow when Redis is absent", async () => {
+  it("fails closed for a protected production flow when Redis and the shared database are unavailable", async () => {
     const previousRedisUrl = process.env.REDIS_URL;
     vi.stubEnv("NODE_ENV", "production");
+    Reflect.set(process.env, "NODE_ENV", "production");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_HOST", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+    vi.stubEnv("UPSTASH_REDIS_TOKEN", "");
     delete process.env.REDIS_URL;
     try {
+      const { prisma } = await import("@/lib/prisma");
+      vi.spyOn(prisma, "$queryRaw").mockRejectedValue(
+        new Error("shared database unavailable"),
+      );
       const result = await checkRateLimitAsync({
         key: `strict-test:${crypto.randomUUID()}`,
         limit: 1,

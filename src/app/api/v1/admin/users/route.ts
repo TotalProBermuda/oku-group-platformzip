@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { issuePasswordlessToken } from "@/server/auth/passwordless";
@@ -41,9 +40,11 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: users });
-  } catch (e: unknown) {
-    const error = getAdminApiErrorDetails(e);
-    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
+  } catch (error: unknown) {
+    const detail = error && typeof error === "object" ? error as { status?: unknown; message?: unknown } : {};
+    const status = typeof detail.status === "number" && detail.status >= 400 && detail.status <= 599 ? detail.status : 500;
+    const message = status === 500 ? "Failed to process referrer account request" : typeof detail.message === "string" ? detail.message : "Request could not be completed";
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
 
@@ -98,6 +99,24 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // A new referrer may earn OKÜ-paid commissions. Start an empty payout
+        // profile with no document requirement; Finance may require evidence
+        // later only when a documented rule applies. Bank data is still supplied
+        // by the referrer after accepting the invitation.
+        await tx.beneficiaryProfile.upsert({
+          where: { userId: newUser.id },
+          create: {
+            userId: newUser.id,
+            proofOfAddressStatus: "NOT_REQUIRED",
+            identificationStatus: "NOT_REQUIRED",
+            taxOrRucStatus: "NOT_REQUIRED",
+            sourceOfFundsStatus: "NOT_REQUIRED",
+            bankReadinessStatus: "MISSING_INFO",
+          },
+          update: {},
+        });
+
+
         const actorResult = await findOrCreateReferralActor({
           actorType: mapReferrerTypeToActorType(referrerType as ReferrerType),
           displayName: name?.trim() || email.trim(),
@@ -137,7 +156,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           purpose: "REFERRER_INVITE",
           requireExistingUserId: user.id,
-          callbackUrl: "/referrer/dashboard",
+          callbackUrl: "/my/beneficiary",
         })).issued;
       } catch {
         invitationSent = false;
@@ -145,8 +164,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, data: user, meta: { invitationSent } }, { status: 201 });
-  } catch (e: unknown) {
-    const error = getAdminApiErrorDetails(e);
-    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
+  } catch (error: unknown) {
+    const detail = error && typeof error === "object" ? error as { status?: unknown; message?: unknown } : {};
+    const status = typeof detail.status === "number" && detail.status >= 400 && detail.status <= 599 ? detail.status : 500;
+    const message = status === 500 ? "Failed to create referrer account" : typeof detail.message === "string" ? detail.message : "Request could not be completed";
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

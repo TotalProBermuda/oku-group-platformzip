@@ -40,7 +40,31 @@ const completeBank = {
   accountHolderName: "Jane Doe",
   accountType: "CHECKING" as const,
   currency: "USD",
+  payoutAuthorization: true,
 };
+
+describe("payout bank-detail authorization", () => {
+  it("rejects bank-detail changes without explicit authorization", async () => {
+    await expect(upsertOwnProfile("user_no_consent", { bankName: "Banesco" }))
+      .rejects.toThrow("Confirm authorization before saving bank details.");
+    expect(mp.store.auditLogs).toHaveLength(0);
+  });
+
+  it("records a versioned consent audit without bank account values", async () => {
+    await upsertOwnProfile("user_with_consent", {
+      bankName: "Banesco",
+      payoutAuthorization: true,
+      banescoAccountNumber: "1234567890",
+    });
+    const audit = mp.store.auditLogs.find(a => a.action === "beneficiary.payout_authorization.accepted");
+    expect(audit).toBeDefined();
+    expect(audit?.metadata).toMatchObject({
+      version: "oku-commission-payouts-v1",
+      source: "beneficiary_self_service",
+    });
+    expect(JSON.stringify(audit?.metadata)).not.toContain("1234567890");
+  });
+});
 
 describe("beneficiary state machine — auto-promotion", () => {
   it("auto-promotes MISSING_INFO → READY_FOR_REVIEW once info is complete", async () => {
@@ -59,7 +83,7 @@ describe("beneficiary state machine — auto-promotion", () => {
   });
 
   it("does NOT promote when info is incomplete (missing bank fields)", async () => {
-    const view = await upsertOwnProfile("user_b", { bankName: "Banesco" });
+    const view = await upsertOwnProfile("user_b", { bankName: "Banesco", payoutAuthorization: true });
     expect(view.status.bankReadinessStatus).toBe("MISSING_INFO");
   });
 
@@ -101,7 +125,7 @@ describe("beneficiary state machine — post-approval demotion on bank-field edi
       bankReadyById: "admin_y",
     });
 
-    const view = await upsertOwnProfile("user_d", { banescoAccountNumber: "9999888877" });
+    const view = await upsertOwnProfile("user_d", { banescoAccountNumber: "9999888877", payoutAuthorization: true });
     expect(view.status.bankReadinessStatus).toBe("READY_FOR_REVIEW");
     expect(view.status.okuApproved).toBe(false);
     expect(view.status.bankReady).toBe(false);
@@ -127,7 +151,7 @@ describe("beneficiary state machine — post-approval demotion on bank-field edi
       okuApprovedById: "admin_x",
     });
 
-    const view = await upsertOwnProfile("user_e", { banescoAccountNumber: "" });
+    const view = await upsertOwnProfile("user_e", { banescoAccountNumber: "", payoutAuthorization: true });
     expect(view.status.bankReadinessStatus).toBe("MISSING_INFO");
     expect(view.status.okuApproved).toBe(false);
     expect(view.bank.accountLast4).toBeNull();
@@ -148,7 +172,7 @@ describe("beneficiary state machine — post-approval demotion on bank-field edi
       bankReadinessStatus: "ON_HOLD",
       complianceHoldReason: "Sanctions check",
     });
-    const view = await upsertOwnProfile("user_f", { banescoAccountNumber: "5555444433" });
+    const view = await upsertOwnProfile("user_f", { banescoAccountNumber: "5555444433", payoutAuthorization: true });
     expect(view.status.bankReadinessStatus).toBe("ON_HOLD");
   });
 
@@ -166,7 +190,7 @@ describe("beneficiary state machine — post-approval demotion on bank-field edi
       bankReadinessStatus: "REJECTED",
       complianceHoldReason: "Document mismatch",
     });
-    const view = await upsertOwnProfile("user_g", { banescoAccountNumber: "5555444433" });
+    const view = await upsertOwnProfile("user_g", { banescoAccountNumber: "5555444433", payoutAuthorization: true });
     expect(view.status.bankReadinessStatus).toBe("REJECTED");
   });
 
@@ -259,7 +283,7 @@ describe("beneficiary state machine — illegal transitions", () => {
     const ownGet = await getOwnProfile("user_n");
     expect(ownGet?.adminVerificationNotes).toBeNull();
 
-    const ownPatch = await upsertOwnProfile("user_n", { accountHolderName: "Jane Doe" });
+    const ownPatch = await upsertOwnProfile("user_n", { accountHolderName: "Jane Doe", payoutAuthorization: true });
     expect(ownPatch.adminVerificationNotes).toBeNull();
 
     const adminGet = await adminGetProfile("user_n");
