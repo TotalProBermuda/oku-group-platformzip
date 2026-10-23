@@ -90,7 +90,7 @@ export default function ExperienceSessionsView({
         <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 style={{ color: "#1a1614", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{seriesTitle}</h3>
+            <h3 style={{ color: "#1a1614", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}><Link href={`${eventHrefBase}/sessions/${encodeURIComponent(session.id)}`} style={{ color: "inherit", textDecoration: "none" }}>{seriesTitle}</Link></h3>
             {sessionTitle ? <p style={{ color: "#7c7168", fontWeight: 600, margin: "0 0 4px" }}>{sessionTitle}</p> : null}
             {session.subtitle ? <p style={{ color: "#7c7168", margin: "0 0 8px" }}>{session.subtitle}</p> : null}
             <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>
@@ -109,6 +109,7 @@ export default function ExperienceSessionsView({
         {session.status === "SCHEDULED" ? (
           <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", marginTop: 14 }}>
             <AddToCalendar sessionId={session.id} title={`${seriesTitle}${sessionTitle ? ` — ${sessionTitle}` : ""}`} startsAt={session.startsAt} endsAt={session.endsAt} location={venue} description={description} labels={{ addToCalendar: labels.addToCalendar, google: labels.calGoogleCalendar, apple: labels.calAppleIcal, outlook: labels.calOutlook, yahoo: labels.calYahoo }} />
+            <Link href={`${eventHrefBase}/sessions/${encodeURIComponent(session.id)}`} className="btn btn-ghost btn-sm">{labels.viewEvent ?? (locale === "es" ? "Ver evento" : locale === "pt" ? "Ver evento" : "View event")}</Link>
             <Link href={`${checkoutHrefBase}?sessionId=${encodeURIComponent(session.id)}`} className="btn btn-primary">{labels.selectTickets}</Link>
           </div>
         ) : null}
