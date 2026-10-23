@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { syncTranslations } from "@/server/i18n/eventTranslations";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -51,13 +52,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } })
       : null;
 
-    const profile = await prisma.profile.update({
-      where: { id },
-      data: {
-        ...body,
-        updatedByUserId: dbUser?.id ?? null,
-        updatedAt: new Date(),
-      },
+    const profile = await prisma.$transaction(async (tx) => {
+      const updated = await tx.profile.update({
+        where: { id },
+        data: {
+          ...body,
+          updatedByUserId: dbUser?.id ?? null,
+          updatedAt: new Date(),
+        },
+      });
+      await syncTranslations(tx, "Profile", updated.id, {
+        displayName: updated.displayName,
+        bio: updated.bio,
+        shortDescription: updated.shortDescription,
+      });
+      return updated;
     });
 
     return NextResponse.json({ profile });
