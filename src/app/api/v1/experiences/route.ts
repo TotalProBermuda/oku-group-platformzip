@@ -59,14 +59,14 @@ export async function GET(req: NextRequest) {
 
   const locale = searchParams.get("locale") ?? "en";
   const localized = await Promise.all(series.map(async s => ({ ...s, sessions: await localizeSessions(s, s.sessions, locale) })));
-  const profiles = localized.flatMap((item) => item.sessions.flatMap((session) => session.profileAssignments.map((assignment) => assignment.profile)));
+  const profiles = localized.flatMap((item) => item.sessions.flatMap((session) => (session.profileAssignments ?? []).map((assignment) => assignment.profile)));
   const translatedProfiles = await localizeContent("Profile", profiles, locale);
   const profilesById = new Map(translatedProfiles.map((profile) => [profile.id, profile]));
   const localizedProfiles = localized.map((item) => ({
     ...item,
     sessions: item.sessions.map((session) => ({
       ...session,
-      profileAssignments: session.profileAssignments.map((assignment) => ({
+      profileAssignments: (session.profileAssignments ?? []).map((assignment) => ({
         ...assignment,
         profile: profilesById.get(assignment.profile.id) ?? assignment.profile,
       })),
