@@ -1373,6 +1373,7 @@ model Session {
   checkins           ExperienceCheckin[]
   attendanceEvents   AttendanceEvent[]
   eventHosts         EventHost[]
+  sessionMenuLinks   SessionMenuLink[]
   sponsorshipSlots   SponsorshipSlot[]
   profileAssignments SessionProfileAssignment[]
   reservationBlocks  ReservationBlock[]
@@ -5419,8 +5420,9 @@ model VenueMenuRecord {
   parent       VenueMenuRecord?  @relation("MenuLineage", fields: [parentMenuId], references: [id], onDelete: SetNull)
   copies       VenueMenuRecord[] @relation("MenuLineage")
 
-  sections   MenuSectionRecord[]
-  eventLinks EventMenuLink[]
+  sections          MenuSectionRecord[]
+  eventLinks        EventMenuLink[]
+  sessionMenuLinks  SessionMenuLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5445,6 +5447,21 @@ model EventMenuLink {
 
   @@unique([seriesId, menuId])
   @@index([seriesId])
+  @@index([menuId])
+}
+
+model SessionMenuLink {
+  id        String   @id @default(cuid())
+  sessionId String
+  menuId    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  session Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  menu    VenueMenuRecord @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, menuId])
+  @@index([sessionId, sortOrder])
   @@index([menuId])
 }
 

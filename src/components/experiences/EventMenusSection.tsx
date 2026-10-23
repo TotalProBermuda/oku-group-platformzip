@@ -1,4 +1,4 @@
-import { getMenusForSeries } from "@/server/menus/menuService";
+import { getMenusForSeries, getMenusForSession } from "@/server/menus/menuService";
 import type { MenuItem, MenuSection, VenueMenu } from "@/data/venues/menus";
 import type { LocalizedText } from "@/types/i18n";
 import type { Locale } from "@/types/i18n";
@@ -17,9 +17,10 @@ const HEADINGS: Record<Locale, { sectionTitle: string; food: string; drinks: str
 
 export default async function EventMenusSection({
   seriesId,
+  sessionId,
   locale,
-}: { seriesId: string; locale: Locale }) {
-  const menus = await getMenusForSeries(seriesId);
+}: { seriesId: string; sessionId?: string | null; locale: Locale }) {
+  const menus = sessionId ? await getMenusForSession(sessionId) : await getMenusForSeries(seriesId);
   if (menus.length === 0) return null;
 
   const labels = HEADINGS[locale] ?? HEADINGS.en;

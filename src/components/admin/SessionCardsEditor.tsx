@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import MediaUpload from "@/components/ui/MediaUpload";
 import EventArtwork from "@/components/ui/EventArtwork";
+import SessionMenusEditor from "@/components/admin/SessionMenusEditor";
 import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
 import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 import { sessionArtworkCandidates, sessionMobileArtworkCandidates } from "@/lib/eventArtwork";
@@ -404,6 +405,7 @@ export default function SessionCardsEditor({ seriesId, sessions, canManageRestri
                  <input type="checkbox" checked={Boolean(effective(key))} onChange={(event) => setEdit(key, event.target.checked)} />{labels[key]}
                </label>)}
           </section>
+          {canManageRestricted && <SessionMenusEditor sessionId={active.id} locale={locale} />}
           <section className="sc-section">
             <h4>Artwork</h4>
              <div className="sc-locales" role="tablist" aria-label="Artwork language">

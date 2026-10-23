@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { VenueMenu, MenuSection, MenuItem } from "@/data/venues/menus";
 import type { LocalizedText } from "@/types/i18n";
+import { resolveSessionMenuLinks } from "@/server/menus/sessionMenuResolution";
 
 type LocalizedOrString = string | LocalizedText | null;
 
@@ -173,6 +174,20 @@ export async function getMenusForSeries(seriesId: string): Promise<VenueMenu[]> 
   return links
     .filter((l) => l.menu.isPublished)
     .map((l) => shapeMenu(l.menu));
+}
+
+// Session menus replace the series menu set for that date. When none are assigned,
+// guests continue to see the existing series-level menus.
+export async function getMenusForSession(sessionId: string): Promise<VenueMenu[]> {
+  const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { seriesId: true } });
+  if (!session) return [];
+  const links = await prisma.sessionMenuLink.findMany({
+    where: { sessionId },
+    include: { menu: { include: { sections: { include: { items: true } } } } },
+    orderBy: { sortOrder: "asc" },
+  });
+  const assigned = links.filter((link) => link.menu.isPublished).map((link) => shapeMenu(link.menu));
+  return resolveSessionMenuLinks(assigned, await getMenusForSeries(session.seriesId));
 }
 
 // Light-weight listing for admin pickers — no sections/items, just headers.

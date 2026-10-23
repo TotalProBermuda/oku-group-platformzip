@@ -360,7 +360,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
           )}
 
           {/* Event-specific menus (Task #69) */}
-          <EventMenusSection seriesId={series.id} locale={safeLocale} />
+          <EventMenusSection seriesId={series.id} sessionId={focusSession?.id} locale={safeLocale} />
 
           {/* Waitlist form */}
           {(series.newsletterCaptureEnabled || series.waitlistEnabled) && (
