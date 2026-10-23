@@ -5,6 +5,7 @@ import { localePath } from "@/i18n/utils";
 import { getSeriesContent, getSessionTitle, getTicketTypeName } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
 import { seriesLocationLabel } from "@/lib/locations";
+import { seriesArtworkCandidates, sessionArtworkCandidates } from "@/lib/eventArtwork";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
@@ -17,10 +18,11 @@ interface PublicSeries {
   heroImageUrlEn?: string | null;
   heroImageUrlEs?: string | null;
   heroImageUrlPt?: string | null;
+  sessionDefaults?: unknown;
   venue: string | null;
   hostType: string | null;
   ticketTypes: Array<{ id: string; name: string; description: string | null; priceCents: number; maxPerOrder: number }>;
-  sessions: Array<{ id: string; title: string | null; startsAt: string; endsAt: string; capacity: number; soldCount: number; flyerImageUrl?: string | null; flyerImageUrlEn?: string | null; flyerImageUrlEs?: string | null; flyerImageUrlPt?: string | null; flyerImageUrlMobileEn?: string | null; flyerImageUrlMobileEs?: string | null; flyerImageUrlMobilePt?: string | null }>;
+  sessions: Array<{ id: string; title: string | null; startsAt: string; endsAt: string; capacity: number; soldCount: number; flyerImageUrl?: string | null; flyerImageUrlEn?: string | null; flyerImageUrlEs?: string | null; flyerImageUrlPt?: string | null; flyerImageUrlMobileEn?: string | null; flyerImageUrlMobileEs?: string | null; flyerImageUrlMobilePt?: string | null; fieldModes?: unknown }>;
   operationalVenue?: { name: string; slug: string } | null;
   eventSpace?: { name: string; conceptKey: string | null } | null;
 }
@@ -66,11 +68,10 @@ export default async function SeriesDetailPage({ params }: Props) {
   const content = getSeriesContent(series.slug, safeLocale);
   const title = content?.title ?? series.title;
   const description = content?.description ?? series.description;
-  const heroImage = safeLocale === "es"
-    ? series.heroImageUrlEs || series.heroImageUrlEn || series.heroImageUrl
-    : safeLocale === "pt"
-      ? series.heroImageUrlPt || series.heroImageUrlEn || series.heroImageUrl
-      : series.heroImageUrlEn || series.heroImageUrl;
+  const firstSessionArtwork = series.sessions
+    .map((session) => sessionArtworkCandidates(session, safeLocale, series)[0])
+    .find((url): url is string => Boolean(url));
+  const heroImage = seriesArtworkCandidates(series, safeLocale)[0] ?? firstSessionArtwork;
 
   const minPrice = series.ticketTypes?.length
     ? Math.min(...series.ticketTypes.map((ticketType) => ticketType.priceCents))
@@ -166,11 +167,7 @@ export default async function SeriesDetailPage({ params }: Props) {
                   const remaining = sess.capacity - sess.soldCount;
                   const pctFull = Math.round((sess.soldCount / sess.capacity) * 100);
                   const sessionTitle = getSessionTitle(sess.title || `${c.sessionLabel} ${idx + 1}`, safeLocale);
-                  const sessionArtwork = safeLocale === "es"
-                    ? sess.flyerImageUrlEs || sess.flyerImageUrl
-                    : safeLocale === "pt"
-                      ? sess.flyerImageUrlPt || sess.flyerImageUrl
-                      : sess.flyerImageUrlEn || sess.flyerImageUrl;
+                  const sessionArtwork = sessionArtworkCandidates(sess, safeLocale, series)[0];
                   const sessionPageUrl = localePath(safeLocale, `/experiences/${series.slug}/sessions/${sess.id}`);
                   const sessionCheckoutUrl = localePath(safeLocale, `/checkout/${series.slug}?sessionId=${encodeURIComponent(sess.id)}`);
                   return (
