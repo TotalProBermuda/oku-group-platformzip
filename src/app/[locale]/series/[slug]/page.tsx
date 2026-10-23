@@ -178,10 +178,11 @@ export default async function SeriesDetailPage({ params }: Props) {
                       }}>
                         <div style={{ height: "100%", width: `${pctFull}%`, background: remaining === 0 ? "var(--color-danger)" : "var(--color-success)", transition: "width 0.3s" }} />
                       </div>
-                      <Link href={sessionPageUrl} style={{ display: "block", color: "inherit", textDecoration: "none" }}>
+                      <Link href={sessionPageUrl} style={{ display: "grid", gridTemplateColumns: sessionArtwork ? "minmax(92px, 36%) minmax(0, 1fr)" : "minmax(0, 1fr)", gap: 16, color: "inherit", textDecoration: "none" }}>
                         {sessionArtwork && (
-                          <div role="img" aria-label={sessionTitle} style={{ width: "100%", aspectRatio: "16 / 9", marginBottom: 16, borderRadius: "var(--radius-md)", backgroundColor: "var(--color-bg-secondary)", backgroundImage: `url("${sessionArtwork}")`, backgroundSize: "contain", backgroundPosition: "center", backgroundRepeat: "no-repeat" }} />
+                          <div role="img" aria-label={sessionTitle} style={{ width: "100%", aspectRatio: "4 / 5", borderRadius: "var(--radius-md)", backgroundColor: "var(--color-bg-secondary)", backgroundImage: `url("${sessionArtwork}")`, backgroundSize: "contain", backgroundPosition: "center", backgroundRepeat: "no-repeat" }} />
                         )}
+                      <div style={{ minWidth: 0 }}>
                       <div style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 600, marginBottom: 12, paddingTop: 4 }}>
                         {sessionTitle}
                       </div>
@@ -205,6 +206,7 @@ export default async function SeriesDetailPage({ params }: Props) {
                             <span className="badge badge-danger">{c.soldOut}</span>
                           )}
                         </div>
+                      </div>
                       </div>
                       </Link>
                       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
