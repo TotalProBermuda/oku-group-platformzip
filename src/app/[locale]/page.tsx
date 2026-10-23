@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -120,21 +121,28 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
       {/* ── PUBLIC MARKETING HERO — always visible regardless of session ── */}
       <section className="hero">
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="hero-eyebrow">{home.eyebrow}</div>
-          <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(48px, 7vw, 80px)", fontWeight: 400, letterSpacing: "-0.03em", color: "white", marginBottom: 20, lineHeight: 1 }}>
-            {home.headline}
+            <div className="home-hero-layout">
+          <div className="home-hero-copy">
+            <div className="hero-eyebrow">{home.eyebrow}</div>
+            <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(48px, 7vw, 80px)", fontWeight: 400, letterSpacing: "-0.03em", color: "white", marginBottom: 20, lineHeight: 1 }}>
+              {home.headline}
+            </div>
+            <p className="hero-subtitle">{home.subtitle}</p>
+            <div className="hero-actions">
+              <Link href={localePath(safeLocale, "/restaurants")} className="btn btn-primary btn-lg">
+                {home.browseRestaurants}
+              </Link>
+              <Link href={localePath(safeLocale, "/experiences")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                {home.browseEvents}
+              </Link>
+            </div>
           </div>
-          <p className="hero-subtitle">{home.subtitle}</p>
-          <div className="hero-actions">
-            <Link href={localePath(safeLocale, "/restaurants")} className="btn btn-primary btn-lg">
-              {home.browseRestaurants}
-            </Link>
-            <Link href={localePath(safeLocale, "/experiences")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-              {home.browseEvents}
-            </Link>
-          </div>
+          <figure className="home-hero-photo">
+            <Image src="/images/home/oku-sushi-feature.webp" alt="Fresh salmon sushi, thoughtfully plated at OKÜ" width={1200} height={1800} sizes="(max-width: 768px) 100vw, 48vw" priority />
+          </figure>
         </div>
-      </section>
+      </div>
+    </section>
 
       <div className="page-container">
         {/* Primary public journeys stay ahead of portals and secondary content. */}
@@ -149,6 +157,62 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
             <strong>{home.browseEvents}</strong>
             <span>{home.eventGatewayDesc}</span>
           </Link>
+        </section>
+
+        {/* Restaurant discovery is visual and directly connected to each venue. */}
+        <section className="home-venue-showcase" aria-labelledby="home-venue-showcase-title">
+          <div className="home-venue-showcase-heading">
+            <span className="home-venue-showcase-eyebrow">{home.venueShowcaseEyebrow}</span>
+            <h2 id="home-venue-showcase-title">{home.venueShowcaseTitle}</h2>
+            <p>{home.venueShowcaseDescription}</p>
+          </div>
+          <div className="home-venue-showcase-grid">
+            {[
+              {
+                href: "/restaurants/oku",
+                title: home.okuCardTitle,
+                category: home.okuCardCategory,
+                description: home.okuCardDescription,
+                image: "/images/home/oku-sushi-feature.webp",
+                alt: home.okuCardAlt,
+              },
+              {
+                href: "/restaurants/catch",
+                title: home.catchCardTitle,
+                category: home.catchCardCategory,
+                description: home.catchCardDescription,
+                image: "/images/catch/grill.jpg",
+                alt: home.catchCardAlt,
+              },
+              {
+                href: "/restaurants/terrace",
+                title: home.terraceCardTitle,
+                category: home.terraceCardCategory,
+                description: home.terraceCardDescription,
+                image: "/images/catch/sushi-burger.jpg",
+                alt: home.terraceCardAlt,
+              },
+            ].map((venue) => (
+              <Link key={venue.href} href={localePath(safeLocale, venue.href)} className="home-venue-card">
+                <div className="home-venue-card-image">
+                  <Image
+                    src={venue.image}
+                    alt={venue.alt}
+                    width={1200}
+                    height={1500}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1000px) 50vw, 33vw"
+                    loading="lazy"
+                  />
+                  <span className="home-venue-card-category">{venue.category}</span>
+                </div>
+                <div className="home-venue-card-copy">
+                  <h3>{venue.title}</h3>
+                  <p>{venue.description}</p>
+                  <span className="home-venue-card-link">{home.venueCardCta} <span aria-hidden="true">→</span></span>
+                </div>
+              </Link>
+            ))}
+          </div>
         </section>
 
         {/* ── PORTAL CARDS — elevated roles only ─────────────────────── */}

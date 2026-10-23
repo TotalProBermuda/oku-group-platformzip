@@ -7,5 +7,21 @@
   "restaurantGatewayDesc": "Descubra OKÜ, CATCH e TERRACE, consulte os horários e reserve uma mesa.",
   "eventGatewayDesc": "Veja os próximos eventos, datas disponíveis e opções de ingressos.",
   "signInCta": "Entrar para Explorar",
-  "browseSeries": "Explorar Séries"
+  "browseSeries": "Explorar Séries",
+  "venueShowcaseEyebrow": "Um lugar para cada vontade",
+  "venueShowcaseTitle": "Boa comida. Boa companhia.",
+  "venueShowcaseDescription": "Escolha o seu ambiente no Gold House: inspiração japonesa, sabores caribenhos ou refeições ao ar livre no terraço com ambos os menus.",
+  "okuCardTitle": "OKÜ",
+  "okuCardCategory": "Fusão asiática",
+  "okuCardDescription": "Sushi e pratos de inspiração japonesa, servidos com hospitalidade acolhedora.",
+  "okuCardAlt": "Sushi de salmão fresco, cuidadosamente apresentado no OKÜ",
+  "catchCardTitle": "CATCH",
+  "catchCardCategory": "Fusão caribenha",
+  "catchCardDescription": "Frutos do mar e sabores caribenhos marcantes, feitos para compartilhar.",
+  "catchCardAlt": "Uma generosa seleção de frutos do mar frescos com limão",
+  "terraceCardTitle": "The Terrace",
+  "terraceCardCategory": "Terraço e celebrações",
+  "terraceCardDescription": "Refeições ao ar livre com pratos do OKÜ e do CATCH, além de espaço para celebrar.",
+  "terraceCardAlt": "Petiscos de camarão e arroz servidos numa travessa de ardósia",
+  "venueCardCta": "Explore o espaço"
 }
