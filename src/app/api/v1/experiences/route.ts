@@ -32,6 +32,18 @@ export async function GET(req: NextRequest) {
         include: {
           ticketPrices: { select: { ticketTypeId: true, priceCents: true } },
           eventHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
+          profileAssignments: {
+            where: { profile: { publicVisible: true, status: "ACTIVE" } },
+            orderBy: { displayOrder: "asc" },
+            select: {
+              assignmentRole: true,
+              displayOrder: true,
+              isPrimary: true,
+              profile: {
+                select: { id: true, displayName: true, shortDescription: true, bio: true, websiteUrl: true, avatarUrl: true, logoUrl: true, slug: true },
+              },
+            },
+          },
         },
         ...(slug ? {} : { take: 3 }),
       },
