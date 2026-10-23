@@ -11,6 +11,8 @@ type Item = {
   name: Translatable;
   description?: Translatable;
   price?: string | null;
+  producerName?: string | null;
+  imageUrl?: string | null;
   dietary: string[];
   tags: string[];
   sortOrder: number;
@@ -147,7 +149,7 @@ export default function MenuEditor({ initial, canEdit }: { initial: MenuShape; c
               ...s,
               items: [
                 ...s.items,
-                { name: { en: "New item", es: "", pt: "" }, price: null, dietary: [], tags: [], sortOrder: s.items.length, isAvailable: true },
+                { name: { en: "New item", es: "", pt: "" }, price: null, producerName: null, imageUrl: null, dietary: [], tags: [], sortOrder: s.items.length, isAvailable: true },
               ],
             }
           : s
@@ -293,6 +295,28 @@ export default function MenuEditor({ initial, canEdit }: { initial: MenuShape; c
                       value={item.tags.join(", ")}
                       onChange={(e) => updateItem(sIdx, iIdx, { tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
                       placeholder="signature, new"
+                      style={inp}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, marginTop: 10 }}>
+                  <div>
+                    <label style={lbl}>Producer / winery (optional)</label>
+                    <input
+                      type="text"
+                      value={item.producerName ?? ""}
+                      onChange={(e) => updateItem(sIdx, iIdx, { producerName: e.target.value || null })}
+                      placeholder="Producer name"
+                      style={inp}
+                    />
+                  </div>
+                  <div>
+                    <label style={lbl}>Photo URL (optional)</label>
+                    <input
+                      type="url"
+                      value={item.imageUrl ?? ""}
+                      onChange={(e) => updateItem(sIdx, iIdx, { imageUrl: e.target.value || null })}
+                      placeholder="https://… or /api/v1/media/…"
                       style={inp}
                     />
                   </div>

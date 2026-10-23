@@ -37,6 +37,11 @@ export const TRANSLATABLE_FIELDS = {
     "bio",
     "headline",
   ],
+  Profile: [
+    "displayName",
+    "bio",
+    "shortDescription",
+  ],
   InvitationTemplate: [
     "subject",
     "headline",

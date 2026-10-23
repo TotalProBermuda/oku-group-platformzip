@@ -1373,6 +1373,7 @@ model Session {
   checkins           ExperienceCheckin[]
   attendanceEvents   AttendanceEvent[]
   eventHosts         EventHost[]
+  sessionMenuLinks   SessionMenuLink[]
   sponsorshipSlots   SponsorshipSlot[]
   profileAssignments SessionProfileAssignment[]
   reservationBlocks  ReservationBlock[]
@@ -5419,8 +5420,9 @@ model VenueMenuRecord {
   parent       VenueMenuRecord?  @relation("MenuLineage", fields: [parentMenuId], references: [id], onDelete: SetNull)
   copies       VenueMenuRecord[] @relation("MenuLineage")
 
-  sections   MenuSectionRecord[]
-  eventLinks EventMenuLink[]
+  sections          MenuSectionRecord[]
+  eventLinks        EventMenuLink[]
+  sessionMenuLinks  SessionMenuLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5448,6 +5450,21 @@ model EventMenuLink {
   @@index([menuId])
 }
 
+model SessionMenuLink {
+  id        String   @id @default(cuid())
+  sessionId String
+  menuId    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  session Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  menu    VenueMenuRecord @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, menuId])
+  @@index([sessionId, sortOrder])
+  @@index([menuId])
+}
+
 model MenuSectionRecord {
   id          String @id @default(cuid())
   menuId      String
@@ -5468,10 +5485,12 @@ model MenuSectionRecord {
 model MenuItemRecord {
   id          String   @id @default(cuid())
   sectionId   String
-  name        Json // { en, es, pt } | string
-  description Json?
-  price       String?
-  dietary     String[] @default([])
+  name         Json // { en, es, pt } | string
+  description  Json?
+  price        String?
+  producerName String?
+  imageUrl     String?
+  dietary      String[] @default([])
   tags        String[] @default([])
   sortOrder   Int      @default(0)
   isAvailable Boolean  @default(true)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { localizeSessions } from "@/server/series/localizeSessions";
-import { localizeEventCatalog } from "@/server/i18n/eventTranslations";
+import { localizeContent, localizeEventCatalog } from "@/server/i18n/eventTranslations";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -32,6 +32,18 @@ export async function GET(req: NextRequest) {
         include: {
           ticketPrices: { select: { ticketTypeId: true, priceCents: true } },
           eventHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
+          profileAssignments: {
+            where: { profile: { publicVisible: true, status: "ACTIVE" } },
+            orderBy: { displayOrder: "asc" },
+            select: {
+              assignmentRole: true,
+              displayOrder: true,
+              isPrimary: true,
+              profile: {
+                select: { id: true, displayName: true, shortDescription: true, bio: true, websiteUrl: true, avatarUrl: true, logoUrl: true, slug: true },
+              },
+            },
+          },
         },
         ...(slug ? {} : { take: 3 }),
       },
@@ -45,6 +57,20 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  const localized = await Promise.all(series.map(async s => ({ ...s, sessions: await localizeSessions(s, s.sessions, searchParams.get("locale") ?? "en") })));
-  return NextResponse.json({ series: await localizeEventCatalog(localized, searchParams.get("locale") ?? "en") });
+  const locale = searchParams.get("locale") ?? "en";
+  const localized = await Promise.all(series.map(async s => ({ ...s, sessions: await localizeSessions(s, s.sessions, locale) })));
+  const profiles = localized.flatMap((item) => item.sessions.flatMap((session) => (session.profileAssignments ?? []).map((assignment) => assignment.profile)));
+  const translatedProfiles = await localizeContent("Profile", profiles, locale);
+  const profilesById = new Map(translatedProfiles.map((profile) => [profile.id, profile]));
+  const localizedProfiles = localized.map((item) => ({
+    ...item,
+    sessions: item.sessions.map((session) => ({
+      ...session,
+      profileAssignments: (session.profileAssignments ?? []).map((assignment) => ({
+        ...assignment,
+        profile: profilesById.get(assignment.profile.id) ?? assignment.profile,
+      })),
+    })),
+  }));
+  return NextResponse.json({ series: await localizeEventCatalog(localizedProfiles, locale) });
 }

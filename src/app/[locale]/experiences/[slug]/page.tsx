@@ -9,6 +9,7 @@ import { getSeriesContent } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
 import EventPageSponsorBlock from "@/components/sponsors/EventPageSponsorBlock";
 import EventMenusSection from "@/components/experiences/EventMenusSection";
+import SessionHostsSection from "@/components/experiences/SessionHostsSection";
 import ShareButtons from "@/components/ui/ShareButtons";
 import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsView";
 import { SERIES_SOCIAL_LINK_LABELS } from "@/lib/socialLinks";
@@ -34,6 +35,12 @@ type EventPageSession = SessionArtwork & {
   status: string;
   ticketPrices?: EventPageTicketPrice[];
   eventHosts?: Array<{ role: string; entity: { displayName: string } }>;
+  profileAssignments?: Array<{
+    assignmentRole: string;
+    displayOrder: number;
+    isPrimary: boolean;
+    profile: { id: string; displayName: string; shortDescription: string | null; bio: string | null; websiteUrl: string | null; avatarUrl: string | null; logoUrl: string | null; slug: string | null };
+  }>;
 };
 type EventPageTicketType = {
   id: string;
@@ -204,7 +211,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
         )}
         <div style={{ position: "absolute", inset: 0, background: heroArtwork.length ? "linear-gradient(to bottom, rgba(26,22,20,0.55) 0%, rgba(26,22,20,0.78) 100%)" : "radial-gradient(ellipse at 60% 50%, rgba(196,30,58,0.08) 0%, transparent 70%)" }} />
         <div className="page-container" style={{ position: "relative", zIndex: 1 }}>
-          {focusSession && heroArtwork.length > 0 ? <div className="experience-focus-poster" style={{ position: "absolute", right: 24, top: 0, bottom: 0, width: "min(300px, 28vw)", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 16px 28px rgba(0,0,0,.35))" }}><EventArtwork candidates={heroArtwork} alt={`${title} — ${focusSession.title ?? "event"}`} style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div> : null}
+          {focusSession && heroArtwork.length > 0 ? <div className="experience-focus-poster" style={{ position: "absolute", right: 24, top: 0, bottom: 0, width: "min(300px, 28vw)", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 16px 28px rgba(0,0,0,.35))" }}><EventArtwork candidates={heroArtwork} alt={`${title} — ${focusSession.title ?? ""} ${safeLocale === "es" ? "arte del evento" : safeLocale === "pt" ? "arte do evento" : "event artwork"}`.trim()} style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div> : null}
           <div className="experience-focus-copy" style={{ maxWidth: focusSession && heroArtwork.length ? "calc(100% - min(340px, 30vw))" : undefined }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
             {series.venue && <span className={`badge ${series.venue === "CATCH" ? "venue-badge-catch" : "venue-badge-oku"}`}>{series.venue}</span>}
@@ -360,7 +367,8 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
           )}
 
           {/* Event-specific menus (Task #69) */}
-          <EventMenusSection seriesId={series.id} locale={safeLocale} />
+          <EventMenusSection seriesId={series.id} sessionId={focusSession?.id} locale={safeLocale} />
+          {focusSession && <SessionHostsSection assignments={focusSession.profileAssignments ?? []} locale={safeLocale} />}
 
           {/* Waitlist form */}
           {(series.newsletterCaptureEnabled || series.waitlistEnabled) && (
