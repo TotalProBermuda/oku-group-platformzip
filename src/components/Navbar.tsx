@@ -23,6 +23,7 @@ interface Props {
   navLabels?: {
     restaurants: string;
     experiences: string;
+    functions: string;
     membership: string;
     careers: string;
     signIn?: string;
@@ -34,6 +35,7 @@ export default async function Navbar({ session, locale = "en", navLabels }: Prop
   const labels = navLabels || {
     restaurants: "Restaurants",
     experiences: "Events",
+    functions: "Functions",
     membership: "Membership",
     careers: "Careers",
     signIn: "Sign In",
@@ -75,6 +77,7 @@ export default async function Navbar({ session, locale = "en", navLabels }: Prop
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <Link href={localePath(locale, "/restaurants")} className="nav-link">{labels.restaurants}</Link>
             <Link href={localePath(locale, "/experiences")} className="nav-link">{labels.experiences}</Link>
+            <Link href={localePath(locale, "/functions")} className="nav-link">{labels.functions}</Link>
             <Link href={localePath(locale, "/membership")}  className="nav-link">{labels.membership}</Link>
             <Link href={localePath(locale, "/careers")}     className="nav-link">{labels.careers}</Link>
           </div>
