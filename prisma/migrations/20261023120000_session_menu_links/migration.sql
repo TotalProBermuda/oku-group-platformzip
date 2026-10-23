@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS "MenuItemRecord" (
   "name" JSONB NOT NULL,
   "description" JSONB,
   "price" TEXT,
+  "producerName" TEXT,
+  "imageUrl" TEXT,
   "dietary" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   "tags" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   "sortOrder" INTEGER NOT NULL DEFAULT 0,
@@ -71,6 +73,8 @@ CREATE TABLE IF NOT EXISTS "MenuItemRecord" (
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "MenuItemRecord_pkey" PRIMARY KEY ("id")
 );
+ALTER TABLE "MenuItemRecord" ADD COLUMN IF NOT EXISTS "producerName" TEXT;
+ALTER TABLE "MenuItemRecord" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;
 CREATE INDEX IF NOT EXISTS "MenuItemRecord_sectionId_idx"
   ON "MenuItemRecord"("sectionId");
 
