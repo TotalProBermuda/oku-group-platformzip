@@ -34,6 +34,7 @@ interface Props {
     calendarGetTickets?: string;
     calendarPrev?: string;
     calendarNext?: string;
+    viewSeries?: string;
     left?: string;
     sessionStatusScheduled?: string;
     sessionStatusSoldOut?: string;
@@ -170,6 +171,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const todayMonth = Number(todayParts.find((part) => part.type === "month")?.value) - 1;
   const todayDay = Number(todayParts.find((part) => part.type === "day")?.value);
   const selectedSessions = selectedDay === null ? sessions : (sessionsByDay.get(selectedDay) ?? []);
+  const viewSeriesLabel = l.viewSeries ?? (locale === "es" ? "Ver serie" : locale === "pt" ? "Ver s�rie" : "View series");
   const viewEventLabel = locale === "es" ? "Ver evento" : locale === "pt" ? "Ver evento" : "View event";
   const buyTicketsLabel = locale === "es" ? "Comprar entradas" : locale === "pt" ? "Comprar ingressos" : (l.calendarGetTickets ?? "Buy tickets");
   const monthSessionsLabel = locale === "es" ? "Eventos de este mes" : locale === "pt" ? "Eventos deste mês" : "Events this month";
@@ -224,6 +226,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
           {coHosts.length ? <div style={{ color: "#7c7168", fontSize: 12 }}><strong>{locale === "es" ? "Con la coorganización de:" : locale === "pt" ? "Coorganizado por:" : "Co-hosted by:"}</strong> {[...new Set(coHosts.map((host) => host.entity.displayName))].join(", ")}</div> : null}
           <div style={{ color: "#6b7280", fontSize: 13 }}>{formatDate(session.startsAt)} · {formatTime(session.startsAt)}</div>
           {session.series.venue ? <div style={{ color: "#8b8179", fontSize: 12 }}>{session.series.venue}</div> : null}
+            <Link href={`/${locale}/series/${session.series.slug}`} className="btn btn-ghost btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{viewSeriesLabel}</Link>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
             <Link href={view} className="btn btn-ghost btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{viewEventLabel}</Link>
             <Link href={buy} className="btn btn-primary btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{buyTicketsLabel}</Link>

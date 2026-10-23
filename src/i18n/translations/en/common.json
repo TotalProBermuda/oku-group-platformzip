@@ -145,6 +145,7 @@
   "confirmedStatus": "CONFIRMED",
   "forLabel": "For:",
   "viewEventLink": "View event →",
+  "viewSeriesLink": "View series →",
   "generalAdmission": "General Admission",
   "membershipStatusLabel": "Membership Status",
   "notCurrentlyMember": "You are not currently a member.",
