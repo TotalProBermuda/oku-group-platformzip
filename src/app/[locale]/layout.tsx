@@ -86,6 +86,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         navLabels={{
           restaurants: nav.restaurants || "Restaurants",
           experiences: nav.experiences || "Experiences",
+          functions: nav.functions || "Functions",
           membership: nav.membership || "Membership",
           careers: nav.careers || "Careers",
           signIn: nav.signIn || "Sign In",
