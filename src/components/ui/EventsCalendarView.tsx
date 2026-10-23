@@ -171,7 +171,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const todayMonth = Number(todayParts.find((part) => part.type === "month")?.value) - 1;
   const todayDay = Number(todayParts.find((part) => part.type === "day")?.value);
   const selectedSessions = selectedDay === null ? sessions : (sessionsByDay.get(selectedDay) ?? []);
-  const viewSeriesLabel = l.viewSeries ?? (locale === "es" ? "Ver serie" : locale === "pt" ? "Ver s�rie" : "View series");
+  const viewSeriesLabel = l.viewSeries ?? (locale === "es" ? "Ver serie" : locale === "pt" ? "Ver série" : "View series");
   const viewEventLabel = locale === "es" ? "Ver evento" : locale === "pt" ? "Ver evento" : "View event";
   const buyTicketsLabel = locale === "es" ? "Comprar entradas" : locale === "pt" ? "Comprar ingressos" : (l.calendarGetTickets ?? "Buy tickets");
   const monthSessionsLabel = locale === "es" ? "Eventos de este mes" : locale === "pt" ? "Eventos deste mês" : "Events this month";
