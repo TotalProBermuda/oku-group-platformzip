@@ -156,7 +156,7 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
     setSaving(true);
     setError("");
 
-    const payload = {
+      const payload: Record<string, unknown> = {
       ...editing,
       priceCents: Math.round((Number(editing.priceCents) || 0)),
       typeCapacity: editing.typeCapacity ? Number(editing.typeCapacity) : null,
@@ -164,7 +164,14 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
       saleEndsAt: editing.saleEndsAt || null,
     };
 
-    const url = editingId
+    const currentTicketType = editingId ? items.find((item) => item.id === editingId) : undefined;
+    if (currentTicketType) {
+      if (Number(payload.priceCents) === currentTicketType.priceCents) delete payload.priceCents;
+      if (payload.ticketStatus === currentTicketType.ticketStatus) delete payload.ticketStatus;
+      if (payload.typeCapacity === currentTicketType.typeCapacity) delete payload.typeCapacity;
+    }
+
+const url = editingId
       ? `/api/v1/admin/experiences/${seriesId}/ticket-types/${editingId}`
       : `/api/v1/admin/experiences/${seriesId}/ticket-types`;
     const method = editingId ? "PATCH" : "POST";
