@@ -48,8 +48,12 @@ export async function PATCH(
   const ticketType = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Series" WHERE "id" = ${id} FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "TicketType" WHERE "id" = ${ttId} FOR UPDATE`;
-    if (["priceCents", "ticketStatus"].some(k => k in body) && await legacySeriesWriteBlocked(id, tx)) return null;
     const current = await tx.ticketType.findUniqueOrThrow({ where: { id: ttId } });
+    const managedPriceOrStatusChanged =
+      ("priceCents" in body && Number(body.priceCents) !== current.priceCents) ||
+      ("ticketStatus" in body && body.ticketStatus !== current.ticketStatus);
+    if (managedPriceOrStatusChanged && await legacySeriesWriteBlocked(id, tx)) return null;
+
     const [issued, committed, held] = await Promise.all([
       tx.ticket.count({ where: { ticketTypeId: ttId, ticketStatus: { notIn: ["CANCELLED", "REFUNDED", "VOIDED"] } } }),
       tx.orderLineItem.aggregate({ where: { ticketTypeId: ttId, order: { status: { in: ["PENDING", "PAID", "PARTIALLY_REFUNDED"] } } }, _sum: { qty: true } }),
