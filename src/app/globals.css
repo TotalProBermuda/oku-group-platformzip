@@ -2974,9 +2974,9 @@ tbody tr:hover td {
   outline: 3px solid #d9b974;
   outline-offset: 3px;
 }
-@media (max-width: 1400px) {
+@media (max-width: 1260px) {
   .home-hero-layout {
-    width: min(680px, 100%);
+    width: min(760px, 100%);
     grid-template-columns: minmax(0, 1fr);
     gap: 26px;
   }
@@ -2985,7 +2985,13 @@ tbody tr:hover td {
     overflow: hidden;
   }
   .venue-orbit-card {
-    width: clamp(280px, 48vw, 360px);
+    width: clamp(250px, 38vw, 320px);
+  }
+  .venue-orbit-card.is-left {
+    transform: translate(-50%, -46%) translateX(calc(-1 * min(15vw, 190px))) scale(.84) rotateY(14deg);
+  }
+  .venue-orbit-card.is-right {
+    transform: translate(-50%, -46%) translateX(min(15vw, 190px)) scale(.84) rotateY(-14deg);
   }
   .venue-orbit-image {
     height: clamp(220px, 32vw, 275px);
