@@ -2775,3 +2775,285 @@ tbody tr:hover td {
     min-height: 0;
   }
 }
+
+
+/* Navigable dining orbit: full cards orbit on desktop and swipe on mobile. */
+.venue-orbit {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: clamp(440px, 43vw, 590px);
+  perspective: 1400px;
+  isolation: isolate;
+  touch-action: pan-y;
+}
+.venue-orbit-ring {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  bottom: 9%;
+  width: 118%;
+  height: 25%;
+  border: 1px solid rgba(208, 173, 113, 0.55);
+  border-radius: 50%;
+  transform: translateX(-50%) rotate(-4deg);
+  pointer-events: none;
+}
+.venue-orbit-card {
+  position: absolute;
+  z-index: 1;
+  top: 46%;
+  left: 50%;
+  width: clamp(270px, 29vw, 370px);
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(0,0,0,.32);
+  transform-origin: center 70%;
+  transition: transform 550ms cubic-bezier(.2,.75,.25,1), opacity 450ms ease, filter 450ms ease;
+}
+.venue-orbit-card.is-active {
+  z-index: 3;
+  opacity: 1;
+  filter: none;
+  transform: translate(-50%, -50%) scale(1);
+}
+.venue-orbit-card.is-left {
+  z-index: 2;
+  opacity: .82;
+  filter: saturate(.88);
+  transform: translate(calc(-50% - 69%), -46%) scale(.84) rotateY(14deg);
+}
+.venue-orbit-card.is-right {
+  z-index: 2;
+  opacity: .82;
+  filter: saturate(.88);
+  transform: translate(calc(-50% + 69%), -46%) scale(.84) rotateY(-14deg);
+}
+.venue-orbit-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.venue-orbit-card-link:focus-visible {
+  outline: 3px solid #d9b974;
+  outline-offset: -5px;
+}
+.venue-orbit-image {
+  position: relative;
+  height: clamp(225px, 23vw, 300px);
+  overflow: hidden;
+  background: #211914;
+}
+.venue-orbit-image img {
+  object-fit: cover;
+  animation: venue-photo-reveal 500ms ease both;
+}
+@keyframes venue-photo-reveal {
+  from { opacity: .62; transform: scale(1.025); }
+  to { opacity: 1; transform: scale(1); }
+}
+.venue-orbit-category {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .11em;
+  line-height: 1.4;
+  text-shadow: 0 2px 12px rgba(0,0,0,.85);
+  text-transform: uppercase;
+}
+.venue-orbit-photo-count {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(20,16,14,.55);
+  color: white;
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+.venue-orbit-card-copy {
+  padding: 16px 19px 18px;
+}
+.venue-orbit-card-copy h3 {
+  margin: 0;
+  color: #1a1614;
+  font-family: var(--font-heading);
+  font-size: clamp(23px, 2vw, 29px);
+  font-weight: 400;
+  line-height: 1.08;
+}
+.venue-orbit-card-copy p {
+  min-height: 48px;
+  margin: 8px 0 12px;
+  color: #756b64;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.venue-orbit-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary, #c8193c);
+  font-size: 12px;
+  font-weight: 750;
+}
+.venue-orbit-controls {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.venue-orbit-arrow,
+.venue-orbit-pause,
+.venue-orbit-dots button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid rgba(225,205,174,.72);
+  border-radius: 50%;
+  background: rgba(31,24,21,.82);
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.venue-orbit-arrow {
+  width: 44px;
+  height: 44px;
+  font-size: 28px;
+  line-height: 1;
+}
+.venue-orbit-pause {
+  position: absolute;
+  left: 50%;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  height: 40px;
+  transform: translateX(-50%);
+  font-size: 13px;
+}
+.venue-orbit-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 57px;
+  display: flex;
+  gap: 9px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+.venue-orbit-dots button {
+  min-width: 12px;
+  min-height: 12px;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 0;
+  background: rgba(255,255,255,.38);
+}
+.venue-orbit-dots button.is-active {
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.16);
+}
+.venue-orbit-arrow:focus-visible,
+.venue-orbit-pause:focus-visible,
+.venue-orbit-dots button:focus-visible {
+  outline: 3px solid #d9b974;
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .home-hero-layout {
+    width: min(680px, 100%);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 26px;
+  }
+  .venue-orbit {
+    height: 470px;
+  }
+  .venue-orbit-card {
+    width: clamp(280px, 48vw, 360px);
+  }
+  .venue-orbit-image {
+    height: clamp(220px, 32vw, 275px);
+  }
+}
+@media (max-width: 600px) {
+  .home-hero-layout {
+    gap: 16px;
+  }
+  .home-hero-copy {
+    text-align: left;
+  }
+  .venue-orbit {
+    width: calc(100vw - 32px);
+    max-width: 480px;
+    height: 430px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+  .venue-orbit-ring {
+    bottom: 11%;
+    width: 146%;
+    height: 22%;
+  }
+  .venue-orbit-card {
+    top: 43%;
+    width: min(78vw, 350px);
+    border-radius: 15px;
+  }
+  .venue-orbit-card.is-active {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .venue-orbit-card.is-left {
+    opacity: .66;
+    transform: translate(calc(-50% - 77%), -46%) scale(.79);
+  }
+  .venue-orbit-card.is-right {
+    opacity: .66;
+    transform: translate(calc(-50% + 77%), -46%) scale(.79);
+  }
+  .venue-orbit-image {
+    height: clamp(190px, 58vw, 245px);
+  }
+  .venue-orbit-card-copy {
+    padding: 14px 16px 16px;
+  }
+  .venue-orbit-card-copy h3 {
+    font-size: 25px;
+  }
+  .venue-orbit-card-copy p {
+    min-height: 0;
+    margin: 7px 0 10px;
+    font-size: 12px;
+  }
+  .venue-orbit-controls {
+    bottom: 0;
+  }
+  .venue-orbit-arrow {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .venue-orbit-dots {
+    bottom: 54px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .venue-orbit-card,
+  .venue-orbit-image img {
+    animation: none !important;
+    transition: none !important;
+  }
+}

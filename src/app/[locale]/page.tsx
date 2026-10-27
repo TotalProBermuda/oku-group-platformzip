@@ -9,6 +9,7 @@ import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
 import EventArtwork from "@/components/ui/EventArtwork";
+import VenueOrbit from "@/components/home/VenueOrbit";
 import { seriesArtworkCandidates, type SeriesArtwork } from "@/lib/eventArtwork";
 
 interface SeriesItem extends SeriesArtwork {
@@ -137,9 +138,54 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
               </Link>
             </div>
           </div>
-          <figure className="home-hero-photo">
-            <Image src="/images/home/oku-sushi-feature.webp" alt="Fresh salmon sushi, thoughtfully plated at OKÜ" width={1200} height={1800} sizes="(max-width: 768px) 100vw, 48vw" priority />
-          </figure>
+          <VenueOrbit
+            label={home.venueShowcaseTitle}
+            locale={safeLocale}
+            venues={[
+              {
+                href: localePath(safeLocale, "/restaurants/oku"),
+                title: home.okuCardTitle,
+                category: home.okuCardCategory,
+                description: home.okuCardDescription,
+                cta: home.venueCardCta,
+                photos: [{ src: "/images/oku/new-rotation/oku-01.webp", alt: "OKÜ sushi with fresh fish and herbs" },
+                  { src: "/images/oku/new-rotation/oku-02.webp", alt: "A composed OKÜ sushi roll" },
+                  { src: "/images/oku/new-rotation/oku-03.webp", alt: "Assorted sushi prepared at OKÜ" },
+                  { src: "/images/oku/new-rotation/oku-04.webp", alt: "A chef carefully plating a dish at OKÜ" },
+                  { src: "/images/oku/new-rotation/oku-05.webp", alt: "Asian-inspired noodles with vegetables at OKÜ" },
+                  { src: "/images/oku/new-rotation/oku-06.webp", alt: "Fried rice from the OKÜ kitchen" },
+                  { src: "/images/oku/new-rotation/oku-07.webp", alt: "A salmon and vegetable entree from the OKÜ kitchen" },
+                  { src: "/images/oku/new-rotation/oku-08.webp", alt: "An array of sushi prepared at the OKÜ counter" },
+                  { src: "/images/oku/new-rotation/oku-09.webp", alt: "A colorful fried rice dish from the OKÜ kitchen" },
+                  { src: "/images/oku/new-rotation/oku-10.webp", alt: "A cocktail served at OKÜ" }],
+              },
+              {
+                href: localePath(safeLocale, "/restaurants/catch"),
+                title: home.catchCardTitle,
+                category: home.catchCardCategory,
+                description: home.catchCardDescription,
+                cta: home.venueCardCta,
+                photos: [
+                  { src: "/images/catch/dining-room.jpg", alt: "The CATCH dining room in Casco Viejo" },
+                  { src: "/images/catch/cocktail.jpg", alt: "A cocktail served at CATCH" },
+                ],
+              },
+              {
+                href: localePath(safeLocale, "/restaurants/terrace"),
+                title: home.terraceCardTitle,
+                category: home.terraceCardCategory,
+                description: home.terraceCardDescription,
+                cta: home.venueCardCta,
+                photos: [
+                  { src: "/images/terrace/terrace-hero.jpg", alt: "Open-air dining on The Terrace" },
+                  { src: "/images/terrace/functions/corporate-dinner.webp", alt: "Guests gathered for dinner on The Terrace" },
+                  { src: "/images/terrace/functions/product-launch.webp", alt: "A product launch hosted at The Terrace" },
+                  { src: "/images/oku/new-rotation/oku-01.webp", alt: "OKÜ sushi available to order on The Terrace" },
+                  { src: "/images/oku/new-rotation/oku-08.webp", alt: "An OKÜ signature dish available to Terrace guests" },
+                ],
+              },
+            ]}
+          />
         </div>
       </div>
     </section>
@@ -157,62 +203,6 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
             <strong>{home.browseEvents}</strong>
             <span>{home.eventGatewayDesc}</span>
           </Link>
-        </section>
-
-        {/* Restaurant discovery is visual and directly connected to each venue. */}
-        <section className="home-venue-showcase" aria-labelledby="home-venue-showcase-title">
-          <div className="home-venue-showcase-heading">
-            <span className="home-venue-showcase-eyebrow">{home.venueShowcaseEyebrow}</span>
-            <h2 id="home-venue-showcase-title">{home.venueShowcaseTitle}</h2>
-            <p>{home.venueShowcaseDescription}</p>
-          </div>
-          <div className="home-venue-showcase-grid">
-            {[
-              {
-                href: "/restaurants/oku",
-                title: home.okuCardTitle,
-                category: home.okuCardCategory,
-                description: home.okuCardDescription,
-                image: "/images/home/oku-sushi-feature.webp",
-                alt: home.okuCardAlt,
-              },
-              {
-                href: "/restaurants/catch",
-                title: home.catchCardTitle,
-                category: home.catchCardCategory,
-                description: home.catchCardDescription,
-                image: "/images/catch/grill.jpg",
-                alt: home.catchCardAlt,
-              },
-              {
-                href: "/restaurants/terrace",
-                title: home.terraceCardTitle,
-                category: home.terraceCardCategory,
-                description: home.terraceCardDescription,
-                image: "/images/catch/sushi-burger.jpg",
-                alt: home.terraceCardAlt,
-              },
-            ].map((venue) => (
-              <Link key={venue.href} href={localePath(safeLocale, venue.href)} className="home-venue-card">
-                <div className="home-venue-card-image">
-                  <Image
-                    src={venue.image}
-                    alt={venue.alt}
-                    width={1200}
-                    height={1500}
-                    sizes="(max-width: 640px) 100vw, (max-width: 1000px) 50vw, 33vw"
-                    loading="lazy"
-                  />
-                  <span className="home-venue-card-category">{venue.category}</span>
-                </div>
-                <div className="home-venue-card-copy">
-                  <h3>{venue.title}</h3>
-                  <p>{venue.description}</p>
-                  <span className="home-venue-card-link">{home.venueCardCta} <span aria-hidden="true">→</span></span>
-                </div>
-              </Link>
-            ))}
-          </div>
         </section>
 
         {/* ── PORTAL CARDS — elevated roles only ─────────────────────── */}
