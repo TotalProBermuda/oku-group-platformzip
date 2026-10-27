@@ -37,7 +37,7 @@
  *   7. On post-auth space-full: void the authorization, return 409.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import {
   authorizePayment,

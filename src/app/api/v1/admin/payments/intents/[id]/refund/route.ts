@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { refundPayment } from "@/server/payments/reservationPaymentService";
 

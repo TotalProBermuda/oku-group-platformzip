@@ -6,7 +6,7 @@ import {
   listReferralActors,
 } from "@/server/referrals/referralActorService";
 import { ReferralActorType, ReferralActorStatus } from "@prisma/client";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const CreateBody = z.object({
   actorType: z.nativeEnum(ReferralActorType),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { HandoffStatus, ReservationStatus } from "@prisma/client";
 
 const HandoffUpdateBody = z.object({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { HostPaymentMethod } from "@prisma/client";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { getHostApiErrorDetails } from "@/app/api/v1/host/errorDetails";

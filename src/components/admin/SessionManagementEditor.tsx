@@ -28,7 +28,7 @@ type Options = {
 type Payload = { fields: string[]; sessions: Session[]; defaults: Record<string, Effective>; options: Options };
 type Edit = { mode: Mode; value: unknown };
 type ScheduleTemplate = { localStart: string; durationMinutes: number };
-type SponsorEdit = import("zod").infer<typeof sponsorValue>[number];
+type SponsorEdit = import("zod/v3").infer<typeof sponsorValue>[number];
 type Preview = {
   previewId: string; requestId: string; targets: Array<{
     id: string; title: string; inventory: Session["inventory"];

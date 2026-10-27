@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import type { Session } from "next-auth";
 import { TicketTypeStatus, TicketVisibilityMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";

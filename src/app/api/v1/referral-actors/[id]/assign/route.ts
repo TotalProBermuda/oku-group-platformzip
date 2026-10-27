@@ -3,7 +3,7 @@ import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { createReferralAssignment, getAssignmentsForScope } from "@/server/referrals/referralAssignmentService";
 import { ReferralCompensationMode, ReferralScopeType } from "@prisma/client";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const CreateAssignmentBody = z.object({
   scopeType: z.nativeEnum(ReferralScopeType),

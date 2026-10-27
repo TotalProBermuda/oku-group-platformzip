@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import type { Prisma } from "@prisma/client";
 import { AvailableSeatsMode, AttendeeListMode, MembershipRuleMode, SeriesHostType, SeriesStatus, VenueKey } from "@prisma/client";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { syncTranslations } from "@/server/i18n/eventTranslations";
 import { finishEventSave } from "@/server/i18n/eventTranslationRequest";

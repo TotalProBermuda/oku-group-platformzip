@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { prisma } from "@/lib/prisma";
 import { ReferralActorType } from "@prisma/client";

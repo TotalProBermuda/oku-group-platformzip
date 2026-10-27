@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 import { seriesSocialLinksSchema } from "@/lib/socialLinks";
 import { seriesArtworkShape } from "@/server/series/artworkInput";
 
