@@ -2881,6 +2881,7 @@ tbody tr:hover td {
 }
 .venue-orbit-card-copy {
   padding: 16px 19px 18px;
+  text-align: left;
 }
 .venue-orbit-card-copy h3 {
   margin: 0;
