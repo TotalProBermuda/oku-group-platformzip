@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
 import { sendInfluencerInviteEmail } from "@/server/influencer/inviteEmail";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const InviteBody = z.object({
   invitedEmail: z.string().trim().email(),

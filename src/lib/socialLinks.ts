@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const socialUrl = z.preprocess(
   (value) => typeof value === "string" && value.trim() === "" ? undefined : value,

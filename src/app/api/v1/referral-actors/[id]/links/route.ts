@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { generateReferralLink, getActorLinks, deactivateLink } from "@/server/referrals/referralLinkService";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const CreateLinkBody = z.object({
   referralAssignmentId: z.string().optional(),

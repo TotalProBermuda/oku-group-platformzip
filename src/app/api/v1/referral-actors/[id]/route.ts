@@ -6,7 +6,7 @@ import {
   updateReferralActor,
 } from "@/server/referrals/referralActorService";
 import { ReferralActorStatus } from "@prisma/client";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const UpdateBody = z.object({
   displayName: z.string().trim().min(1).optional(),

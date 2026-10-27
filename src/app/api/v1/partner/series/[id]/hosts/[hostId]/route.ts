@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { legacySeriesMutation } from "@/server/series/legacySessionGuard";
 import { requirePartnerForSeries, PartnerAuthError } from "@/lib/partnerAuth";
 import { Prisma } from "@prisma/client";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const PatchBody = z.object({
   isFrontFacing: z.boolean().optional(),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ticketRows } from "@/server/commerce/ticketIssuance";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";

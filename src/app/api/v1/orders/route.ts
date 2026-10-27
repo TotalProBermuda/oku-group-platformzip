@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";
 import { purchasedEntitlements } from "@/server/commerce/sessionProducts";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { isDemoModeEnabled, DEMO_DISABLED_MESSAGE } from "@/lib/demoMode";
 
 const demoOrderInputSchema = z.object({

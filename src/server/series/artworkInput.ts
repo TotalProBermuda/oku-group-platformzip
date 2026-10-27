@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 import { isSafeArtworkUrl, seriesArtworkFields, sessionArtworkFields, sessionMobileArtworkFields } from "@/lib/eventArtwork";
 
 export const artworkUrlSchema = z.preprocess(

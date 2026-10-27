@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { isEncryptionAvailable } from "@/server/security/encryption";

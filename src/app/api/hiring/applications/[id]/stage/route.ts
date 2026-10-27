@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const StageBody = z.object({ status: z.enum([
   "DRAFT", "SUBMITTED", "UNDER_REVIEW", "HR_SCREEN", "MANAGER_REVIEW",

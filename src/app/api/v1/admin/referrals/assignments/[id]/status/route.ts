@@ -3,7 +3,7 @@
 // under `referrer.assignment.status.changed` for full lifecycle reconstruction.
 
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { ReferralAssignmentStatus } from "@prisma/client";

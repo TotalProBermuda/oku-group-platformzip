@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 
 export const updateSessionScheduleSchema = z.object({
   startsAt: z.coerce.date({ invalid_type_error: "Choose a valid start date and time." }),

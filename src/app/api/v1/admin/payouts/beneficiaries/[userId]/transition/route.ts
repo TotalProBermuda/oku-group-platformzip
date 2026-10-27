@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
 import { transitionStatus, TransitionError } from "@/server/beneficiaries/beneficiaryService";

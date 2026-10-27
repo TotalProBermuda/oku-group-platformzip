@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import type { Session } from "next-auth";
 import { EntityType, Prisma } from "@prisma/client";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 function isAdmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(r));

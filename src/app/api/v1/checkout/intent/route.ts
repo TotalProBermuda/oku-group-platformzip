@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";

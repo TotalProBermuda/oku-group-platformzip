@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { requireSession } from "@/server/auth/session";
 import { authenticateTest } from "@/server/authorizeNet/client";
 import { getResendClient } from "@/server/invitation/resend";
