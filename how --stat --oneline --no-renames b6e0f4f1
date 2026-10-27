@@ -1,0 +1,45 @@
+[33mfa5d90bc[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Add explicit event-page action to session cards (#157)
+[33md399df66[m Add reusable session-level event menus (#156)
+[33m6fd16c21[m[33m ([m[1;32mcodex/manual-referrer-settlement-20261023[m[33m)[m Add localized functions and catering journeys
+[33mb0f80855[m[33m ([m[1;32mcodex/oku-p1-manual-settlement-20261023[m[33m)[m Add food and function photography to key pages (#146)
+[33m03598ab1[m[33m ([m[1;32mcodex/oku-priorities-followup-20261023[m[33m)[m Improve OKU referrer onboarding and series discovery
+[33m3046846d[m[33m ([m[1;32mcodex/release-pr147-20261022[m[33m)[m Merge pull request #153 from TotalProBermuda/codex/deployment-source-archives-20261022
+[33mf1cb8f0b[m[33m ([m[1;31morigin/codex/deployment-source-archives-20261022[m[33m)[m Exclude named source media ZIPs only from isolated deployment copy
+[33mfe7b8d36[m Merge pull request #152 from TotalProBermuda/codex/preserve-replit-runtime-metadata-20261022
+[33m90f2514f[m[33m ([m[1;31morigin/codex/preserve-replit-runtime-metadata-20261022[m[33m)[m Preserve Replit runtime metadata during deployment packaging
+[33m42e6f079[m Merge pull request #151 from TotalProBermuda/codex/replit-runtime-node-20261022
+[33m39062438[m[33m ([m[1;31morigin/codex/replit-runtime-node-20261022[m[33m)[m Type isolated startup test environment explicitly
+[33m2f95acf8[m Start production through build-recorded Node without npm PATH dependency
+[33m38c51c9e[m Merge pull request #150 from TotalProBermuda/codex/replit-build-context-guard-20261022
+[33m9881fe8f[m[33m ([m[1;31morigin/codex/replit-build-context-guard-20261022[m[33m)[m Match isolated Replit build cleanup to verified build context
+[33m8d41dd3a[m Merge pull request #149 from TotalProBermuda/codex/replit-deployment-package-20261022
+[33md1c2395d[m[33m ([m[1;31morigin/codex/replit-deployment-package-20261022[m[33m)[m Trim isolated deployment build copies to fit Replit image limit
+[33mf23dd480[m Merge pull request #147 from TotalProBermuda/codex/dedicated-session-event-pages-20261020
+[33m035b0179[m[33m ([m[1;31morigin/codex/dedicated-session-event-pages-20261020[m[33m)[m Test revoked sessions and migration-free post-merge setup
+[33m9e1012b9[m Preserve session contracts and move partner search helper out of route exports
+[33mc5134917[m Revoke inactive sessions and make release preparation data-preserving
+[33m0fa342e8[m Fix repository lint and strict typecheck failures
+[33m72a90c7f[m[33m ([m[1;32mcodex/pr147-release-fix[m[33m)[m Use safe error narrowing in bookings endpoint
+[33mecf35874[m Assert account tickets include occurrence identity
+[33m9a009c99[m Type session identity for account event links
+[33m946620d8[m Include session identity in customer ticket links
+[33md03fa87a[m[33m ([m[1;34mgrafted[m[33m)[m Handle sessions with no venue in event hero
+[33m04294fb5[m Improve Terrace page with curated photos and menus
+[33m86ee172e[m[33m ([m[1;32mcodex/release-main-20261019[m[33m)[m Correct OKÜ positioning and private dining capacity (#144)
+[33mc32ca510[m Fix session translations and Panama event time
+[33ma0afbd2d[m Fix localized checkout labels and preserve event artwork (#142)
+[33m77863628[m[33m ([m[1;31msubrepl-9c2224y5/main[m[33m, [m[1;31msubrepl-0sz08mf1/main[m[33m, [m[1;31msubrepl-0sz08mf1/HEAD[m[33m, [m[1;32mcodex/event-checkout-localization-20261017[m[33m)[m Improve event session journey and localization
+[33maf37e274[m[33m ([m[1;31msubrepl-9c2224y5/codex/event-session-customer-journey-20261017[m[33m, [m[1;31msubrepl-0sz08mf1/codex/event-session-customer-journey-20261017[m[33m, [m[1;31morigin/codex/event-session-customer-journey-20261017[m[33m)[m Merge latest main into event journey
+[33mf9f9a73f[m Merge pull request #122 from TotalProBermuda/codex/responsive-session-artwork-20261012
+[33m5c7c95b0[m Localize event count labels
+[33m23304016[m Preserve event selection across locale changes
+[33m9be134f8[m Localize session event controls
+[33mc35c988f[m Improve session event journey and localization
+[33m9f914409[m[33m ([m[1;31msubrepl-9c2224y5/codex/responsive-session-artwork-20261012[m[33m, [m[1;31msubrepl-0sz08mf1/codex/responsive-session-artwork-20261012[m[33m, [m[1;31morigin/codex/responsive-session-artwork-20261012[m[33m)[m Merge main into responsive artwork and resolve conflicts
+[33m16dfb187[m[33m ([m[1;32mcodex/pr122-review-20261012[m[33m)[m test: isolate series artwork fallback fixture
+[33m8d834d95[m test: scope event artwork assertions to fixture sessions
+[33m570e2577[m Stabilize mobile artwork viewport emulation
+[33m53e20c6d[m Make responsive artwork browser viewport deterministic
+[33m51fc8910[m Make artwork browser assertions viewport-aware
+[33m1d581bec[m Fix mobile session artwork editor JSX
+[33mc2672a44[m Add responsive localized session artwork

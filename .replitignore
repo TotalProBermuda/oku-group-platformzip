@@ -13,3 +13,11 @@ catch-starter-kit/node_modules/
 # Workspace-only design preview dependencies and generated output.
 artifacts/mockup-sandbox/node_modules/
 artifacts/mockup-sandbox/dist/
+
+# Large source/media archive and failed staging output are not runtime inputs.
+attached_assets/
+.release-staging-partial-20261022/
+.cache/
+artifacts/
+
+# Root dependencies are required by the production start command.

@@ -8,6 +8,7 @@ import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
 import EventArtwork from "@/components/ui/EventArtwork";
+import VenueOrbit from "@/components/home/VenueOrbit";
 import { seriesArtworkCandidates, type SeriesArtwork } from "@/lib/eventArtwork";
 
 interface SeriesItem extends SeriesArtwork {
@@ -120,21 +121,73 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
       {/* ── PUBLIC MARKETING HERO — always visible regardless of session ── */}
       <section className="hero">
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="hero-eyebrow">{home.eyebrow}</div>
-          <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(48px, 7vw, 80px)", fontWeight: 400, letterSpacing: "-0.03em", color: "white", marginBottom: 20, lineHeight: 1 }}>
-            {home.headline}
+            <div className="home-hero-layout">
+          <div className="home-hero-copy">
+            <div className="hero-eyebrow">{home.eyebrow}</div>
+            <div style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(48px, 7vw, 80px)", fontWeight: 400, letterSpacing: "-0.03em", color: "white", marginBottom: 20, lineHeight: 1 }}>
+              {home.headline}
+            </div>
+            <p className="hero-subtitle">{home.subtitle}</p>
+            <div className="hero-actions">
+              <Link href={localePath(safeLocale, "/restaurants")} className="btn btn-primary btn-lg">
+                {home.browseRestaurants}
+              </Link>
+              <Link href={localePath(safeLocale, "/experiences")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                {home.browseEvents}
+              </Link>
+            </div>
           </div>
-          <p className="hero-subtitle">{home.subtitle}</p>
-          <div className="hero-actions">
-            <Link href={localePath(safeLocale, "/restaurants")} className="btn btn-primary btn-lg">
-              {home.browseRestaurants}
-            </Link>
-            <Link href={localePath(safeLocale, "/experiences")} className="btn btn-lg" style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-              {home.browseEvents}
-            </Link>
-          </div>
+          <VenueOrbit
+            label={home.venueShowcaseTitle}
+            locale={safeLocale}
+            venues={[
+              {
+                href: localePath(safeLocale, "/restaurants/oku"),
+                title: home.okuCardTitle,
+                category: home.okuCardCategory,
+                description: home.okuCardDescription,
+                cta: home.venueCardCta,
+                photos: [{ src: "/images/oku/new-rotation/oku-01.webp", alt: "OKÜ sushi with fresh fish and herbs" },
+                  { src: "/images/oku/new-rotation/oku-02.webp", alt: "A composed OKÜ sushi roll" },
+                  { src: "/images/oku/new-rotation/oku-03.webp", alt: "Assorted sushi prepared at OKÜ" },
+                  { src: "/images/oku/new-rotation/oku-04.webp", alt: "A chef carefully plating a dish at OKÜ" },
+                  { src: "/images/oku/new-rotation/oku-05.webp", alt: "Asian-inspired noodles with vegetables at OKÜ" },
+                  { src: "/images/oku/new-rotation/oku-06.webp", alt: "Fried rice from the OKÜ kitchen" },
+                  { src: "/images/oku/new-rotation/oku-07.webp", alt: "A salmon and vegetable entree from the OKÜ kitchen" },
+                  { src: "/images/oku/new-rotation/oku-08.webp", alt: "An array of sushi prepared at the OKÜ counter" },
+                  { src: "/images/oku/new-rotation/oku-09.webp", alt: "A colorful fried rice dish from the OKÜ kitchen" },
+                  { src: "/images/oku/new-rotation/oku-10.webp", alt: "A cocktail served at OKÜ" }],
+              },
+              {
+                href: localePath(safeLocale, "/restaurants/catch"),
+                title: home.catchCardTitle,
+                category: home.catchCardCategory,
+                description: home.catchCardDescription,
+                cta: home.venueCardCta,
+                photos: [
+                  { src: "/images/catch/dining-room.jpg", alt: "The CATCH dining room in Casco Viejo" },
+                  { src: "/images/catch/cocktail.jpg", alt: "A cocktail served at CATCH" },
+                ],
+              },
+              {
+                href: localePath(safeLocale, "/restaurants/terrace"),
+                title: home.terraceCardTitle,
+                category: home.terraceCardCategory,
+                description: home.terraceCardDescription,
+                cta: home.venueCardCta,
+                photos: [
+                  { src: "/images/terrace/terrace-hero.jpg", alt: "Open-air dining on The Terrace" },
+                  { src: "/images/terrace/functions/corporate-dinner.webp", alt: "Guests gathered for dinner on The Terrace" },
+                  { src: "/images/terrace/functions/product-launch.webp", alt: "A product launch hosted at The Terrace" },
+                  { src: "/images/oku/new-rotation/oku-01.webp", alt: "OKÜ sushi available to order on The Terrace" },
+                  { src: "/images/oku/new-rotation/oku-08.webp", alt: "An OKÜ signature dish available to Terrace guests" },
+                ],
+              },
+            ]}
+          />
         </div>
-      </section>
+      </div>
+    </section>
 
       <div className="page-container">
         {/* Primary public journeys stay ahead of portals and secondary content. */}
