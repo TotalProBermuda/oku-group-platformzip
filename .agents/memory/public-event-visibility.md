@@ -14,3 +14,14 @@ Public purchase actions must independently require sale eligibility for the disp
 **Why:** Checkout's existing selection behavior can choose an eligible sibling when a requested session is absent. The owner requires UI-only protection against entering that path from closed-event pages, while leaving checkout rules unchanged.
 
 **How to apply:** Keep event navigation available when sales are closed, but disable purchase actions across cards, calendars, detail heroes and booking sidebars. Use existing status, timing, product and inventory data; recheck time-sensitive links when activated.
+
+Requests targeting the Events page's “Events this month” card refer specifically
+to the calendar/month sidebar, not standalone session cards or calendar popovers.
+
+**Why:** The owner explicitly corrected this distinction after a similarly named
+standalone session component was mistaken for the requested sidebar.
+
+**How to apply:** Confirm the owning surface before changing shared card renderers.
+Keep parent-series navigation on the bare localized series route, while preserving
+the standalone View Event URL and the exact-session Get Tickets URL. Do not
+duplicate the new sidebar action on other surfaces unless separately requested.

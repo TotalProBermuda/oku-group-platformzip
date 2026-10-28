@@ -57,6 +57,33 @@ function assertCardLinks(markup: string, locale: string, expectedIds: string[], 
 }
 
 describe("rendered session navigation (fixtures only, no database)", () => {
+  it.each(["en", "es", "pt"] as const)("adds the translated %s parent-series action only to month/sidebar cards", locale => {
+    const rows = sessions.map(session => ({
+      ...session, series: { id: "series", slug, title: "Wine Down Wednesday", venue: "OKU", heroImageUrl: null },
+    }));
+    seed([2027, 0, null, 13, rows, false, "calendar", { [slug]: { ...purchaseSeries, slug, sessions } }]);
+    const markup = renderToStaticMarkup(<EventsCalendarView locale={locale}
+      labels={{ calendarGetTickets: calendars[locale].calendarGetTickets, viewSeriesLink: calendars[locale].viewSeriesLink }} />);
+    const cards = [...markup.matchAll(/<article\b[^>]*id="session-([^"]+)"[^>]*>([\s\S]*?)<\/article>/g)];
+    expect(cards).toHaveLength(3); // Two month cards and one calendar popover.
+    cards.forEach(([, id, card], index) => {
+      const hrefs = [...card.matchAll(/href="([^"]+)"/g)].map(match => match[1].replaceAll("&amp;", "&"));
+      expect(hrefs).toEqual([
+        `/${locale}/experiences/${slug}/sessions/${id}`,
+        `/${locale}/checkout/${slug}?sessionId=${id}`,
+        ...(index < rows.length ? [`/${locale}/experiences/${slug}`] : []),
+      ]);
+      if (index < rows.length) {
+        expect(card).toContain('<div style="margin-top:6px"><a');
+        expect(card).toContain(`>${calendars[locale].viewSeriesLink}</a>`);
+        expect(card.indexOf(`href="/${locale}/experiences/${slug}"`))
+          .toBeGreaterThan(card.indexOf(`href="/${locale}/checkout/${slug}?sessionId=${id}"`));
+      } else {
+        expect(card).not.toContain(calendars[locale].viewSeriesLink);
+      }
+    });
+  });
+
   it.each(["en", "es", "pt"] as const)("keeps %s sibling series cards distinct in list and calendar modes", locale => {
     for (const view of ["list", "calendar"]) {
       seed([view, new Date(2027, 0, 1), ""]);

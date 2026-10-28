@@ -49,7 +49,8 @@ test("calendar purchase links stay exact, fail closed, and expire without choosi
   await expect(month.locator('a[href*="/checkout/"]')).toHaveCount(2);
   for (const session of sessions) {
     const card = month.locator(`article[id="session-${session.id}"]`);
-    await expect(card.locator('a[href*="/experiences/"]')).toHaveAttribute("href", `/en/experiences/${slug}/sessions/${session.id}`);
+    await expect(card.getByRole("link", { name: "View event", exact: true })).toHaveAttribute("href", `/en/experiences/${slug}/sessions/${session.id}`);
+    await expect(card.getByRole("link", { name: "View series →", exact: true })).toHaveAttribute("href", `/en/experiences/${slug}`);
     const ticket = card.locator('a[href*="/checkout/"]');
     if ([activeId, "eligible-sibling"].includes(session.id)) {
       await expect(ticket).toHaveAttribute("href", `/en/checkout/${slug}?sessionId=${session.id}`);
@@ -58,13 +59,27 @@ test("calendar purchase links stay exact, fail closed, and expire without choosi
       await expect(card.getByText("Tickets not currently on sale")).toBeVisible();
     }
   }
+  const firstCard = month.locator(`article[id="session-${activeId}"]`);
+  const viewEventBox = await firstCard.getByRole("link", { name: "View event", exact: true }).boundingBox();
+  const ticketBox = await firstCard.locator('a[href*="/checkout/"]').boundingBox();
+  const seriesBox = await firstCard.getByRole("link", { name: "View series →", exact: true }).boundingBox();
+  expect(viewEventBox).not.toBeNull();
+  expect(ticketBox).not.toBeNull();
+  expect(seriesBox).not.toBeNull();
+  expect(seriesBox!.y).toBeGreaterThanOrEqual(Math.max(viewEventBox!.y + viewEventBox!.height, ticketBox!.y + ticketBox!.height) + 5);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   // Exercise compact previews, not only month cards.
+  const calendarTab = page.getByRole("tab", { name: "Calendar", exact: true });
+  if (await calendarTab.isVisible()) await calendarTab.click();
   await page.getByRole("button", { name: /Wednesday, October 28, 3 events/ }).focus();
   const preview = page.getByRole("group", { name: "Event previews for 28" });
   await expect(preview.locator('a[href*="/checkout/"]')).toHaveCount(1);
   await expect(preview.locator('a[href*="/checkout/"]')).toHaveAttribute("href", `/en/checkout/${slug}?sessionId=${activeId}`);
+  await expect(preview.getByRole("link", { name: "View series →", exact: true })).toHaveCount(0);
   await page.clock.fastForward(5 * 60 * 1000 + 1000);
   await expect(page.locator('article a[href*="/checkout/"]')).toHaveCount(0);
-  await expect(month.locator('a[href*="/experiences/"]')).toHaveCount(5);
+  if (await calendarTab.isVisible()) await page.getByRole("tab", { name: "List", exact: true }).click();
+  await expect(month.getByRole("link", { name: "View event", exact: true })).toHaveCount(5);
+  await expect(month.getByRole("link", { name: "View series →", exact: true })).toHaveCount(5);
   expect(unsafeRequests).toEqual([]);
 });

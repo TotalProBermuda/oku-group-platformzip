@@ -34,6 +34,7 @@ interface Props {
     calendarNoSessions?: string;
     calendarSelectDay?: string;
     calendarGetTickets?: string;
+    viewSeriesLink?: string;
     ticketsNotOnSale?: string;
     calendarPrev?: string;
     calendarNext?: string;
@@ -181,7 +182,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
     };
   }
 
-  function sessionCard(session: SessionRow, compact = false) {
+  function sessionCard(session: SessionRow, compact = false, showSeriesLink = false) {
     const title = session.series.title;
     const sessionTitle = session.title ?? null;
     const artwork = sessionArtworkCandidates(session, locale, session.series);
@@ -212,6 +213,9 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
               className="btn btn-primary btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
               unavailableLabel={ticketsNotOnSaleLabel}>{buyTicketsLabel}</SessionTicketAction>
           </div>
+          {showSeriesLink && l.viewSeriesLink ? <div style={{ marginTop: 6 }}>
+            <Link href={`/${locale}/experiences/${encodeURIComponent(session.series.slug)}`} className="btn btn-ghost btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", borderColor: "#e5e0d8", color: "#1a1614" }}>{l.viewSeriesLink}</Link>
+          </div> : null}
         </div>
       </article>
     );
@@ -252,7 +256,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
             <h2 className="events-month-title">{selectedDay === null ? monthSessionsLabel : new Date(Date.UTC(year, month, selectedDay, 12)).toLocaleDateString(localeTag, { weekday: "long", month: "long", day: "numeric", timeZone: TIME_ZONE })}</h2>
             {selectedDay !== null ? <button type="button" onClick={() => setSelectedDay(null)} className="btn btn-ghost btn-sm" style={{ minHeight: 44 }}>{locale === "es" ? "Ver todo el mes" : locale === "pt" ? "Ver o mês todo" : "Show all dates"}</button> : null}
           </div>
-          {selectedSessions.length ? <div className="events-month-cards">{selectedSessions.map((session) => sessionCard(session, true))}</div>
+          {selectedSessions.length ? <div className="events-month-cards">{selectedSessions.map((session) => sessionCard(session, true, true))}</div>
             : !loading ? <p style={{ color: "#6b7280", fontSize: 14 }}>{selectedDay === null ? noSessionsLabel : selectDayLabel}</p> : null}
         </div>
 

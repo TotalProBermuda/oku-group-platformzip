@@ -34,6 +34,7 @@ export default async function ExperiencesPage({ params }: Props) {
             calendarNoSessions: c.calendarNoSessions,
             calendarSelectDay: c.calendarSelectDay,
             calendarGetTickets: c.calendarGetTickets,
+            viewSeriesLink: c.viewSeriesLink,
             calendarPrev: c.calendarPrev,
             calendarNext: c.calendarNext,
             left: c.left,
