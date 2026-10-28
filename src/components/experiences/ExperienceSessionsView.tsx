@@ -7,6 +7,7 @@ import EventArtwork from "@/components/ui/EventArtwork";
 import ExpandableText from "@/components/ui/ExpandableText";
 import { sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
+import { sessionCheckoutHref } from "@/lib/sessionCheckoutHref";
 
 type Session = SessionArtwork & {
   id: string; title: string | null; subtitle?: string | null; description?: string | null;
@@ -27,12 +28,14 @@ function eventDateKey(value: Date) {
 }
 
 export default function ExperienceSessionsView({
-  sessions, ticketTypes, seriesTitle, seriesDescription, seriesImage, seriesArtwork, seriesHosts, focusSessionId, checkoutHrefBase, venue, locale, labels,
+  sessions, ticketTypes, seriesTitle, seriesDescription, seriesImage, seriesArtwork, seriesHosts, focusSessionId, standalone = false, checkoutQuery, checkoutHrefBase, venue, locale, labels,
 }: {
   sessions: Session[]; seriesTitle: string; seriesDescription: string; seriesImage?: string | null;
   seriesArtwork?: SeriesArtwork;
   seriesHosts?: Array<{ role: string; entity: { displayName: string } }>;
   focusSessionId?: string | null;
+  standalone?: boolean;
+  checkoutQuery?: Record<string, string | string[] | undefined>;
   ticketTypes: Array<{ id: string; priceCents: number }>;
   checkoutHrefBase: string; venue: string; locale: string;
   labels: Record<string, string>;
@@ -99,7 +102,7 @@ export default function ExperienceSessionsView({
         {session.status === "SCHEDULED" ? (
           <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", marginTop: 14 }}>
             <AddToCalendar sessionId={session.id} title={title} startsAt={session.startsAt} endsAt={session.endsAt} location={venue} description={description} labels={{ addToCalendar: labels.addToCalendar, google: labels.calGoogleCalendar, apple: labels.calAppleIcal, outlook: labels.calOutlook, yahoo: labels.calYahoo }} />
-            <Link href={`${checkoutHrefBase}?sessionId=${encodeURIComponent(session.id)}`} className="btn btn-primary">{labels.selectTickets}</Link>
+             <Link href={sessionCheckoutHref(checkoutHrefBase, session.id, checkoutQuery)} className="btn btn-primary">{labels.selectTickets}</Link>
           </div>
         ) : null}
         </div>
@@ -109,10 +112,10 @@ export default function ExperienceSessionsView({
 
   return (
     <div>
-      <div role="group" aria-label={labels.sessionView} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      {!standalone && <div role="group" aria-label={labels.sessionView} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={view === "list" ? "btn btn-primary btn-sm" : "btn btn-ghost btn-sm"}>{labels.listView}</button>
         <button type="button" aria-pressed={view === "calendar"} onClick={() => setView("calendar")} className={view === "calendar" ? "btn btn-primary btn-sm" : "btn btn-ghost btn-sm"}>{labels.calendarView}</button>
-      </div>
+      </div>}
       {view === "calendar" ? (
         <div style={{ ...cardStyle, marginBottom: 16 }}>
           <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
