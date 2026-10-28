@@ -145,6 +145,8 @@
   "confirmedStatus": "CONFIRMADO",
   "forLabel": "Para:",
   "viewEventLink": "Ver evento →",
+  "viewSeriesLink": "Ver serie →",
+  "ticketsNotOnSale": "Entradas no disponibles para la venta",
   "generalAdmission": "Entrada General",
   "membershipStatusLabel": "Estado de Membresía",
   "notCurrentlyMember": "Actualmente no eres miembro.",

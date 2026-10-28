@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import Link from "next/link";
 import EventArtwork from "@/components/ui/EventArtwork";
 import { sessionArtworkCandidates, type SeriesArtwork, type SessionArtwork } from "@/lib/eventArtwork";
+import SessionTicketAction from "@/components/experiences/SessionTicketAction";
+import { loadCalendarPurchaseSeries, type PublicPurchaseSeries } from "@/lib/sessionPurchaseEligibility";
 
 interface SessionRow extends SessionArtwork {
   id: string;
@@ -32,6 +34,7 @@ interface Props {
     calendarNoSessions?: string;
     calendarSelectDay?: string;
     calendarGetTickets?: string;
+    ticketsNotOnSale?: string;
     calendarPrev?: string;
     calendarNext?: string;
     left?: string;
@@ -91,11 +94,13 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
+  const [purchaseSeries, setPurchaseSeries] = useState<Record<string, PublicPurchaseSeries>>({});
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setSessions([]);
+    setPurchaseSeries({});
     setSelectedDay(null);
     setHoveredDay(null);
     const { after, before } = getPanamaMonthBounds(year, month);
@@ -105,8 +110,12 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
         if (!response.ok) throw new Error("Unable to load sessions");
         return response.json();
       })
-      .then((data: { sessions?: SessionRow[] }) => {
-        if (active) setSessions(data.sessions ?? []);
+      .then(async (data: { sessions?: SessionRow[] }) => {
+        if (!active) return;
+        const rows = data.sessions ?? [];
+        setSessions(rows);
+        const catalog = await loadCalendarPurchaseSeries(rows.map(row => row.series.slug), locale);
+        if (active) setPurchaseSeries(catalog);
       })
       .catch(() => {
         if (active) setSessions([]);
@@ -143,6 +152,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
   const selectedSessions = selectedDay === null ? sessions : (sessionsByDay.get(selectedDay) ?? []);
   const viewEventLabel = locale === "es" ? "Ver evento" : locale === "pt" ? "Ver evento" : "View event";
   const buyTicketsLabel = locale === "es" ? "Comprar entradas" : locale === "pt" ? "Comprar ingressos" : (l.calendarGetTickets ?? "Buy tickets");
+  const ticketsNotOnSaleLabel = l.ticketsNotOnSale ?? (locale === "es" ? "Entradas no disponibles para la venta" : locale === "pt" ? "Ingressos não estão à venda no momento" : "Tickets not currently on sale");
   const monthSessionsLabel = locale === "es" ? "Eventos de este mes" : locale === "pt" ? "Eventos deste mês" : "Events this month";
   const noSessionsLabel = l.calendarNoSessions ?? (locale === "es" ? "No hay eventos este mes." : locale === "pt" ? "Não há eventos neste mês." : "No events this month.");
   const selectDayLabel = l.calendarSelectDay ?? (locale === "es" ? "Selecciona un día para filtrar los eventos." : locale === "pt" ? "Selecione um dia para filtrar os eventos." : "Select a day to filter events.");
@@ -167,8 +177,7 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
 
   function eventLinks(session: SessionRow) {
     return {
-      view: `/${locale}/experiences/${session.series.slug}?sessionId=${encodeURIComponent(session.id)}#session-${encodeURIComponent(session.id)}`,
-      buy: `/${locale}/checkout/${session.series.slug}?sessionId=${encodeURIComponent(session.id)}`,
+      view: `/${locale}/experiences/${encodeURIComponent(session.series.slug)}/sessions/${encodeURIComponent(session.id)}`,
     };
   }
 
@@ -177,7 +186,9 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
     const sessionTitle = session.title ?? null;
     const artwork = sessionArtworkCandidates(session, locale, session.series);
     const coHosts = [...(session.series.seriesHosts ?? []), ...(session.eventHosts ?? [])].filter((host) => host.role === "CO_HOST");
-    const { view, buy } = eventLinks(session);
+    const { view } = eventLinks(session);
+    const catalog = purchaseSeries[session.series.slug];
+    const purchasableSession = catalog?.sessions.find(candidate => candidate.id === session.id);
     return (
       <article id={`session-${session.id}`} key={session.id} style={{
         background: "#fff", border: "1px solid #e5e0d8", borderRadius: 14, overflow: "hidden",
@@ -196,7 +207,10 @@ export default function EventsCalendarView({ locale, labels: l }: Props) {
           {session.series.venue ? <div style={{ color: "#8b8179", fontSize: 12 }}>{session.series.venue}</div> : null}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
             <Link href={view} className="btn btn-ghost btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{viewEventLabel}</Link>
-            <Link href={buy} className="btn btn-primary btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{buyTicketsLabel}</Link>
+            <SessionTicketAction session={purchasableSession} series={catalog}
+              checkoutHrefBase={`/${locale}/checkout/${encodeURIComponent(session.series.slug)}`}
+              className="btn btn-primary btn-sm" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              unavailableLabel={ticketsNotOnSaleLabel}>{buyTicketsLabel}</SessionTicketAction>
           </div>
         </div>
       </article>

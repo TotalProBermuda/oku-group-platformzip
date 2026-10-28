@@ -10,12 +10,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect, notFound: mocks.notFound }));
 vi.mock("next-auth", () => ({ getServerSession: vi.fn(async () => null) }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
-vi.mock("@/i18n/getTranslations", () => ({
-  getTranslations: vi.fn(async () => ({ common: {
-    selectTickets: "Select Tickets", sessionsHeading: "Sessions", aboutThisExperience: "About",
-    bookYourPlace: "Book your place", left: "left", from: "From",
-  } })),
-}));
 vi.mock("@/components/sponsors/EventPageSponsorBlock", () => ({ default: () => null }));
 vi.mock("@/components/experiences/EventMenusSection", () => ({ default: () => null }));
 vi.mock("@/components/ui/ShareButtons", () => ({ default: () => null }));
@@ -27,9 +21,9 @@ const slug = "wine-down-wednesday";
 const sessionId = "cmv1ohwb40006w3f2woikjbnk";
 function fixture(locale = "en") {
   return {
-    id: "series-1", slug, title: "Wine Down Wednesday", description: "Series details",
+    id: "series-1", slug, status: "PUBLISHED", title: "Wine Down Wednesday", description: "Series details",
     venue: "OKU", heroImageUrlEn: "/series-en.jpg", heroImageUrlEs: "/series-es.jpg",
-    ticketTypes: [{ id: "ticket", name: "General Admission", priceCents: 3500 }],
+    ticketTypes: [{ id: "ticket", ticketStatus: "ACTIVE", name: "General Admission", priceCents: 3500 }],
     sessions: [
       { id: "other-session", title: "Another Wednesday", description: "Other details",
         startsAt: "2027-01-06T23:00:00Z", endsAt: "2027-01-07T02:00:00Z",
@@ -45,6 +39,8 @@ function fixture(locale = "en") {
 let series: ReturnType<typeof fixture> | null;
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-28T18:00:00Z"));
   series = fixture();
   mocks.fetch.mockImplementation(async (url: string) => ({
     ok: true,
@@ -52,7 +48,7 @@ beforeEach(() => {
   }));
   vi.stubGlobal("fetch", mocks.fetch);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 async function renderSession(
   locale = "en",
@@ -66,6 +62,10 @@ async function renderSession(
 }
 function ticketLinks(markup: string) {
   return [...markup.matchAll(/href="([^"]*\/checkout\/[^"]*)"/g)]
+    .map(match => new URL(match[1].replaceAll("&amp;", "&"), "https://example.test"));
+}
+function eventLinks(markup: string) {
+  return [...markup.matchAll(/href="([^"]*\/experiences\/[^"]*)"/g)]
     .map(match => new URL(match[1].replaceAll("&amp;", "&"), "https://example.test"));
 }
 
@@ -101,6 +101,12 @@ describe("public standalone session rendering (isolated data, no database)", () 
     });
     expect(markup).toContain(`${locale} requested Wine Down`);
     expect(mocks.fetch.mock.calls[0][0]).toContain(`locale=${locale}`);
+    const returnLinks = eventLinks(markup);
+    expect(returnLinks).toHaveLength(1);
+    expect(returnLinks[0].pathname + returnLinks[0].search + returnLinks[0].hash)
+      .toBe(`/${locale}/experiences/${slug}?sessionId=${sessionId}#session-${sessionId}`);
+    expect(markup).toContain(locale === "es" ? "Ver serie →" : locale === "pt" ? "Ver série →" : "View series →");
+    expect(ticketLinks(markup)).toHaveLength(3);
     for (const link of ticketLinks(markup)) {
       expect(link.pathname).toBe(`/${locale}/checkout/${slug}`);
       expect(link.searchParams.getAll("sessionId")).toEqual([sessionId]);
@@ -137,6 +143,11 @@ describe("public standalone session rendering (isolated data, no database)", () 
     expect(markup).toContain('role="group"');
     expect(markup).toContain('href="#sessions"');
     expect(ticketLinks(markup).map(link => link.searchParams.get("sessionId"))).toEqual(["other-session", sessionId]);
+    expect(eventLinks(markup).map(link => link.pathname + link.search + link.hash)).toEqual([
+      `/en/experiences/${slug}/sessions/other-session`,
+      `/en/experiences/${slug}/sessions/${sessionId}`,
+    ]);
+    expect(markup).not.toContain("View series →");
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
@@ -146,7 +157,54 @@ describe("public standalone session rendering (isolated data, no database)", () 
     }));
     expect(markup).toContain("Another Wednesday");
     expect(markup).toContain(`id="session-${sessionId}"`);
+    expect(markup).toContain(`id="session-${sessionId}" style="background:#fff;border:1px solid #e5e0d8;border-radius:12px;padding:12px;border-color:#c41e3a;border-width:2px`);
+    expect(eventLinks(markup).map(link => link.pathname)).toEqual([
+      `/en/experiences/${slug}/sessions/other-session`,
+      `/en/experiences/${slug}/sessions/${sessionId}`,
+    ]);
+    expect(ticketLinks(markup).slice(0, 2).map(link => link.searchParams.get("sessionId"))).toEqual(["other-session", sessionId]);
     expect(ticketLinks(markup).at(-1)?.searchParams.get("sessionId")).toBe(sessionId);
+  });
+
+  it.each(["en", "es", "pt"])("keeps every %s active Oct 28 purchase action bound to the exact Wine Down session", async locale => {
+    series = fixture(locale);
+    Object.assign(series!.sessions[1], {
+      startsAt: "2026-10-28T23:00:00Z", endsAt: "2026-10-29T02:00:00Z",
+    });
+    const markup = await renderSession(locale, { sessionId: "other-session", ref: "oct28" });
+    expect(ticketLinks(markup)).toHaveLength(3);
+    for (const link of ticketLinks(markup)) {
+      expect(link.pathname).toBe(`/${locale}/checkout/${slug}`);
+      expect(link.searchParams.getAll("sessionId")).toEqual([sessionId]);
+      expect(link.searchParams.get("ref")).toBe("oct28");
+    }
+    expect(eventLinks(markup)[0].pathname + eventLinks(markup)[0].search + eventLinks(markup)[0].hash)
+      .toBe(`/${locale}/experiences/${slug}?sessionId=${sessionId}#session-${sessionId}`);
+  });
+
+  it.each([
+    ["past", { startsAt: "2026-10-27T23:00:00Z", endsAt: "2026-10-28T02:00:00Z" }],
+    ["ongoing without late sales", { startsAt: "2026-10-28T17:00:00Z", endsAt: "2026-10-28T22:00:00Z" }],
+    ["future but all enabled ticket sales closed", {}],
+  ])("removes all standalone and focused-series ticket CTAs for %s, not substituting the eligible sibling", async (reason, dates) => {
+    Object.assign(series!.sessions[1], dates);
+    if (reason === "future but all enabled ticket sales closed") {
+      Object.assign(series!, { ticketTypes: [
+        { id: "ticket", ticketStatus: "ACTIVE", name: "Expired product", priceCents: 3500, saleEndsAt: "2026-10-27T00:00:00Z" },
+        { id: "sibling-ticket", ticketStatus: "ACTIVE", name: "Sibling product", priceCents: 3500 },
+      ] });
+      Object.assign(series!.sessions[1], { fieldModes: { "ticket.sibling-ticket.enabled": { mode: "clear" } } });
+    }
+    const markup = await renderSession("en", { sessionId: "other-session" });
+    expect(ticketLinks(markup)).toHaveLength(0);
+    expect(markup.match(/Tickets not currently on sale/g)).toHaveLength(3); // Hero, card, sticky sidebar.
+    expect(eventLinks(markup)[0].pathname).toBe(`/en/experiences/${slug}`);
+    const seriesMarkup = renderToStaticMarkup(await seriesPage({
+      params: Promise.resolve({ locale: "en", slug }), searchParams: Promise.resolve({ sessionId }),
+    }));
+    // The sibling remains on sale, but neither this card nor the focused sidebar can link to it.
+    expect(ticketLinks(seriesMarkup).map(link => link.searchParams.get("sessionId"))).toEqual(["other-session"]);
+    expect(eventLinks(seriesMarkup).map(link => link.pathname)).toContain(`/en/experiences/${slug}/sessions/${sessionId}`);
   });
 
   it("uses the session title, artwork and retained nested URL for metadata", async () => {

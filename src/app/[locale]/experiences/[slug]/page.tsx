@@ -17,13 +17,13 @@ import EventArtwork from "@/components/ui/EventArtwork";
 import ExpandableText from "@/components/ui/ExpandableText";
 import { seriesArtworkCandidates, sessionArtworkCandidates } from "@/lib/eventArtwork";
 import { PANAMA_TIME_ZONE } from "@/lib/panamaDateTime";
-import { sessionCheckoutHref } from "@/lib/sessionCheckoutHref";
+import SessionTicketAction from "@/components/experiences/SessionTicketAction";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://okugroup.com";
 
-async function getSeries(slug: string, locale = "en") {
-  const res = await fetch(`${BASE}/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${encodeURIComponent(locale)}`, { cache: "no-store" });
+async function getSeries(slug: string, locale = "en", sessionId?: string) {
+  const res = await fetch(`${BASE}/api/v1/experiences?slug=${encodeURIComponent(slug)}&locale=${encodeURIComponent(locale)}${sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : ""}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
   return data.series?.[0] ?? null;
@@ -50,7 +50,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug, sessionId } = await params;
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
-  const series = await getSeries(slug, safeLocale);
+  const series = await getSeries(slug, safeLocale, sessionId);
   if (!series) return {};
   const event = sessionId ? series.sessions?.find((candidate: { id: string }) => candidate.id === sessionId) : null;
   if (sessionId && !event) notFound();
@@ -88,7 +88,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
-    getSeries(slug, safeLocale),
+    getSeries(slug, safeLocale, sessionId),
     getAvailability(slug),
     getServerSession(authOptions),
     getTranslations(safeLocale, ["common"]),
@@ -124,7 +124,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const description = standaloneSession?.description ?? content?.description ?? series.description;
   const artwork = standaloneSession ? sessionArtworkCandidates(standaloneSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
   const checkoutBase = localePath(safeLocale, `/checkout/${encodeURIComponent(slug)}`);
-  const checkoutHref = focusSessionId ? sessionCheckoutHref(checkoutBase, focusSessionId, standaloneSession ? query : {}) : "#sessions";
+  const focusedSession = sessions.find((event: { id: string }) => event.id === focusSessionId);
 
   const pageUrl = `${PUBLIC_BASE}/${safeLocale}/experiences/${encodeURIComponent(slug)}${sessionId ? `/sessions/${encodeURIComponent(sessionId)}` : ""}`;
   const locationStr = [series.venue, series.venueAddress, series.city].filter(Boolean).join(", ");
@@ -149,7 +149,11 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
             {firstSession && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>📅 {fmtDate(firstSession.startsAt)}</span>}
             {standaloneSession && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{fmtTime(standaloneSession.startsAt)} – {fmtTime(standaloneSession.endsAt)} (Panama)</span>}
           </div>
-          {standaloneSession && <Link href={checkoutHref} className="btn btn-primary" style={{ marginBottom: 20 }}>{c.selectTickets}</Link>}
+          {standaloneSession && <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+            <SessionTicketAction session={standaloneSession} series={series} checkoutHrefBase={checkoutBase}
+              query={query} className="btn btn-primary" unavailableLabel={c.ticketsNotOnSale}>{c.selectTickets}</SessionTicketAction>
+            <Link href={`${localePath(safeLocale, `/experiences/${encodeURIComponent(slug)}`)}?sessionId=${encodeURIComponent(sessionId!)}#session-${encodeURIComponent(sessionId!)}`} className="btn btn-ghost" style={{ color: "white" }}>{c.viewSeriesLink}</Link>
+          </div>}
           {/* Social sharing in hero */}
           <ShareButtons
             url={pageUrl}
@@ -206,6 +210,8 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
               <ExperienceSessionsView
                 sessions={sessions}
                 ticketTypes={ticketTypes}
+                seriesStatus={series.status}
+                seriesSlug={slug}
                 seriesTitle={title}
                 seriesDescription={description ?? ""}
                 seriesImage={series.heroImageUrl}
@@ -220,7 +226,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
                 labels={{
                   left: c.left, addToCalendar: c.addToCalendar, calGoogleCalendar: c.calGoogleCalendar,
                   calAppleIcal: c.calAppleIcal, calOutlook: c.calOutlook, calYahoo: c.calYahoo,
-                  selectTickets: c.selectTickets, sessionView: "Session display options", listView: "List", calendarView: "Calendar",
+                  selectTickets: c.selectTickets, ticketsNotOnSale: c.ticketsNotOnSale, viewEvent: c.viewEventLink, sessionView: "Session display options", listView: "List", calendarView: "Calendar",
                   from: "From",
                   previousMonth: "Previous month", nextMonth: "Next month", events: "events", chooseDate: "Choose a date with an event to see its details.", noSessions: c.noSessions ?? "No upcoming sessions.",
                 }}
@@ -349,7 +355,12 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
             )}
             <div>
               {sessions.length > 0 ? (
-                <Link href={checkoutHref} className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
+                focusedSession
+                  ? <SessionTicketAction session={focusedSession} series={series} checkoutHrefBase={checkoutBase}
+                    query={standaloneSession ? query : undefined} className="btn btn-primary"
+                    style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}
+                    unavailableLabel={c.ticketsNotOnSale}>{c.selectTickets}</SessionTicketAction>
+                  : <Link href="#sessions" className="btn btn-primary" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.selectTickets}</Link>
               ) : (
                 <span className="btn btn-ghost" aria-disabled="true" style={{ display: "block", textAlign: "center", width: "100%", padding: "14px" }}>{c.noSessions ?? "No upcoming sessions"}</span>
               )}

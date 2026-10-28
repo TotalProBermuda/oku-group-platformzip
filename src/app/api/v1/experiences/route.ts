@@ -9,6 +9,9 @@ export async function GET(req: NextRequest) {
   const venue     = searchParams.get("venue");
   const featured  = searchParams.get("featured");
   const slug      = searchParams.get("slug");
+  // Direct event details may describe an ongoing or past calendar session.
+  // Keep this exception scoped to a specific session within a public series.
+  const sessionId = slug ? searchParams.get("sessionId") : null;
   const now       = new Date();
 
   const where: any = {
@@ -26,7 +29,9 @@ export async function GET(req: NextRequest) {
       ticketTypes: { where: { ticketStatus: "ACTIVE" }, orderBy: { displayOrder: "asc" } },
       seriesHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
       sessions: {
-        where: { status: "SCHEDULED", OR: [{ startsAt: { gt: now } }, { allowLateSales: true }], endsAt: { gt: now } },
+        where: sessionId
+          ? { status: "SCHEDULED", id: sessionId }
+          : { status: "SCHEDULED", OR: [{ startsAt: { gt: now } }, { allowLateSales: true }], endsAt: { gt: now } },
         orderBy: { startsAt: "asc" },
         include: {
           ticketPrices: { select: { ticketTypeId: true, priceCents: true } },

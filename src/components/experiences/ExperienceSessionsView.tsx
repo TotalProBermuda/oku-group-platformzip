@@ -7,12 +7,13 @@ import EventArtwork from "@/components/ui/EventArtwork";
 import ExpandableText from "@/components/ui/ExpandableText";
 import { sessionArtworkCandidates, type SessionArtwork, type SeriesArtwork } from "@/lib/eventArtwork";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
-import { sessionCheckoutHref } from "@/lib/sessionCheckoutHref";
+import SessionTicketAction from "@/components/experiences/SessionTicketAction";
+import type { PurchaseTicket } from "@/lib/sessionPurchaseEligibility";
 
 type Session = SessionArtwork & {
   id: string; title: string | null; subtitle?: string | null; description?: string | null;
   flyerImageUrl?: string | null; startsAt: string; endsAt: string; capacity: number;
-  soldCount: number; status: string; ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
+  soldCount: number; status: string; allowLateSales?: boolean; ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
   eventHosts?: Array<{ role: string; entity: { displayName: string } }>;
 };
 
@@ -28,15 +29,16 @@ function eventDateKey(value: Date) {
 }
 
 export default function ExperienceSessionsView({
-  sessions, ticketTypes, seriesTitle, seriesDescription, seriesImage, seriesArtwork, seriesHosts, focusSessionId, standalone = false, checkoutQuery, checkoutHrefBase, venue, locale, labels,
+  sessions, ticketTypes, seriesStatus, seriesSlug, seriesTitle, seriesDescription, seriesImage, seriesArtwork, seriesHosts, focusSessionId, standalone = false, checkoutQuery, checkoutHrefBase, venue, locale, labels,
 }: {
-  sessions: Session[]; seriesTitle: string; seriesDescription: string; seriesImage?: string | null;
+  sessions: Session[]; seriesSlug: string; seriesTitle: string; seriesDescription: string; seriesImage?: string | null;
   seriesArtwork?: SeriesArtwork;
   seriesHosts?: Array<{ role: string; entity: { displayName: string } }>;
   focusSessionId?: string | null;
   standalone?: boolean;
   checkoutQuery?: Record<string, string | string[] | undefined>;
-  ticketTypes: Array<{ id: string; priceCents: number }>;
+  seriesStatus: string;
+  ticketTypes: Array<PurchaseTicket & { priceCents: number }>;
   checkoutHrefBase: string; venue: string; locale: string;
   labels: Record<string, string>;
 }) {
@@ -99,10 +101,13 @@ export default function ExperienceSessionsView({
         </div>
         {description ? <div style={{ marginTop: 10 }}><ExpandableText text={description} locale={locale} maxLines={2} /></div> : null}
         {coHosts.length ? <p style={{ color: "#7c7168", fontSize: 13, margin: "8px 0 0" }}><strong>Co-hosted by:</strong> {[...new Set(coHosts.map((host) => host.entity.displayName))].join(", ")}</p> : null}
+        {!standalone && <Link href={`/${locale}/experiences/${encodeURIComponent(seriesSlug)}/sessions/${encodeURIComponent(session.id)}`} className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}>{labels.viewEvent}</Link>}
         {session.status === "SCHEDULED" ? (
           <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", marginTop: 14 }}>
             <AddToCalendar sessionId={session.id} title={title} startsAt={session.startsAt} endsAt={session.endsAt} location={venue} description={description} labels={{ addToCalendar: labels.addToCalendar, google: labels.calGoogleCalendar, apple: labels.calAppleIcal, outlook: labels.calOutlook, yahoo: labels.calYahoo }} />
-             <Link href={sessionCheckoutHref(checkoutHrefBase, session.id, checkoutQuery)} className="btn btn-primary">{labels.selectTickets}</Link>
+             <SessionTicketAction session={session} series={{ status: seriesStatus, ticketTypes, sessionDefaults: seriesArtwork?.sessionDefaults }}
+               checkoutHrefBase={checkoutHrefBase} query={checkoutQuery} className="btn btn-primary"
+               unavailableLabel={labels.ticketsNotOnSale}>{labels.selectTickets}</SessionTicketAction>
           </div>
         ) : null}
         </div>
