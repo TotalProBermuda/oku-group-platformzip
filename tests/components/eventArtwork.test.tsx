@@ -6,6 +6,19 @@ import ExperienceSessionsView from "@/components/experiences/ExperienceSessionsV
 import { seriesArtworkCandidates } from "@/lib/eventArtwork";
 
 describe("series/session artwork rendering", () => {
+  it("keeps the reported focused session highlighted with its session-bound ticket link", () => {
+    const sessionId = "cmv1ohwb40006w3f2woikjbnk";
+    const markup = renderToStaticMarkup(<ExperienceSessionsView
+      sessions={[{ id: sessionId, title: "Wine Down Wednesday", startsAt: "2027-01-01T20:00:00Z", endsAt: "2027-01-01T22:00:00Z", capacity: 20, soldCount: 0, status: "SCHEDULED" }]}
+      focusSessionId={sessionId} seriesTitle="Wine Down Wednesday" seriesDescription=""
+      ticketTypes={[]} checkoutHrefBase="/en/checkout/wine-down-wednesday"
+      venue="OKU" locale="en" labels={{ selectTickets: "Select Tickets" }} />);
+    expect(markup).toContain(`id="session-${sessionId}"`);
+    expect(markup).toContain("border-color:#c41e3a;border-width:2px");
+    expect(markup).toContain(`href="/en/checkout/wine-down-wednesday?sessionId=${sessionId}"`);
+    expect(markup).toContain("Select Tickets");
+  });
+
   it.each(["en", "es", "pt"])("renders %s series hero and session card using shared candidates", locale => {
     const series = { heroImageUrl: "/legacy.jpg", heroImageUrlEn: "/en.jpg", heroImageUrlEs: "/es.jpg", heroImageUrlPt: "/pt.jpg" };
     const hero = renderToStaticMarkup(<EventArtwork candidates={seriesArtworkCandidates(series, locale)} alt="Series hero" />);
