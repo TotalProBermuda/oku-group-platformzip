@@ -397,6 +397,11 @@ enum TicketTypeStatus {
   SOLD_OUT
 }
 
+enum SessionTicketSalesMode {
+  INHERIT
+  OVERRIDE
+}
+
 enum TicketStatus {
   ISSUED
   CHECKED_IN
@@ -1319,6 +1324,9 @@ model Session {
   inheritsSeriesSponsors Boolean       @default(true)
   giftBagEnabled         Boolean       @default(false)
   streetsideEnabled      Boolean       @default(false)
+  ticketSalesMode        SessionTicketSalesMode @default(INHERIT)
+  ticketSalesStartAt     DateTime?
+  ticketSalesEndAt       DateTime?
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
 

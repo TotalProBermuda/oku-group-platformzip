@@ -7,6 +7,7 @@ import InvitationPanel from "@/components/invitation/InvitationPanel";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 import ExperienceAnalyticsTab from "@/components/admin/ExperienceAnalyticsTab";
 import TicketTypeManager from "@/components/admin/TicketTypeManager";
+import SessionTicketSalesManager from "@/components/admin/SessionTicketSalesManager";
 import SeriesHostManager from "@/components/admin/SeriesHostManager";
 import OperatorsPanel from "@/components/admin/OperatorsPanel";
 import SeriesSponsorManager from "@/components/admin/SeriesSponsorManager";
@@ -422,7 +423,10 @@ export default function AdminExperienceEditPage() {
                 {tab === "tickets" ? (t("admin", "ticket_types") ?? "Ticket Types") : tab === "addons" ? (t("admin", "addons") ?? "Add-Ons") : tab === "influencers" ? (t("admin", "influencer_assignments") ?? "Influencer Assignments") : (t("admin", "attendees") ?? "Attendees")}
               </h2>
               {tab === "tickets" && (
-                <TicketTypeManager seriesId={id} />
+                <>
+                  <TicketTypeManager seriesId={id} />
+                  <SessionTicketSalesManager sessions={series.sessions ?? []} />
+                </>
               )}
               {tab === "addons" && (
                 <>

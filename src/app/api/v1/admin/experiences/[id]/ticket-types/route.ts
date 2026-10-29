@@ -9,6 +9,12 @@ function isAdmin(session: any) {
   );
 }
 
+function parseSaleDate(value: unknown): Date | null | "INVALID" {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? "INVALID" : date;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -59,6 +65,15 @@ export async function POST(
     return NextResponse.json({ error: "name and priceCents are required" }, { status: 400 });
   }
 
+  const parsedSaleStart = parseSaleDate(saleStartsAt);
+  const parsedSaleEnd = parseSaleDate(saleEndsAt);
+  if (parsedSaleStart === "INVALID" || parsedSaleEnd === "INVALID") {
+    return NextResponse.json({ error: "Sale window dates must be valid." }, { status: 400 });
+  }
+  if (parsedSaleStart && parsedSaleEnd && parsedSaleEnd <= parsedSaleStart) {
+    return NextResponse.json({ error: "Sale end must be after sale start." }, { status: 400 });
+  }
+
   const ticketType = await prisma.ticketType.create({
     data: {
       seriesId: id,
@@ -71,8 +86,8 @@ export async function POST(
       minPerOrder: Number(minPerOrder),
       typeCapacity: typeCapacity ? Number(typeCapacity) : null,
       displayOrder: Number(displayOrder),
-      saleStartsAt: saleStartsAt ? new Date(saleStartsAt) : null,
-      saleEndsAt: saleEndsAt ? new Date(saleEndsAt) : null,
+      saleStartsAt: parsedSaleStart,
+      saleEndsAt: parsedSaleEnd,
       visibilityMode: visibilityMode as any,
       requiresMembership: Boolean(requiresMembership),
       earlyAccessOnly: Boolean(earlyAccessOnly),

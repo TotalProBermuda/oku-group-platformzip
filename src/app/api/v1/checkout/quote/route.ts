@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
+import { resolveTicketSalesWindow } from "@/server/commerce/ticketSalesWindow";
 
 export async function POST(req: NextRequest) {
   const auth = await getOptionalSession();
@@ -74,11 +75,18 @@ export async function POST(req: NextRequest) {
         }, { status: 403 });
       }
 
-      if (tt.saleStartsAt && new Date() < tt.saleStartsAt && !userMembership?.benefitsJson?.earlyAccess) {
+      const now = new Date();
+      const effectiveWindow = resolveTicketSalesWindow(tt, sess);
+      const beforeSaleStart = Boolean(effectiveWindow.startsAt && now < effectiveWindow.startsAt);
+      const afterSaleEnd = Boolean(effectiveWindow.endsAt && now > effectiveWindow.endsAt);
+      const hasEarlyAccess = Boolean(beforeSaleStart && userMembership?.benefitsJson?.earlyAccess);
+      if (afterSaleEnd || (beforeSaleStart && !hasEarlyAccess)) {
         return NextResponse.json({
-          error: "NOT_YET_ON_SALE",
-          message: `This ticket is not yet on sale. Members get early access.`,
-          gating: { reason: "early_access", saleStartsAt: tt.saleStartsAt, upgradeUrl: "/membership" },
+          error: effectiveWindow.startsAt && now < effectiveWindow.startsAt ? "NOT_YET_ON_SALE" : "TICKET_OUTSIDE_SALE_WINDOW",
+          message: effectiveWindow.startsAt && now < effectiveWindow.startsAt
+            ? "This ticket is not yet on sale. Members get early access."
+            : "This ticket is not currently on sale.",
+          gating: { reason: effectiveWindow.startsAt && now < effectiveWindow.startsAt ? "early_access" : "sale_window", saleStartsAt: effectiveWindow.startsAt, saleEndsAt: effectiveWindow.endsAt, upgradeUrl: "/membership" },
         }, { status: 400 });
       }
 

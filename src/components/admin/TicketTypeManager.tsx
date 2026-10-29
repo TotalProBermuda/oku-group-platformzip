@@ -72,6 +72,7 @@ function statusColor(s: string) {
 export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
   const t = useTranslation();
   const [items, setItems] = useState<TicketType[]>([]);
+  const [seriesSessions, setSeriesSessions] = useState<Array<{ id: string; title?: string | null; startsAt: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<TicketType> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -81,10 +82,20 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/v1/admin/experiences/${seriesId}/ticket-types`);
-    const data = await res.json();
-    setItems(data.ticketTypes ?? []);
-    setLoading(false);
+    try {
+      const [res, seriesRes] = await Promise.all([
+        fetch(`/api/v1/admin/experiences/${seriesId}/ticket-types`),
+        fetch(`/api/v1/admin/experiences/${seriesId}`),
+      ]);
+      const data = await res.json();
+      setItems(data.ticketTypes ?? []);
+      if (seriesRes.ok) {
+        const seriesData = await seriesRes.json();
+        setSeriesSessions(seriesData.series?.sessions ?? []);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [seriesId]);
 
   useEffect(() => { load(); }, [load]);
@@ -417,6 +428,11 @@ export default function TicketTypeManager({ seriesId }: { seriesId: string }) {
             <div>
               <label style={labelStyle}>{t("admin", "sale_ends") ?? "Sale Closes"}</label>
               <input type="datetime-local" style={inputStyle} value={editing.saleEndsAt ?? ""} onChange={(e) => set("saleEndsAt", e.target.value || null)} />
+              {editing.saleEndsAt && seriesSessions.some((session) => new Date(editing.saleEndsAt as string).getTime() < new Date(session.startsAt).getTime()) && (
+                <p role="alert" style={{ margin: "6px 0 0", color: "#9a3412", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 7, padding: "8px 10px", fontSize: 12, lineHeight: 1.45 }}>
+                  This series-level cutoff is before at least one event begins and will close this ticket type for every event in the series. If only some events should close earlier, use Event-level ticket availability below.
+                </p>
+              )}
             </div>
 
             <div style={{ gridColumn: "1 / -1", display: "flex", gap: 24 }}>

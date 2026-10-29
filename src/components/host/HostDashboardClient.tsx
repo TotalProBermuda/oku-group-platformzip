@@ -106,6 +106,14 @@ type MeData = {
   venue: { id: string; name: string } | null;
 };
 
+type MonitoredSession = { id: string; title: string | null; startsAt: string; status: string; series: { title: string } };
+type MonitoredTicket = {
+  id: string; code: string; attendeeName: string | null; attendeeEmail: string | null;
+  ticketStatus: string; checkedInAt: string | null; sessionId: string;
+  ticketType: { name: string } | null;
+  order: { status: string; orderType: string; channel: string } | null;
+};
+
 // ─── Constants ─────────────────────────────────────────────────────────────
 
 const LOSS_REASONS = [
@@ -1144,7 +1152,12 @@ export default function HostDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<"queue" | "chat" | "referral">("queue");
+  const [activeTab, setActiveTab] = useState<"queue" | "chat" | "referral" | "tickets">("queue");
+  const [monitoredSessions, setMonitoredSessions] = useState<MonitoredSession[]>([]);
+  const [monitoredTickets, setMonitoredTickets] = useState<MonitoredTicket[]>([]);
+  const [ticketMonitorError, setTicketMonitorError] = useState("");
+  const [ticketMonitorTruncated, setTicketMonitorTruncated] = useState(false);
+  const [ticketSessionFilter, setTicketSessionFilter] = useState("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showScanner, setShowScanner] = useState(false);
   // Holds the raw decoded code from the QR camera so ScanResultModal
@@ -1202,6 +1215,29 @@ export default function HostDashboardClient() {
     const iv = setInterval(load, 20_000);
     return () => clearInterval(iv);
   }, [load]);
+
+  const canMonitorTickets = Boolean(data?.user.roles.some((role) => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "SUPERADMIN"].includes(role)));
+  useEffect(() => {
+    if (!canMonitorTickets) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/v1/host/ticket-monitor", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "Ticket list unavailable");
+        if (!active) return;
+        setMonitoredSessions(payload.sessions ?? []);
+        setMonitoredTickets(payload.tickets ?? []);
+        setTicketMonitorTruncated(Boolean(payload.truncated));
+        setTicketMonitorError("");
+      } catch (error) {
+        if (active) setTicketMonitorError(error instanceof Error ? error.message : "Ticket list unavailable");
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 20_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [canMonitorTickets]);
 
   async function handleAction(id: string, status: string, extra?: Record<string, string>) {
     await fetch(`/api/v1/host/bookings/${id}/status`, {
@@ -1424,13 +1460,14 @@ export default function HostDashboardClient() {
           })}
         </div>
 
-        {/* Tab nav — Queue · Chat · Referral in one row */}
+        {/* Tab nav — operational reservations, tickets, chat and referral */}
         <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: 4 }}>
           {([
             { key: "queue",    labelKey: "tabs.queue",    badge: pending + confirmed + arrived, badgeColor: "#fbbf24" },
+            ...(canMonitorTickets ? [{ key: "tickets", labelKey: "tickets", label: "Tickets", badge: monitoredTickets.length, badgeColor: "#38bdf8" }] : []),
             { key: "chat",     labelKey: "tabs.chat",     badge: waitingChats,                  badgeColor: "#a78bfa" },
             { key: "referral", labelKey: "tabs.referral", badge: referralCount,                 badgeColor: "#c8a96e" },
-          ] as { key: string; labelKey: string; badge: number; badgeColor: string }[]).map((tab) => (
+          ] as { key: string; labelKey: string; label?: string; badge: number; badgeColor: string }[]).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
@@ -1442,7 +1479,7 @@ export default function HostDashboardClient() {
                 fontSize: 13, cursor: "pointer", position: "relative",
               }}
             >
-              {t("host", tab.labelKey)}
+              {tab.label ?? t("host", tab.labelKey)}
               {tab.badge > 0 && (
                 <span style={{
                   marginLeft: 6, fontSize: 10, fontWeight: 800,
@@ -1454,6 +1491,61 @@ export default function HostDashboardClient() {
             </button>
           ))}
         </div>
+
+        {activeTab === "tickets" && canMonitorTickets && (() => {
+          const visibleSessions = ticketSessionFilter === "all"
+            ? monitoredSessions
+            : monitoredSessions.filter((session) => session.id === ticketSessionFilter);
+          const sessionIds = new Set(visibleSessions.map((session) => session.id));
+          const visibleTickets = monitoredTickets.filter((ticket) => sessionIds.has(ticket.sessionId));
+          const checkedInCount = visibleTickets.filter((ticket) => ticket.checkedInAt || ticket.ticketStatus === "CHECKED_IN").length;
+          const paidCount = visibleTickets.filter((ticket) => ["PAID", "COMPLETED", "CAPTURED", "SUCCEEDED"].includes(ticket.order?.status ?? "")).length;
+          return (
+            <section aria-label="Event tickets and check-in" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ margin: 0, color: "white", fontSize: 18 }}>Event tickets</h2>
+                  <p style={{ margin: "5px 0 0", color: "#6b7280", fontSize: 12 }}>Guest list, order status and door check-in · refreshes every 20 seconds</p>
+                </div>
+                <select aria-label="Filter ticket list by event" value={ticketSessionFilter} onChange={(event) => setTicketSessionFilter(event.target.value)} style={{ minWidth: 220, maxWidth: "100%", background: "#151518", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 9, padding: "9px 11px", color: "#e5e7eb", fontSize: 12 }}>
+                  <option value="all">All upcoming / recent events</option>
+                  {monitoredSessions.map((session) => <option key={session.id} value={session.id}>{session.series.title}{session.title ? ` · ${session.title}` : ""} · {new Date(session.startsAt).toLocaleDateString([], { month: "short", day: "numeric" })}</option>)}
+                </select>
+              </div>
+              {ticketMonitorError ? (
+                <div role="alert" style={{ color: "#fca5a5", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: 12, fontSize: 13 }}>Ticket list unavailable: {ticketMonitorError}. Reservations remain available.</div>
+              ) : <>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                  {[{ label: "Tickets listed", value: visibleTickets.length, color: "#d1d5db" }, { label: "Paid orders", value: paidCount, color: "#34d399" }, { label: "Checked in", value: checkedInCount, color: "#60a5fa" }].map((metric) => (
+                    <div key={metric.label} style={{ minWidth: 120, border: `1px solid ${metric.color}33`, borderRadius: 10, padding: "9px 12px", background: `${metric.color}0d` }}><div style={{ color: metric.color, fontSize: 19, fontWeight: 800 }}>{metric.value}</div><div style={{ color: "#6b7280", fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>{metric.label}</div></div>
+                  ))}
+                </div>
+                {ticketMonitorTruncated && <p role="status" style={{ color: "#fbbf24", fontSize: 12, margin: "0 0 10px" }}>This list reached its display limit. Narrow it to an event to see a complete guest list.</p>}
+                {visibleTickets.length === 0 ? <div style={{ border: "1px solid rgba(255,255,255,0.06)", borderRadius: 11, padding: "24px 14px", textAlign: "center", color: "#6b7280", fontSize: 13 }}>{visibleSessions.length ? "No ticket records for this event window." : "No upcoming or recent event sessions."}</div> : (
+                  <div style={{ overflowX: "auto", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 11 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680, fontSize: 12 }}>
+                      <thead><tr style={{ color: "#6b7280", textAlign: "left", textTransform: "uppercase", letterSpacing: ".06em", fontSize: 10, background: "rgba(255,255,255,0.025)" }}>{["Guest", "Event", "Ticket", "Order", "Check-in"].map((label) => <th key={label} style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>{label}</th>)}</tr></thead>
+                      <tbody>{visibleTickets.map((ticket) => {
+                        const event = visibleSessions.find((session) => session.id === ticket.sessionId);
+                        const checked = Boolean(ticket.checkedInAt) || ticket.ticketStatus === "CHECKED_IN";
+                        const status = ticket.order?.status ?? "NO LINKED ORDER";
+                        const orderColor = ["PAID", "COMPLETED", "CAPTURED", "SUCCEEDED"].includes(status) ? "#34d399" : status === "NO LINKED ORDER" ? "#9ca3af" : "#fbbf24";
+                        return <tr key={ticket.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                          <td style={{ padding: "11px 12px" }}><div style={{ color: "#f3f4f6", fontWeight: 650 }}>{ticket.attendeeName || "Guest"}</div><div style={{ color: "#6b7280", marginTop: 3 }}>{ticket.attendeeEmail || "—"}</div></td>
+                          <td style={{ padding: "11px 12px", color: "#d1d5db" }}>{event?.series.title}{event?.title ? ` · ${event.title}` : ""}<div style={{ color: "#6b7280", marginTop: 3 }}>{event ? new Date(event.startsAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</div></td>
+                          <td style={{ padding: "11px 12px", color: "#d1d5db" }}>{ticket.ticketType?.name ?? "Admission"}<div style={{ color: "#6b7280", marginTop: 3 }}>{ticket.ticketStatus.replace(/_/g, " ")}</div></td>
+                          <td style={{ padding: "11px 12px" }}><span style={{ color: orderColor, background: `${orderColor}12`, border: `1px solid ${orderColor}30`, borderRadius: 20, padding: "3px 8px", fontSize: 10, fontWeight: 700 }}>{status.replace(/_/g, " ")}</span></td>
+                          <td style={{ padding: "11px 12px" }}><span style={{ color: checked ? "#34d399" : "#fbbf24", background: checked ? "rgba(52,211,153,0.1)" : "rgba(251,191,36,0.09)", border: `1px solid ${checked ? "rgba(52,211,153,0.3)" : "rgba(251,191,36,0.25)"}`, borderRadius: 20, padding: "3px 8px", fontSize: 10, fontWeight: 700 }}>{checked ? "CHECKED IN" : "NOT CHECKED IN"}</span>{ticket.checkedInAt && <div style={{ color: "#6b7280", marginTop: 4 }}>{new Date(ticket.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>}</td>
+                        </tr>;
+                      })}</tbody>
+                    </table>
+                  </div>
+                )}
+                <p style={{ color: "#6b7280", fontSize: 11, margin: "10px 0 0" }}>“No linked order” is only a record label; it does not by itself mean the ticket was complimentary or unpaid.</p>
+              </>}
+            </section>
+          );
+        })()}
 
         {/* Queue tab */}
         {activeTab === "queue" && (

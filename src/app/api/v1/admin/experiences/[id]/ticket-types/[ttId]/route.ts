@@ -9,6 +9,12 @@ function isAdmin(session: any) {
   );
 }
 
+function parseSaleDate(value: unknown): Date | null | "INVALID" {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? "INVALID" : date;
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; ttId: string }> }
@@ -42,6 +48,15 @@ export async function PATCH(
     ticketStatus,
   } = body;
 
+  const requestedStart = saleStartsAt === undefined ? existing.saleStartsAt : parseSaleDate(saleStartsAt);
+  const requestedEnd = saleEndsAt === undefined ? existing.saleEndsAt : parseSaleDate(saleEndsAt);
+  if (requestedStart === "INVALID" || requestedEnd === "INVALID") {
+    return NextResponse.json({ error: "Sale window dates must be valid." }, { status: 400 });
+  }
+  if (requestedStart && requestedEnd && requestedEnd <= requestedStart) {
+    return NextResponse.json({ error: "Sale end must be after sale start." }, { status: 400 });
+  }
+
   const ticketType = await prisma.ticketType.update({
     where: { id: ttId },
     data: {
@@ -54,8 +69,8 @@ export async function PATCH(
       ...(minPerOrder !== undefined && { minPerOrder: Number(minPerOrder) }),
       ...(typeCapacity !== undefined && { typeCapacity: typeCapacity ? Number(typeCapacity) : null }),
       ...(displayOrder !== undefined && { displayOrder: Number(displayOrder) }),
-      ...(saleStartsAt !== undefined && { saleStartsAt: saleStartsAt ? new Date(saleStartsAt) : null }),
-      ...(saleEndsAt !== undefined && { saleEndsAt: saleEndsAt ? new Date(saleEndsAt) : null }),
+      ...(saleStartsAt !== undefined && { saleStartsAt: requestedStart }),
+      ...(saleEndsAt !== undefined && { saleEndsAt: requestedEnd }),
       ...(visibilityMode !== undefined && { visibilityMode: visibilityMode as any }),
       ...(requiresMembership !== undefined && { requiresMembership: Boolean(requiresMembership) }),
       ...(earlyAccessOnly !== undefined && { earlyAccessOnly: Boolean(earlyAccessOnly) }),
