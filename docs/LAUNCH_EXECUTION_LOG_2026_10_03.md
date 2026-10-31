@@ -1,5 +1,22 @@
 # Launch execution log — 3 October 2026
 
+## PR #115: durable refund coordination prototype
+
+- Added an isolated SQL coordinator prototype for payment-scoped reservations,
+  single submission claims, UNKNOWN-result balance retention and evidence-bound
+  terminal reconciliation. It is not imported by production routes.
+- The proposed tables exist only in a test fixture; no Prisma migration or
+  production database change is included.
+- The PR reports 331 tests across 44 files, including eight isolated PGlite tests.
+  PGlite uses one connection and cannot establish multi-worker PostgreSQL locking
+  or serialization-retry safety. The prototype is not an active refund fix.
+- Remaining gates include reviewed production schema/migration, trusted provider
+  reconciliation, verified enrollment of historical captures/refunds, durable
+  worker recovery, exactly-once bundle entitlement/capacity/ledger effects,
+  owner-approved policy, and a separately approved controlled live test.
+- No payment, refund, payout, database or production setting was changed for this
+  prototype or while resolving PR conflicts.
+
 ## 4 October: membership policy calculation implementation
 
 - Owner approved implementing the recommended annual 30-day refund structure and
