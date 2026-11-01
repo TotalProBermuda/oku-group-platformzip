@@ -1,0 +1,140 @@
+  backup-before-cybersource-expiry-20261012           [m a500089a Published your App
+  backup-before-github-main-release-20261012          [m e707520d Published your App
+  backup-before-host-fix-20261008-180428              [m 79414286 Published your App
+  backup-before-pr119-deploy-20261011                 [m bd91282c Published your App
+  backup/pre-rebase-ef7d31b4                          [m ef7d31b4 Update app layout structure
+  backup/pre-sync-91675cb8                            [m 91675cb8 Update app layout structure
+  backup/replit-before-pr39                           [m 022b61a0 Published your App
+  backup/workspace-1be6698                            [m 1be6698b Update app layout structure
+  backup/workspace-before-pr133-release-20261016      [m f2eb82cf Update memory configuration and add event translation release policy
+  codex/auto-event-translation-review-20261016        [m 7a6d24fe [[34morigin/main[m: ahead 387, behind 4] Merge pull request #130 from TotalProBermuda/codex/session-editor-ux-20261015
+  codex/automatic-event-content-translation-20261016  [m c8a46f7a Update linting configuration and project dependencies
+  codex/automatic-event-translations-release-20261016 [m f2eb82cf [[34morigin/codex/automatic-event-translations-release-20261016[m: ahead 3] Update memory configuration and add event translation release policy
+  codex/cybersource-test-expiry-runtime-fix-20261012  [m 33d2f9bc [[34morigin/codex/cybersource-test-expiry-runtime-fix-20261012[m] test: cover gateway test freshness lifecycle
++ [36mcodex/dedicated-session-event-pages-20261020        [m 39a54ba7 ([36m/tmp/oku-event-system[m) [[34morigin/codex/dedicated-session-event-pages-20261020[m: ahead 452, behind 9] Fix empty Prisma payload lint type
+  codex/dedicated-session-event-pages-fix-20261021    [m ed3480f1 [[34morigin/codex/dedicated-session-event-pages-20261020[m: ahead 489, behind 9] Fix CI environment-file newline encoding
+  codex/dependency-audit-remediation-20261019         [m d3091b33 Remove test-only fixture port mapping and correct release notes
+  codex/dependency-security-20261015                  [m c8a46f7a [[34morigin/main[m: ahead 388, behind 4] Update linting configuration and project dependencies
+  codex/event-checkout-localization-20261017          [m 77863628 [[34morigin/main[m: ahead 432, behind 4] Improve event session journey and localization
+  codex/event-session-cart-flow-20261017              [m dadfbbfb [[34morigin/main[m: ahead 425, behind 4] Refresh event cards when visitor changes language
+  codex/host-dashboard-upcoming-20261014              [m 1fd10c5d [[34morigin/main[m: ahead 378, behind 4] Merge pull request #125 from TotalProBermuda/codex/session-schedule-capacity-20261013
+  codex/launch-prod-audit-remediation-20261014        [m ed470a23 [[34morigin/codex/launch-prod-audit-remediation-20261014[m] Patch production dependencies for security advisories
+  codex/live-source-port-20261029                     [m eed3cea6 Published your App
++ [36mcodex/localized-series-artwork-20261011             [m c84360c1 ([36m/tmp/oku-localized-series-artwork[m) [[34morigin/codex/localized-series-artwork-20261011[m] chore: remove agent-local notes from artwork change
++ [36mcodex/manual-referrer-settlement-20261023           [m 6fd16c21 ([36m/tmp/oku-payout[m) [[34morigin/main[m: ahead 460, behind 4] Add localized functions and catering journeys
+  codex/oku-deploy-food-20261023                      [m 9bb5029f [[34morigin/main[m: ahead 460, behind 4] Published your App
+  codex/oku-functions-events-closeout-20261023        [m 9332d69f [[34morigin/main[m: ahead 471, behind 4] Published your App
++ [36mcodex/oku-p1-manual-settlement-20261023             [m b0f80855 ([36m/tmp/oku-p1-payout[m) [[34morigin/main[m: ahead 459, behind 4] Add food and function photography to key pages (#146)
+  codex/oku-pr146-refresh-20261023                    [m a72b43f8 Fix homepage hero CSS rule boundary
++ [36mcodex/oku-pr148-integration                         [m 4ca64506 ([36m/tmp/oku-pr148-int-20261022[m) [[34morigin/pr/148[m] Add application quality workflow to enable PR verification
+  codex/oku-priorities-20261022                       [m 98be5b22 [[34morigin/codex/oku-priorities-20261022[m] Fix event calendar UTF-8 encoding
+  codex/oku-priorities-followup-20261023              [m 03598ab1 [[34morigin/main[m: ahead 458, behind 4] Improve OKU referrer onboarding and series discovery
+  codex/oku-referrer-bank-onboarding-20261021         [m e184304e [[34morigin/codex/oku-referrer-bank-onboarding-20261021[m: behind 1] Narrow PATCH error status safely
+  codex/pr122-review-20261012                         [m 16dfb187 test: isolate series artwork fallback fixture
++ [36mcodex/pr147-release-fix                             [m 72a90c7f ([36m/tmp/oku-pr147[m) [[34morigin/codex/dedicated-session-event-pages-20261020[m: behind 4] Use safe error narrowing in bookings endpoint
+  codex/publish-main-77863628                         [m 4ed0d265 [[34morigin/main[m: ahead 433, behind 4] Published your App
++ [36mcodex/referrer-bank-main-rebase-20261023            [m 9baaa3b0 ([36m/tmp/oku-p1-rebase-1023[m) [[34morigin/codex/oku-referrer-bank-onboarding-20261021[m: ahead 27] Merge remote-tracking branch 'origin/main' into codex/referrer-bank-main-rebase-20261023
+  codex/referrer-payout-onboarding-20261021           [m 44d8c3c1 Published your App
+  codex/release-checkout-locale-20261017              [m 46649e71 [[34morigin/main[m: ahead 436, behind 4] Published your App
++ [36mcodex/release-dependency-security-20261016          [m 7fb92c50 ([36m/tmp/oku-translation-worker-startup[m) [[34morigin/codex/release-dependency-security-20261016[m] fix: keep release lockfile tarball URLs portable
+  codex/release-host-dashboard-upcoming-20261014      [m 877dfa39 [[34morigin/main[m: ahead 380, behind 4] Published your App
+  codex/release-main-20261019                         [m 86ee172e [[34morigin/main[m: ahead 435, behind 4] Correct OKÜ positioning and private dining capacity (#144)
+  codex/release-pr147-20261022                        [m 3046846d Merge pull request #153 from TotalProBermuda/codex/deployment-source-archives-20261022
+  codex/release-pr154-live-20261023                   [m c1b87bc9 Published your App
+  codex/release-session-mgmt-20261015                 [m b02b56e4 [[34morigin/main[m: ahead 385, behind 4] Published your App
+  codex/replit-event-detail-fix-20261017              [m 328d6753 [[34morigin/main[m: ahead 417, behind 4] Published your App
+  codex/replit-main-release-20261012                  [m 77493aa3 [[34morigin/main[m: ahead 377, behind 4] Published your App
+  codex/replit-publish-event-session-20261017         [m 75e10ff9 [[34morigin/main[m: ahead 416, behind 4] Published your App
+  codex/replit-release-20261015                       [m ab154c10 [[34morigin/main[m: ahead 389, behind 4] Update package dependencies
+  codex/session-editor-ux-20261015                    [m dc128e1e [[34morigin/codex/session-editor-ux-20261015[m: ahead 1] Published your App
+  codex/session-management-dynamic-20261014           [m 4135ab76 [[34morigin/main[m: ahead 380, behind 4] Patch production dependencies for security advisories (#127)
+  codex/session-schedule-capacity-20261013            [m 12da1329 [[34morigin/codex/session-schedule-capacity-20261013[m: ahead 1] Published your App
+  codex/site-conversion-20261019                      [m fd0aa66b [[34morigin/codex/site-conversion-20261019[m: behind 1] Remove unverified venue capacity claims (pt)
++ [36mcodex/terrace-homepage-visuals-20261020             [m 8f4c5847 ([36m/tmp/oku-terrace-homepage[m) [[34morigin/main[m: ahead 442, behind 4] Style visual restaurant cards for responsive home
+  codex/terrace-release-20261019                      [m 44d8c3c1 [[34morigin/main[m: ahead 437, behind 4] Published your App
+  codex/test-pr142                                    [m 5e774205 Fix checkout locale and artwork fallback
+  codex/translation-worker-production-startup-20261016[m 8c815277 [[34morigin/codex/translation-worker-production-startup-20261016[m] Clarify Publishing secret configuration versus running production
+  codex/unified-series-session-editor-20261015        [m a291c2f5 [[34morigin/main[m: ahead 389, behind 4] Fix duplicate session schedule JSX
+  feat/passwordless-referrer-customer-access          [m 8caccf68 fix(auth): defer customer creation until verification
++ [36mfix/checkout-session-venue-timezone                 [m dac5d19b ([36m/tmp/oku-checkout-session-timezone[m) Merge pull request #134 from TotalProBermuda/codex/release-dependency-security-20261016
+  fix/google-sign-in-without-redis                    [m 548c91e4 [[34msubrepl-0sz08mf1/fix/google-sign-in-without-redis[m] fix: keep Google sign-in available without Redis
+  fix/google-sign-in-without-redis-clean              [m 2ee3aa27 [[34msubrepl-0sz08mf1/fix/google-sign-in-without-redis-clean[m: ahead 1] Merge pull request #25 from TotalProBermuda/fix/google-sign-in-without-redis-clean
+  fix/production-account-bootstrap                    [m d38128c1 [[34msubrepl-0sz08mf1/fix/production-account-bootstrap[m: ahead 3] Published your App
+  fix/production-url-secret-hygiene                   [m ac0e4d32 [[34msubrepl-0sz08mf1/fix/production-url-secret-hygiene[m] fix: secure production URL configuration
+  fix/replit-deployment-build                         [m c8c808a3 [[34msubrepl-0sz08mf1/fix/replit-deployment-build[m: ahead 6] Refactor production account authentication and document RBAC role separation
+  fix/root-layout-script-hydration                    [m fed274dd [[34msubrepl-0sz08mf1/fix/root-layout-script-hydration[m: ahead 2] Update replit configuration file
+  github-main                                         [m 548c91e4 [[34msubrepl-0sz08mf1/main[m: ahead 83, behind 4] fix: keep Google sign-in available without Redis
+* [32mmain                                                [m b7cce551 [[34msubrepl-0sz08mf1/main[m: ahead 454, behind 4] Published your App
+  production-github-main-20260905                     [m 5027e8e6 [[34msubrepl-0sz08mf1/main[m: ahead 82, behind 4] Published your App
+  production-github-main-20260906                     [m cdb73935 [[34msubrepl-0sz08mf1/main[m: ahead 208, behind 4] Published your App
+  production-invu-diagnostic-20260906                 [m 022b61a0 [[34msubrepl-0sz08mf1/main[m: ahead 91, behind 4] Published your App
+  production-invu-sync                                [m 796b2bbb [[34msubrepl-0sz08mf1/main[m: ahead 83, behind 4] Published your App
+  production-main-20260903                            [m a32693b2 Published your App
+  production-main-20260905                            [m 22f52125 [[34msubrepl-0sz08mf1/main[m: ahead 79, behind 4] Published your App
+  release/pr133-autoscale-20261016                    [m 4089aafe Merge pull request #133 from TotalProBermuda/codex/translation-worker-production-startup-20261016
+  release/pr134-autoscale-20261016                    [m a09c1b5a Published your App
+  replit-agent                                        [m 0ef66d3d Published your App
+  replit-pre-github-sync-20260910                     [m f65cd104 Implement role-based access control and admin profile management enhancements
+  rollback-before-session-schedule-republish-20261013 [m 0a18e52f Add guarded per-session schedule editing
+  subrepl-0sz08mf1                                    [m fc8b4b72 Task #131: Show launch readiness history so admins can spot regressions
+  subrepl-0z0qot3n                                    [m adfbd8e0 ProofPay canonical event foundation: LedgerEvent schema, emitLedgerEvent service, reservation + commission lifecycle wiring, POS_CHECK_CLOSED event type, cross-system dedup index
+  subrepl-3qmgm0rh                                    [m 710edfd8 task-144: Pure Referrer Console — A: Extract dormant modules
+  subrepl-3vurle5h                                    [m 9337d741 Update system knowledge about payment processing and audit logging
+  subrepl-4p8nwiiv                                    [m ed646705 Task #168 — final audit pass: real file confirmed clean, no stale blocks
+  subrepl-528659mq                                    [m 83015985 Task #110: Automate audit-log anomaly alerts (RUNBOOK §1.2)
+  subrepl-5m92n00x                                    [m 9d7114f3 Task #167: fix misleading comment in referrer-resolution resolve route
+  subrepl-6lwsbvlp                                    [m f3a0300a Translate beneficiary status emails into ES and PT (task #88)
+  subrepl-7bqqblf1                                    [m 482ab6e9 Update document status logic for beneficiary profiles
+  subrepl-7jpydn7u                                    [m 084d931d Task #140 (Referrer trust loop): pre-merge governance pass
+  subrepl-8kgcijj0                                    [m 8fef57b0 feat(streetside): Slice C — migrate pure STREETSIDE_HOST to PureReferrerConsole
+  subrepl-9c2224y5                                    [m 249a51fe feat(orders): Orders Intelligence System — Schema, API & UX (Task #8)
+  subrepl-9gz3a2jg                                    [m 32c44544 Update virus scanning logic to reject various risky file types
+  subrepl-9mj82f0q                                    [m da4ef384 Improve handling of actor identity conflicts during creation
+  subrepl-a28jjc3c                                    [m 517639c3 feat: Reservation block QR scan feedback & gift bag creation clarity (Task #19)
+  subrepl-aouy96gk                                    [m 8bd9165a Repair localized session aliases and redirect legacy series checkout to canonical checkout
+  subrepl-b0kd51zx                                    [m 691d8597 Task #16: Quick admin UX fixes — commission %, invite preview, upload DnD
+  subrepl-bpabr41h                                    [m 4e0e7df2 Update next-env.d.ts type definitions
+  subrepl-bpqtbjz5                                    [m 711121fc Task #10: Streetside scan permissions & event check-in engine — final code review fixes (round 6)
+  subrepl-buwxdgrg                                    [m 858e69c1 QR reservation flow hardening: fix iOS Safari Submit button tap on mobile
+  subrepl-c3vtkggj                                    [m 6fdb3ede Add screenshot to attached assets
+  subrepl-cazirrea                                    [m 0ba9bde2 Task #109 — Fill in on-call decision-makers table & DPO inbox
+  subrepl-d1vpmpez                                    [m 447f03b9 docs: record event-referrer deferral decision and convergence path (Slice E)
+  subrepl-d5gdhxwi                                    [m 3e6665e7 Task #38: INVU Integration Foundation — Schema, Encryption, Credentials & Superadmin Config Page
+  subrepl-dq7cei64                                    [m 5442c939 Saved progress at the end of the loop
+  subrepl-dzw9sjc5                                    [m b81d688c Dynamic commission rules + INVU field audit
+  subrepl-eqsfa0px                                    [m db89c633 Task #138: Show recent launch-readiness test alerts on /admin/launch-readiness
+  subrepl-f3a4u50t                                    [m 499c5d3a Harden attribution failures with PENDING_ATTRIBUTION recovery — write-PENDING-first session strategy, unique constraints on legacy rows, idempotent retry/resolve writes, sweep job, admin review surface with nav link (EN/ES/PT)
+  subrepl-g6g60vvi                                    [m 83529875 Revert unrelated mockup-sandbox generated file change from #199 diff
+  subrepl-iem5jhoa                                    [m 8525ec11 Task #130: SUPERADMIN /admin/launch-readiness audit page
+  subrepl-iheqjfxw                                    [m a37c9166 fix: Replace "Completed Today" with four status sub-groups on streetside and referral feeds (Task #159)
+  subrepl-ije6ac63                                    [m 80336f74 task-30: Complete i18n of streetside host page and admin status badges
+  subrepl-k0nyt0q2                                    [m 864d541f Update retention policies and improve object storage handling
+  subrepl-kwunf4zh                                    [m bc5e01f5 Run all browser tests reliably in a single command
+  subrepl-lh33l2v6                                    [m 5e1ef68c Task #9: Streetside UX fixes & bug patches (all 8 items)
+  subrepl-lv2sqeg3                                    [m 0ce10e6b fix(referrer): P1/P2 fixes for actor-first dashboard + admin resolve (pass 4)
+  subrepl-lzbzryrr                                    [m 8de7fb01 Render nested experience sessions directly with authoritative ticket links and regression coverage
+  subrepl-m3liy9jh                                    [m bc3863e4 feat: Event lifecycle — archive, duplicate, add-to-calendar, front-facing calendar (Task #17)
+  subrepl-m6mxkoqm                                    [m 843a4889 feat: influencer assignment & onboarding engine (Track A + B)
+  subrepl-m996yxxv                                    [m 2cb2fce4 Add automated tests for beneficiary state machine and payout-batch gating
+  subrepl-nl60gf8p                                    [m a49910ec feat(referrer-console-D): embed shared console core in influencer + partner dashboards
+  subrepl-ntdecxg6                                    [m 5cc967e1 feat(referrer): Slice B — migrate referrer dashboard to PureReferrerConsole
+  subrepl-nue5k6b5                                    [m 61b1a3a0 Update trust components and tests with centralized constants and improved logic
+  subrepl-odgd3etb                                    [m c747607d fix(invu): Round 6 — i18n prefix fixes, hardcoded string removal, close route idempotency
+  subrepl-ouac88dz                                    [m da4bfe9b Update runbook to reflect new translation process
+  subrepl-q04m2dk1                                    [m 6d978bcc Guard all public session purchase actions with exact-session sale eligibility
+  subrepl-r3263qgf                                    [m b9b01854 fix(revenue): Task #39 P0 stabilization
+  subrepl-r5j5d8x0                                    [m 14127618 feat: Admin Nav Consolidation (Task #7)
+  subrepl-sc7ptvgl                                    [m e1dd20fc Task #139: Rate-limit launch-readiness test alert button
+  subrepl-scn4hqdi                                    [m 1d6c255f Post-merge setup completed successfully
+  subrepl-tkpa6p9q                                    [m 9d816d12 Add tests for beneficiary document access denied and successful retrieval
+  subrepl-tt9sna60                                    [m a868a33e Task #6: Order Drawer — Rich Overview & Demo Data
+  subrepl-u7xihed9                                    [m 6e2589f7 fix: ReferralActor merge-conflict surface — mechanical validation pass + TS null fix
+  subrepl-ujst6gyw                                    [m e66beae4 Ledger Outbox #186: claim-ownership predicate + no-Redis polling drain + AdminNav entry + route auth tests + UI polish
+  subrepl-vivs0hr4                                    [m f8a8f380 feat(admin): replace emoji icons with Lucide SVGs in EntityLink, add copy-to-clipboard Order ID
+  subrepl-wrx58mf2                                    [m 08f0f55c Git commit prior to rebase
+  subrepl-wy2ml9n9                                    [m 9234fc76 Task #137: Add admin "Send test alert" button to /admin/launch-readiness
+  subrepl-xbt7esdk                                    [m 66b7df8b Add type annotation to date variable in seed script
+  subrepl-xoxhwou7                                    [m 815a3c82 Remove unused preheader text from beneficiary status emails
+  subrepl-z13m2cam                                    [m 2b50fbef Task #82: Let beneficiaries upload supporting documents securely
+  subrepl-zc4l0amu                                    [m 6dde3dfb Update incident response runbook with corrected file path
+  test/reservation-email-guest-details                [m 5fa7d197 fix: surface reservation email failures and guest details
