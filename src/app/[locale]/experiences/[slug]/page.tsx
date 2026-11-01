@@ -107,7 +107,7 @@ const venueGrad: Record<string, string> = {
   CATCH:"linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%)",
 };
 
-interface Props { params: Promise<{ locale: string; slug: string }>; searchParams?: Promise<{ sessionId?: string }> }
+interface Props { params: Promise<{ locale: string; slug: string }>; searchParams?: Promise<{ sessionId?: string }>; dedicatedSessionId?: string }
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({ sessionId: undefined })]);
@@ -144,7 +144,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   };
 }
 
-export default async function ExperienceDetailPage({ params, searchParams }: Props) {
+export default async function ExperienceDetailPage({ params, searchParams, dedicatedSessionId }: Props) {
   const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({ sessionId: undefined })]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
@@ -175,9 +175,10 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const sessions    = series.sessions ?? [];
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
-  const focusSessionId = sessions.some((event) => event.id === query.sessionId) ? query.sessionId ?? null : null;
+  const requestedSessionId = dedicatedSessionId ?? query.sessionId ?? null;
+  const focusSessionId = sessions.some((event) => event.id === requestedSessionId) ? requestedSessionId : null;
   const focusSession = focusSessionId ? sessions.find((event) => event.id === focusSessionId) : null;
-  if (query.sessionId && !focusSession) notFound();
+  if (requestedSessionId && !focusSession) notFound();
   const heroArtwork = focusSession ? sessionArtworkCandidates(focusSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
   const displayedTicketTypes = focusSession
     ? ticketTypes.filter((ticket) => sessionProductEnabled(focusSession, series, ticket.id))
@@ -265,7 +266,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
         <div className="experience-main">
           {/* Keep the series overview on the series page; the selected event has its
               own description in the event detail card below. */}
-          {!focusSession && (
+          {!focusSessionId && (
             <section style={{ marginBottom: 28 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
                 {c.aboutThisExperience}
@@ -278,7 +279,7 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
           {sessions.length > 0 && (
             <section style={{ marginBottom: 48 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
-                {focusSession ? (safeLocale === "es" ? "Detalles del evento" : safeLocale === "pt" ? "Detalhes do evento" : "Event details") : c.sessionsHeading}
+                {focusSessionId ? (safeLocale === "es" ? "Detalles del evento" : safeLocale === "pt" ? "Detalhes do evento" : "Event details") : c.sessionsHeading}
               </h2>
               <div id="sessions">
               <ExperienceSessionsView
