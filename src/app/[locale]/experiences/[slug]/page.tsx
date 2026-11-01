@@ -1,3 +1,4 @@
+import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
