@@ -114,6 +114,7 @@ export default async function ExperienceDetailPage({ params, searchParams, dedic
   const requestedSessionId = dedicatedSessionId ?? query.sessionId ?? null;
   const focusSessionId = sessions.some((event) => event.id === requestedSessionId) ? requestedSessionId : null;
   const focusSession = focusSessionId ? sessions.find((event) => event.id === focusSessionId) : null;
+  const displayDescription = focusSession?.description ?? description;
   if (requestedSessionId && !focusSession) notFound();
   const heroArtwork = focusSession ? sessionArtworkCandidates(focusSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
   const displayedTicketTypes = focusSession
