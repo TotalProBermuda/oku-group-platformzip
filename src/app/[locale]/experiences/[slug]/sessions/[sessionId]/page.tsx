@@ -17,5 +17,6 @@ export default async function SessionEventPage({ params }: Props) {
   return ExperienceDetailPage({
     params: Promise.resolve({ locale, slug }),
     searchParams: Promise.resolve({ sessionId }),
+    dedicatedSessionId: sessionId,
   });
 }
