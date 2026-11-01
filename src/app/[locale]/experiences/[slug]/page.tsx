@@ -79,6 +79,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ExperienceDetailPage({ params, searchParams, dedicatedSessionId }: Props) {
   const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({ sessionId: undefined })]);
+  const sessionId = dedicatedSessionId ?? query.sessionId;
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
