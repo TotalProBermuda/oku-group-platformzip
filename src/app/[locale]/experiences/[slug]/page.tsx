@@ -266,12 +266,12 @@ export default async function ExperienceDetailPage({ params, searchParams, dedic
         <div className="experience-main">
           {/* Keep the series overview on the series page; the selected event has its
               own description in the event detail card below. */}
-          {!focusSessionId && (
+          {!dedicatedSessionId && (
             <section style={{ marginBottom: 28 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
                 {c.aboutThisExperience}
               </h2>
-              {displayDescription ? <ExpandableText text={displayDescription} locale={safeLocale} maxLines={3} /> : null}
+              {displayDescription ? <ExpandableText text={description} locale={safeLocale} maxLines={3} /> : null}
             </section>
           )}
 
