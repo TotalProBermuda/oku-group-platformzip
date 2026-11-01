@@ -34,6 +34,11 @@ An entire workstream closes only when its remaining acceptance checks pass.
 - [x] Pure refund admission rules implemented: cumulative balance, reserved/unknown
       amounts, replay and request binding. 23 model tests; 49 focused tests pass.
       Not wired to live routes; NOT proof of database concurrency safety.
+- [x] Review-gated SQL coordinator prototype adds durable reservations, a one-time
+      submission claim and evidence-bound reconciliation. Eight isolated PGlite
+      tests cover persistence/replay and UNKNOWN retention. Test-only schema; no live
+      route or migration. PGlite is single-connection, so multi-worker PostgreSQL
+      concurrency and serialization-retry behavior remain unverified.
 - [ ] Durable cumulative/concurrent refund limits and unknown-result reconciliation.
 - [ ] Partial bundle refunds restore each affected entitlement/capacity exactly once.
 - [ ] Owner approves refund policy, any migration, and controlled live financial tests.
