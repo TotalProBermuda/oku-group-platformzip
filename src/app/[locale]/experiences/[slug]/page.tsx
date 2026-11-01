@@ -42,10 +42,7 @@ const venueGrad: Record<string, string> = {
   CATCH:"linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%)",
 };
 
-interface Props {
-  params: Promise<{ locale: string; slug: string; sessionId?: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}
+interface Props { params: Promise<{ locale: string; slug: string }>; searchParams?: Promise<{ sessionId?: string }>; dedicatedSessionId?: string }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug, sessionId } = await params;
@@ -80,11 +77,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ExperienceDetailPage({ params, searchParams }: Props) {
-  const [{ locale, slug, sessionId }, query] = await Promise.all([
-    params,
-    searchParams ?? Promise.resolve<Record<string, string | string[] | undefined>>({}),
-  ]);
+export default async function ExperienceDetailPage({ params, searchParams, dedicatedSessionId }: Props) {
+  const [{ locale, slug }, query] = await Promise.all([params, searchParams ?? Promise.resolve({ sessionId: undefined })]);
   const safeLocale = isValidLocale(locale) ? (locale as Locale) : "en";
 
   const [series, availability, session, translations] = await Promise.all([
@@ -116,7 +110,15 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
   const sessions    = standaloneSession ? [standaloneSession] : series.sessions ?? [];
   const ticketTypes = series.ticketTypes ?? [];
   const firstSession = sessions[0];
-  const focusSessionId = sessionId ?? (typeof query.sessionId === "string" && sessions.some((event: any) => event.id === query.sessionId) ? query.sessionId : null);
+  const requestedSessionId = dedicatedSessionId ?? query.sessionId ?? null;
+  const focusSessionId = sessions.some((event) => event.id === requestedSessionId) ? requestedSessionId : null;
+  const focusSession = focusSessionId ? sessions.find((event) => event.id === focusSessionId) : null;
+  if (requestedSessionId && !focusSession) notFound();
+  const heroArtwork = focusSession ? sessionArtworkCandidates(focusSession, safeLocale, series) : seriesArtworkCandidates(series, safeLocale);
+  const displayedTicketTypes = focusSession
+    ? ticketTypes.filter((ticket) => sessionProductEnabled(focusSession, series, ticket.id))
+    : ticketTypes;
+  const pricingSessions = focusSession ? [focusSession] : sessions;
   const isCountdownActive = series.showCountdown && series.earlyReleaseAt && new Date() < new Date(series.earlyReleaseAt);
 
   const content = getSeriesContent(series.slug, safeLocale);
@@ -192,19 +194,22 @@ export default async function ExperienceDetailPage({ params, searchParams }: Pro
       <div className="page-container experience-layout" style={{ padding: "48px 24px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 48, alignItems: "start" }}>
         {/* Left column */}
         <div className="experience-main">
-          {/* Description */}
-          <section style={{ marginBottom: 28 }}>
-            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
-              {c.aboutThisExperience}
-            </h2>
-            {description ? <ExpandableText text={description} locale={safeLocale} maxLines={3} /> : null}
-          </section>
+          {/* Keep the series overview on the series page; the selected event has its
+              own description in the event detail card below. */}
+          {!focusSessionId && (
+            <section style={{ marginBottom: 28 }}>
+              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 10 }}>
+                {c.aboutThisExperience}
+              </h2>
+              {displayDescription ? <ExpandableText text={displayDescription} locale={safeLocale} maxLines={3} /> : null}
+            </section>
+          )}
 
           {/* Sessions */}
           {sessions.length > 0 && (
             <section style={{ marginBottom: 48 }}>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 400, color: "#1a1614", marginBottom: 16 }}>
-                {c.sessionsHeading}
+                {focusSessionId ? (safeLocale === "es" ? "Detalles del evento" : safeLocale === "pt" ? "Detalhes do evento" : "Event details") : c.sessionsHeading}
               </h2>
               <div id="sessions">
               <ExperienceSessionsView
