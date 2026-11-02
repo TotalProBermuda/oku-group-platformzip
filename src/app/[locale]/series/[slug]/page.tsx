@@ -101,7 +101,7 @@ export default async function SeriesDetailPage({ params }: Props) {
           )}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
             <Link
-              href={localePath(safeLocale, `/series/${series.slug}/checkout`)}
+              href={"#sessions"}
               className="btn btn-primary btn-lg"
               style={{ background: "var(--color-primary)", border: "none" }}
             >
@@ -123,7 +123,7 @@ export default async function SeriesDetailPage({ params }: Props) {
       {/* ── SESSIONS + TICKET TYPES ── */}
       <div className="page-container">
         <div style={{ display: "grid", gap: 48 }}>
-          <section>
+          <section id="sessions">
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
               <h2 className="section-title" style={{ margin: 0 }}>{c.sessionsHeading}</h2>
               {series.sessions?.length > 0 && (
@@ -173,7 +173,11 @@ export default async function SeriesDetailPage({ params }: Props) {
                           )}
                         </div>
                       </div>
-                    </div>
+                    <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+                    <Link className="btn btn-outline" href={localePath(safeLocale, "/experiences/" + series.slug + "/sessions/" + sess.id)}>View event →</Link>
+                    <Link className="btn btn-primary" href={localePath(safeLocale, "/checkout/" + series.slug + "?sessionId=" + encodeURIComponent(sess.id))}>Get tickets →</Link>
+                  </div>
+                  </div>
                   );
                 })}
               </div>
@@ -210,7 +214,7 @@ export default async function SeriesDetailPage({ params }: Props) {
                 </table>
               </div>
               <div style={{ marginTop: 24 }}>
-                <Link href={localePath(safeLocale, `/series/${series.slug}/checkout`)} className="btn btn-primary btn-lg">
+                <Link href={"#sessions"} className="btn btn-primary btn-lg">
                   {c.purchaseTickets}
                 </Link>
               </div>

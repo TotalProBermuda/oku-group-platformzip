@@ -1,6 +1,11 @@
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/:locale/experiences/:slug", destination: "/:locale/series/:slug" }],
+    };
+  },
   reactStrictMode: true,
   experimental: {
     serverActions: {
