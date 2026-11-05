@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 // Last-resort fallback — fires when the root layout itself throws.
 // Must render its own <html>/<body> because the layout has failed.
@@ -30,9 +31,9 @@ export default function GlobalError({
         <div style={{ maxWidth: 520, textAlign: "center" }}>
           <h1 style={{ fontSize: 40, margin: "0 0 12px", fontWeight: 500 }}>OKÜ Hospitality Group</h1>
           <p style={{ color: "#5a514c", margin: "0 0 32px" }}>We hit a problem loading the page. Please refresh.</p>
-          <a href="/" style={{ display: "inline-block", padding: "14px 28px", backgroundColor: "#1a1a1a", color: "#f5f2ef", textDecoration: "none", borderRadius: 2 }}>
+          <Link href="/" style={{ display: "inline-block", padding: "14px 28px", backgroundColor: "#1a1a1a", color: "#f5f2ef", textDecoration: "none", borderRadius: 2 }}>
             Refresh
-          </a>
+          </Link>
         </div>
       </body>
     </html>

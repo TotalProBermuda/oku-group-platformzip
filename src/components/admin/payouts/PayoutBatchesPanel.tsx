@@ -482,7 +482,7 @@ function ExportActionBar({
       </div>
       {descriptor.status !== "READY" && (
         <div style={{ fontSize: 11, color: "#92700a", marginTop: 8 }}>
-          ⚠ This format records the operator's intent on the batch but cannot yet
+           ⚠ This format records the operator&apos;s intent on the batch but cannot yet
           render an actual bank file. The audit hash is still produced and locked.
         </div>
       )}

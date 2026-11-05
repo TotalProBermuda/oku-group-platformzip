@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSyncLogs } from "@/server/services/invu/invuIntegrationService";
 
-function isSuperadmin(session: any) {
-  return session?.user?.roles?.some((r: string) => r === "SUPERADMIN");
+function isSuperadmin(session: Session | null) {
+  return session?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function GET(req: NextRequest) {

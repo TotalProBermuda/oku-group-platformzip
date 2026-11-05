@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
@@ -38,7 +39,8 @@ export async function GET() {
         currency: "USD",
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

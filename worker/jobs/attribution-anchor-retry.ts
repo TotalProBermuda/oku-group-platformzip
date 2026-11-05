@@ -14,6 +14,12 @@ export interface AttributionAnchorRetryJobData {
   attributionSessionId?: string;
 }
 
+/** Minimal job shape consumed by the handler; BullMQ Jobs satisfy this contract. */
+export interface AttributionAnchorRetryJob {
+  id?: string;
+  data: AttributionAnchorRetryJobData;
+}
+
 /**
  * Idempotently ensure all anchor-side writes exist for a session's referrer
  * context. Called by both the retry job and the admin manual-resolve action.
@@ -133,7 +139,7 @@ export async function ensureAnchorWrites(session: {
  *    emit ATTRIBUTION_ANCHOR_FAILED; admin must manually resolve.
  */
 export async function handleAttributionAnchorRetryJob(
-  job: Job<AttributionAnchorRetryJobData>
+  job: AttributionAnchorRetryJob
 ): Promise<{ outcome: "anchored" | "failed_review" | "already_resolved" | "not_found" | "sweep_enqueued" }> {
   const { attributionSessionId } = job.data;
 

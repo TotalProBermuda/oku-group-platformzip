@@ -5,12 +5,15 @@ import LanguageSwitcher from "./i18n/LanguageSwitcher";
 import Brandmark from "./Brandmark";
 import type { Locale } from "@/types/i18n";
 import { localePath } from "@/i18n/utils";
+import { hasReferrerDashboardRole } from "@/lib/referrerDashboardRoles";
+import { hasLinkedReferrerIdentity } from "@/server/referrals/referrerDashboardAccess";
 
 export type NavSession = {
   user: {
     name: string | null;
     email: string | null;
     roles: string[];
+    hasReferrerDashboard?: boolean;
   };
 } | null;
 
@@ -20,6 +23,7 @@ interface Props {
   navLabels?: {
     restaurants: string;
     experiences: string;
+    functions?: string;
     membership: string;
     careers: string;
     signIn?: string;
@@ -27,15 +31,41 @@ interface Props {
   };
 }
 
-export default function Navbar({ session, locale = "en", navLabels }: Props) {
-  const labels = navLabels || {
+export default async function Navbar({ session, locale = "en", navLabels }: Props) {
+  const labels = {
     restaurants: "Restaurants",
     experiences: "Events",
+    functions: "Functions",
     membership: "Membership",
     careers: "Careers",
     signIn: "Sign In",
     signOut: "Sign Out",
+    ...navLabels,
   };
+  const roles = session?.user.roles ?? [];
+  const shouldResolveLinkedIdentity =
+    Boolean(session?.user.email) &&
+    !hasReferrerDashboardRole(roles) &&
+    !roles.some((role) =>
+      [
+        "SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR",
+        "RESTAURANT_HOST", "STREETSIDE_HOST", "RESTAURANT_SUPERVISOR",
+        "INFLUENCER", "INVESTOR",
+      ].includes(role) || role.startsWith("STAFF_"),
+    );
+  const hasReferrerDashboard =
+    hasReferrerDashboardRole(roles) ||
+    (shouldResolveLinkedIdentity
+      ? await hasLinkedReferrerIdentity({ email: session!.user.email! })
+      : false);
+  const navSession = session
+    ? {
+        user: {
+          ...session.user,
+          hasReferrerDashboard,
+        },
+      }
+    : null;
 
   return (
     <header style={{ position: "sticky", top: 0, background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)", borderBottom: "1px solid var(--color-border)", zIndex: 100 }}>
@@ -48,18 +78,19 @@ export default function Navbar({ session, locale = "en", navLabels }: Props) {
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <Link href={localePath(locale, "/restaurants")} className="nav-link">{labels.restaurants}</Link>
             <Link href={localePath(locale, "/experiences")} className="nav-link">{labels.experiences}</Link>
-            <Link href={localePath(locale, "/membership")}  className="nav-link">{labels.membership}</Link>
-            <Link href={localePath(locale, "/careers")}     className="nav-link">{labels.careers}</Link>
+            <Link href={localePath(locale, "/functions")} className="nav-link">{labels.functions}</Link>
+            <Link href={localePath(locale, "/membership")} className="nav-link">{labels.membership}</Link>
+            <Link href={localePath(locale, "/careers")} className="nav-link">{labels.careers}</Link>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <LanguageSwitcher currentLocale={locale} variant="header" />
-            <NavbarAuth session={session} locale={locale} signInLabel={labels.signIn} signOutLabel={labels.signOut} />
+            <NavbarAuth session={navSession} locale={locale} signInLabel={labels.signIn} signOutLabel={labels.signOut} />
           </div>
         </div>
 
         <div className="nav-mobile-right">
           <LanguageSwitcher currentLocale={locale} variant="header" />
-          <NavbarMobileMenu session={session} locale={locale} labels={labels} />
+          <NavbarMobileMenu session={navSession} locale={locale} labels={labels} />
         </div>
       </nav>
     </header>

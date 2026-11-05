@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
 
 interface Venue {
@@ -468,7 +469,7 @@ export default function InvuIntegrationPanel({ venues }: { venues: Venue[] }) {
               View the real INVU closed checks pulled for this venue, the reservations each one was matched to, and the host/referrer that earns commission.
             </p>
           </div>
-          <a
+          <Link
             href="/admin/integrations/invu/closed-orders"
             style={{
               padding: "10px 18px",
@@ -483,7 +484,7 @@ export default function InvuIntegrationPanel({ venues }: { venues: Venue[] }) {
             }}
           >
             Open Closed Orders →
-          </a>
+          </Link>
         </div>
       )}
 
@@ -715,12 +716,12 @@ export default function InvuIntegrationPanel({ venues }: { venues: Venue[] }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <p style={{ ...sectionTitle, marginBottom: 0 }}>{t("admin", "invu.syncDiagnostics.title")}</p>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <a href="/admin/table-sessions" style={{ fontSize: 12, color: "var(--color-accent)", textDecoration: "none", padding: "4px 10px", border: "1px solid var(--color-accent)", borderRadius: 6 }}>
+            <Link href="/admin/table-sessions" style={{ fontSize: 12, color: "var(--color-accent)", textDecoration: "none", padding: "4px 10px", border: "1px solid var(--color-accent)", borderRadius: 6 }}>
               {t("admin", "invu.syncDiagnostics.tableSessionsLink")}
-            </a>
-            <a href="/admin/review-queue" style={{ fontSize: 12, color: "var(--color-accent)", textDecoration: "none", padding: "4px 10px", border: "1px solid var(--color-accent)", borderRadius: 6 }}>
+            </Link>
+            <Link href="/admin/review-queue" style={{ fontSize: 12, color: "var(--color-accent)", textDecoration: "none", padding: "4px 10px", border: "1px solid var(--color-accent)", borderRadius: 6 }}>
               {t("admin", "invu.syncDiagnostics.reviewQueueLink")}
-            </a>
+            </Link>
             {connectionStatus?.credentialId && (
               <button style={btnPrimary} onClick={handleTriggerSync} disabled={loading}>{t("admin", "invu.syncDiagnostics.triggerManualSync")}</button>
             )}

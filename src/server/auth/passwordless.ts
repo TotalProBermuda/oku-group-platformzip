@@ -236,7 +236,7 @@ export async function issuePasswordlessToken(input: {
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
   const callbackUrl = sanitizePasswordlessCallback(input.callbackUrl);
   const recipient = await prisma.$transaction(async (tx) => {
-    let candidate = await findActiveUserByEmail(tx, email);
+    const candidate = await findActiveUserByEmail(tx, email);
     let evidence: Awaited<ReturnType<typeof findKnownCustomerEvidence>> | null = null;
     if (input.requireExistingUserId && candidate?.id !== input.requireExistingUserId) {
       return null;
@@ -276,13 +276,25 @@ export async function issuePasswordlessToken(input: {
   });
 
   if (!recipient) return { issued: false };
-  await sendPasswordlessEmail({
-    email,
-    name: recipient.name,
-    rawToken,
-    purpose,
-    locale: recipient.locale,
-  });
+  try {
+    await sendPasswordlessEmail({
+      email,
+      name: recipient.name,
+      rawToken,
+      purpose,
+      locale: recipient.locale,
+    });
+  } catch (error) {
+    // A failed/uncertain delivery must not leave an unreported usable credential.
+    // Target only this attempt so a concurrent successful resend is untouched.
+    await prisma.$transaction(async (tx) => {
+      await tx.passwordlessToken.updateMany({
+        where: { tokenHash, consumedAt: null, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+    throw error;
+  }
   return { issued: true };
 }
 

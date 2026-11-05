@@ -22,6 +22,7 @@ import {
   type NormalizedVoidResult,
   type PaymentProviderAdapter,
   type ProviderStatus,
+  errorMessage,
   safeTruncate,
 } from "./types";
 
@@ -187,8 +188,8 @@ class AuthNetAdapter implements PaymentProviderAdapter {
           : r.message ?? `Authentication failed (${r.resultCode ?? "no result code"})`,
         status: null,
       };
-    } catch (e: any) {
-      return { ok: false, message: e?.message || "Authorize.net test failed", status: null };
+    } catch (error: unknown) {
+      return { ok: false, message: errorMessage(error, "Authorize.net test failed"), status: null };
     }
   }
 
@@ -215,8 +216,8 @@ class AuthNetAdapter implements PaymentProviderAdapter {
         opaqueData: input.instrument.authNetOpaqueData,
         invoiceNumber: input.invoiceNumber,
       });
-    } catch (e: any) {
-      networkError = e?.message || "network error";
+    } catch (error: unknown) {
+      networkError = errorMessage(error, "network error");
     }
     const parsed = parseAuthNetResult(raw, networkError);
     return {
@@ -241,8 +242,8 @@ class AuthNetAdapter implements PaymentProviderAdapter {
         amount: centsToAmount(input.amountCents),
         refTransId: input.originalTransactionId,
       });
-    } catch (e: any) {
-      networkError = e?.message || "network error";
+    } catch (error: unknown) {
+      networkError = errorMessage(error, "network error");
     }
     const parsed = parseAuthNetResult(raw, networkError);
     return {
@@ -263,8 +264,8 @@ class AuthNetAdapter implements PaymentProviderAdapter {
     let networkError: string | null = null;
     try {
       raw = await voidTransaction({ refTransId: input.originalTransactionId });
-    } catch (e: any) {
-      networkError = e?.message || "network error";
+    } catch (error: unknown) {
+      networkError = errorMessage(error, "network error");
     }
     const parsed = parseAuthNetResult(raw, networkError);
     return {

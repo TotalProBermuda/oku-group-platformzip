@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 
@@ -13,7 +15,7 @@ export async function GET(req: NextRequest) {
     const seriesId = searchParams.get("seriesId");
     const sessionId = searchParams.get("sessionId");
 
-    const where: any = {};
+    const where: Prisma.ReservationBlockWhereInput = {};
     if (seriesId) where.seriesId = seriesId;
     if (sessionId) where.sessionId = sessionId;
 
@@ -27,8 +29,9 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: blocks });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -61,7 +64,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: block });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 
@@ -17,15 +18,18 @@ export async function GET(
         series: { select: { id: true, title: true, slug: true } },
         session: { select: { id: true, startsAt: true } },
         payment: { select: { id: true, status: true, amountCents: true } },
-        tickets: { select: { id: true, status: true } },
+        tickets: { select: { id: true, ticketStatus: true } },
       },
     });
 
-    return NextResponse.json({ ok: true, data: orders });
-  } catch (e: any) {
+    return NextResponse.json({ ok: true, data: orders.map(order => ({ ...order,
+      tickets: order.tickets.map(({ id, ticketStatus }) => ({ id, status: ticketStatus })),
+    })) });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

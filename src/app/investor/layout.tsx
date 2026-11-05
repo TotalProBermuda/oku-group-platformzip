@@ -11,7 +11,7 @@ import type { Locale } from "@/types/i18n";
 
 export default async function InvestorLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
 
   if (!session || (!roles.includes("INVESTOR") && !roles.includes("SUPERADMIN"))) {
     redirect("/login?callbackUrl=/investor");

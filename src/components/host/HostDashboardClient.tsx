@@ -8,6 +8,8 @@ import { useTranslation } from "@/components/i18n/LocaleProvider";
 const QRScanner = lazy(() => import("./QRScanner"));
 import BindInvuOrderControl, { type AttributionSessionForBind } from "./BindInvuOrderControl";
 import ScanResultModal from "./ScanResultModal";
+import ReservationReviewPanel from "./ReservationReviewPanel";
+import type { Prisma } from "@prisma/client";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -71,6 +73,45 @@ type ChatSession = {
   messages: Array<{ id: string; senderRole: string; content: string; createdAt: string }>;
 };
 
+type InboundHandoff = Prisma.ReservationHandoffGetPayload<{
+  include: {
+    reservation: {
+      include: {
+        zone: { select: { name: true; conceptKey: true } };
+        attributions: { include: { referrer: { select: { fullName: true; referrerType: true } } }; take: 1 };
+        attributionSession: {
+          include: {
+            referralActor: { select: { id: true; displayName: true; actorType: true } };
+            legacyReferrer: { select: { id: true; fullName: true; referrerType: true } };
+          };
+        };
+      };
+    };
+  };
+}>;
+type HostCommission = { id: string; status: string; totalCents: number; commissionCents: number; coversCount: number; placedAt: Date | null; createdAt: Date };
+type HostDashboardTab = "queue" | "tickets" | "chat" | "referral";
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong. Please try again.";
+}
+
+type InvuDiagnostic = { probe?: string; httpStatus?: number; arrayCounts?: Record<string, unknown>; containsInternalOrderId?: boolean; containsPublicOrderNumber?: boolean };
+type InvuCloseResult = {
+  grossCents: number;
+  taxCents: number;
+  commissionableCents: number;
+  commissionAllocations: Array<{ earnerType: string; amountCents: number }>;
+};
+type InvuSyncResponse = { ok?: boolean; error?: string; diagnostic?: unknown; tableSession?: InvuCloseResult | null };
+
+function parseInvuSyncResponse(raw: string): InvuSyncResponse | null {
+  if (!raw) return null;
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object") return null;
+  return parsed as InvuSyncResponse;
+}
+
 type HostProfile = {
   id: string;
   displayName: string;
@@ -91,6 +132,7 @@ type MeData = {
   user: { id: string; name: string; email: string; roles: string[] };
   hostProfile: HostProfile | null;
   todayReservations: Reservation[];
+  upcomingReservations?: Reservation[];
   // 7-day window of COMPLETED reservations at the venue, server-driven
   // by /api/v1/host/me. Used by the "Closed" tab + stat chip so closed
   // tables drop off the active queue immediately but stay reachable for
@@ -100,9 +142,9 @@ type MeData = {
   // chain; lets the panel render "Walked in by <name>" for HOST_WALKIN
   // sessions without an extra schema relation.
   hostUserNameById?: Record<string, string>;
-  inboundHandoffs: any[];
+  inboundHandoffs: InboundHandoff[];
   chatSessions: ChatSession[];
-  commissions: any[];
+  commissions: HostCommission[];
   venue: { id: string; name: string } | null;
 };
 
@@ -270,7 +312,7 @@ function ReservationCard({ res, onAction }: {
         { label: drinkType === "ALCOHOLIC" ? t("host", "card.alcoholic") : t("host", "card.nonAlcoholic"), at: new Date() },
         ...prev,
       ]);
-    } catch (e: any) { alert(e.message); }
+    } catch (error: unknown) { alert(errorMessage(error)); }
     setDrinkSaving(false);
   }
 
@@ -288,7 +330,7 @@ function ReservationCard({ res, onAction }: {
       setCommittedPartySize(partyAdj);
       setPartySaved(true);
       setTimeout(() => setPartySaved(false), 3000);
-    } catch (e: any) { alert(e.message); }
+    } catch (error: unknown) { alert(errorMessage(error)); }
     setPartySaving(false);
   }
 
@@ -301,9 +343,9 @@ function ReservationCard({ res, onAction }: {
       // A proxy/server failure can produce an empty or HTML body. Do not let
       // that obscure the operational failure behind a JSON parse exception.
       const raw = await r.text();
-      let d: any;
+      let d: InvuSyncResponse | null;
       try {
-        d = raw ? JSON.parse(raw) : null;
+        d = parseInvuSyncResponse(raw);
       } catch {
         throw new Error(`INVU sync failed (HTTP ${r.status}). Please try again or check the INVU connection.`);
       }
@@ -312,7 +354,7 @@ function ReservationCard({ res, onAction }: {
       }
       if (!d.ok) {
         const diagnostic = Array.isArray(d.diagnostic)
-          ? d.diagnostic.map((probe: any) => {
+          ? d.diagnostic.map((probe: InvuDiagnostic) => {
               const count = Object.values(probe.arrayCounts ?? {})
                 .reduce((sum: number, value: unknown) => sum + (typeof value === "number" ? value : 0), 0);
               const match = probe.containsInternalOrderId || probe.containsPublicOrderNumber;
@@ -321,9 +363,9 @@ function ReservationCard({ res, onAction }: {
           : "";
         throw new Error(`${d.error}${diagnostic ? `\n\nRead-only diagnostic: ${diagnostic}` : ""}`);
       }
-      setInvuSyncResult(d.tableSession);
-    } catch (e: any) {
-      alert(e.message);
+      setInvuSyncResult(d.tableSession ?? null);
+    } catch (error: unknown) {
+      alert(errorMessage(error));
     }
     setInvuSyncing(false);
   }
@@ -357,8 +399,8 @@ function ReservationCard({ res, onAction }: {
         allocations,
       });
       setShowManualClose(false);
-    } catch (e: any) {
-      alert(e?.message ?? "Manual close could not be recorded");
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Manual close could not be recorded");
     } finally {
       setManualSaving(false);
     }
@@ -721,6 +763,13 @@ function ReservationCard({ res, onAction }: {
               {res.status === "SEATED" && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <QuickBtn label={t("host", "actions.complete")} color="#6b7280" disabled={updating} onClick={() => act("COMPLETED")} />
+                  <QuickBtn label="Close — no purchase" color="#b45309" disabled={updating || !!boundInvuOrderId || res.actualRevenueCents != null} onClick={() => {
+                    const reason = window.prompt("Briefly explain why the guest left without a purchase (required for the audit log):");
+                    if (!reason || reason.trim().length < 8) { if (reason !== null) window.alert("Please enter at least 8 characters."); return; }
+                    if (window.confirm("Confirm this party left without a purchase? This records $0 revenue, releases the table hold, and keeps the reservation audit history.")) {
+                      void act("COMPLETED", { noSaleConfirmed: "true", noSaleReason: reason.trim() });
+                    }
+                  }} />
                   <QuickBtn label={invuSyncing ? "Syncing INVU close…" : "Sync closed INVU check"} color="#c8a96e" disabled={invuSyncing || !boundInvuOrderId} onClick={syncInvuClose} />
                   <QuickBtn label={showManualClose ? "Hide manual fallback" : "Record manual fallback close"} color="#f59e0b" disabled={manualSaving} onClick={() => setShowManualClose((open) => !open)} />
                 </div>
@@ -1187,8 +1236,8 @@ export default function HostDashboardClient() {
           if (self) setShiftOn(self.isOnShift);
         }
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error: unknown) {
+      setError(errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -1240,11 +1289,15 @@ export default function HostDashboardClient() {
   }, [canMonitorTickets]);
 
   async function handleAction(id: string, status: string, extra?: Record<string, string>) {
-    await fetch(`/api/v1/host/bookings/${id}/status`, {
+    const response = await fetch(`/api/v1/host/bookings/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, ...extra }),
     });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      window.alert(payload.error ?? "Could not update this reservation.");
+    }
     await load();
   }
 
@@ -1263,7 +1316,7 @@ export default function HostDashboardClient() {
     </div>
   );
 
-  const { user, hostProfile, todayReservations, chatSessions, commissions } = data;
+  const { user, hostProfile, todayReservations, upcomingReservations = [], chatSessions, commissions } = data;
   const closedReservations = data.closedReservations ?? [];
   const hostUserNameById = data.hostUserNameById ?? {};
   const roles = user.roles;
@@ -1299,7 +1352,9 @@ export default function HostDashboardClient() {
   // Filtered reservations. CLOSED is special: it pulls from the 7-day
   // closedReservations payload rather than today's queue, so older
   // closed tables remain reachable for a week without polluting Active.
-  const filteredReservations = filterStatus === "CLOSED"
+  const filteredReservations = filterStatus === "UPCOMING"
+    ? upcomingReservations
+    : filterStatus === "CLOSED"
     ? closedReservations
     : filterStatus === "all"
     ? todayReservations.filter((r) => !["COMPLETED", "CANCELLED"].includes(r.status))
@@ -1310,11 +1365,11 @@ export default function HostDashboardClient() {
   // Today's same-day finished/cancelled rows shown beneath the active
   // queue. Hidden when CLOSED filter is active because the closed list
   // already shows that data (and more, going back 7 days).
-  const doneReservations = filterStatus === "CLOSED"
+  const doneReservations = filterStatus === "CLOSED" || filterStatus === "UPCOMING"
     ? []
     : todayReservations.filter((r) => ["COMPLETED", "CANCELLED"].includes(r.status));
 
-  const STATUS_FILTERS = ["all", "PENDING", "CONFIRMED", "ARRIVED", "SEATED", "CLOSED"];
+  const STATUS_FILTERS = ["all", "UPCOMING", "PENDING", "CONFIRMED", "ARRIVED", "SEATED", "CLOSED"];
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d0f", color: "white" }}>
@@ -1383,6 +1438,8 @@ export default function HostDashboardClient() {
             {data.venue && <span style={{ color: "#374151", marginLeft: 8 }}>· {data.venue.name}</span>}
           </div>
         </div>
+
+        <ReservationReviewPanel dark onArchived={() => void load()} />
 
         {/* Shift clock-in/out — streetside hosts only */}
         {isStreetsideHost && shiftOn !== null && (
@@ -1462,15 +1519,15 @@ export default function HostDashboardClient() {
 
         {/* Tab nav — operational reservations, tickets, chat and referral */}
         <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: 4 }}>
-          {([
+          {(([
             { key: "queue",    labelKey: "tabs.queue",    badge: pending + confirmed + arrived, badgeColor: "#fbbf24" },
             ...(canMonitorTickets ? [{ key: "tickets", labelKey: "tickets", label: "Tickets", badge: monitoredTickets.length, badgeColor: "#38bdf8" }] : []),
             { key: "chat",     labelKey: "tabs.chat",     badge: waitingChats,                  badgeColor: "#a78bfa" },
             { key: "referral", labelKey: "tabs.referral", badge: referralCount,                 badgeColor: "#c8a96e" },
-          ] as { key: string; labelKey: string; label?: string; badge: number; badgeColor: string }[]).map((tab) => (
+          ] as { key: HostDashboardTab; labelKey: string; label?: string; badge: number; badgeColor: string }[])).map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
+              onClick={() => setActiveTab(tab.key)}
               style={{
                 flex: 1, padding: "9px 0", borderRadius: 9, border: "none",
                 background: activeTab === tab.key ? "rgba(255,255,255,0.1)" : "transparent",
@@ -1556,12 +1613,16 @@ export default function HostDashboardClient() {
                 // CLOSED uses the COMPLETED meta swatch (grey) since both
                 // signal "table done" — just sourced from a longer window.
                 const meta = f === "CLOSED" ? STATUS_META["COMPLETED"] : STATUS_META[f];
-                const count = f === "all"
+                const count = f === "UPCOMING"
+                  ? upcomingReservations.length
+                  : f === "all"
                   ? todayReservations.filter((r) => !["COMPLETED","CANCELLED"].includes(r.status)).length
                   : f === "CLOSED"
                   ? closedCount
                   : todayReservations.filter((r) => r.status === f).length;
-                const label = f === "all"
+                const label = f === "UPCOMING"
+                  ? t("host", "filters.upcoming")
+                  : f === "all"
                   ? t("host", "filters.all")
                   : f === "CLOSED"
                   ? "Closed"

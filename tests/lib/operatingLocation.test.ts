@@ -16,6 +16,6 @@ describe("Local #5 operating-location baseline", () => {
     ]);
     expect(new Set(LOCAL5_SPACE_SPECS.map((space) => space.conceptKey)).size).toBe(4);
     expect(LOCAL5_SPACE_SPECS.find((space) => space.conceptKey === "PRIVATE_DINING_ROOM"))
-      .toMatchObject({ name: "Private Dining Room", requiresApproval: true });
+      .toMatchObject({ name: "Private Dining Room", capacity: 8, requiresApproval: true });
   });
 });

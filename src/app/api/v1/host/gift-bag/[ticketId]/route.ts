@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getHostApiErrorDetails, isUniqueConstraintError } from "@/app/api/v1/host/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { getEffectiveScanConfig } from "@/server/streetside/getScanConfig";
+import { ticketGiftBagEntitlement } from "@/server/commerce/sessionProducts";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ ticketId: string }> }) {
   try {
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
       where: { id: ticketId },
       select: {
         id: true,
+        entitlementSnapshot: true,
         sessionId: true,
         checkedInAt: true,
         giftBagLogs: { select: { id: true } },
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
     }
 
     // Enforce event-level gift-bag enablement (SUPERADMINs bypass)
-    if (!roles.includes("SUPERADMIN") && !ticket.session?.giftBagEnabled) {
+    if (!roles.includes("SUPERADMIN") && !ticketGiftBagEntitlement(ticket)) {
       return NextResponse.json({ ok: false, error: "Gift bag mode is not enabled for this event" }, { status: 403 });
     }
 
@@ -89,10 +92,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
     });
 
     return NextResponse.json({ ok: true, data: log });
-  } catch (e: any) {
-    if (e.code === "P2002") {
+  } catch (e: unknown) {
+    if (isUniqueConstraintError(e)) {
       return NextResponse.json({ ok: false, error: "Gift bag already recorded for this ticket" }, { status: 409 });
     }
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

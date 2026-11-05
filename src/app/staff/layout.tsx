@@ -13,7 +13,7 @@ import type { RoleKey } from "@/types/roles";
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
   // Allow anyone with check-in permission OR a staff role (covers SOPs page).
   const staffRoles = ["STAFF_OKU", "STAFF_CATCH", "SUPERADMIN", "RESTAURANT_HOST"];
   const canCheckIn = hasPermission(roles as RoleKey[], "tickets:checkin");

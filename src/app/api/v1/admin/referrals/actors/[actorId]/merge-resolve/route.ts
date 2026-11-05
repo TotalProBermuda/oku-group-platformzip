@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { findOrLinkReferralActor } from "@/server/referrals/referralActorDedupeService";
@@ -273,10 +274,11 @@ export async function POST(
     }
 
     return NextResponse.json({ ok: false, error: "Unknown decision" }, { status: 400 });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "unknown error" },
-      { status: e?.status ?? 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

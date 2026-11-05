@@ -8,8 +8,30 @@ import EntityLink from "@/components/entities/EntityLink";
 import ActionMenu, { ActionItem } from "@/components/entities/ActionMenu";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
 import { Globe, EyeOff, Users, DollarSign, Calendar, Plus, Settings } from "lucide-react";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
+import type { Prisma } from "@prisma/client";
 
 type Tab = "overview" | "sessions" | "orders";
+
+const seriesDrawerInclude = {
+  sessions: { include: { _count: { select: { tickets: true } }, ticketPrices: true, occupancies: { select: { id: true, scope: true, status: true, space: { select: { id: true, name: true } } } } }, orderBy: { startsAt: "asc" as const } },
+  ticketTypes: true,
+  influencer: { include: { user: { select: { id: true, name: true, email: true } } } },
+  partner: { include: { user: { select: { id: true, name: true, email: true } } } },
+  operationalVenue: { select: { id: true, name: true, slug: true } },
+  eventSpace: { select: { id: true, name: true, conceptKey: true } },
+  _count: { select: { Order: true, sessions: true } },
+} satisfies Prisma.SeriesInclude;
+
+type SeriesRecord = Prisma.SeriesGetPayload<{ include: typeof seriesDrawerInclude }>;
+type SeriesOrder = {
+  id: string;
+  status: string;
+  totalCents: number;
+  user: { name: string | null; email: string } | null;
+};
+type SeriesOrders = { orders: SeriesOrder[]; totalRevenueCents: number; count: number };
 
 function responseError(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== "object") return fallback;
@@ -44,8 +66,8 @@ export default function SeriesDrawer({
   const dateLocale =
     locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
 
-  const [series, setSeries] = useState<any>(null);
-  const [orders, setOrders] = useState<any>(null);
+  const [series, setSeries] = useState<SeriesRecord | null>(null);
+  const [orders, setOrders] = useState<SeriesOrders | null>(null);
   const [loading, setLoading] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
@@ -54,6 +76,7 @@ export default function SeriesDrawer({
   const [sessionForm, setSessionForm] = useState({ title: "", startsAt: "", endsAt: "", capacity: "", occupancyScope: "VENUE", setupMinutes: "0", resetMinutes: "0" });
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const translations = useSeriesTranslations(seriesId, Boolean(seriesId));
 
   const fetchSeries = useCallback(async () => {
     if (!seriesId) return;
@@ -62,7 +85,7 @@ export default function SeriesDrawer({
       const r = await fetch(`/api/v1/admin/series?id=${seriesId}`);
       const all = await r.json();
       if (all.ok) {
-        const found = all.data.find((s: any) => s.id === seriesId);
+        const found = all.data.find((s: SeriesRecord) => s.id === seriesId);
         setSeries(found || null);
       }
     } finally {
@@ -128,12 +151,13 @@ export default function SeriesDrawer({
         setSessionError(responseError(payload, t("admin", "createEventFailed")));
         return;
       }
-      const result = payload as { conflictCount?: number };
+      const result = payload as { conflictCount?: number; translation?: unknown };
+      const translation = await translations.onSave(result);
       setSessionForm({ title: "", startsAt: "", endsAt: "", capacity: "", occupancyScope: series?.spaceId ? "SPACE" : "VENUE", setupMinutes: "0", resetMinutes: "0" });
       setShowSessionForm(false);
       await fetchSeries();
       onUpdated?.();
-      flash(result.conflictCount ? `${t("admin", "eventCreated")} ${result.conflictCount} reservation conflict(s) need review.` : t("admin", "eventCreated"));
+      flash(translation?.state === "ready" ? "Saved / translations ready." : translation?.state === "retry" ? "Saved / translation needs retry." : result.conflictCount ? `${t("admin", "eventCreated")} ${result.conflictCount} reservation conflict(s) need review. Translation pending.` : "Saved / translation pending.");
     } catch {
       setSessionError(t("admin", "createEventFailed"));
     } finally {
@@ -187,14 +211,14 @@ export default function SeriesDrawer({
     return items;
   };
 
-  const fmtDate = (d: string) =>
+  const fmtDate = (d: Date | string) =>
     new Date(d).toLocaleDateString(dateLocale, {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
 
-  const fmtDateTime = (d: string) =>
+  const fmtDateTime = (d: Date | string) =>
     new Date(d).toLocaleString(dateLocale, {
       month: "short",
       day: "numeric",
@@ -221,7 +245,7 @@ export default function SeriesDrawer({
       title={series?.title ?? t("admin", "series")}
       subtitle={series?.slug ? `/${series.slug}` : undefined}
       badge={series ? <StatusBadge status={series.status} dot /> : undefined}
-      tabs={TABS as any}
+      tabs={TABS}
       activeTab={tab}
       onTabChange={(k) => setTab(k as Tab)}
       width={560}
@@ -256,6 +280,7 @@ export default function SeriesDrawer({
 
       {series && tab === "overview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />
           <Section title={t("admin", "details")}>
             <Link href={`/admin/experiences/${series.id}`} className="btn btn-primary btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
               <Settings size={13} />
@@ -315,7 +340,7 @@ export default function SeriesDrawer({
 
           <Section title={t("admin", "stats")}>
             <StatPill icon={<Calendar size={13} />} label={t("admin", "sessions")} value={series._count?.sessions ?? series.sessions?.length ?? "—"} />
-            <StatPill icon={<Users size={13} />} label={t("admin", "attendees")} value={series._count?.orders ?? "—"} />
+            <StatPill icon={<Users size={13} />} label={t("admin", "attendees")} value={series._count?.Order ?? "—"} />
           </Section>
         </div>
       )}
@@ -399,7 +424,7 @@ export default function SeriesDrawer({
               {t("admin", "noSessionsFound")}
             </div>
           )}
-          {series?.sessions?.map((sess: any) => (
+          {series?.sessions?.map((sess) => (
             <div
               key={sess.id}
               style={{
@@ -438,7 +463,7 @@ export default function SeriesDrawer({
                       </div>
                     )}
                   </div>
-                  {sess.occupancies?.map((occupancy: any) => (
+                  {sess.occupancies?.map((occupancy) => (
                     <div key={occupancy.id} style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 6 }}>
                       {occupancy.scope === "VENUE" ? t("admin", "wholeVenueExclusive") : occupancy.space?.name || t("admin", "selectedSpaceExclusive")} · {occupancy.status}
                     </div>
@@ -486,7 +511,7 @@ export default function SeriesDrawer({
                 </div>
               )}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {orders.orders.map((o: any) => (
+                {orders.orders.map((o) => (
                   <button
                     key={o.id}
                     onClick={() => onOrderOpen?.(o.id)}
@@ -555,7 +580,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function StatPill({ icon, label, value }: { icon: React.ReactNode; label: string; value: any }) {
+function StatPill({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-text-secondary)" }}>

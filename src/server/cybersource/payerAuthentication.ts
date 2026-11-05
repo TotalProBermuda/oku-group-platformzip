@@ -6,6 +6,7 @@ import {
   getResolvedCybersourceConfig,
   type ResolvedCybersourceConfig,
 } from "@/server/cybersource/client";
+import { asRecord, errorMessage } from "@/server/payments/providers/types";
 
 type Billing = {
   firstName: string;
@@ -36,6 +37,8 @@ export type PayerAuthenticationData = {
   indicator?: string;
   eciRaw?: string;
   cavv?: string;
+  ucafCollectionIndicator?: string;
+  ucafAuthenticationData?: string;
   xid?: string;
   directoryServerTransactionId?: string;
   threeDSServerTransactionId?: string;
@@ -50,7 +53,42 @@ export type PayerAuthenticationChallenge = {
   cardType?: string;
 };
 
-type Call = { httpStatus: number | null; body: any; networkError: string | null };
+type Call = { httpStatus: number | null; body: unknown; networkError: string | null };
+
+// Explicit allowlist only: never log request bodies, tokens, billing, or raw
+// provider messages (which can contain payment data).
+function logAuthenticationFailure(stage: "setup" | "enrollment" | "validation", result: Call) {
+  const code = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(value) ? value : undefined;
+  const body = asRecord(result.body);
+  const errorInformation = asRecord(body?.errorInformation);
+  console.warn(JSON.stringify({
+    type: "checkout_authentication_failed", stage,
+    httpStatus: result.httpStatus,
+    status: code(body?.status),
+    reason: code(errorInformation?.reason),
+    networkFailure: Boolean(result.networkError),
+  }));
+}
+
+/**
+ * Flex Microform returns a JWT. Payer Authentication's `transientToken`
+ * field is deliberately different from the Payments API's
+ * `transientTokenJwt` field: it expects the JWT's `jti` claim, not the full
+ * encoded JWT. Keep this conversion at the server boundary so the browser
+ * never has to interpret payment credentials.
+ */
+export function payerAuthenticationTransientToken(transientTokenJwt: string): string {
+  const payload = transientTokenJwt.split(".")[1];
+  if (!payload) throw new Error("The secure card token is malformed. Please start a fresh payment attempt.");
+
+  try {
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (typeof claims?.jti !== "string" || claims.jti.length < 20) throw new Error("missing jti");
+    return claims.jti;
+  } catch {
+    throw new Error("The secure card token is malformed. Please start a fresh payment attempt.");
+  }
+}
 
 async function postSigned(cfg: ResolvedCybersourceConfig, path: string, body: unknown): Promise<Call> {
   const host = cybersourceHost(cfg.env);
@@ -66,44 +104,54 @@ async function postSigned(cfg: ResolvedCybersourceConfig, path: string, body: un
       body: json,
     });
     const text = await response.text();
-    let parsed: any = null;
+    let parsed: unknown = null;
     try { parsed = text ? JSON.parse(text) : null; } catch { parsed = { rawText: text.slice(0, 1000) }; }
     return { httpStatus: response.status, body: parsed, networkError: null };
-  } catch (error: any) {
-    return { httpStatus: null, body: null, networkError: error?.message ?? "network error" };
+  } catch (error: unknown) {
+    return { httpStatus: null, body: null, networkError: errorMessage(error, "network error") };
   }
 }
 
-function toAuthenticationData(info: any): PayerAuthenticationData {
+function toAuthenticationData(value: unknown): PayerAuthenticationData {
+  const info = asRecord(value);
+  const stringValue = (key: string, fallback?: string): string | undefined => {
+    const candidate = info?.[key] ?? (fallback ? info?.[fallback] : undefined);
+    return typeof candidate === "string" ? candidate : undefined;
+  };
   return {
-    indicator: info?.indicator,
-    eciRaw: info?.eciRaw ?? info?.eci,
-    cavv: info?.cavv,
-    xid: info?.xid,
-    directoryServerTransactionId: info?.directoryServerTransactionId,
-    threeDSServerTransactionId: info?.threeDSServerTransactionId,
-    specificationVersion: info?.specificationVersion,
-    paresStatus: info?.paresStatus,
+    indicator: stringValue("indicator", "ecommerceIndicator"),
+    eciRaw: stringValue("eciRaw", "eci"),
+    cavv: stringValue("cavv"),
+    ucafCollectionIndicator: stringValue("ucafCollectionIndicator"),
+    ucafAuthenticationData: stringValue("ucafAuthenticationData"),
+    xid: stringValue("xid"),
+    directoryServerTransactionId: stringValue("directoryServerTransactionId"),
+    threeDSServerTransactionId: stringValue("threeDSServerTransactionId"),
+    specificationVersion: stringValue("specificationVersion"),
+    paresStatus: stringValue("paresStatus"),
   };
 }
 
 /** Start the CyberSource browser 3-D Secure device-profiling session. */
-export async function setupPayerAuthentication(transientToken: string) {
+export async function setupPayerAuthentication(transientTokenJwt: string) {
   const cfg = await getResolvedCybersourceConfig();
   const result = await postSigned(cfg, "/risk/v1/authentication-setups", {
-    tokenInformation: { transientToken },
+    tokenInformation: { transientToken: payerAuthenticationTransientToken(transientTokenJwt) },
   });
-  const info = result.body?.consumerAuthenticationInformation;
-  if (!result.httpStatus || result.httpStatus >= 300 || !info?.referenceId || !info?.accessToken || !info?.deviceDataCollectionUrl) {
-    throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Unable to initialize cardholder verification.");
+  const body = asRecord(result.body);
+  const info = asRecord(body?.consumerAuthenticationInformation);
+  const errorInformation = asRecord(body?.errorInformation);
+  if (!result.httpStatus || result.httpStatus >= 300 || typeof info?.referenceId !== "string" || typeof info.accessToken !== "string" || typeof info.deviceDataCollectionUrl !== "string") {
+    logAuthenticationFailure("setup", result);
+    throw new Error((typeof errorInformation?.message === "string" ? errorInformation.message : null) ?? result.networkError ?? "Unable to initialize cardholder verification.");
   }
-  return { referenceId: info.referenceId as string, accessToken: info.accessToken as string, deviceDataCollectionUrl: info.deviceDataCollectionUrl as string };
+  return { referenceId: info.referenceId, accessToken: info.accessToken, deviceDataCollectionUrl: info.deviceDataCollectionUrl };
 }
 
 /** Check enrollment after browser device collection. The caller may then either
  * authorize a frictionless result or render the returned step-up iframe. */
 export async function checkPayerAuthentication(input: {
-  transientToken: string;
+  transientTokenJwt: string;
   referenceId: string;
   amount: string;
   currency: string;
@@ -117,8 +165,10 @@ export async function checkPayerAuthentication(input: {
   const cfg = await getResolvedCybersourceConfig();
   const result = await postSigned(cfg, "/risk/v1/authentications", {
     orderInformation: { amountDetails: { totalAmount: input.amount, currency: input.currency }, billTo: input.billing },
+    // This is our own user ID, not a CyberSource TMS customer token.
+    // Flex supplies the payment credential via tokenInformation below.
+    buyerInformation: { merchantCustomerId: input.customerId },
     paymentInformation: {
-      customer: { customerId: input.customerId },
       card: { expirationMonth: input.expirationMonth, expirationYear: input.expirationYear },
     },
     deviceInformation: {
@@ -137,14 +187,22 @@ export async function checkPayerAuthentication(input: {
       deviceChannel: "BROWSER", transactionMode: "eCommerce",
       referenceId: input.referenceId, returnUrl: input.returnUrl, acsWindowSize: "05",
     },
-    tokenInformation: { transientToken: input.transientToken },
+    tokenInformation: { transientToken: payerAuthenticationTransientToken(input.transientTokenJwt) },
   });
-  const info = result.body?.consumerAuthenticationInformation;
-  if (result.body?.status === "PENDING_AUTHENTICATION" && info?.authenticationTransactionId && info?.stepUpUrl && info?.token) {
-    return { kind: "challenge" as const, challenge: { authenticationTransactionId: info.authenticationTransactionId, stepUpUrl: info.stepUpUrl, token: info.token, cardType: result.body?.paymentInformation?.card?.type } };
+  const body = asRecord(result.body);
+  const info = asRecord(body?.consumerAuthenticationInformation);
+  const paymentInformation = asRecord(body?.paymentInformation);
+  const card = asRecord(paymentInformation?.card);
+  const errorInformation = asRecord(body?.errorInformation);
+  if (result.httpStatus && result.httpStatus < 300 && body?.status === "PENDING_AUTHENTICATION" && typeof info?.authenticationTransactionId === "string" && typeof info.stepUpUrl === "string" && typeof info.accessToken === "string") {
+    const url = new URL(info.stepUpUrl);
+    const expectedHost = cfg.env === "production" ? "centinelapi.cardinalcommerce.com" : "centinelapistag.cardinalcommerce.com";
+    if (url.protocol !== "https:" || url.hostname !== expectedHost || url.username || url.password) throw new Error("Invalid verification destination.");
+    return { kind: "challenge" as const, challenge: { authenticationTransactionId: info.authenticationTransactionId, stepUpUrl: info.stepUpUrl, token: info.accessToken, cardType: typeof card?.type === "string" ? card.type : undefined } };
   }
-  if (result.body?.status === "AUTHENTICATION_SUCCESSFUL") return { kind: "authenticated" as const, authentication: toAuthenticationData(info) };
-  throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
+  if (result.httpStatus && result.httpStatus < 300 && body?.status === "AUTHENTICATION_SUCCESSFUL") return { kind: "authenticated" as const, authentication: toAuthenticationData(info) };
+  logAuthenticationFailure("enrollment", result);
+  throw new Error((typeof errorInformation?.message === "string" ? errorInformation.message : null) ?? result.networkError ?? "Cardholder verification was not completed.");
 }
 
 /** Complete a required 3-D Secure challenge, then return fields safe to send
@@ -155,8 +213,11 @@ export async function validatePayerAuthentication(input: { authenticationTransac
     paymentInformation: input.cardType ? { card: { type: input.cardType } } : undefined,
     consumerAuthenticationInformation: { authenticationTransactionId: input.authenticationTransactionId },
   });
-  if (result.body?.status !== "AUTHENTICATION_SUCCESSFUL") {
-    throw new Error(result.body?.errorInformation?.message ?? result.networkError ?? "Cardholder verification was not completed.");
+  const body = asRecord(result.body);
+  const errorInformation = asRecord(body?.errorInformation);
+  if (!result.httpStatus || result.httpStatus >= 300 || body?.status !== "AUTHENTICATION_SUCCESSFUL") {
+    logAuthenticationFailure("validation", result);
+    throw new Error((typeof errorInformation?.message === "string" ? errorInformation.message : null) ?? result.networkError ?? "Cardholder verification was not completed.");
   }
-  return toAuthenticationData(result.body?.consumerAuthenticationInformation);
+  return toAuthenticationData(asRecord(body?.consumerAuthenticationInformation));
 }

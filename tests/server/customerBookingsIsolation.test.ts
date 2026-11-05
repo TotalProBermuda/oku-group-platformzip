@@ -44,6 +44,9 @@ describe("customer booking isolation", () => {
       where: expect.objectContaining({
         attendeeEmailNormalized: "guest@example.com",
       }),
+      select: expect.objectContaining({
+        session: { select: expect.objectContaining({ id: true }) },
+      }),
     }));
   });
 

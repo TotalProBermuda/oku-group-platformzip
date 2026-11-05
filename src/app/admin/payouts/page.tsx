@@ -1,4 +1,5 @@
 import AdminPageShell from "@/components/admin/AdminPageShell";
+import Link from "next/link";
 import PayoutBatchesPanel from "@/components/admin/payouts/PayoutBatchesPanel";
 import { listBatches } from "@/server/payouts/payoutBatchService";
 
@@ -39,9 +40,9 @@ export default async function AdminPayoutsPage() {
           Payout batches will refuse to advance if any included influencer is not <b>BANK_READY</b>.
           Manage beneficiary records and bank-readiness status in the Beneficiaries view.
         </div>
-        <a href="/admin/payouts/beneficiaries" style={{ padding: "8px 14px", borderRadius: 6, background: "#1f1d1b", color: "#fff", fontWeight: 600, textDecoration: "none", fontSize: 13 }}>
+        <Link href="/admin/payouts/beneficiaries" style={{ padding: "8px 14px", borderRadius: 6, background: "#1f1d1b", color: "#fff", fontWeight: 600, textDecoration: "none", fontSize: 13 }}>
           Open Beneficiaries →
-        </a>
+        </Link>
       </div>
       <PayoutBatchesPanel initialBatches={batches} />
     </AdminPageShell>

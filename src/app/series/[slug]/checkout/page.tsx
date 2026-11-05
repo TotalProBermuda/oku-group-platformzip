@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
 import { getTicketTypeName, getSessionTitle } from "@/data/seriesTranslations";
 import type { Locale } from "@/types/i18n";
@@ -37,7 +38,7 @@ interface OrderResult {
   tickets: { id: string; code: string }[];
 }
 
-export default function CheckoutPage({ params }: { params: any }) {
+export default function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
   const t = useTranslation();
   const locale = useLocale();
 
@@ -60,18 +61,16 @@ export default function CheckoutPage({ params }: { params: any }) {
   const [slug, setSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.resolve(params).then((p: any) => {
-      const s = typeof p === "string" ? p : p.slug;
-      setSlug(s);
-    });
+    void params.then(({ slug: seriesSlug }) => setSlug(seriesSlug));
   }, [params]);
 
   useEffect(() => {
     if (!slug) return;
     fetch("/api/v1/series")
       .then((r) => r.json())
+      .then(async (response) => response.json() as Promise<{ data?: Series[] }>)
       .then((json) => {
-        const found = (json.data || []).find((s: any) => s.slug === slug);
+        const found = (json.data || []).find((seriesOption) => seriesOption.slug === slug);
         if (!found) {
           setError(t("common", "seriesNotFound"));
         } else {
@@ -162,7 +161,7 @@ export default function CheckoutPage({ params }: { params: any }) {
             ))}
           </div>
           <div className="mt-4">
-            <a href="/my/orders" className="btn btn-primary">{t("common", "viewMyOrders")}</a>
+            <Link href="/my/orders" className="btn btn-primary">{t("common", "viewMyOrders")}</Link>
           </div>
         </div>
       </div>

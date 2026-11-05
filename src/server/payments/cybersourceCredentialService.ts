@@ -167,7 +167,7 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
   }
 
   const data: Record<string, unknown> = {};
-  const nonSecretKeys: Array<keyof CybersourcePatchBody> = [
+  const nonSecretKeys = [
     "enabled",
     "environment",
     "checkoutTitle",
@@ -175,7 +175,7 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
     "cardSecurityCodeEnabled",
     "detailedDeclineMessagesEnabled",
     "debugMode",
-  ];
+  ] as const;
   for (const k of nonSecretKeys) {
     if (body[k] !== undefined) data[k as string] = body[k];
   }
@@ -225,10 +225,12 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
     "portfolioIdLast4"
   );
 
-  // Reset test state when any core credential field changes — the prior test
-  // result is no longer valid for the new key material. Non-secret config
-  // changes (checkout title, debug mode, etc.) do not invalidate the test.
-  if (merchantIdChanged || keyIdChanged || sharedSecretChanged) {
+  // Reset certification when core credentials or the endpoint environment
+  // changes. The pass remains valid indefinitely only for this exact setup;
+  // checkout title, debug mode, and other display-only changes do not expire it.
+  const environmentChanged =
+    body.environment !== undefined && body.environment !== prev.environment;
+  if (merchantIdChanged || keyIdChanged || sharedSecretChanged || environmentChanged) {
     data.lastTestStatus = null;
     data.lastTestedAt = null;
     data.lastTestMessage = null;
@@ -260,7 +262,7 @@ export function buildCybersourceUpdate(body: CybersourcePatchBody, prev: Cred) {
     "detailedDeclineMessagesEnabled",
     "debugMode",
   ] as const) {
-    if (body[k] !== undefined && (prev as any)[k] !== body[k]) {
+    if (body[k] !== undefined && prev[k] !== body[k]) {
       publicSettingsChanged = true;
     }
   }

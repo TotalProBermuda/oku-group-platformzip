@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import "./commerce-settings.css";
+import FinanceRulesPanel from "./FinanceRulesPanel";
 
 type StoreStatus = "OPEN" | "CLOSED" | "TEST_MODE";
 type DebugMode = "OFF" | "ERRORS_ONLY" | "VERBOSE";
@@ -239,12 +241,10 @@ export default function CommerceSettingsPanel() {
     if (!draft || !original) return;
     setSaving(true);
     try {
-      const patch: Partial<Settings> = {};
-      (Object.keys(draft) as (keyof Settings)[]).forEach((k) => {
-        if (JSON.stringify(draft[k]) !== JSON.stringify(original[k])) {
-          (patch as any)[k] = draft[k];
-        }
-      });
+      const changedEntries = (Object.keys(draft) as (keyof Settings)[])
+        .filter((key) => JSON.stringify(draft[key]) !== JSON.stringify(original[key]))
+        .map((key) => [key, draft[key]] as const);
+      const patch = Object.fromEntries(changedEntries) as Partial<Settings>;
       const res = await fetch("/api/v1/admin/commerce/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -295,6 +295,7 @@ export default function CommerceSettingsPanel() {
 
   return (
     <main className="commerce-settings">
+      <FinanceRulesPanel />
       <header className="commerce-settings__header">
         <h1>Commerce Settings</h1>
         <p>
@@ -695,13 +696,13 @@ export default function CommerceSettingsPanel() {
                 label="Send test email"
                 helper="Test delivery from the Payments operations area to avoid duplicating credentials here."
               >
-                <a
+                <Link
                   href="/admin/payments"
                   className="commerce-settings__btn"
                   style={{ display: "inline-block", textDecoration: "none" }}
                 >
                   Test from Payments →
-                </a>
+                </Link>
               </SettingRow>
             </>
           )}
@@ -736,7 +737,7 @@ export default function CommerceSettingsPanel() {
                     </span>
                     {badge}
                     <span className="commerce-settings__integration-action">
-                      <a href="/admin/payments?tab=cybersource">Manage →</a>
+                      <Link href="/admin/payments?tab=cybersource">Manage →</Link>
                     </span>
                   </div>
                 );
@@ -755,7 +756,7 @@ export default function CommerceSettingsPanel() {
                   <Badge variant="neutral">Not configured · standby</Badge>
                 )}
                 <span className="commerce-settings__integration-action">
-                  <a href="/admin/payments?tab=authnet">Manage →</a>
+                  <Link href="/admin/payments?tab=authnet">Manage →</Link>
                 </span>
               </div>
               <div className="commerce-settings__integration-row">
@@ -769,7 +770,7 @@ export default function CommerceSettingsPanel() {
                   <Badge variant="error">Missing</Badge>
                 )}
                 <span className="commerce-settings__integration-action">
-                  <a href="/admin/payments">Manage →</a>
+                  <Link href="/admin/payments">Manage →</Link>
                 </span>
               </div>
               <div className="commerce-settings__integration-row">
@@ -779,7 +780,7 @@ export default function CommerceSettingsPanel() {
                 </span>
                 <Badge variant="neutral">See integration</Badge>
                 <span className="commerce-settings__integration-action">
-                  <a href="/admin/integrations/invu">Manage →</a>
+                  <Link href="/admin/integrations/invu">Manage →</Link>
                 </span>
               </div>
               <div className="commerce-settings__integration-row">
@@ -793,7 +794,7 @@ export default function CommerceSettingsPanel() {
                   <Badge variant="warning">Inline fallback</Badge>
                 )}
                 <span className="commerce-settings__integration-action">
-                  <a href="/admin/payments">Status →</a>
+                  <Link href="/admin/payments">Status →</Link>
                 </span>
               </div>
             </>

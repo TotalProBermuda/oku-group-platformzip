@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isWithinTicketSalesWindow } from "@/server/commerce/ticketSalesWindow";
+import { sessionProductEnabled } from "./sessionProducts";
+import type { Prisma } from "@prisma/client";
 
 type CheckoutItem = { ticketTypeId?: string; addonId?: string; qty: number };
 
@@ -20,19 +22,25 @@ export async function assertCheckoutCatalogPolicy(input: {
   sessionId: string;
   items: CheckoutItem[];
   now?: Date;
+  db?: Prisma.TransactionClient;
 }) {
+  const db = input.db ?? prisma;
   const now = input.now ?? new Date();
-  const session = await prisma.session.findUnique({
+  const session = await db.session.findUnique({
     where: { id: input.sessionId },
     include: {
+      ticketPrices: true,
       series: {
         select: {
           id: true,
+          venueId: true,
           status: true,
           minMembershipTier: true,
           isFounderOnly: true,
           commercialOwnerInfluencerId: true,
           influencerId: true,
+          membershipRuleMode: true,
+          sessionDefaults: true,
         },
       },
     },
@@ -40,6 +48,12 @@ export async function assertCheckoutCatalogPolicy(input: {
   if (!session) throw new CatalogPolicyError("SESSION_NOT_FOUND", "Session not found", 404);
   if (session.status !== "SCHEDULED") {
     throw new CatalogPolicyError("SESSION_UNAVAILABLE", "This session is not available for purchase.");
+  }
+  if (session.endsAt <= now) {
+    throw new CatalogPolicyError("SESSION_ENDED", "This event has already ended.", 409);
+  }
+  if (session.startsAt <= now && !session.allowLateSales) {
+    throw new CatalogPolicyError("SESSION_SALES_CLOSED", "Ticket sales have closed because this event has started.", 409);
   }
   if (session.series.status !== "PUBLISHED") {
     throw new CatalogPolicyError("EXPERIENCE_NOT_PUBLIC", "This experience is not available for purchase.");
@@ -52,10 +66,16 @@ export async function assertCheckoutCatalogPolicy(input: {
   }
 
   const [membership, user, tickets, addons] = await Promise.all([
-    prisma.membership.findFirst({ where: { userId: input.userId, status: "ACTIVE" }, select: { tier: true } }),
-    prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } }),
-    prisma.ticketType.findMany({ where: { id: { in: [...ticketQuantities.keys()] } } }),
-    prisma.experienceAddon.findMany({ where: { id: { in: [...addonQuantities.keys()] } } }),
+    db.membership.findFirst({
+      where: { userId: input.userId, status: "ACTIVE" },
+      select: { tier: true, benefitsJson: true },
+    }),
+    db.user.findUnique({ where: { id: input.userId }, select: { email: true } }),
+    db.ticketType.findMany({
+      where: { id: { in: [...ticketQuantities.keys()] } },
+      include: { pricingRules: { where: { isActive: true }, orderBy: { priority: "asc" } } },
+    }),
+    db.experienceAddon.findMany({ where: { id: { in: [...addonQuantities.keys()] } } }),
   ]);
 
   if (tickets.length !== ticketQuantities.size) {
@@ -68,9 +88,9 @@ export async function assertCheckoutCatalogPolicy(input: {
   const email = user?.email?.toLowerCase();
   const [newsletter, invitations] = await Promise.all([
     email
-      ? prisma.newsletterSubscription.findFirst({ where: { email, isActive: true }, select: { id: true } })
+      ? db.newsletterSubscription.findFirst({ where: { email, isActive: true }, select: { id: true } })
       : null,
-    prisma.eventInvitation.findMany({
+    db.eventInvitation.findMany({
       where: {
         seriesId: session.series.id,
         status: { notIn: ["DECLINED"] },
@@ -95,6 +115,7 @@ export async function assertCheckoutCatalogPolicy(input: {
       throw new CatalogPolicyError("TICKET_SCOPE_MISMATCH", "A ticket does not belong to this experience.", 400);
     }
     if (ticket.ticketStatus !== "ACTIVE") throw new CatalogPolicyError("TICKET_INACTIVE", "This ticket is not available.");
+    if (!sessionProductEnabled(session, session.series, ticket.id)) throw new CatalogPolicyError("SESSION_PRODUCT_DISABLED", "This ticket is not available for this session.");
     if (!isWithinTicketSalesWindow(ticket, session, now)) {
       throw new CatalogPolicyError("TICKET_OUTSIDE_SALE_WINDOW", "This ticket is not currently on sale.");
     }
@@ -135,7 +156,7 @@ export async function assertCheckoutCatalogPolicy(input: {
     }
   }
 
-  return { session, tickets, addons };
+  return { session, tickets, addons, membership };
 }
 
 function aggregate(items: CheckoutItem[], key: "ticketTypeId" | "addonId") {

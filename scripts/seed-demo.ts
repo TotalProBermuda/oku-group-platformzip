@@ -4,12 +4,12 @@
  * Safe to re-run: uses upsert / skip-if-exists patterns.
  */
 
-import { PrismaClient } from "@prisma/client";
+import { AttributionSource, OrderStatus, PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function rand<T>(arr: T[]): T {
+function rand<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
@@ -422,8 +422,8 @@ async function main() {
   if (sessions.length === 0) {
     console.log("     ⚠ No sessions found — skipping orders");
   } else {
-    const ORDER_STATUSES = ["PAID", "PAID", "PAID", "PENDING", "CANCELLED"] as const;
-    const ATTRIBUTION_SOURCES = ["DIRECT", "DIRECT", "INFLUENCER_HOST", "EVENT_REFERRER_LINK"] as const;
+    const ORDER_STATUSES: readonly OrderStatus[] = ["PAID", "PAID", "PAID", "PENDING", "CANCELLED"];
+    const ATTRIBUTION_SOURCES: readonly AttributionSource[] = ["DIRECT", "DIRECT", "INFLUENCER_HOST", "EVENT_REFERRER_LINK"];
     const DEMO_TRANS_IDS = ["AUTH-100123", "AUTH-100456", "AUTH-100789", "AUTH-101234", "AUTH-101567"];
     let ordersCreated = 0;
 

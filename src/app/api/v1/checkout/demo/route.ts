@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";
+import { purchasedEntitlements } from "@/server/commerce/sessionProducts";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { safeEnqueue } from "@/server/queue/queue";
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
 
     let subtotalCents = 0;
     let totalQty = 0;
-    const lineItemsData: { ticketTypeId: string; qty: number; unitPriceCents: number; totalCents: number }[] = [];
+    const lineItemsData: { ticketTypeId: string; nameSnapshot: string; qty: number; unitPriceCents: number; totalCents: number }[] = [];
 
     for (const item of items) {
       const tt = ttMap.get(item.ticketTypeId);
@@ -88,17 +90,20 @@ export async function POST(req: Request) {
     }
 
     const order = await prisma.$transaction(async (tx) => {
-      const updated = await tx.session.updateMany({
-        where: {
-          id: sessionId,
-          soldCount: { lte: session.capacity - totalQty },
-        },
-        data: { soldCount: { increment: totalQty } },
-      });
-
-      if (updated.count === 0) {
-        throw new Error("Not enough capacity");
+      const current = await reserveCatalogCapacityInTransaction(tx, { sessionId, ticketItems: items.map(i => ({ id: i.ticketTypeId, qty: i.qty })), addonItems: [] });
+      const rights = purchasedEntitlements(current);
+      const [currentProducts, currentPrices] = await Promise.all([
+        tx.ticketType.findMany({ where: { seriesId: current.seriesId } }),
+        tx.sessionTicketPrice.findMany({ where: { sessionId } }),
+      ]);
+      for (const line of lineItemsData) {
+        const product = currentProducts.find(p => p.id === line.ticketTypeId);
+        if (!product) throw new Error("Ticket product is unavailable");
+        line.nameSnapshot = product.name;
+        line.unitPriceCents = currentPrices.find(p => p.ticketTypeId === product.id)?.priceCents ?? product.priceCents;
+        line.totalCents = line.unitPriceCents * line.qty;
       }
+      subtotalCents = lineItemsData.reduce((n, l) => n + l.totalCents, 0);
 
       const newOrder = await tx.order.create({
         data: {
@@ -106,6 +111,7 @@ export async function POST(req: Request) {
           seriesId,
           sessionId,
           status: "PAID",
+          entitlementSnapshot: rights,
           subtotalCents,
           feesCents: 0,
           taxCents: 0,
@@ -133,6 +139,8 @@ export async function POST(req: Request) {
             orderId: newOrder.id,
             userId,
             sessionId,
+            ticketTypeId: item.ticketTypeId,
+            entitlementSnapshot: rights,
             code: genCode(),
             attendeeName: auth.session.user.name ?? null,
             attendeeEmail: auth.session.user.email?.trim().toLowerCase() ?? null,
@@ -159,11 +167,12 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, data: order });
-  } catch (err: any) {
-    if (err.message === "Unauthorized") {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "Unauthorized") {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
-    if (err.message === "Not enough capacity") {
+    if (message === "Not enough capacity") {
       return NextResponse.json({ ok: false, error: "Not enough capacity" }, { status: 400 });
     }
     return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });

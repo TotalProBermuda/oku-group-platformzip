@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePartnerForSeries, PartnerAuthError, hasFullSeriesAccess, accessibleSessionIds } from "@/lib/partnerAuth";
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const fullAccess = hasFullSeriesAccess(auth);
     const allowedSessions = accessibleSessionIds(auth);
-    const where: any = { order: { seriesId: id, status: "PAID" } };
+    const where: Prisma.TicketWhereInput = { order: { seriesId: id, status: "PAID" } };
     if (sessionId) {
       if (!fullAccess && !allowedSessions.has(sessionId)) {
         return new Response("Forbidden", { status: 403 });
@@ -74,9 +75,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         "content-disposition": `attachment; filename="attendees-${id}-${ts}.csv"`,
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof PartnerAuthError) return new Response(e.message, { status: e.status });
-    if (e.message === "Unauthorized") return new Response("Unauthorized", { status: 401 });
+    if (e instanceof Error && e.message === "Unauthorized") return new Response("Unauthorized", { status: 401 });
     console.error("[partner/attendees/export]", e);
     return new Response("Internal error", { status: 500 });
   }

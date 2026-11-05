@@ -1,4 +1,14 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import type { ApplicationStatus, EngagementType, OpportunityStatus } from "@prisma/client";
+
+const OPPORTUNITY_STATUSES = ["DRAFT", "PUBLISHED", "PAUSED", "CLOSED", "ARCHIVED"] as const satisfies readonly OpportunityStatus[];
+const ENGAGEMENT_TYPES = ["FULL_TIME", "PART_TIME", "SEASONAL", "CONTRACT", "CONSULTANT", "FREELANCE", "TALENT", "INTERN", "TEMPORARY"] as const satisfies readonly EngagementType[];
+const APPLICATION_STATUSES = ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "HR_SCREEN", "MANAGER_REVIEW", "INTERVIEW_SCHEDULED", "TRIAL_SHIFT", "OFFER_PENDING", "HIRED", "REJECTED", "WITHDRAWN", "ARCHIVED"] as const satisfies readonly ApplicationStatus[];
+
+function isOneOf<T extends string>(value: string, options: readonly T[]): value is T {
+  return options.includes(value as T);
+}
 
 // ── Filters ────────────────────────────────────────────────────────────────
 export type OpportunityFilters = {
@@ -78,11 +88,11 @@ export type OpportunityRow = {
 export async function getOpportunityDashboardRows(
   filters: OpportunityFilters = {}
 ): Promise<OpportunityRow[]> {
-  const where: any = {};
-  if (filters.status) where.status = filters.status;
+  const where: Prisma.OpportunityWhereInput = {};
+  if (filters.status && isOneOf(filters.status, OPPORTUNITY_STATUSES)) where.status = filters.status;
   if (filters.department) where.department = { contains: filters.department, mode: "insensitive" };
   if (filters.location) where.locationKey = filters.location;
-  if (filters.engagementType) where.engagementType = filters.engagementType;
+  if (filters.engagementType && isOneOf(filters.engagementType, ENGAGEMENT_TYPES)) where.engagementType = filters.engagementType;
   if (filters.search) {
     where.title = { contains: filters.search, mode: "insensitive" };
   }
@@ -149,16 +159,16 @@ export type ApplicationRow = {
   opportunityTitle: string;
   applicantName: string;
   applicantEmail: string;
-  normalized: Record<string, any>;
+  normalized: Record<string, unknown>;
 };
 
 export async function getApplicationsPipeline(
   filters: ApplicationFilters = {},
   limit = 50
 ): Promise<ApplicationRow[]> {
-  const where: any = {};
+  const where: Prisma.ApplicationSubmissionWhereInput = {};
   if (filters.opportunityId) where.opportunityId = filters.opportunityId;
-  if (filters.stage) where.status = filters.stage;
+  if (filters.stage && isOneOf(filters.stage, APPLICATION_STATUSES)) where.status = filters.stage;
 
   const rows = await prisma.applicationSubmission.findMany({
     where,
@@ -180,7 +190,7 @@ export async function getApplicationsPipeline(
     opportunityTitle: r.opportunity.title,
     applicantName: r.applicantProfile.fullName,
     applicantEmail: r.applicantProfile.email,
-    normalized: (r.normalizedSnapshotJson as Record<string, any>) ?? {},
+    normalized: asJsonRecord(r.normalizedSnapshotJson),
   }));
 
   // Client-side filter on normalized JSON fields
@@ -192,7 +202,9 @@ export async function getApplicationsPipeline(
   }
   if (filters.language) {
     filtered = filtered.filter((r) => {
-      const langs: string[] = Array.isArray(r.normalized.languages) ? r.normalized.languages : [];
+      const langs: string[] = Array.isArray(r.normalized.languages)
+        ? r.normalized.languages.filter((language): language is string => typeof language === "string")
+        : [];
       return langs.some((l) => l.toLowerCase().includes(filters.language!.toLowerCase()));
     });
   }
@@ -200,13 +212,20 @@ export async function getApplicationsPipeline(
     const min = parseInt(filters.experience);
     if (!isNaN(min)) {
       filtered = filtered.filter((r) => {
-        const yrs = parseInt(r.normalized.yearsExperience ?? r.normalized.yearsHospitalityExperience ?? "0");
+        const years = r.normalized.yearsExperience ?? r.normalized.yearsHospitalityExperience;
+        const yrs = parseInt(typeof years === "string" || typeof years === "number" ? String(years) : "0");
         return yrs >= min;
       });
     }
   }
 
   return filtered;
+}
+
+function asJsonRecord(value: Prisma.JsonValue): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 // ── Dashboard summary stats ────────────────────────────────────────────────

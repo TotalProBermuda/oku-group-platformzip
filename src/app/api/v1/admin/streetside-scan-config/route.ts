@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,8 +35,9 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: { streetsideHosts, globalDefault } });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    const details = getAdminApiErrorDetails(error);
+    return NextResponse.json({ ok: false, error: details.message }, { status: details.status });
   }
 }
 
@@ -76,7 +78,8 @@ export async function PUT(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, data: config });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (error: unknown) {
+    const details = getAdminApiErrorDetails(error);
+    return NextResponse.json({ ok: false, error: details.message }, { status: details.status });
   }
 }

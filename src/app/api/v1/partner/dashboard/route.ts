@@ -63,7 +63,7 @@ export async function GET() {
       where: { userId },
       select: {
         actorTypeCode: true,
-        referralLinks: {
+        links: {
           where: { isActive: true },
           select: { code: true },
           orderBy: { createdAt: "asc" },
@@ -83,12 +83,12 @@ export async function GET() {
       series: seriesList,
       referrals,
       referral: {
-        referralCode: referralActor?.referralLinks[0]?.code ?? null,
+        referralCode: referralActor?.links[0]?.code ?? null,
         actorTypeCode: referralActor?.actorTypeCode ?? null,
       },
     });
-  } catch (err: any) {
-    if (err.message === "Unauthorized") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

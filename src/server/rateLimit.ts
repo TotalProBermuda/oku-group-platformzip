@@ -91,7 +91,12 @@ function checkRateLimitInMemory(opts: RateLimitOptions): RateLimitResult {
 function stableRateLimitSecret(): string | null {
   // APP_ENCRYPTION_KEY is already mandatory for encrypted production data.
   // Auth secrets are a safe compatibility fallback for older environments.
-  return process.env.APP_ENCRYPTION_KEY ?? process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? null;
+  return (
+    process.env.APP_ENCRYPTION_KEY ??
+    process.env.AUTH_SECRET ??
+    process.env.NEXTAUTH_SECRET ??
+    null
+  );
 }
 
 function hashRateLimitKey(key: string): string | null {
@@ -99,9 +104,15 @@ function hashRateLimitKey(key: string): string | null {
   return secret ? createHmac("sha256", secret).update(key).digest("hex") : null;
 }
 
-async function checkRateLimitRedis(client: Redis, opts: RateLimitOptions): Promise<RateLimitResult> {
+async function checkRateLimitRedis(
+  client: Redis,
+  opts: RateLimitOptions,
+): Promise<RateLimitResult> {
   const keyHash = hashRateLimitKey(opts.key);
-  if (!keyHash) throw new Error("No stable secret available for Redis rate-limit key hashing");
+  if (!keyHash)
+    throw new Error(
+      "No stable secret available for Redis rate-limit key hashing",
+    );
 
   // A Lua script prevents the INCR/EXPIRE split that can leave a counter
   // without an expiry if a process stops between two separate commands.
@@ -113,11 +124,15 @@ async function checkRateLimitRedis(client: Redis, opts: RateLimitOptions): Promi
     [String(Math.max(1, opts.windowMs))],
   )) as [number, number];
   const [count, ttlMs] = reply;
-  if (!Number.isInteger(count)) throw new Error("Redis rate-limit counter did not return a count");
+  if (!Number.isInteger(count))
+    throw new Error("Redis rate-limit counter did not return a count");
   if (count > opts.limit) {
     return {
       ok: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((ttlMs > 0 ? ttlMs : opts.windowMs) / 1000)),
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((ttlMs > 0 ? ttlMs : opts.windowMs) / 1000),
+      ),
       remaining: 0,
     };
   }
@@ -129,15 +144,20 @@ function pruneExpiredBuckets(now: Date) {
   nextPruneAt = now.getTime() + PRUNE_INTERVAL_MS;
   // Best effort only. Expired buckets never affect a new window because the
   // uniqueness key includes windowStart; this keeps cleanup off the hot path.
-  void prisma.rateLimitBucket.deleteMany({ where: { expiresAt: { lt: now } } }).catch(() => {});
+  void prisma.rateLimitBucket
+    .deleteMany({ where: { expiresAt: { lt: now } } })
+    .catch(() => {});
 }
 
-async function checkRateLimitDatabase(opts: RateLimitOptions): Promise<RateLimitResult | null> {
+async function checkRateLimitDatabase(
+  opts: RateLimitOptions,
+): Promise<RateLimitResult | null> {
   const keyHash = hashRateLimitKey(opts.key);
   if (!keyHash) return null;
 
   const now = new Date();
-  const windowStartMs = Math.floor(now.getTime() / opts.windowMs) * opts.windowMs;
+  const windowStartMs =
+    Math.floor(now.getTime() / opts.windowMs) * opts.windowMs;
   const windowStart = new Date(windowStartMs);
   const expiresAt = new Date(windowStartMs + opts.windowMs);
   pruneExpiredBuckets(now);
@@ -157,19 +177,26 @@ async function checkRateLimitDatabase(opts: RateLimitOptions): Promise<RateLimit
     RETURNING "count";
   `;
   const count = rows[0]?.count;
-  if (!Number.isInteger(count)) throw new Error("Rate limit counter did not return a count");
+  if (!Number.isInteger(count))
+    throw new Error("Rate limit counter did not return a count");
   if (count > opts.limit) {
     return {
       ok: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / 1000)),
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((expiresAt.getTime() - now.getTime()) / 1000),
+      ),
       remaining: 0,
     };
   }
   return { ok: true, remaining: Math.max(0, opts.limit - count) };
 }
 
-export async function checkRateLimitAsync(opts: RateLimitOptions): Promise<RateLimitResult> {
-  const mustBeDistributed = opts.requireDistributed && process.env.NODE_ENV === "production";
+export async function checkRateLimitAsync(
+  opts: RateLimitOptions,
+): Promise<RateLimitResult> {
+  const mustBeDistributed =
+    opts.requireDistributed && process.env["NODE_ENV"] === "production";
 
   const redisClient = getRedis();
   if (redisClient) {
@@ -218,16 +245,22 @@ export const HONEYPOT_FIELD = "_company";
 // Parses both application/json and form-encoded bodies. Used by public
 // POST routes that may receive either JSON (from React fetch handlers)
 // or form-encoded payloads (from native <form method="POST">).
-export async function parseRequestBody(req: Request): Promise<Record<string, unknown>> {
+export async function parseRequestBody(
+  req: Request,
+): Promise<Record<string, unknown>> {
   const ct = req.headers.get("content-type") || "";
   if (ct.includes("application/json")) {
     return (await req.json().catch(() => ({}))) as Record<string, unknown>;
   }
-  if (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data")) {
+  if (
+    ct.includes("application/x-www-form-urlencoded") ||
+    ct.includes("multipart/form-data")
+  ) {
     const form = await req.formData().catch(() => null);
     if (!form) return {};
     const out: Record<string, unknown> = {};
-    for (const [k, v] of form.entries()) out[k] = typeof v === "string" ? v : "";
+    for (const [k, v] of form.entries())
+      out[k] = typeof v === "string" ? v : "";
     return out;
   }
   return (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -246,16 +279,28 @@ export function gatePublicPost(
   req: Request,
   body: unknown,
   routeKey: string,
-  opts: { limit?: number; windowMs?: number; botSuccessBody?: unknown; requireDistributed?: boolean } = {},
+  opts: {
+    limit?: number;
+    windowMs?: number;
+    botSuccessBody?: unknown;
+    requireDistributed?: boolean;
+  } = {},
 ): { ok: true } | { ok: false; response: Response } {
   const limit = opts.limit ?? 10;
   const windowMs = opts.windowMs ?? 60_000;
 
   if (isBotSubmission(body)) {
-    return { ok: false, response: Response.json(opts.botSuccessBody ?? { ok: true }) };
+    return {
+      ok: false,
+      response: Response.json(opts.botSuccessBody ?? { ok: true }),
+    };
   }
 
-  const r = checkRateLimit({ key: `${routeKey}:${clientIp(req)}`, limit, windowMs });
+  const r = checkRateLimit({
+    key: `${routeKey}:${clientIp(req)}`,
+    limit,
+    windowMs,
+  });
   if (!r.ok) {
     return {
       ok: false,
@@ -283,7 +328,10 @@ export async function gatePublicPostAsync(
   const windowMs = opts.windowMs ?? 60_000;
 
   if (isBotSubmission(body)) {
-    return { ok: false, response: Response.json(opts.botSuccessBody ?? { ok: true }) };
+    return {
+      ok: false,
+      response: Response.json(opts.botSuccessBody ?? { ok: true }),
+    };
   }
 
   const r = await checkRateLimitAsync({

@@ -8,14 +8,26 @@ import { seriesLocationLabel } from "@/lib/locations";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
-async function getSeries() {
-  const res = await fetch(`${BASE}/api/v1/series`, { cache: "no-store" });
-  return res.json();
+interface PublicSeriesCard {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  venue: string | null;
+  ticketTypes: Array<{ priceCents: number }>;
+  sessions: Array<{ id: string }>;
+  operationalVenue?: { name: string; slug: string } | null;
+  eventSpace?: { name: string; conceptKey: string | null } | null;
 }
 
-function getPriceRange(ticketTypes: any[]) {
+async function getSeries() {
+  const res = await fetch(`${BASE}/api/v1/series`, { cache: "no-store" });
+  return res.json() as Promise<{ data?: PublicSeriesCard[] }>;
+}
+
+function getPriceRange(ticketTypes: PublicSeriesCard["ticketTypes"]) {
   if (!ticketTypes?.length) return null;
-  const prices = ticketTypes.map((t: any) => t.priceCents);
+  const prices = ticketTypes.map((ticketType) => ticketType.priceCents);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const fmt = (c: number) => `$${(c / 100).toFixed(0)}`;
@@ -38,8 +50,8 @@ export default async function SeriesPage({ params }: Props) {
   ]);
 
   const c = translations.common as Record<string, string>;
-  const okuSeries  = (data || []).filter((s: any) => s.venue !== "CATCH");
-  const catchSeries = (data || []).filter((s: any) => s.venue === "CATCH");
+  const okuSeries  = (data || []).filter((series) => series.venue !== "CATCH");
+  const catchSeries = (data || []).filter((series) => series.venue === "CATCH");
 
   return (
     <div>
@@ -73,7 +85,7 @@ export default async function SeriesPage({ params }: Props) {
                   <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
                 </div>
                 <div className="card-grid">
-                  {okuSeries.map((s: any) => (
+                  {okuSeries.map((s) => (
                     <SeriesCard key={s.id} series={s} locale={safeLocale} c={c} />
                   ))}
                 </div>
@@ -86,7 +98,7 @@ export default async function SeriesPage({ params }: Props) {
                   <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
                 </div>
                 <div className="card-grid">
-                  {catchSeries.map((s: any) => (
+                  {catchSeries.map((s) => (
                     <SeriesCard key={s.id} series={s} locale={safeLocale} c={c} />
                   ))}
                 </div>
@@ -99,7 +111,7 @@ export default async function SeriesPage({ params }: Props) {
   );
 }
 
-function SeriesCard({ series, locale, c }: { series: any; locale: Locale; c: Record<string, string> }) {
+function SeriesCard({ series, locale, c }: { series: PublicSeriesCard; locale: Locale; c: Record<string, string> }) {
   const priceRange = getPriceRange(series.ticketTypes);
   const sessionCount = series.sessions?.length ?? 0;
   const content = getSeriesContent(series.slug, locale);
@@ -109,7 +121,7 @@ function SeriesCard({ series, locale, c }: { series: any; locale: Locale; c: Rec
 
   return (
     <Link href={localePath(locale, `/series/${series.slug}`)} className="series-card" style={{ textDecoration: "none" }}>
-      <div className="series-card-image" style={{ background: venueGradients[series.venue] ?? venueGradients.OKU, position: "relative" }}>
+      <div className="series-card-image" style={{ background: venueGradients[series.venue ?? ""] ?? venueGradients.OKU, position: "relative" }}>
         <span style={{ fontFamily: "var(--font-heading)", fontSize: 52, color: "rgba(255,255,255,0.07)", fontWeight: 400, letterSpacing: "-0.02em", userSelect: "none" }}>
           {locationLabel ?? "OKÜ"}
         </span>

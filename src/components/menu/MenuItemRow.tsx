@@ -27,7 +27,9 @@ export default function MenuItemRow({ item, accent, locale = "en" }: Props) {
           ))}
           {item.tags && item.tags.map(t => (
             <span key={t} style={{ marginLeft: 8, fontSize: 9, color: "#7d7269", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", verticalAlign: "middle" }}>
-              {t}
+              {t.toLowerCase() === "signature"
+                ? ({ en: "Signature", es: "Especialidad", pt: "Destaque" } as Record<Locale, string>)[locale]
+                : t}
             </span>
           ))}
         </div>

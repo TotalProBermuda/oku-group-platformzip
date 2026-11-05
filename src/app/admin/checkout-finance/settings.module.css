@@ -1,0 +1,12 @@
+.page { max-width: 960px; margin: auto; padding: 24px 16px; overflow-wrap: anywhere; }
+.page p { line-height: 1.6; }
+.panel { margin: 24px 0; padding: clamp(16px, 3vw, 28px); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px; }
+.page label { display: grid; gap: 8px; }
+.page input:not([type=checkbox]) { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; padding: 10px; font-size: 16px; border: 1px solid var(--color-border); border-radius: 8px; }
+.page .check { display: flex; align-items: flex-start; gap: 12px; margin: 24px 0; }
+.check input { width: 22px; height: 22px; flex-shrink: 0; }
+.preview { margin-top: 24px; padding: 16px; background: var(--layer-2); border-radius: 12px; }
+.preview dl div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; }
+.rule { border-top: 1px solid var(--color-border); padding: 16px 0; }
+@media (max-width: 600px) { .page button { width: 100%; min-height: 48px; } }

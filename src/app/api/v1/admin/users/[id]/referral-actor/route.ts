@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { prisma } from "@/lib/prisma";
 import { logAdminAction } from "@/lib/adminAudit";
@@ -59,8 +60,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
     const actor = await findActorForUser(id);
     return NextResponse.json({ ok: true, actor, effectiveRule: await effectiveRuleFor(actor) });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -133,7 +135,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         skippedReasons: [...new Set(backfill.skipped.map((entry) => entry.reason))],
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

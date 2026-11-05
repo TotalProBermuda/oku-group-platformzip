@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { SponsorApplicationStatus } from "@prisma/client";
 
-function isAdmin(s: any) {
-  return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
+function isAdmin(s: Session | null) {
+  return s?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -32,15 +33,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json().catch(() => ({}));
   const { status, reviewNotes, agreedPriceCents } = body;
 
-  const validStatuses = ["PENDING", "UNDER_REVIEW", "APPROVED", "REJECTED", "WITHDRAWN"];
-  if (status && !validStatuses.includes(status)) {
+  const parsedStatus = status ? Object.values(SponsorApplicationStatus).find((value) => value === status) : undefined;
+  if (status && !parsedStatus) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
   const app = await prisma.sponsorApplication.update({
     where: { id },
     data: {
-      ...(status ? { status, reviewedAt: new Date(), reviewedByUserId: (session as any)?.user?.id ?? null } : {}),
+      ...(parsedStatus ? { status: parsedStatus, reviewedAt: new Date(), reviewedByUserId: session?.user?.id ?? null } : {}),
       ...(reviewNotes !== undefined ? { reviewNotes } : {}),
     },
     include: {

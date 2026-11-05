@@ -1,54 +1,33 @@
 import { redirect } from "next/navigation";
 import { getOptionalSession } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
-import { INCLUDE_FULL } from "@/server/host/hostService";
+import { getHostQueue } from "@/server/host/hostService";
+import { parseQueueSelection, type QueueSelection } from "@/server/host/queueSelection";
 import HostOperationsBoard from "@/components/host/HostOperationsBoard";
 import { getCurrentRoles } from "@/server/auth/currentRoles";
+import type { ComponentProps } from "react";
 
 export const dynamic = "force-dynamic";
 
-async function getData(venueId: string | null) {
+async function getData(venueId: string | null, selection: QueueSelection) {
   const include = { zones: { where: { isBookable: true }, include: { tables: { where: { isActive: true } } }, orderBy: { sortOrder: "asc" as const } } };
   const venue = venueId
     ? await prisma.venue.findUnique({ where: { id: venueId }, include })
     : await prisma.venue.findFirst({ include });
   if (!venue) return { reservations: [], waitlist: [], zones: [] };
 
-  // Rolling window — must match getHostQueue() in src/server/host/hostService.ts.
-  // The server runs in UTC and Venue has no timezone column, so a Panama
-  // booking at 22:30 local (= 03:30 UTC next day) was being shoved into
-  // "yesterday" by a midnight-bounded SSR window and rendered as an empty
-  // board, even though the 20s client-side refresh (which uses the rolling
-  // window) would have populated it. Aligning both bounds eliminates the
-  // empty-on-first-paint flash and prevents users from thinking the queue
-  // is broken when it isn't.
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-  const windowEnd = new Date(now.getTime() + 30 * 60 * 60 * 1000);
-
-  const [reservations, waitlist] = await Promise.all([
-    prisma.reservation.findMany({
-      where: {
-        venueId: venue.id,
-        reservationDate: { gte: windowStart, lt: windowEnd },
-        status: { notIn: ["CANCELLED"] },
-      },
-      include: INCLUDE_FULL,
-      orderBy: { reservationDate: "asc" },
-    }),
-    prisma.resWaitlistEntry.findMany({
-      where: { venueId: venue.id, status: { in: ["ACTIVE", "READY"] } },
-      include: { zone: true },
-      orderBy: { createdAt: "asc" },
-    }),
-  ]);
-
-  return { reservations, waitlist, zones: venue.zones };
+  return getHostQueue(venue.id, selection);
 }
 
-export default async function HostOperationsPage() {
+export default async function HostOperationsPage({ searchParams }: { searchParams: Promise<{ date?: string; reservationId?: string }> }) {
+  const selection = parseQueueSelection(await searchParams);
   const session = await getOptionalSession();
-  if (!session) redirect("/login?callbackUrl=/host/operations");
+  if (!session) {
+    const query = new URLSearchParams();
+    if (selection.reservationId) query.set("reservationId", selection.reservationId);
+    if (selection.date) query.set("date", selection.date);
+    redirect(`/login?callbackUrl=${encodeURIComponent(`/host/operations?${query}`)}`);
+  }
   const roles = await getCurrentRoles(session.userId);
   const allowed = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "RESTAURANT_HOST", "RESTAURANT_SUPERVISOR"];
   if (!roles.some((r) => allowed.includes(r))) {
@@ -64,6 +43,23 @@ export default async function HostOperationsPage() {
     : await prisma.restaurantHostProfile.findUnique({ where: { userId: session.userId }, select: { venueId: true } });
   if (!isSuperadmin && !profile?.venueId) redirect("/login");
 
-  const data = await getData(profile?.venueId ?? null);
-  return <HostOperationsBoard reservations={data.reservations as any} waitlist={data.waitlist as any} zones={data.zones as any} canOverrideCapacity={canOverrideCapacity} />;
+  const linkedVenue = isSuperadmin && selection.reservationId
+    ? await prisma.reservation.findUnique({ where: { id: selection.reservationId }, select: { venueId: true } })
+    : null;
+  const data = await getData(profile?.venueId ?? linkedVenue?.venueId ?? null, selection);
+  type BoardProps = ComponentProps<typeof HostOperationsBoard>;
+  // Prisma returns Date instances and full relation records here. Normalize the
+  // values at the server/client boundary to the board's serializable DTO shape.
+  const reservations = data.reservations.map((reservation) => ({
+    ...reservation,
+    reservationDate: reservation.reservationDate.toISOString(),
+    statusLogs: reservation.statusLogs.map((log) => ({ ...log, changedAt: log.changedAt.toISOString() })),
+  })) as unknown as BoardProps["reservations"];
+  const waitlist = data.waitlist.map((entry) => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+    contactName: entry.contactName ?? "Guest",
+  })) as unknown as BoardProps["waitlist"];
+  const zones = data.zones as unknown as BoardProps["zones"];
+  return <HostOperationsBoard reservations={reservations} waitlist={waitlist} zones={zones} canOverrideCapacity={canOverrideCapacity} selectedDate={selection.date} />;
 }

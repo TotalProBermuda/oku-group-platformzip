@@ -25,6 +25,7 @@
  * The endpoint will return 503 until the secret is configured.
  */
 import { NextRequest, NextResponse } from "next/server";
+import type { LedgerEventType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { enqueueLedgerEvent } from "@/server/services/ledger/ledgerOutboxService";
 import { verifyCybersourceWebhookSignature } from "@/server/cybersource/webhookSignature";
@@ -34,7 +35,7 @@ export const dynamic = "force-dynamic";
 const WEBHOOK_SECRET = process.env.CYBERSOURCE_WEBHOOK_SECRET;
 
 /** Map Cybersource webhook eventType strings to our ledger types */
-function mapLedgerEventType(csEventType: string): string | null {
+function mapLedgerEventType(csEventType: string): LedgerEventType | null {
   switch (csEventType) {
     case "payments.payments.authorized":
     case "payments.payments.authorized_pending_review":
@@ -54,6 +55,30 @@ function mapLedgerEventType(csEventType: string): string | null {
     default:
       return null;
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function readStringAtPath(value: unknown, path: readonly string[]): string | undefined {
+  let current: unknown = value;
+  for (const key of path) {
+    const record = asRecord(current);
+    if (!record) return undefined;
+    current = record[key];
+  }
+  return typeof current === "string" ? current : undefined;
+}
+
+function firstStringAtPaths(value: unknown, paths: readonly (readonly string[])[]): string {
+  for (const path of paths) {
+    const candidate = readStringAtPath(value, path);
+    if (candidate !== undefined) return candidate;
+  }
+  return "";
 }
 
 export async function POST(req: NextRequest) {
@@ -98,7 +123,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 4. Parse body
-  let payload: any;
+  let payload: unknown;
   try {
     payload = JSON.parse(rawBody.toString("utf8"));
   } catch {
@@ -106,26 +131,19 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Extract key fields
-  const csEventType: string = payload?.eventType ?? payload?.type ?? "";
-  const csTransactionId: string =
-    payload?.payload?.id ??
-    payload?.data?.object?.id ??
-    payload?.id ??
-    "";
-  const csStatus: string =
-    payload?.payload?.status ??
-    payload?.data?.object?.status ??
-    "";
-  const merchantReference: string =
-    payload?.payload?.clientReferenceInformation?.code ??
-    payload?.data?.object?.clientReferenceInformation?.code ??
-    payload?.clientReferenceInformation?.code ??
-    "";
-  const merchantTransactionId: string =
-    payload?.payload?.clientReferenceInformation?.transactionId ??
-    payload?.data?.object?.clientReferenceInformation?.transactionId ??
-    payload?.clientReferenceInformation?.transactionId ??
-    "";
+  const csEventType = firstStringAtPaths(payload, [["eventType"], ["type"]]);
+  const csTransactionId = firstStringAtPaths(payload, [["payload", "id"], ["data", "object", "id"], ["id"]]);
+  const csStatus = firstStringAtPaths(payload, [["payload", "status"], ["data", "object", "status"]]);
+  const merchantReference = firstStringAtPaths(payload, [
+    ["payload", "clientReferenceInformation", "code"],
+    ["data", "object", "clientReferenceInformation", "code"],
+    ["clientReferenceInformation", "code"],
+  ]);
+  const merchantTransactionId = firstStringAtPaths(payload, [
+    ["payload", "clientReferenceInformation", "transactionId"],
+    ["data", "object", "clientReferenceInformation", "transactionId"],
+    ["clientReferenceInformation", "transactionId"],
+  ]);
 
   if (!csTransactionId) {
     // Not actionable — return 200 so Cybersource stops retrying
@@ -133,6 +151,9 @@ export async function POST(req: NextRequest) {
   }
 
   const mappedLedgerType = mapLedgerEventType(csEventType);
+  if (!mappedLedgerType) {
+    return NextResponse.json({ ok: true, skipped: "unsupported_event_type" });
+  }
 
   // 6. Find matching reservation intent and/or ticket-order payment. Ticket
   // checkout persists its merchant reference before the external request, so
@@ -144,6 +165,7 @@ export async function POST(req: NextRequest) {
 
   const ticketPayment = await prisma.payment.findFirst({
     where: {
+      provider: "CYBERSOURCE",
       OR: [
         { gatewayTransactionId: csTransactionId },
         ...(merchantReference ? [{ gatewayReferenceId: merchantReference }] : []),
@@ -165,7 +187,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await enqueueLedgerEvent(prisma, {
-      eventType: (mappedLedgerType ?? "PAYMENT_AUTHORIZED") as any,
+      eventType: mappedLedgerType,
       source: {
         system: "cybersource_webhook",
         connector: "cybersource_v2",
@@ -181,17 +203,22 @@ export async function POST(req: NextRequest) {
         cybersourceStatus: csStatus,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // P2002 = duplicate — treat as idempotent success
-    if (err?.code !== "P2002") {
+    const errorCode =
+      typeof err === "object" && err !== null && "code" in err
+        ? (err as { code?: unknown }).code
+        : undefined;
+    const isDuplicate = errorCode === "P2002";
+    if (!isDuplicate) {
       console.error("[cybersource-webhook] ledger enqueue failed", err);
+      return NextResponse.json({ error: "Unable to record notification" }, { status: 503 });
     }
   }
 
   // 8. Advance intent status based on event type (if not already in terminal state)
-  // Note: these service calls are advisory (best-effort). The durable state is the
-  // PaymentIntent row; any failure here is logged and the webhook returns 200 so
-  // Cybersource does not retry (re-delivery is deduplicated via the ledger outbox).
+  // Recording the event is not enough: failed state updates must be retried.
+  // Compare-and-set prevents a delayed event overwriting a concurrent transition.
   const terminalStatuses = ["CAPTURED", "REFUNDED", "CANCELLED"];
   if (intent && !terminalStatuses.includes(intent.status)) {
     try {
@@ -200,20 +227,22 @@ export async function POST(req: NextRequest) {
         csEventType.includes("transmitted")
       ) {
         if (intent.status === "AUTHORIZED") {
-          await prisma.paymentIntent.update({
-            where: { id: intent.id },
+          const updated = await prisma.paymentIntent.updateMany({
+            where: { id: intent.id, status: intent.status },
             data: { status: "CAPTURED" },
           });
+          if (updated.count !== 1) return NextResponse.json({ error: "Payment state changed; retry notification" }, { status: 503 });
         }
       } else if (
         csEventType.includes("voided") ||
         csEventType.includes("reversed")
       ) {
         if (intent.status === "AUTHORIZED") {
-          await prisma.paymentIntent.update({
-            where: { id: intent.id },
+          const updated = await prisma.paymentIntent.updateMany({
+            where: { id: intent.id, status: intent.status },
             data: { status: "CANCELLED" },
           });
+          if (updated.count !== 1) return NextResponse.json({ error: "Payment state changed; retry notification" }, { status: 503 });
         }
       } else if (csEventType.includes("refund")) {
         if (intent.status === "CAPTURED") {
@@ -225,6 +254,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error("[cybersource-webhook] intent status advance failed", err);
+      return NextResponse.json({ error: "Unable to update payment state" }, { status: 503 });
     }
   }
 
@@ -239,17 +269,25 @@ export async function POST(req: NextRequest) {
       csEventType.includes("refund") ? "REFUNDED" :
       csEventType.includes("voided") || csEventType.includes("reversed") ? "VOIDED" :
       csEventType.includes("failed") || csEventType.includes("declined") ? "FAILED" :
-      csEventType.includes("authorized") || csEventType.includes("captured") || csEventType.includes("transmitted") ? "SUCCEEDED" :
+      csEventType === "payments.payments.authorized" || csEventType.includes("captured") || csEventType.includes("transmitted") ? "SUCCEEDED" :
       null;
-    if (paymentStatus) {
-      await prisma.payment.update({
-        where: { id: ticketPayment.id },
+    // Late deliveries must not revive refunded/voided payments or turn a
+    // completed payment into a decline. Compare-and-set also protects against
+    // another handler changing the state after the read above.
+    const terminal = ["REFUNDED", "VOIDED"].includes(ticketPayment.status);
+    const staleFailure = ticketPayment.status === "SUCCEEDED" && paymentStatus === "FAILED";
+    if (paymentStatus && !terminal && !staleFailure) {
+      const updated = await prisma.payment.updateMany({
+        where: { id: ticketPayment.id, provider: "CYBERSOURCE", status: ticketPayment.status },
         data: {
           status: paymentStatus,
           gatewayTransactionId: csTransactionId,
         },
       });
-      if (paymentStatus === "SUCCEEDED" && ticketPayment.order.status === "PENDING") {
+      if (updated.count === 0) {
+        return NextResponse.json({ error: "Payment state changed; retry notification" }, { status: 503 });
+      }
+      if (updated.count > 0 && paymentStatus === "SUCCEEDED" && ticketPayment.order.status === "PENDING") {
         await prisma.auditLog.create({
           data: {
             actorId: "system:cybersource_webhook",

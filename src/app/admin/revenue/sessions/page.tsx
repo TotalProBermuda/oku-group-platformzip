@@ -263,7 +263,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function AttributionTab({ detail, t }: { detail: Detail; t: Function }) {
+function AttributionTab({ detail, t }: { detail: Detail; t: ReturnType<typeof useTranslation> }) {
   const s = detail.session;
   const res = s.reservation;
   const attr = res?.attributions?.[0];
@@ -281,7 +281,7 @@ function AttributionTab({ detail, t }: { detail: Detail; t: Function }) {
   );
 }
 
-function TableRevenueTab({ detail, t, showRaw, onToggleRaw }: { detail: Detail; t: Function; showRaw: boolean; onToggleRaw: () => void }) {
+function TableRevenueTab({ detail, t, showRaw, onToggleRaw }: { detail: Detail; t: ReturnType<typeof useTranslation>; showRaw: boolean; onToggleRaw: () => void }) {
   const s = detail.session;
   const fmt2 = (cents: number) => "$" + (cents / 100).toFixed(2);
   return (
@@ -310,7 +310,7 @@ function TableRevenueTab({ detail, t, showRaw, onToggleRaw }: { detail: Detail; 
   );
 }
 
-function CommissionLogicTab({ detail, t }: { detail: Detail; t: Function }) {
+function CommissionLogicTab({ detail, t }: { detail: Detail; t: ReturnType<typeof useTranslation> }) {
   const s = detail.session;
   const allocs = s.allocations;
   const entries = s.reservation?.commissions ?? [];
@@ -367,7 +367,7 @@ function CommissionLogicTab({ detail, t }: { detail: Detail; t: Function }) {
   );
 }
 
-function AdjustmentsTab({ detail, t }: { detail: Detail; t: Function }) {
+function AdjustmentsTab({ detail, t }: { detail: Detail; t: ReturnType<typeof useTranslation> }) {
   const allocs = (detail.session.allocations as Array<{
     id: string;
     earnerType: string;
@@ -405,7 +405,7 @@ function AdjustmentsTab({ detail, t }: { detail: Detail; t: Function }) {
   );
 }
 
-function AuditTrailTab({ detail, t }: { detail: Detail; t: Function }) {
+function AuditTrailTab({ detail, t }: { detail: Detail; t: ReturnType<typeof useTranslation> }) {
   const logs = detail.auditLogs;
 
   if (logs.length === 0) {

@@ -142,6 +142,7 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
       label: "Finance",
       tabs: [
         { label: "Payments",        href: "/admin/payments",               roles: ["SUPERADMIN"] },
+        { label: "Ticket Fees & Tax", href: "/admin/checkout-finance", roles: ["SUPERADMIN"] },
         { label: "Payment Ledger",  href: "/admin/payments/payment-ledger",roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
         { label: "Payouts",         href: "/admin/payouts",                roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
         { label: "Beneficiaries",   href: "/admin/payouts/beneficiaries",  roles: ["SUPERADMIN", "ADMIN_FINANCE"] },
@@ -173,6 +174,7 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
         { label: l.hiring,      href: "/admin/hiring",            roles: ["SUPERADMIN", "ADMIN_HR"] },
         { label: l.sponsorship, href: "/admin/sponsorship",       roles: ["SUPERADMIN"] },
         { label: l.partners,    href: "/admin/partners/reports",  roles: ["SUPERADMIN"] },
+        { label: "Partner Support", href: "/admin/partner-support", roles: ["SUPERADMIN"] },
         { label: l.memberships, href: "/admin/memberships",       roles: ["SUPERADMIN"] },
       ],
     },
@@ -254,7 +256,14 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
         </div>
 
         {/* ── Group button bar ────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+        <div className="admin-nav-groups" onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            const group = (event.target as HTMLElement).closest(".admin-nav-group");
+            group?.querySelector<HTMLButtonElement>(".admin-nav-group-btn")?.focus();
+            cancelClose();
+            setOpenGroup(null);
+          }
+        }}>
           {groups.map((group) => {
             const active = groupIsActive(group);
             const open   = openGroup === group.label;
@@ -262,16 +271,19 @@ export default function AdminNav({ labels = {} }: AdminNavProps) {
             return (
               <div
                 key={group.label}
-                style={{ position: "relative" }}
+                className="admin-nav-group"
                 onMouseEnter={() => openMenu(group.label)}
                 onMouseLeave={scheduleClose}
+                onFocus={() => openMenu(group.label)}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleClose();
+                }}
               >
                 {/* Group label trigger */}
                 <button
                   className="admin-nav-group-btn"
                   data-active={active || open}
-                  onFocus={() => openMenu(group.label)}
-                  onBlur={scheduleClose}
+                  onClick={() => openMenu(group.label)}
                   aria-haspopup="true"
                   aria-expanded={open}
                 >

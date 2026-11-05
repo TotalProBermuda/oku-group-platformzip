@@ -31,9 +31,26 @@ export interface ResolvedSponsors {
   directCount: number;
 }
 
+type SponsorAssignmentInput = {
+  id: string;
+  entityId: string;
+  isActive: boolean;
+  showOnEventPage?: boolean;
+  showOnTicket?: boolean;
+  showOnEmail?: boolean;
+  showOnCheckInView?: boolean;
+  tier: { id: string; key: string; label: string; displayOrder: number };
+  entity?: { displayName?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null;
+  displayNameOverride?: string | null;
+  logoUrl?: string | null;
+  logoVariant?: string | null;
+  websiteUrl?: string | null;
+  sortOrder: number;
+};
+
 /** Given raw assignments from the DB, produce grouped, ordered view models */
 export function resolveSponsors(
-  assignments: any[],
+  assignments: SponsorAssignmentInput[],
   surface: SponsorSurface,
   isInherited = false
 ): ResolvedSponsors {
@@ -84,8 +101,8 @@ export function resolveSponsors(
 
 /** Merge series-level + event-level assignments for an event */
 export function mergeSponsors(
-  seriesAssignments: any[],
-  eventAssignments: any[],
+  seriesAssignments: SponsorAssignmentInput[],
+  eventAssignments: SponsorAssignmentInput[],
   surface: SponsorSurface
 ): ResolvedSponsors {
   const inherited = resolveSponsors(seriesAssignments, surface, true);
@@ -130,7 +147,7 @@ export function mergeSponsors(
   };
 }
 
-function surfaceToField(surface: SponsorSurface): string {
+function surfaceToField(surface: SponsorSurface): keyof Pick<SponsorAssignmentInput, "showOnEventPage" | "showOnTicket" | "showOnEmail" | "showOnCheckInView"> {
   switch (surface) {
     case "event_page": return "showOnEventPage";
     case "ticket":     return "showOnTicket";

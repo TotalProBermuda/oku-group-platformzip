@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
+import { getHostApiErrorDetails } from "@/app/api/v1/host/errorDetails";
 
 function isHost(roles: string[]) {
   return roles.some((r) => ["RESTAURANT_HOST", "RESTAURANT_SUPERVISOR", "STREETSIDE_HOST", "SUPERADMIN"].includes(r));
@@ -24,8 +25,9 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, contacts });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
 }
 
@@ -55,7 +57,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, contact }, { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
 }

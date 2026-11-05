@@ -1,3 +1,4 @@
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -17,4 +18,7 @@ const nextConfig = {
     unoptimized: true,
   },
 };
-export default nextConfig;
+// A production build must never overwrite a running dev server's manifests/chunks.
+export default function config(phase) {
+  return { ...nextConfig, distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next" };
+}

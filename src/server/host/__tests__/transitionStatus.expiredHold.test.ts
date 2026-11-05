@@ -116,8 +116,8 @@ async function main() {
       await transitionStatus(reservation.id, "CONFIRMED", HOST_ID, {
         reservationDate: start.toISOString(), tableLabel: "T1",
       });
-    } catch (err: any) {
-      acceptError = err;
+    } catch (err: unknown) {
+      acceptError = err instanceof Error ? err : new Error(String(err));
     }
 
     try {
@@ -169,14 +169,15 @@ async function main() {
       await transitionStatus(blockedReservation.id, "CONFIRMED", HOST_ID, {
         reservationDate: start.toISOString(), tableLabel: "T1",
       });
-    } catch (err: any) {
-      blockError = err;
+    } catch (err: unknown) {
+      blockError = err instanceof Error ? err : new Error(String(err));
     }
 
     try {
       await assert(
         "transitionStatus CONFIRMED is blocked by a real non-expired competing hold",
-        blockError !== null && ((blockError as any).status === 409 || /capacity/i.test(blockError.message))
+        blockError !== null &&
+          (("status" in blockError && blockError.status === 409) || /capacity/i.test(blockError.message))
       );
       passed++;
     } catch { failed++; }

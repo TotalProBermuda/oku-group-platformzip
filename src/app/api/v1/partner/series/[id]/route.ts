@@ -41,9 +41,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         delegateSessionIds: Array.from(auth.delegateSessionIds),
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (e instanceof Error && e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/series] GET", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

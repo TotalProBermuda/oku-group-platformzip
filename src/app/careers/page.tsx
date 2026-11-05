@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EngagementType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import CareerJobCard from "@/components/hiring/CareerJobCard";
 
@@ -19,9 +20,11 @@ export default async function CareersPage({ searchParams }: Props) {
   const sp = await searchParams;
 
   const baseWhere = { status: "PUBLISHED" as const, visibility: "PUBLIC" as const };
-  const where: typeof baseWhere & { department?: string; engagementType?: string } = { ...baseWhere };
+  const where: typeof baseWhere & { department?: string; engagementType?: EngagementType } = { ...baseWhere };
   if (sp.dept) where.department = sp.dept;
-  if (sp.type) where.engagementType = sp.type;
+  if (sp.type && Object.values(EngagementType).includes(sp.type as EngagementType)) {
+    where.engagementType = sp.type as EngagementType;
+  }
 
   const [opportunities, allOpps] = await Promise.all([
     prisma.opportunity.findMany({ where, orderBy: { createdAt: "desc" } }),

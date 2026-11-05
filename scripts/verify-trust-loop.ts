@@ -136,7 +136,7 @@ async function main() {
   console.log(`    commissionEligibility: ${final?.tableSession?.commissionEligibility}`);
   console.log(`  MatchProofs (${proofs.length}):`);
   for (const p of proofs) {
-    console.log(`    - ${p.matchTier} via ${p.sourceField} value="${p.sourceValue}" confidence=${p.confidence}`);
+    console.log(`    - ${p.matchTier} via ${p.sourceField ?? "unknown"} evidence=${JSON.stringify(p.supportingDataJson)} confidence=${p.confidence}`);
   }
 
   console.log("\nKeeping rows so you can inspect. To clean up, run with --cleanup.");
@@ -146,7 +146,7 @@ async function main() {
     await prisma.matchProof.deleteMany({ where: { attributionSessionId: session.id } });
     await prisma.tableSession.updateMany({
       where: { attributionSessionId: session.id },
-      data: { invuOrderNormalizedId: null, matchStatus: "UNMATCHED", commissionEligibility: "NOT_ELIGIBLE" },
+      data: { matchStatus: "UNMATCHED", commissionEligibility: "NOT_ELIGIBLE" },
     });
     await prisma.invuOrderNormalized.update({ where: { id: normalized.id }, data: { tableSessionId: null } });
     await prisma.operationalBinding.delete({ where: { id: binding.id } });

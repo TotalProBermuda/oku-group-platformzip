@@ -15,6 +15,12 @@ const ALL_STATUSES = [
   "REJECTED", "WITHDRAWN",
 ];
 
+function toAuthBadgeValue(value: unknown): boolean | string | null | undefined {
+  return typeof value === "boolean" || typeof value === "string" || value === null
+    ? value
+    : undefined;
+}
+
 export default function ApplicationsPipelineTable({ rows, opportunities }: Props) {
   const [updating, setUpdating] = useState<string | null>(null);
 
@@ -64,8 +70,8 @@ export default function ApplicationsPipelineTable({ rows, opportunities }: Props
               ? n.languages
               : n.languages ? [n.languages] : [];
             const yrsExp = n.yearsExperience ?? n.yearsHospitalityExperience ?? null;
-            const workAuth = n.authorizedToWork ?? n.workAuthorization;
-            const weekend = n.weekendAvailability;
+            const workAuth = toAuthBadgeValue(n.authorizedToWork ?? n.workAuthorization);
+            const weekend = toAuthBadgeValue(n.weekendAvailability);
 
             return (
               <tr key={row.id}>
@@ -152,7 +158,7 @@ export default function ApplicationsPipelineTable({ rows, opportunities }: Props
   );
 }
 
-function AuthBadge({ value }: { value: any }) {
+function AuthBadge({ value }: { value: boolean | string | null | undefined }) {
   if (value === true || value === "yes" || value === "Yes") {
     return <span style={{ color: "#1f8a55", fontSize: 13, fontWeight: 700 }}>✓</span>;
   }

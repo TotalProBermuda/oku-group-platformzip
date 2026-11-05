@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
+import { SponsorDealPaymentStatus } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 
 // Sponsorship payment creation is a financial/governance write — SUPERADMIN only.
-function isAdmin(s: any) {
-  return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
+function isAdmin(s: Session | null) {
+  return s?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -34,12 +35,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const paidTotalCents = allPayments.reduce((s, p) => s + p.amountCents, 0);
 
     const d = await tx.sponsorDeal.findUnique({ where: { id: dealId }, select: { agreedPriceCents: true } });
-    const paymentStatus = paidTotalCents >= (d?.agreedPriceCents ?? 0) ? "PAID"
-      : paidTotalCents > 0 ? "PARTIALLY_PAID" : "UNPAID";
+    const paymentStatus: SponsorDealPaymentStatus = paidTotalCents >= (d?.agreedPriceCents ?? 0)
+      ? SponsorDealPaymentStatus.PAID
+      : paidTotalCents > 0 ? SponsorDealPaymentStatus.PARTIALLY_PAID : SponsorDealPaymentStatus.UNPAID;
 
     const updated = await tx.sponsorDeal.update({
       where: { id: dealId },
-      data: { paidTotalCents, paymentStatus: paymentStatus as any },
+      data: { paidTotalCents, paymentStatus },
     });
 
     return [p, updated];

@@ -1,0 +1,55 @@
+
+Running 20 tests using 1 worker
+
+  ✓   1 [desktop] › tests/browser/session-management.spec.ts:163:3 › session management fixture workflow › edits a SERIES referral lifecycle through defaults preview/apply without overflowing at 375px (4.8s)
+  ✓   2 [desktop] › tests/browser/session-management.spec.ts:212:3 › session management fixture workflow › activates a draft SERIES assignment then retires it through preview/apply (2.9s)
+  ✓   3 [desktop] › tests/browser/session-management.spec.ts:250:3 › session management fixture workflow › previews a date-only session change with an empty patch (3.2s)
+  ✓   4 [desktop] › tests/browser/session-management.spec.ts:268:3 › session management fixture workflow › FB_DIRECTOR fixture has no referral lifecycle controls (2.1s)
+  ✓   5 [desktop] › tests/browser/session-management.spec.ts:275:3 › session management fixture workflow › selects a session, edits one locale, and previews exact old/new values without contacts (2.7s)
+  ✓   6 [desktop] › tests/browser/session-management.spec.ts:297:3 › session management fixture workflow › shows defaults preview diffs even when a new series has zero affected sessions (4.1s)
+  ✓   7 [desktop] › tests/browser/session-management.spec.ts:313:3 › session management fixture workflow › a 409 preserves the selected session and locale draft for re-preview (2.7s)
+  ✘   8 [desktop] › tests/browser/session-management.spec.ts:329:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview (7.5s)
+  ✓   9 [desktop] › tests/browser/session-management.spec.ts:342:3 › session management fixture workflow › new session defaults checkbox is false by default and only sends true when opted in (3.2s)
+  ✓  10 [desktop] › tests/browser/session-management.spec.ts:359:3 › session management fixture workflow › stacks within a 375px viewport and preserves existing create-session flow (2.4s)
+  ✓  11 [mobile] › tests/browser/session-management.spec.ts:163:3 › session management fixture workflow › edits a SERIES referral lifecycle through defaults preview/apply without overflowing at 375px (3.6s)
+  ✓  12 [mobile] › tests/browser/session-management.spec.ts:212:3 › session management fixture workflow › activates a draft SERIES assignment then retires it through preview/apply (2.7s)
+  ✓  13 [mobile] › tests/browser/session-management.spec.ts:250:3 › session management fixture workflow › previews a date-only session change with an empty patch (3.2s)
+  ✓  14 [mobile] › tests/browser/session-management.spec.ts:268:3 › session management fixture workflow › FB_DIRECTOR fixture has no referral lifecycle controls (2.2s)
+  ✓  15 [mobile] › tests/browser/session-management.spec.ts:275:3 › session management fixture workflow › selects a session, edits one locale, and previews exact old/new values without contacts (4.1s)
+  ✓  16 [mobile] › tests/browser/session-management.spec.ts:297:3 › session management fixture workflow › shows defaults preview diffs even when a new series has zero affected sessions (4.0s)
+  ✓  17 [mobile] › tests/browser/session-management.spec.ts:313:3 › session management fixture workflow › a 409 preserves the selected session and locale draft for re-preview (4.3s)
+  ✓  18 [mobile] › tests/browser/session-management.spec.ts:329:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview (4.1s)
+  ✓  19 [mobile] › tests/browser/session-management.spec.ts:342:3 › session management fixture workflow › new session defaults checkbox is false by default and only sends true when opted in (3.3s)
+  ✓  20 [mobile] › tests/browser/session-management.spec.ts:359:3 › session management fixture workflow › stacks within a 375px viewport and preserves existing create-session flow (2.1s)
+
+
+  1) [desktop] › tests/browser/session-management.spec.ts:329:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeFocused[2m([22m[2m)[22m failed
+
+    Locator:  getByRole('button', { name: 'Confirm and apply' })
+    Expected: focused
+    Received: inactive
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeFocused" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Confirm and apply' })[22m
+    [2m    14 × locator resolved to <button type="button" class="jsx-8ec6b766bd8f7f8d btn btn-primary">Confirm and apply</button>[22m
+    [2m       - unexpected value "inactive"[22m
+
+
+      334 |     await page.getByRole("button", { name: "Preview changes" }).click();
+      335 |     const confirm = page.getByRole("button", { name: "Confirm and apply" });
+    > 336 |     await expect(confirm).toBeFocused();
+          |                           ^
+      337 |     await page.keyboard.press("Enter");
+      338 |     await expect(page.getByRole("status")).toContainText("Session changes saved.");
+      339 |     expect(committed).toEqual([{ previewId: "fixture-preview", requestId: "fixture-request" }]);
+        at /home/runner/workspace/tests/browser/session-management.spec.ts:336:27
+
+    Error Context: test-results/session-management-session-37b31-applies-the-fixture-preview-desktop/error-context.md
+
+  1 failed
+    [desktop] › tests/browser/session-management.spec.ts:329:3 › session management fixture workflow › confirmation dialog receives focus and Enter applies the fixture preview
+  19 passed (1.6m)

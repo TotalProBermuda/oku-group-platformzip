@@ -35,10 +35,10 @@ export async function GET() {
     }));
 
     return NextResponse.json({ ok: true, data });
-  } catch (e: any) {
-    if (e.message === "Unauthorized") {
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message === "Unauthorized") {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Internal server error" }, { status: 500 });
   }
 }

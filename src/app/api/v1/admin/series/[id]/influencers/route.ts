@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-function isAdmin(session: any) {
+function isAdmin(session: Session | null) {
   return session?.user?.roles?.some((r: string) =>
     ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL"].includes(r)
   );

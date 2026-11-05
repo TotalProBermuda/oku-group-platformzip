@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
+import Link from "next/link";
 
 // ─── Strings ────────────────────────────────────────────────────────────────
 
@@ -375,7 +376,7 @@ export default function PublicChatbot() {
 
         {/* Booking redirect */}
         {step === "booking" && (
-          <a
+          <Link
             href="/reservations"
             style={{
               display: "block", padding: "11px 0", borderRadius: 11,
@@ -386,7 +387,7 @@ export default function PublicChatbot() {
             }}
           >
             {s.reserveBtn}
-          </a>
+          </Link>
         )}
 
         {/* Chat — name/phone collection */}

@@ -56,7 +56,7 @@ export default async function OpportunityPage({
                 fontSize: 14,
               }}
             >
-              ✓ Your application has been submitted. We'll be in touch soon.
+              ✓ Your application has been submitted. We&apos;ll be in touch soon.
             </div>
           )}
 

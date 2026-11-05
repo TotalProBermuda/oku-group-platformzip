@@ -26,8 +26,9 @@ import {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: pendingParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await pendingParams;
   const { userId, roles } = await requireSession();
   const isSuperAdmin = roles.includes("SUPERADMIN");
   const { tableTotalCents } = await req.json();
@@ -48,6 +49,7 @@ export async function POST(
       contactName: true,
       status: true,
       commissionValidatedAt: true,
+      actualRevenueCents: true,
       venueId: true,
       assignedTableLabel: true,
       assignedRestaurantHostId: true,

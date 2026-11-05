@@ -70,7 +70,7 @@ export default async function AdminReferralsMergeConflictsPage() {
     getServerSession(authOptions),
     cookies(),
   ]);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
   if (!roles.includes("SUPERADMIN")) {
     redirect("/admin");
   }

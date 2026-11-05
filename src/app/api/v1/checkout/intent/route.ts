@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
-import { reserveCatalogCapacityOrThrow } from "@/server/commerce/capacity";
+import { reserveCatalogCapacityInTransaction } from "@/server/commerce/capacity";
+import { lockSessionInventory } from "@/server/commerce/sessionInventory";
+import { purchasedEntitlements } from "@/server/commerce/sessionProducts";
+import { Prisma } from "@prisma/client";
 import { getEventReferrerByCode } from "@/server/events/eventReferrerService";
 import { resolveActorFromCode } from "@/server/referrals/referralActorService";
 import { assertCheckoutCatalogPolicy, CatalogPolicyError } from "@/server/commerce/catalogPolicy";
 import { createGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 import { createCheckoutHold, expireCheckoutHoldsForSession } from "@/server/commerce/checkoutHold";
 import { gatePublicPostAsync } from "@/server/rateLimit";
+import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
+import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
+import { checkoutEmailsMatch } from "@/lib/checkoutContact";
 
 const Body = z.object({
   sessionId: z.string(),
+  expectedTotalCents: z.number().int().nonnegative().optional(),
   items: z.array(z.object({
     ticketTypeId: z.string().optional(),
     addonId: z.string().optional(),
@@ -46,6 +53,10 @@ export async function POST(req: Request) {
     const body = Body.parse(rawBody);
     const auth = await getOptionalSession();
     if (!auth && !body.guest) return NextResponse.json({ ok: false, error: "Guest contact details are required." }, { status: 400 });
+    const account = auth ? await prisma.user.findUnique({ where: { id: auth.userId }, select: { email: true } }) : null;
+    if (auth && (!account?.email || (body.guest && !checkoutEmailsMatch(account.email, body.guest.email)))) {
+      return NextResponse.json({ ok: false, error: "CHECKOUT_ACCOUNT_MISMATCH", message: "Use your signed-in account email for this purchase. To book with another email, sign out first and restart checkout." }, { status: 409 });
+    }
     const guestUser = auth ? null : await prisma.user.upsert({
       where: { email: body.guest!.email }, update: {},
       create: { email: body.guest!.email, name: body.guest!.name, phone: body.guest!.phone }, select: { id: true },
@@ -54,23 +65,38 @@ export async function POST(req: Request) {
 
     await expireCheckoutHoldsForSession(body.sessionId);
 
+    return await prisma.$transaction(async tx => {
+    await lockSessionInventory(tx, body.sessionId);
     // Validate identity, product scope, visibility, access, sale windows, and
     // per-product inventory before any capacity is reserved or order is made.
-    const catalog = await assertCheckoutCatalogPolicy({ userId, sessionId: body.sessionId, items: body.items });
+    const catalog = await assertCheckoutCatalogPolicy({ userId, sessionId: body.sessionId, items: body.items, db: tx });
 
     const ticketTypes = catalog.tickets;
     const addons = catalog.addons;
 
     // Compute subtotal
+    const membershipDiscountBps = (catalog.membership?.benefitsJson as { discountBps?: number } | null)?.discountBps;
     const subtotalCents = body.items.reduce((sum, item) => {
-    const product = item.ticketTypeId
-      ? ticketTypes.find(t => t.id === item.ticketTypeId)
-      : addons.find(a => a.id === item.addonId);
-    return sum + (product?.priceCents ?? 0) * item.qty;
+    const ticket = item.ticketTypeId ? ticketTypes.find(t => t.id === item.ticketTypeId) : undefined;
+    const addon = item.addonId ? addons.find(a => a.id === item.addonId) : undefined;
+    const unitPrice = ticket
+      ? calculateTicketUnitPrice({
+          ticket,
+          sessionPriceCents: catalog.session.ticketPrices.find((price) => price.ticketTypeId === ticket.id)?.priceCents,
+          membershipDiscountBps,
+          applyMembershipDiscount: catalog.session.series.membershipRuleMode === "MEMBERS_DISCOUNT",
+        })
+      : (addon?.priceCents ?? 0);
+    return sum + unitPrice * item.qty;
     }, 0);
 
+    const { feesCents, taxCents, totalCents, financeRule } = await priceCheckoutCharges(subtotalCents);
+    if (body.expectedTotalCents !== undefined && body.expectedTotalCents !== totalCents) {
+      return NextResponse.json({ ok: false, error: "PRICE_CHANGED", message: "The price has changed. Please review a fresh quote before paying." }, { status: 409 });
+    }
+
     // Reserve capacity atomically only after policy has passed.
-    await reserveCatalogCapacityOrThrow({
+    await reserveCatalogCapacityInTransaction(tx, {
       sessionId: body.sessionId,
       ticketItems: body.items.filter((item) => item.ticketTypeId).map((item) => ({ id: item.ticketTypeId!, qty: item.qty })),
       addonItems: body.items.filter((item) => item.addonId).map((item) => ({ id: item.addonId!, qty: item.qty })),
@@ -109,8 +135,7 @@ export async function POST(req: Request) {
       const scopeOk =
         a.scopeType === "GLOBAL" ||
         (a.scopeType === "SERIES" && a.scopeId === series.id) ||
-        a.scopeType === "VENUE" ||
-        a.scopeType === "CAMPAIGN";
+        (a.scopeType === "VENUE" && !!series.venueId && a.scopeId === series.venueId);
       if (scopeOk) {
         referralAssignmentId = a.id;
         if (resolvedAttributionSource === "DIRECT") {
@@ -134,21 +159,21 @@ export async function POST(req: Request) {
     // Keep the payment intent authoritative and aligned with the quote shown
     // to the guest.  Amounts are calculated server-side; the browser never
     // supplies a payable total.
-    const feesCents = Math.round(subtotalCents * 0.05);
-    const taxCents = Math.round(subtotalCents * 0.084);
-    const totalCents = subtotalCents + feesCents + taxCents;
 
-    const order = await prisma.order.create({
+    const order = await tx.order.create({
     data: {
       userId,
       seriesId: series.id,
       sessionId: session.id,
       status: "PENDING",
+      entitlementSnapshot: purchasedEntitlements(session),
+      checkoutLocale: body.guest?.locale ?? "en",
       subtotalCents,
       feesCents,
       taxCents,
       totalCents,
       currency: "USD",
+      events: { create: { eventType: "OTHER", eventLabel: "checkout-finance-snapshot", eventPayload: financeRule } },
       couponCode: body.couponCode,
       attributionId: body.attributionId,
       // SYSTEM 1: OKU pays the influencer based on commissionRateBps
@@ -162,18 +187,26 @@ export async function POST(req: Request) {
     },
   });
 
-    const checkoutHoldExpiresAt = await createCheckoutHold(order.id);
-    const guestCredential = auth ? null : await createGuestCheckoutCredential(order.id);
-    if (body.guest) await prisma.orderEvent.create({ data: {
+    const checkoutHoldExpiresAt = await createCheckoutHold(order.id, tx);
+    const guestCredential = auth ? null : await createGuestCheckoutCredential(order.id, tx);
+    if (body.guest) await tx.orderEvent.create({ data: {
       orderId: order.id, eventType: "ORDER_CREATED", eventLabel: "guest-checkout-contact",
       eventPayload: { email: body.guest.email, name: body.guest.name, phone: body.guest.phone ?? null, locale: body.guest.locale ?? "en", marketingEmailConsent: body.guest.marketingEmailConsent },
     }});
 
-    await prisma.orderLineItem.createMany({
+    await tx.orderLineItem.createMany({
     data: body.items.map(i => {
       const tt = i.ticketTypeId ? ticketTypes.find(t => t.id === i.ticketTypeId) : undefined;
       const addon = i.addonId ? addons.find(a => a.id === i.addonId) : undefined;
       const product = tt ?? addon!;
+      const unitPriceCents = tt
+        ? calculateTicketUnitPrice({
+            ticket: tt,
+            sessionPriceCents: catalog.session.ticketPrices.find((price) => price.ticketTypeId === tt.id)?.priceCents,
+            membershipDiscountBps,
+            applyMembershipDiscount: catalog.session.series.membershipRuleMode === "MEMBERS_DISCOUNT",
+          })
+        : product.priceCents;
       return {
         orderId: order.id,
         itemType: tt ? "ticket" : "addon",
@@ -181,8 +214,8 @@ export async function POST(req: Request) {
         addonId: addon?.id,
         nameSnapshot: product.name,
         qty: i.qty,
-        unitPriceCents: product.priceCents,
-        totalCents: product.priceCents * i.qty,
+        unitPriceCents,
+        totalCents: unitPriceCents * i.qty,
       };
     })
   });
@@ -190,9 +223,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, data: {
       intentId: order.id, orderId: order.id, totalCents: order.totalCents, currency: order.currency,
       checkoutHoldExpiresAt: checkoutHoldExpiresAt.toISOString(),
+      confirmationEmail: account?.email ?? body.guest!.email,
       ...(guestCredential ? { guestCheckoutToken: guestCredential.token } : {}),
     } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2034") return NextResponse.json({ ok: false, error: "INVENTORY_CHANGED", message: "Availability changed. Review a fresh quote." }, { status: 409 });
     if (error instanceof CatalogPolicyError) {
       return NextResponse.json({ ok: false, error: error.code, message: error.message }, { status: error.status });
     }

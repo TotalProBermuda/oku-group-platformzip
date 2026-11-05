@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getHostApiErrorDetails, isUniqueConstraintError } from "@/app/api/v1/host/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { getEffectiveScanConfig } from "@/server/streetside/getScanConfig";
@@ -88,10 +89,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ar
     });
 
     return NextResponse.json({ ok: true, data: log });
-  } catch (e: any) {
-    if (e.code === "P2002") {
+  } catch (e: unknown) {
+    if (isUniqueConstraintError(e)) {
       return NextResponse.json({ ok: false, error: "Gift bag already recorded for this arrival" }, { status: 409 });
     }
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

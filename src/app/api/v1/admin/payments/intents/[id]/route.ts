@@ -9,6 +9,7 @@
  *   POST /api/v1/admin/payments/intents/[id]/refund  — refund/route.ts
  */
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { getPaymentStatus } from "@/server/payments/reservationPaymentService";
@@ -28,10 +29,11 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ ok: true, data: { ...status, attempts } });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const error = getAdminApiErrorDetails(err);
     return NextResponse.json(
-      { ok: false, error: err.message },
-      { status: err.status ?? 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { localizeSessions } from "@/server/series/localizeSessions";
+import { localizeContent, localizeEventCatalog } from "@/server/i18n/eventTranslations";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -7,12 +10,13 @@ export async function GET(req: NextRequest) {
   const venue     = searchParams.get("venue");
   const featured  = searchParams.get("featured");
   const slug      = searchParams.get("slug");
+  const now       = new Date();
 
-  const where: any = {
+  const where: Prisma.SeriesWhereInput = {
     status: { in: ["PUBLISHED", "SOLD_OUT"] },
   };
   if (category) where.category = category;
-  if (venue)    where.venue    = venue;
+  if (venue === "OKU" || venue === "CATCH") where.venue = venue;
   if (featured === "true") where.isFeatured = true;
   if (slug)     where.slug     = slug;
 
@@ -21,7 +25,28 @@ export async function GET(req: NextRequest) {
     orderBy: [{ isFeatured: "desc" }, { startsAt: "asc" }],
     include: {
       ticketTypes: { where: { ticketStatus: "ACTIVE" }, orderBy: { displayOrder: "asc" } },
-      sessions: { where: { status: "SCHEDULED" }, orderBy: { startsAt: "asc" }, take: 3 },
+      seriesHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
+      sessions: {
+        where: { status: "SCHEDULED", OR: [{ startsAt: { gt: now } }, { allowLateSales: true }], endsAt: { gt: now } },
+        orderBy: { startsAt: "asc" },
+        include: {
+          ticketPrices: { select: { ticketTypeId: true, priceCents: true } },
+          eventHosts: { where: { isFrontFacing: true }, orderBy: { sortOrder: "asc" }, select: { role: true, entity: { select: { displayName: true, logoUrl: true, websiteUrl: true } } } },
+          profileAssignments: {
+            where: { profile: { publicVisible: true, status: "ACTIVE" } },
+            orderBy: { displayOrder: "asc" },
+            select: {
+              assignmentRole: true,
+              displayOrder: true,
+              isPrimary: true,
+              profile: {
+                select: { id: true, displayName: true, shortDescription: true, bio: true, websiteUrl: true, avatarUrl: true, logoUrl: true, slug: true },
+              },
+            },
+          },
+        },
+        ...(slug ? {} : { take: 3 }),
+      },
       experienceInfluencer: {
         where: { isPubliclyVisible: true },
         orderBy: { sortOrder: "asc" },
@@ -32,5 +57,20 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ series });
+  const locale = searchParams.get("locale") ?? "en";
+  const localized = await Promise.all(series.map(async s => ({ ...s, sessions: await localizeSessions(s, s.sessions, locale) })));
+  const profiles = localized.flatMap((item) => item.sessions.flatMap((session) => (session.profileAssignments ?? []).map((assignment) => assignment.profile)));
+  const translatedProfiles = await localizeContent("Profile", profiles, locale);
+  const profilesById = new Map(translatedProfiles.map((profile) => [profile.id, profile]));
+  const localizedProfiles = localized.map((item) => ({
+    ...item,
+    sessions: item.sessions.map((session) => ({
+      ...session,
+      profileAssignments: (session.profileAssignments ?? []).map((assignment) => ({
+        ...assignment,
+        profile: profilesById.get(assignment.profile.id) ?? assignment.profile,
+      })),
+    })),
+  }));
+  return NextResponse.json({ series: await localizeEventCatalog(localizedProfiles, locale) });
 }

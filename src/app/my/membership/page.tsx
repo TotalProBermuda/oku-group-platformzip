@@ -65,11 +65,11 @@ export default async function MyMembershipPage() {
     id: o.id,
     status: o.status,
     createdAt: o.createdAt.toISOString(),
-    tickets: o.tickets.map((tk) => ({
-      session: tk.session
-        ? { series: tk.session.series ?? null }
-        : null,
-    })),
+      tickets: o.tickets.map((tk) => ({
+        session: tk.session
+          ? { series: tk.session.series ? { ...tk.session.series, venue: tk.session.series.venue ?? "" } : null }
+          : null,
+      })),
   }));
 
   return (

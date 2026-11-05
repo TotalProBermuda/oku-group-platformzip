@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { Prisma, TicketStatus } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { hasPermission } from "@/lib/permissions";
@@ -21,8 +23,10 @@ export async function GET(req: Request) {
     const seriesId = searchParams.get("seriesId") ?? undefined;
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 200);
 
-    const where: any = {};
-    if (status) where.ticketStatus = status;
+    const parsedStatus = status ? Object.values(TicketStatus).find((value) => value === status) : undefined;
+    if (status && !parsedStatus) return NextResponse.json({ ok: false, error: "Invalid ticket status" }, { status: 400 });
+    const where: Prisma.TicketWhereInput = {};
+    if (parsedStatus) where.ticketStatus = parsedStatus;
     if (sessionId) where.sessionId = sessionId;
     if (seriesId) where.session = { seriesId };
     if (checkedIn === "yes") where.checkedInAt = { not: null };
@@ -88,7 +92,8 @@ export async function GET(req: Request) {
         order: t.order,
       })),
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

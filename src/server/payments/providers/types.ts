@@ -143,3 +143,15 @@ export function safeTruncate(value: unknown, maxChars = 2000): unknown {
     return { _truncated: true, preview: String(value).slice(0, maxChars) };
   }
 }
+
+/** Return an Error message without assuming thrown values are Error instances. */
+export function errorMessage(value: unknown, fallback: string): string {
+  return value instanceof Error && value.message ? value.message : fallback;
+}
+
+/** Narrow untrusted provider/HTTP data before reading named properties. */
+export function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}

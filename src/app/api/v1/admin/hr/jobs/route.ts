@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 
 export async function GET() {
   try {
@@ -16,8 +17,8 @@ export async function GET() {
     });
 
     return NextResponse.json({ ok: true, data: jobs });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (error: unknown) {
+    const details = getAdminApiErrorDetails(error);
+    return NextResponse.json({ ok: false, error: details.message }, { status: details.status });
   }
 }

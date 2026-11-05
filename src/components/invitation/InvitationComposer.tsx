@@ -282,7 +282,7 @@ export default function InvitationComposer({ seriesId, onSent }: ComposerProps) 
             onChange={(e) => setResendNonResponders(e.target.checked)}
             style={{ width: 15, height: 15, accentColor: "#c41e3a" }}
           />
-          <span style={{ fontSize: 12, color: "#4b4540", lineHeight: 1.4 }}>Skip recipients who already RSVP'd or declined</span>
+          <span style={{ fontSize: 12, color: "#4b4540", lineHeight: 1.4 }}>Skip recipients who already RSVP&apos;d or declined</span>
         </label>
 
         {/* Send result */}

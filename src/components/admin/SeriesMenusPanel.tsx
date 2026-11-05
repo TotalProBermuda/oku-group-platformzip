@@ -24,6 +24,34 @@ type EventMenuLink = {
   menu: MenuHeader;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toMenuHeader(value: unknown): MenuHeader | null {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.venueSlug !== "string") return null;
+  const title = value.menuTitle;
+  const menuTitle: LocalizedJson = typeof title === "string" || title === null
+    ? title
+    : isRecord(title) && Object.values(title).every((entry) => typeof entry === "string")
+      ? title as Record<string, string>
+      : null;
+  const count = isRecord(value._count) ? value._count : {};
+  const sections = Array.isArray(value.sections) ? value.sections.length : 0;
+  const eventLinks = typeof count.eventLinks === "number" ? count.eventLinks : undefined;
+
+  return {
+    id: value.id,
+    venueSlug: value.venueSlug,
+    menuType: value.menuType === "DRINKS" || value.menuType === "drinks" ? "DRINKS" : "FOOD",
+    menuTitle,
+    isHouseMenu: typeof value.isHouseMenu === "boolean" ? value.isHouseMenu : true,
+    isPublished: typeof value.isPublished === "boolean" ? value.isPublished : true,
+    parentMenuId: typeof value.parentMenuId === "string" ? value.parentMenuId : null,
+    _count: { sections: typeof count.sections === "number" ? count.sections : sections, eventLinks },
+  };
+}
+
 const VENUE_LABEL: Record<string, string> = { oku: "OKÜ", catch: "CATCH", terrace: "TERRACE" };
 
 function titleOf(t: LocalizedJson, locale: "en" | "es" | "pt" = "en"): string {
@@ -60,17 +88,9 @@ export default function SeriesMenusPanel({ seriesId, seriesTitle }: { seriesId: 
       if (linksRes?.ok) setLinks(linksRes.data ?? []);
       // Fall back to listAllMenus if the lighter endpoint isn't available.
       if (menusRes?.ok && Array.isArray(menusRes.data)) {
+        const menuItems: unknown[] = menusRes.data;
         setAllMenus(
-          menusRes.data.map((m: any) => ({
-            id: m.id,
-            venueSlug: m.venueSlug,
-            menuType: m.menuType ?? (m.menuType === "drinks" ? "DRINKS" : "FOOD"),
-            menuTitle: m.menuTitle,
-            isHouseMenu: m.isHouseMenu ?? true,
-            isPublished: m.isPublished ?? true,
-            parentMenuId: m.parentMenuId ?? null,
-            _count: { sections: m._count?.sections ?? (m.sections?.length ?? 0) },
-          })),
+          menuItems.map((menu) => toMenuHeader(menu)).filter((menu): menu is MenuHeader => menu !== null),
         );
       }
     } finally {
@@ -139,7 +159,7 @@ export default function SeriesMenusPanel({ seriesId, seriesTitle }: { seriesId: 
         <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Event Menus</h3>
         <p style={{ fontSize: 13, color: "#7d7269", lineHeight: 1.5 }}>
           Attach a bespoke food or drinks menu to this event. Guests on the event page will see this
-          menu instead of the venue's standing house menu. The house menu stays untouched for walk-in guests.
+          menu instead of the venue&apos;s standing house menu. The house menu stays untouched for walk-in guests.
         </p>
       </div>
 
@@ -154,7 +174,7 @@ export default function SeriesMenusPanel({ seriesId, seriesTitle }: { seriesId: 
 
       {links.length === 0 ? (
         <div style={{ padding: "24px", background: "#fafaf9", border: "1px dashed #e5e0d8", borderRadius: 10, color: "#7d7269", fontSize: 14 }}>
-          No menus attached yet. Pick an existing menu or duplicate the venue's house menu as a starting point.
+          No menus attached yet. Pick an existing menu or duplicate the venue&apos;s house menu as a starting point.
         </div>
       ) : (
         <div style={{ display: "grid", gap: 12 }}>

@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login?callbackUrl=/admin");
 
-  const roles: string[] = (session.user as any)?.roles ?? [];
+  const roles = session.user.roles ?? [];
   const adminRoles = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_COMMERCIAL", "ADMIN_IR", "ADMIN_HR", "ADMIN_FINANCE"];
   if (!roles.some((r) => adminRoles.includes(r))) {
     redirect("/login?callbackUrl=/admin");

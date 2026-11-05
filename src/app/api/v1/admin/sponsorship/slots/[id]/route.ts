@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-function isAdmin(s: any) {
-  return s?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r));
+function isAdmin(s: Session | null) {
+  return s?.user?.roles?.includes("SUPERADMIN") ?? false;
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     "askPriceCents", "floorPriceCents", "isPublished", "status",
     "availableFrom", "availableTo", "sortOrder", "internalNotes", "seriesId", "sessionId",
   ] as const;
-  const data: any = {};
+  const data: import("@prisma/client").Prisma.SponsorshipSlotUncheckedUpdateInput = {};
   for (const key of allowed) {
     if (key in body) {
       if (key === "availableFrom" || key === "availableTo") {

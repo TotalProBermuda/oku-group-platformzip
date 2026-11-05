@@ -22,7 +22,7 @@ export async function GET(
       completed,
       noShows,
     ] = await Promise.all([
-      prisma.eventRegistrant.count({ where: { sessionId: { in: sessionIds } } }),
+      prisma.eventRegistrant.count({ where: { seriesId: { in: [...new Set(sessions.map((session) => session.seriesId))] } } }),
       prisma.ticket.count({
         where: {
           sessionId: { in: sessionIds },
@@ -69,8 +69,8 @@ export async function GET(
       noShows,
       sessionCount: sessions.length,
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load event funnel" }, { status: 500 });
   }
 }
 
@@ -80,6 +80,6 @@ async function resolveSessions(id: string) {
 
   return prisma.session.findMany({
     where: { seriesId: id },
-    select: { id: true },
+    select: { id: true, seriesId: true },
   });
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatPanamaOperationalDate } from "@/lib/panamaDateTime";
 import { getResendClient, isResendConfigured } from "@/server/invitation/resend";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || process.env.NEXTAUTH_URL || "https://www.okuhospitalitygroup.com";
@@ -14,10 +15,6 @@ const RECIPIENTS: Record<RecipientKind, readonly string[]> = {
 
 function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
-
-function formatDate(value: Date) {
-  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(value);
 }
 
 function emailShell({ eyebrow, title, details, ctaLabel, ctaHref }: { eyebrow: string; title: string; details: string; ctaLabel: string; ctaHref: string }) {
@@ -55,7 +52,7 @@ export async function sendNewReservationOperationalAlerts(reservationId: string)
   if (!reservation) return;
   const venue = reservation.venue.name === "Gold House" ? "OKÜ & CATCH by OKÜ Hospitality Group" : reservation.venue.name;
   const space = reservation.assignedSpace?.name ?? reservation.requestedSpace?.name ?? "To be assigned";
-  const details = `Reference: <strong>${escapeHtml(reservation.confirmationCode)}</strong><br>${escapeHtml(venue)} · ${escapeHtml(space)}<br>${reservation.partySize} guest${reservation.partySize === 1 ? "" : "s"} · ${escapeHtml(formatDate(reservation.reservationDate))}`;
+  const details = `Reference: <strong>${escapeHtml(reservation.confirmationCode)}</strong><br>${escapeHtml(venue)} · ${escapeHtml(space)}<br>${reservation.partySize} guest${reservation.partySize === 1 ? "" : "s"} · ${escapeHtml(formatPanamaOperationalDate(reservation.reservationDate))}`;
   await Promise.all([
     sendIndividually({ kind: "ACTION", subject: `Action required: new reservation request — ${reservation.confirmationCode}`, html: emailShell({ eyebrow: "New reservation request", title: "Initiate the guest journey", details, ctaLabel: "Open Operations Board", ctaHref: `${BASE_URL}/host/operations?reservationId=${encodeURIComponent(reservation.id)}` }), auditAction: "reservation.operational_alert.action", entityId: reservation.id }),
     sendIndividually({ kind: "AWARENESS", subject: `New reservation request — ${reservation.confirmationCode}`, html: emailShell({ eyebrow: "Reservation notification", title: "A new reservation was received", details, ctaLabel: "Open Admin Console", ctaHref: `${BASE_URL}/admin` }), auditAction: "reservation.operational_alert.awareness", entityId: reservation.id }),
@@ -67,7 +64,7 @@ export async function sendPaidTicketOperationalAlerts(orderId: string) {
   if (!order || order.status !== "PAID") return;
   const quantity = order.lineItems.reduce((sum, item) => sum + item.qty, 0);
   const reference = order.id.slice(-8).toUpperCase();
-  const details = `Order: <strong>${reference}</strong><br>${escapeHtml(order.series.title)} · ${quantity} ticket${quantity === 1 ? "" : "s"}<br>${escapeHtml(formatDate(order.session.startsAt))}`;
+  const details = `Order: <strong>${reference}</strong><br>${escapeHtml(order.series.title)} · ${quantity} ticket${quantity === 1 ? "" : "s"}<br>${escapeHtml(formatPanamaOperationalDate(order.session.startsAt))}`;
   await Promise.all([
     sendIndividually({ kind: "ACTION", subject: `Action required: new paid ticket sale — ${order.series.title}`, html: emailShell({ eyebrow: "Ticket sale", title: "Prepare the guest journey", details, ctaLabel: "Open Attendee List", ctaHref: `${BASE_URL}/admin/experiences/${encodeURIComponent(order.series.id)}/attendees` }), auditAction: "ticket.operational_alert.action", entityId: order.id }),
     sendIndividually({ kind: "AWARENESS", subject: `New paid ticket sale — ${order.series.title}`, html: emailShell({ eyebrow: "Ticket sale notification", title: "A ticket sale completed", details, ctaLabel: "Open Order", ctaHref: `${BASE_URL}/admin/orders?orderId=${encodeURIComponent(order.id)}` }), auditAction: "ticket.operational_alert.awareness", entityId: order.id }),

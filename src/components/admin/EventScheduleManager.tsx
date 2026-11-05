@@ -1,29 +1,59 @@
 "use client";
+import LocalizedArtworkEditor from "@/components/admin/LocalizedArtworkEditor";
+import MobileSessionArtworkEditor from "@/components/admin/MobileSessionArtworkEditor";
+import SessionManagementEditor from "@/components/admin/SessionManagementEditor";
+import SessionCardsEditor from "@/components/admin/SessionCardsEditor";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
+import MediaUpload from "@/components/ui/MediaUpload";
+import { panamaDateTimeLocalInput, panamaDateTimeLocalIso } from "@/lib/panamaDateTime";
+import { useTranslation } from "@/components/i18n/LocaleProvider";
+import SeriesTranslationStatus from "@/components/admin/SeriesTranslationStatus";
+import { useSeriesTranslations } from "@/components/admin/useSeriesTranslations";
 
 type SessionRow = {
   id: string;
   title?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  flyerImageUrl?: string | null;
+  flyerImageUrlEn?: string | null;
+  flyerImageUrlEs?: string | null;
+  flyerImageUrlPt?: string | null;
+  flyerImageUrlMobileEn?: string | null;
+  flyerImageUrlMobileEs?: string | null;
+  flyerImageUrlMobilePt?: string | null;
+  ticketPrices?: Array<{ ticketTypeId: string; priceCents: number }>;
   startsAt: string;
   endsAt: string;
   capacity: number;
   status: string;
+  allowLateSales?: boolean;
 };
 
 type FormState = {
   title: string;
+  subtitle: string;
+  description: string;
+  flyerImageUrl: string;
+  flyerImageUrlEn: string;
+  flyerImageUrlEs: string;
+  flyerImageUrlPt: string;
+  flyerImageUrlMobileEn: string;
+  flyerImageUrlMobileEs: string;
+  flyerImageUrlMobilePt: string;
+  ticketPrices: Record<string, string>;
   startsAt: string;
   endsAt: string;
   capacity: string;
   occupancyScope: "NONE" | "SPACE" | "VENUE";
   setupMinutes: string;
   resetMinutes: string;
+  useSeriesDefaults: boolean;
 };
 
 function localInput(date: Date) {
-  const timezoneOffset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+  return panamaDateTimeLocalInput(date);
 }
 
 function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
@@ -35,12 +65,19 @@ function initialForm(defaultCapacity: number, hasSpace: boolean): FormState {
 
   return {
     title: "",
+    subtitle: "",
+    description: "",
+    flyerImageUrl: "",
+    flyerImageUrlEn: "", flyerImageUrlEs: "", flyerImageUrlPt: "",
+    flyerImageUrlMobileEn: "", flyerImageUrlMobileEs: "", flyerImageUrlMobilePt: "",
+    ticketPrices: {},
     startsAt: localInput(start),
     endsAt: localInput(end),
     capacity: String(Math.max(1, defaultCapacity || 1)),
     occupancyScope: hasSpace ? "SPACE" : "NONE",
     setupMinutes: "0",
     resetMinutes: "0",
+    useSeriesDefaults: false,
   };
 }
 
@@ -74,24 +111,26 @@ export default function EventScheduleManager({
   defaultCapacity,
   hasOperationalVenue,
   hasPhysicalSpace,
+  ticketTypes = [],
   onCreated,
+  canManageSessionContent = false,
 }: {
   seriesId: string;
   sessions: SessionRow[];
   defaultCapacity: number;
   hasOperationalVenue: boolean;
   hasPhysicalSpace: boolean;
+  ticketTypes?: Array<{ id: string; name: string; priceCents: number }>;
   onCreated: () => Promise<void> | void;
+  canManageSessionContent?: boolean;
 }) {
+  const t = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(() => initialForm(defaultCapacity, hasPhysicalSpace));
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
-
-  const sortedSessions = useMemo(
-    () => [...sessions].sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()),
-    [sessions],
-  );
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const translations = useSeriesTranslations(seriesId, showForm);
 
   function openForm() {
     setNotice("");
@@ -119,12 +158,18 @@ export default function EventScheduleManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: form.title.trim() || undefined,
-          startsAt: new Date(form.startsAt).toISOString(),
-          endsAt: new Date(form.endsAt).toISOString(),
+          subtitle: form.subtitle.trim() || undefined,
+          description: form.description.trim() || undefined,
+          flyerImageUrl: form.flyerImageUrl || undefined,
+          ...(canManageSessionContent ? { flyerImageUrlEn: form.flyerImageUrlEn, flyerImageUrlEs: form.flyerImageUrlEs, flyerImageUrlPt: form.flyerImageUrlPt, flyerImageUrlMobileEn: form.flyerImageUrlMobileEn, flyerImageUrlMobileEs: form.flyerImageUrlMobileEs, flyerImageUrlMobilePt: form.flyerImageUrlMobilePt } : {}),
+          ticketPrices: Object.entries(form.ticketPrices).filter(([, value]) => value.trim() !== "").map(([ticketTypeId, value]) => ({ ticketTypeId, priceCents: Math.round(Number(value) * 100) })),
+          startsAt: panamaDateTimeLocalIso(form.startsAt),
+          endsAt: panamaDateTimeLocalIso(form.endsAt),
           capacity: form.capacity,
           occupancyScope: form.occupancyScope,
           setupMinutes: form.setupMinutes,
           resetMinutes: form.resetMinutes,
+          ...(form.useSeriesDefaults ? { useSeriesDefaults: true } : {}),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -133,14 +178,19 @@ export default function EventScheduleManager({
         return;
       }
 
+      const translation = await translations.onSave(payload);
       const conflicts = Number((payload as { conflictCount?: unknown } | null)?.conflictCount ?? 0);
       setNotice(
-        conflicts > 0
+        translation?.state === "ready"
+          ? "Saved / translations ready."
+          : translation?.state === "retry"
+            ? "Saved / translation needs retry."
+            : conflicts > 0
           ? `Event created. ${conflicts} existing reservation(s) need review; none were cancelled.`
-          : "Event created.",
+          : "Saved / translation pending.",
       );
-      setShowForm(false);
       await onCreated();
+      setShowForm(false);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not create this event.");
     } finally {
@@ -167,6 +217,7 @@ export default function EventScheduleManager({
           {notice}
         </div>
       ) : null}
+      {showForm && <SeriesTranslationStatus translation={translations.translation} loading={translations.loading} working={translations.working} error={translations.error} onResume={translations.resume} onRetry={translations.retry} onRefresh={translations.refresh} />}
 
       {showForm ? (
         <form onSubmit={createEvent} style={{ background: "#fff", border: "1px solid #e5e0d8", borderRadius: 12, marginTop: 16, padding: 18 }}>
@@ -174,6 +225,10 @@ export default function EventScheduleManager({
             <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
               Event title (optional)
               <input value={form.title} maxLength={160} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} style={inputStyle} />
+            </label>
+            <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
+              Theme / subtitle (optional)
+              <input value={form.subtitle} maxLength={240} onChange={(e) => setForm((current) => ({ ...current, subtitle: e.target.value }))} style={inputStyle} />
             </label>
             <label style={{ color: "#534942", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
               Capacity
@@ -208,6 +263,26 @@ export default function EventScheduleManager({
               </>
             ) : null}
           </div>
+          <label style={{ color: "#534942", display: "block", fontSize: 12, fontWeight: 700, marginTop: 14, textTransform: "uppercase" }}>
+            Session description (optional)
+            <textarea rows={3} maxLength={5000} value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} style={{ ...inputStyle, resize: "vertical" }} />
+          </label>
+          <MediaUpload value={form.flyerImageUrl} onChange={(url) => setForm((current) => ({ ...current, flyerImageUrl: url }))} label="Session flyer / image (optional)" mediaType="image" aspectRatio="portrait" maxSizeMB={10} />
+          {canManageSessionContent && <LocalizedArtworkEditor kind="session" value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
+          {canManageSessionContent && <MobileSessionArtworkEditor value={form} onChange={(field, url) => setForm(current => ({ ...current, [field]: url }))} />}
+          {canManageSessionContent && ticketTypes.length ? <div style={{ borderTop: "1px solid #eee7df", marginTop: 16, paddingTop: 14 }}>
+            <h4 style={{ color: "#1a1614", fontSize: 14, margin: "0 0 4px" }}>Session ticket prices</h4>
+            <p style={{ color: "#7c7168", fontSize: 12, margin: "0 0 10px" }}>Leave a price blank to inherit the series ticket price. Existing paid orders keep their recorded prices.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+              {ticketTypes.map((ticket) => <label key={ticket.id} style={{ color: "#534942", fontSize: 12, fontWeight: 700 }}>{ticket.name} · base ${(ticket.priceCents / 100).toFixed(2)}
+                <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="Use series price" value={form.ticketPrices[ticket.id] ?? ""} onChange={(event) => setForm((current) => ({ ...current, ticketPrices: { ...current.ticketPrices, [ticket.id]: event.target.value } }))} style={inputStyle} />
+              </label>)}
+            </div>
+          </div> : null}
+          <label style={{ color: "#534942", display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, lineHeight: 1.45, marginTop: 14 }}>
+            <input type="checkbox" checked={form.useSeriesDefaults} onChange={(event) => setForm((current) => ({ ...current, useSeriesDefaults: event.target.checked }))} />
+            <span><strong>{t("admin", "sessionCreateInheritDefaults")}</strong><br /><span style={{ color: "#7c7168" }}>{t("admin", "sessionCreateInheritDefaultsHelp")}</span></span>
+          </label>
           <p style={{ color: "#7c7168", fontSize: 12, lineHeight: 1.5, margin: "14px 0 0" }}>
             Dining coverage creates a linked draft block. Existing reservations are flagged for review and are never cancelled automatically.
           </p>
@@ -220,22 +295,13 @@ export default function EventScheduleManager({
         </form>
       ) : null}
 
-      <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
-        {sortedSessions.length === 0 ? (
-          <p style={{ color: "#8a817a", fontSize: 14, margin: 0 }}>No event sessions yet.</p>
-        ) : sortedSessions.map((session) => (
-          <div key={session.id} style={{ alignItems: "center", background: "#fff", border: "1px solid #e5e0d8", borderRadius: 10, display: "flex", gap: 14, justifyContent: "space-between", padding: 14, flexWrap: "wrap" }}>
-            <div>
-              <strong style={{ color: "#1a1614", display: "block", fontSize: 14 }}>{session.title || "Event session"}</strong>
-              <span style={{ color: "#6b7280", fontSize: 13 }}>
-                {new Date(session.startsAt).toLocaleString()} – {new Date(session.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </div>
-            <div style={{ color: "#6b7280", fontSize: 12, textAlign: "right" }}>
-              <strong style={{ color: "#374151" }}>{session.status}</strong><br />Capacity {session.capacity}
-            </div>
-          </div>
-        ))}
+      <SessionCardsEditor seriesId={seriesId} sessions={sessions} canManageRestricted={canManageSessionContent} onSaved={onCreated} />
+      <div style={{ borderTop: "1px solid #e8e0d8", marginTop: 22, paddingTop: 14 }}>
+        <button type="button" className="btn btn-ghost" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((open) => !open)}>
+          {showAdvanced ? "Close advanced series tools" : "Advanced series tools"}
+        </button>
+        <p style={{ color: "#7c7168", fontSize: 12, margin: "6px 0 0" }}>For administrators who need to apply a change across multiple dates or manage series defaults.</p>
+        {showAdvanced && <div style={{ marginTop: 12 }}><SessionManagementEditor seriesId={seriesId} onSaved={onCreated} canManageRestricted={canManageSessionContent} /></div>}
       </div>
     </section>
   );

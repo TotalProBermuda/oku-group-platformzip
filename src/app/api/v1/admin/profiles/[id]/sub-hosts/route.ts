@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 
 export async function GET(
   req: NextRequest,
@@ -27,8 +28,9 @@ export async function GET(
     });
 
     return NextResponse.json({ ok: true, data: subHosts });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (error: unknown) {
+    const details = getAdminApiErrorDetails(error);
+    return NextResponse.json({ ok: false, error: details.message }, { status: details.status });
   }
 }
 
@@ -108,7 +110,8 @@ export async function POST(
     });
 
     return NextResponse.json({ ok: true, data: result }, { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (error: unknown) {
+    const details = getAdminApiErrorDetails(error);
+    return NextResponse.json({ ok: false, error: details.message }, { status: details.status });
   }
 }

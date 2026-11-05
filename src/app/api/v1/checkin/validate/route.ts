@@ -29,8 +29,8 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, ...result });
-  } catch (e: any) {
-    const status = e.status || 500;
-    return NextResponse.json({ ok: false, error: e.message }, { status });
+  } catch (error: unknown) {
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to validate check-in" }, { status });
   }
 }

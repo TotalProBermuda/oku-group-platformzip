@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
@@ -19,7 +20,7 @@ export async function GET(
         user: { select: { id: true, name: true, email: true } },
         session: { select: { id: true, startsAt: true } },
         payment: { select: { status: true, amountCents: true } },
-        tickets: { select: { id: true, status: true } },
+        tickets: { select: { id: true, ticketStatus: true } },
       },
     });
 
@@ -29,12 +30,15 @@ export async function GET(
 
     return NextResponse.json({
       ok: true,
-      data: { orders, totalRevenueCents, count: orders.length },
+      data: { orders: orders.map(order => ({ ...order,
+        tickets: order.tickets.map(({ id, ticketStatus }) => ({ id, status: ticketStatus })),
+      })), totalRevenueCents, count: orders.length },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

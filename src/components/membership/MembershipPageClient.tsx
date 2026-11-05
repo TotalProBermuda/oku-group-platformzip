@@ -15,7 +15,6 @@ interface Plan {
   avacaContributionBps: number;
   isInviteOnly: boolean;
   maxActiveMembers: number | null;
-  benefitsJson: any;
 }
 
 interface Props {

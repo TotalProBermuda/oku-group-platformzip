@@ -97,8 +97,10 @@ export default function AdminTicketsPanel({ canWrite }: { canWrite: boolean }) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Request failed");
         setRows(data.data ?? []);
-      } catch (e: any) {
-        if (e.name !== "AbortError") setError(e.message);
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setError(error instanceof Error ? error.message : "Request failed");
+        }
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
       }

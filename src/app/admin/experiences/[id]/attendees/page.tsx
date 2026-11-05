@@ -8,7 +8,7 @@ import { getTranslations } from "@/i18n/getTranslations";
 import type { Locale } from "@/types/i18n";
 import { AttendeesTable } from "@/components/checkin/AttendeesTable";
 
-export default async function AttendeesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<any> }) {
+export default async function AttendeesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ session?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.roles?.some((r: string) => ["SUPERADMIN","FB_DIRECTOR","ADMIN_COMMERCIAL"].includes(r))) {
     redirect("/login");
@@ -30,7 +30,7 @@ export default async function AttendeesPage({ params, searchParams }: { params: 
   });
   if (!series) redirect("/admin/experiences");
 
-  const where: any = { order: { seriesId: id, status: "PAID" } };
+  const where: import("@prisma/client").Prisma.TicketWhereInput = { order: { seriesId: id, status: "PAID" } };
   if (selectedSession) where.sessionId = selectedSession;
 
   const tickets = await prisma.ticket.findMany({

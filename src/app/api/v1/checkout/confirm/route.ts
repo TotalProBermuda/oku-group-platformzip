@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { ticketRows } from "@/server/commerce/ticketIssuance";
+import { z } from "zod/v3";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
@@ -12,6 +13,8 @@ import { getActiveCheckoutAdapter } from "@/server/payments/providers";
 import type { PaymentInstrument } from "@/server/payments/providers/types";
 import { hasValidGuestCheckoutCredential } from "@/server/commerce/guestCheckout";
 import { hasActiveCheckoutHold } from "@/server/commerce/checkoutHold";
+import { lockSessionInventory } from "@/server/commerce/sessionInventory";
+import { bindChallenge, requireBoundChallenge } from "@/server/cybersource/challengeBinding";
 import {
   checkPayerAuthentication,
   validatePayerAuthentication,
@@ -53,7 +56,7 @@ const Body = z.object({
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Enter a complete billing address before paying." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Check billing details and card expiry before paying.", data: { code: "INVALID_CHECKOUT_DETAILS" } }, { status: 400 });
   }
   const body = parsed.data;
   const auth = await getOptionalSession();
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
   const guard = await assertActiveGatewayReady();
   if (guard) {
     return NextResponse.json(
-      { ok: false, error: guard.error, data: { provider: guard.provider } },
+      { ok: false, error: guard.error, data: { provider: guard.provider, code: "GATEWAY_NOT_READY" } },
       { status: guard.status },
     );
   }
@@ -95,43 +98,19 @@ export async function POST(req: Request) {
   if (!(await hasActiveCheckoutHold(order.id))) {
     return NextResponse.json({ ok: false, error: "Checkout session expired. Please start again." }, { status: 410 });
   }
+  if (!order.session) {
+    return NextResponse.json({ ok: false, error: "This occurrence is no longer available for checkout." }, { status: 409 });
+  }
+  if (!["SCHEDULED", "SOLD_OUT"].includes(order.session.status)) {
+    return NextResponse.json({ ok: false, error: "Ticket sales are paused for this occurrence. No payment was attempted." }, { status: 409 });
+  }
 
   const invoiceNumber = order.id.slice(-12);
-  const qtyTotal = order.lineItems.reduce((s, li) => s + li.qty, 0);
 
   const { adapter, provider } = await getActiveCheckoutAdapter();
 
-  // Claim this order before calling the provider. `Payment.orderId` is unique,
-  // so this is the durable idempotency boundary for an external charge: only
-  // one request can obtain the claim, including requests arriving on separate
-  // server instances. A duplicate must never be retried automatically because
-  // its first attempt may already be in flight at Cybersource.
-  try {
-    await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        provider,
-        status: "INITIATED",
-        amountCents: order.totalCents,
-        currency: order.currency,
-        // Persist the merchant reference before calling the gateway. If the
-        // response is lost, a webhook or finance review can reconcile the
-        // payment without guessing which order it belonged to.
-        gatewayReferenceId: invoiceNumber,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Payment is already being processed. Please wait before trying again.",
-          data: { orderId: order.id },
-        },
-        { status: 409 },
-      );
-    }
-    throw error;
+  if (order.payment) {
+    return NextResponse.json({ ok: false, error: "This payment attempt already exists. Contact support before retrying.", data: { code: "PAYMENT_OUTCOME_UNKNOWN" } }, { status: 409 });
   }
 
   const instrument: PaymentInstrument = {
@@ -158,18 +137,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Secure cardholder verification is required before payment." }, { status: 400 });
     }
     try {
+      const challengeContext = { orderId: order.id, amountCents: order.totalCents, currency: order.currency, transientToken: body.cybersourceTransientToken, billing };
       if (pa.authenticationTransactionId) {
-        payerAuthentication = await validatePayerAuthentication({
-          authenticationTransactionId: pa.authenticationTransactionId,
-          cardType: pa.cardType,
-        });
+        const bound = await requireBoundChallenge(challengeContext, pa.authenticationTransactionId);
+        payerAuthentication = await validatePayerAuthentication(bound);
       } else {
         if (!pa.referenceId || !pa.browser || !pa.expirationMonth || !pa.expirationYear) {
           return NextResponse.json({ ok: false, error: "Secure cardholder verification has not started." }, { status: 400 });
         }
         const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
         const enrollment = await checkPayerAuthentication({
-          transientToken: body.cybersourceTransientToken,
+          transientTokenJwt: body.cybersourceTransientToken,
           referenceId: pa.referenceId,
           amount: (order.totalCents / 100).toFixed(2),
           currency: order.currency,
@@ -181,13 +159,38 @@ export async function POST(req: Request) {
           expirationYear: pa.expirationYear,
         });
         if (enrollment.kind === "challenge") {
+          await bindChallenge(challengeContext, enrollment.challenge);
           return NextResponse.json({ ok: false, data: { payerAuthenticationChallenge: enrollment.challenge } }, { status: 202 });
         }
         payerAuthentication = enrollment.authentication;
       }
     } catch {
-      return NextResponse.json({ ok: false, error: "Your card could not complete secure verification. Please start a fresh payment attempt." }, { status: 402 });
+      return NextResponse.json({ ok: false, error: "Your card could not complete secure verification. Please start a fresh payment attempt.", data: { code: "CARDHOLDER_VERIFICATION_FAILED" } }, { status: 402 });
     }
+  }
+
+  // Authentication may span two browser requests. Claim only after server
+  // verification, but always BEFORE charging. The unique orderId still gates
+  // concurrent submissions and ambiguous gateway outcomes remain locked.
+  if (!(await hasActiveCheckoutHold(order.id))) {
+    return NextResponse.json({ ok: false, error: "Checkout expired during verification.", data: { code: "CHECKOUT_EXPIRED" } }, { status: 410 });
+  }
+  try {
+    await prisma.$transaction(async tx => {
+    await lockSessionInventory(tx, order.sessionId);
+    const current = await tx.session.findUnique({ where: { id: order.sessionId }, select: { status: true } });
+    if (!current || !["SCHEDULED", "SOLD_OUT"].includes(current.status)) throw Object.assign(new Error("Ticket sales are paused. No payment was attempted."), { status: 409 });
+    await tx.payment.create({ data: {
+      orderId: order.id, provider, status: "INITIATED", amountCents: order.totalCents,
+      currency: order.currency, gatewayReferenceId: invoiceNumber,
+    } });
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "status" in error && error.status === 409) return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Ticket sales are paused." }, { status: 409 });
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ ok: false, error: "Payment is already being processed. Please do not retry.", data: { code: "PAYMENT_OUTCOME_UNKNOWN" } }, { status: 409 });
+    }
+    throw error;
   }
 
   const result = await adapter.charge({
@@ -210,22 +213,22 @@ export async function POST(req: Request) {
       : (result.rawSafeResponse as Prisma.InputJsonValue);
 
   if (!result.ok) {
-    // A transport error, or an upstream 5xx with no transaction identifier,
-    // is not proof that CyberSource did not receive the payment. Do not mark
+    // Transport errors, upstream 5xx responses and intermediate/review states
+    // are not proof that CyberSource did not receive the payment. Do not mark
     // the order failed, release its capacity, or invite the guest to submit a
     // second charge. Keep the durable payment claim in INITIATED state until
     // the gateway reference is reconciled by a webhook or finance.
     const responseIs5xx = /^5\d\d$/.test(result.responseCode ?? "");
     const outcomeUnknown =
       provider === "CYBERSOURCE" &&
-      !result.transactionId &&
-      (result.failureCode === "NETWORK" || responseIs5xx);
+      (result.failureCode === "PAYMENT_REVIEW_REQUIRED" || result.failureCode === "ADAPTER_ERROR" || result.failureCode === "NETWORK" || responseIs5xx);
 
     if (outcomeUnknown) {
       await prisma.payment.update({
         where: { orderId: order.id },
         data: {
           status: "INITIATED",
+          gatewayTransactionId: result.transactionId,
           gatewayResponseCode: result.responseCode,
           gatewayRawSafeJson,
         },
@@ -326,6 +329,7 @@ export async function POST(req: Request) {
   // compatibility with refund/void code paths that still read them).
   const isAuthNet = provider === "AUTHORIZE_NET";
   await prisma.$transaction(async (tx) => {
+    await lockSessionInventory(tx, order.sessionId);
     await tx.order.update({
       where: { id: order.id },
       data: { status: "PAID", paidAt: new Date() },
@@ -367,23 +371,9 @@ export async function POST(req: Request) {
       },
     });
 
-    // Create tickets (1 per qty)
-    const codes: string[] = [];
-    for (let i = 0; i < qtyTotal; i++) {
-      codes.push(
-        `T-${order.id.slice(0, 6)}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-      );
-    }
+    // Preserve purchased product identity; add-ons never create admission tickets.
     await tx.ticket.createMany({
-      data: codes.map((code) => ({
-        orderId: order.id,
-        userId: order.userId,
-        sessionId: order.sessionId,
-        code,
-        attendeeName: order.user.name,
-        attendeeEmail: order.user.email.trim().toLowerCase(),
-        attendeeEmailNormalized: order.user.email.trim().toLowerCase(),
-      })),
+      data: ticketRows(order),
     });
   });
 

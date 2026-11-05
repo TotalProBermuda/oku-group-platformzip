@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Html5QrcodeScanner } from "html5-qrcode";
 
 interface Props {
   onScan: (result: string) => void;
@@ -9,7 +10,7 @@ interface Props {
 
 export default function QRScanner({ onScan, onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
 
@@ -43,8 +44,9 @@ export default function QRScanner({ onScan, onClose }: Props) {
 
         scannerRef.current = scanner;
         setReady(true);
-      } catch (e: any) {
-        setError("Camera unavailable: " + (e.message ?? "unknown error"));
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        setError("Camera unavailable: " + message);
       }
     }
 

@@ -9,8 +9,9 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: pendingParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await pendingParams;
   // Operational reservation control — restaurant hosts / admins only. Also
   // closes a pre-existing hole where any logged-in user could log a comp drink
   // against any reservation.
@@ -44,8 +45,8 @@ export async function POST(
   await prisma.reservationStatusLog.create({
     data: {
       reservationId: params.id,
-      fromStatus: reservation.status as any,
-      toStatus: reservation.status as any,
+      fromStatus: reservation.status,
+      toStatus: reservation.status,
       changedByUserId: userId,
       changedByLabel: "COMP_DRINK",
       notes: `Complimentary ${label} offered to waiting guests`,

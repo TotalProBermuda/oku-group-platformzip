@@ -105,8 +105,8 @@ export default function BeneficiariesPanel({ initial, canSeeDetail }: Props) {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Failed to load detail");
       setOpenDetail(json.data);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (error: unknown) {
+      setErr(error instanceof Error ? error.message : "Failed to load detail");
       setOpenDetail(null);
     } finally {
       setOpenLoading(false);
@@ -136,8 +136,8 @@ export default function BeneficiariesPanel({ initial, canSeeDetail }: Props) {
       if (!json.ok) throw new Error(json.error || "Failed");
       setOpenDetail(json.data);
       applySummaryUpdate(userId, json.data);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (error: unknown) {
+      setErr(error instanceof Error ? error.message : "Failed to save beneficiary details");
     } finally {
       setBusy(false);
     }
@@ -156,8 +156,8 @@ export default function BeneficiariesPanel({ initial, canSeeDetail }: Props) {
       if (!json.ok) throw new Error(json.error || "Failed");
       setOpenDetail(json.data);
       applySummaryUpdate(userId, json.data);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (error: unknown) {
+      setErr(error instanceof Error ? error.message : "Failed to update beneficiary status");
     } finally {
       setBusy(false);
     }

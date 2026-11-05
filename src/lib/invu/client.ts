@@ -278,7 +278,8 @@ export async function getPayments(
   _branchId: string,
   _fromDate: Date,
   _toDate: Date
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
+  void _token; void _branchId; void _fromDate; void _toDate;
   logSatelliteNoOpOnce();
   return [];
 }
@@ -289,7 +290,8 @@ export async function getCreditNotes(
   _branchId: string,
   _fromDate: Date,
   _toDate: Date
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
+  void _token; void _branchId; void _fromDate; void _toDate;
   logSatelliteNoOpOnce();
   return [];
 }
@@ -300,7 +302,8 @@ export async function getOrderTotals(
   _branchId: string,
   _fromDate: Date,
   _toDate: Date
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
+  void _token; void _branchId; void _fromDate; void _toDate;
   logSatelliteNoOpOnce();
   return [];
 }

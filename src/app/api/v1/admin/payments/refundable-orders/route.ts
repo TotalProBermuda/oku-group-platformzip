@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { getProviderAdapterSafe } from "@/server/payments/providers";
@@ -117,12 +120,11 @@ export async function GET(req: Request) {
     const eligibilityFilter = (searchParams.get("eligibility") ?? "").trim();
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "20", 10) || 20, 100);
 
-    const allowedStatuses = ["PAID", "PARTIALLY_REFUNDED", "REFUNDED", "CANCELLED"];
-    const where: any = {
-      orderType: { in: WEBSITE_ORDER_TYPES as unknown as string[] },
-      status: allowedStatuses.includes(statusFilter)
-        ? statusFilter
-        : { in: ["PAID", "PARTIALLY_REFUNDED"] },
+    const allowedStatuses = [OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED, OrderStatus.REFUNDED, OrderStatus.CANCELLED];
+    const parsedStatus = allowedStatuses.find((status) => status === statusFilter);
+    const where: Prisma.OrderWhereInput = {
+      orderType: { in: [...WEBSITE_ORDER_TYPES] },
+      status: parsedStatus ?? { in: [OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED] },
     };
     if (
       providerFilter === "AUTHORIZE_NET" ||
@@ -218,10 +220,11 @@ export async function GET(req: Request) {
         rows,
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

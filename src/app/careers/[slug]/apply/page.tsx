@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { validateAnswers } from "@/lib/hiring/validation";
 import { normalizeSubmission } from "@/lib/hiring/normalization";
@@ -39,7 +40,7 @@ export default async function ApplyPage({
     );
   }
 
-  let existingDraft = null;
+  let existingDraft: Prisma.ApplicationDraftGetPayload<Record<string, never>> | null = null;
   if (draftId) {
     existingDraft = await prisma.applicationDraft.findUnique({ where: { id: draftId } });
   }
@@ -49,11 +50,12 @@ export default async function ApplyPage({
   // ── Server action: save draft ──────────────────────────────────────────────
   async function saveDraft(values: Record<string, unknown>) {
     "use server";
+    const answersJson = JSON.parse(JSON.stringify(values)) as Prisma.InputJsonValue;
 
     if (existingDraft) {
       await prisma.applicationDraft.update({
         where: { id: existingDraft.id },
-        data: { answersJson: values },
+        data: { answersJson },
       });
       return;
     }
@@ -64,7 +66,7 @@ export default async function ApplyPage({
         formTemplateId: opp.formTemplateId!,
         source: "manual",
         templateVersion: opp.formTemplate!.version,
-        answersJson: values,
+        answersJson,
       },
     });
 
@@ -74,6 +76,7 @@ export default async function ApplyPage({
   // ── Server action: submit ──────────────────────────────────────────────────
   async function submit(values: Record<string, unknown>) {
     "use server";
+    const answersJson = JSON.parse(JSON.stringify(values)) as Prisma.InputJsonValue;
 
     // 1. Create or update the draft
     let draft = existingDraft;
@@ -84,13 +87,13 @@ export default async function ApplyPage({
           formTemplateId: opp.formTemplateId!,
           source: "manual",
           templateVersion: opp.formTemplate!.version,
-          answersJson: values,
+          answersJson,
         },
       });
     } else {
       await prisma.applicationDraft.update({
         where: { id: draft.id },
-        data: { answersJson: values },
+        data: { answersJson },
       });
     }
 

@@ -13,9 +13,10 @@
  *   search  — search by reservationId, cybersourceTransactionId, or confirmationCode
  */
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
-import type { PaymentIntentStatus } from "@prisma/client";
+import type { PaymentIntentStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
     const statusFilter =
       statusParam && VALID_STATUSES.includes(statusParam) ? statusParam : undefined;
 
-    const where: any = {};
+    const where: Prisma.PaymentIntentWhereInput = {};
     if (statusFilter) where.status = statusFilter;
     if (search) {
       where.OR = [
@@ -126,10 +127,11 @@ export async function GET(req: NextRequest) {
         pages: Math.ceil(total / limit),
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const error = getAdminApiErrorDetails(err);
     return NextResponse.json(
-      { ok: false, error: err.message ?? "Unknown error" },
-      { status: err.status ?? 500 },
+      { ok: false, error: error.message },
+      { status: error.status },
     );
   }
 }

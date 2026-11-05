@@ -5,8 +5,9 @@ import { aggregateToTableSession } from "@/server/services/invu/invuAggregationS
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: pendingParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await pendingParams;
   const { roles } = await requireSession();
   if (!roles.includes("SUPERADMIN")) {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });

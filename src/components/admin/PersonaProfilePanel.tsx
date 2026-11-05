@@ -37,6 +37,35 @@ type ReferrerResolutionData = {
   legacyReferrer: ResolutionLegacy | null;
 };
 
+type CompensationPlanOption = { id: string; name: string; modelType: string; appliesToType?: string };
+type LegacyPersonaReferrer = {
+  id: string;
+  fullName: string;
+  referrerType: string;
+  isActive: boolean;
+  referralCode: string;
+  compensationPlan: (CompensationPlanOption & {
+    flatPerCoverCents: number;
+    commissionPercent: number | null;
+    hourlyRateCents: number;
+  }) | null;
+  _count?: { commissions?: number; attributions?: number };
+};
+type PersonaUser = { id: string; name: string | null; email: string | null; referrer: LegacyPersonaReferrer | null };
+type AvailableReferrer = {
+  id: string;
+  userId: string | null;
+  referrerType: string;
+  referralCode: string;
+  user?: { name: string | null; email: string | null } | null;
+};
+type PersonaCompensation = {
+  plans: CompensationPlanOption[];
+  commissionTotals: { count?: number; pending: number; approved: number; paid: number };
+  influencerProfile: { _count?: { ledger?: number } } | null;
+  ledgerTotals?: { earned: number; paid: number } | null;
+};
+
 const RESOLUTION_STATE_STYLE: Record<
   ReferrerResolutionState,
   { bg: string; color: string; border: string; dot: string }
@@ -403,7 +432,7 @@ export type PersonaProfilePanelProps = {
   /** Optional callback after a link/unlink/plan change so parents can refresh. */
   onChange?: () => void;
   /** Pre-fetched user record (avoids an extra request when the parent already has it). */
-  initialUser?: any;
+  initialUser?: PersonaUser | null;
   /** Show a friendly empty state (e.g., for company entities without a platform account). */
   emptyMessage?: string;
 };
@@ -415,9 +444,9 @@ export default function PersonaProfilePanel({
   initialUser,
   emptyMessage,
 }: PersonaProfilePanelProps) {
-  const [user, setUser] = useState<any>(initialUser ?? null);
-  const [compensation, setCompensation] = useState<any>(null);
-  const [availableReferrers, setAvailableReferrers] = useState<any[]>([]);
+  const [user, setUser] = useState<PersonaUser | null>(initialUser ?? null);
+  const [compensation, setCompensation] = useState<PersonaCompensation | null>(null);
+  const [availableReferrers, setAvailableReferrers] = useState<AvailableReferrer[]>([]);
   const [actor, setActor] = useState<ActorRecord | null>(null);
   const [actorDashboard, setActorDashboard] = useState<ActorDashboard | null>(null);
   const [parentEntities, setParentEntities] = useState<Map<string, { id: string; displayName: string; type: string }>>(new Map());
@@ -730,7 +759,7 @@ export default function PersonaProfilePanel({
                   style={{ flex: 1, padding: "7px 10px", border: "1px solid #e0d9d3", borderRadius: 7, fontSize: 13 }}
                 >
                   <option value="">— Select a plan —</option>
-                  {(compensation?.plans ?? []).map((p: any) => (
+                  {(compensation?.plans ?? []).map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
@@ -782,8 +811,8 @@ export default function PersonaProfilePanel({
               >
                 <option value="">{refLoading ? "Loading profiles…" : availableReferrers.length === 0 ? "No referrer profiles available" : "Select a referrer profile…"}</option>
                 {availableReferrers
-                  .filter((r: any) => !r.userId || r.userId === userId)
-                  .map((r: any) => (
+                  .filter((r) => !r.userId || r.userId === userId)
+                  .map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.user?.name || r.user?.email || "Unnamed"} — {r.referrerType?.replace(/_/g, " ")} ({r.referralCode})
                     </option>

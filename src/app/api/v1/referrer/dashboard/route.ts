@@ -7,6 +7,7 @@ import {
 } from "@/server/commissions/earnerScope";
 import { getMyReferrals, type ReferralRow } from "@/server/referrals/myReferralsSource";
 import type { Prisma } from "@prisma/client";
+import { hasReferrerDashboardRole } from "@/lib/referrerDashboardRoles";
 
 /**
  * Map a reservation status to the legacy `conversionStage` vocabulary the
@@ -47,15 +48,7 @@ export async function GET() {
   const auth = await getOptionalSession();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Referrer-capable roles — mirrors the /referrer prefix allowed list in
-  // src/middleware.ts (keep in sync; Edge runtime cannot import this set).
-  const REFERRER_CAPABLE_ROLES = new Set([
-    "SUPERADMIN", "REFERRER",
-    "TAXI_DRIVER", "HOTEL_CONCIERGE", "CONCIERGE", "TOUR_GUIDE",
-    "PROMOTER", "PRIVATE_NETWORK", "INFLUENCER_SUB_REFERRER",
-    "INFLUENCER", "PARTNER",
-  ]);
-  const hasReferrerCapableRole = auth.roles.some((r) => REFERRER_CAPABLE_ROLES.has(r));
+  const hasReferrerCapableRole = hasReferrerDashboardRole(auth.roles);
   // Capture here so the nested async helper inherits a narrowed (non-null) string.
   const currentUserId: string = auth.userId;
 
@@ -70,14 +63,22 @@ export async function GET() {
       select: { actorId: true },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map((r) => r.actorId);
+    if (rows.length === 0) return [];
+    const activeActors = await prisma.referralActor.findMany({
+      where: {
+        id: { in: rows.map((row) => row.actorId) },
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+    return activeActors.map((actor) => actor.id);
   }
 
   if (!hasReferrerCapableRole) {
     // Check DB: allow if they have a linked actor, legacy referrer, or admin-approved link.
     const [actorCount, legacyCount, adminLinkedIds] = await Promise.all([
-      prisma.referralActor.count({ where: { userId: auth.userId } }),
-      prisma.referrer.count({ where: { userId: auth.userId } }),
+      prisma.referralActor.count({ where: { userId: auth.userId, status: "ACTIVE" } }),
+      prisma.referrer.count({ where: { userId: auth.userId, isActive: true } }),
       findAdminLinkedActorIds(),
     ]);
     if (actorCount === 0 && legacyCount === 0 && adminLinkedIds.length === 0) {
@@ -95,8 +96,8 @@ export async function GET() {
     legacyReferrer: { include: { compensationPlan: true } },
   } as const;
 
-  let actor = await prisma.referralActor.findUnique({
-    where: { userId: auth.userId },
+  let actor = await prisma.referralActor.findFirst({
+    where: { userId: auth.userId, status: "ACTIVE" },
     include: ACTOR_INCLUDE,
   });
 
@@ -115,8 +116,8 @@ export async function GET() {
     actor?.legacyReferrer ??
     (actor
       ? null
-      : await prisma.referrer.findUnique({
-          where: { userId: auth.userId },
+       : await prisma.referrer.findFirst({
+           where: { userId: auth.userId, isActive: true },
           include: { compensationPlan: true },
         }));
 

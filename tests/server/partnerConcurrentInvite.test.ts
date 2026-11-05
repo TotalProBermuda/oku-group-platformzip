@@ -97,6 +97,7 @@ vi.mock("@/lib/prisma", () => ({
         displayName: "New Sub-Referrer",
         actorType: "INFLUENCER_SUB_REFERRER",
       })),
+      update: vi.fn().mockImplementation(async ({ where }: { where: { id: string } }) => ({ id: where.id })),
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
   },

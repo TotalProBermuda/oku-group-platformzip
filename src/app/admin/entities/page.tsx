@@ -18,7 +18,9 @@ interface Entity {
   _count: { seriesHosts: number; eventHosts: number };
 }
 
-const BLANK: Partial<Entity> & { type: "PERSON" | "COMPANY" } = {
+type EntityDraft = Pick<Entity, "type" | "displayName" | "logoUrl" | "description" | "websiteUrl" | "instagramUrl">;
+
+const BLANK: EntityDraft = {
   type: "PERSON",
   displayName: "",
   logoUrl: null,
@@ -35,7 +37,7 @@ export default function AdminEntitiesPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId]     = useState<string | null>(null);
-  const [form, setForm]         = useState<any>({ ...BLANK });
+  const [form, setForm]         = useState<EntityDraft>({ ...BLANK });
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
   const [success, setSuccess]   = useState("");
@@ -106,13 +108,6 @@ export default function AdminEntitiesPage() {
     if (res.ok) { setSuccess("Deleted"); load(); }
   }
 
-  const fld = (key: string, label: string, type = "text") => (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
-      <input className="form-input" type={type} value={form[key] ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, [key]: e.target.value }))} />
-    </div>
-  );
-
   return (
     <div className="page-container" style={{ padding: "40px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
@@ -160,22 +155,22 @@ export default function AdminEntitiesPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Type</label>
-              <select className="form-select" value={form.type} onChange={(e) => setForm((f: any) => ({ ...f, type: e.target.value }))}>
+              <select className="form-select" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as EntityDraft["type"] }))}>
                 <option value="PERSON">Person</option>
                 <option value="COMPANY">Company</option>
               </select>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Display Name *</label>
-              <input className="form-input" type="text" value={form.displayName ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, displayName: e.target.value }))} />
+              <input className="form-input" type="text" value={form.displayName ?? ""} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Website</label>
-              <input className="form-input" type="text" value={form.websiteUrl ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, websiteUrl: e.target.value }))} />
+              <input className="form-input" type="text" value={form.websiteUrl ?? ""} onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Instagram URL</label>
-              <input className="form-input" type="text" value={form.instagramUrl ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, instagramUrl: e.target.value }))} />
+              <input className="form-input" type="text" value={form.instagramUrl ?? ""} onChange={(e) => setForm((f) => ({ ...f, instagramUrl: e.target.value }))} />
             </div>
           </div>
 
@@ -187,7 +182,7 @@ export default function AdminEntitiesPage() {
             </div>
             <MediaUpload
               value={form.logoUrl ?? ""}
-              onChange={(url) => setForm((f: any) => ({ ...f, logoUrl: url }))}
+              onChange={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
               mediaType="icon"
               aspectRatio="wide"
               maxSizeMB={5}
@@ -214,7 +209,7 @@ export default function AdminEntitiesPage() {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         marginBottom: 6,
                       }}>
-                        <img src={form.logoUrl} alt="" style={{ maxHeight: size, maxWidth: size + 16, objectFit: "contain" }} />
+                        {form.logoUrl && <img src={form.logoUrl} alt="" style={{ maxHeight: size, maxWidth: size + 16, objectFit: "contain" }} />}
                       </div>
                       <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280" }}>{label}</div>
                       <div style={{ fontSize: 9, color: "#9ca3af" }}>{note}</div>
@@ -235,7 +230,7 @@ export default function AdminEntitiesPage() {
 
           <div className="form-group">
             <label className="form-label">Description</label>
-            <textarea className="form-input" rows={3} value={form.description ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, description: e.target.value }))} />
+            <textarea className="form-input" rows={3} value={form.description ?? ""} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="btn btn-primary" disabled={saving} onClick={submit}>{saving ? "Saving…" : editId ? "Update" : "Create"}</button>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
@@ -25,6 +26,9 @@ export async function POST(
       );
     }
 
+    if (["PARTIALLY_REFUNDED", "REFUNDED"].includes(order.status) || (order.status !== "PAID" && order.payment)) {
+      return NextResponse.json({ ok: false, error: "This order has payment activity. Reconcile or refund it through Finance before cancellation." }, { status: 409 });
+    }
     // Unpaid order — safe to cancel without touching the gateway.
     if (order.status !== "PAID") {
       const updated = await prisma.order.update({
@@ -47,6 +51,7 @@ export async function POST(
 
     // Paid order — Payments P5: route void by Payment.provider, never by
     // active checkout gateway. DEMO is blocked.
+    requirePermission(roles, "admin:payments:refund");
     if (!order.payment) {
       return NextResponse.json(
         { ok: false, error: "Cannot cancel a paid order without a payment record." },
@@ -115,6 +120,7 @@ export async function POST(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.ticket.updateMany({ where: { orderId: id }, data: { ticketStatus: "VOIDED" } });
       const o = await tx.order.update({
         where: { id },
         data: { status: "CANCELLED", cancelledAt: new Date() },
@@ -155,10 +161,11 @@ export async function POST(
     });
 
     return NextResponse.json({ ok: true, data: updated });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

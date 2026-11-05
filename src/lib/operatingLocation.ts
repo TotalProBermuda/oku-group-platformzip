@@ -51,7 +51,7 @@ export const LOCAL5_SPACE_SPECS = [
     conceptKey: "PRIVATE_DINING_ROOM",
     name: "Private Dining Room",
     legacyNames: ["VIP", "Private Dining"],
-    capacity: 10,
+    capacity: 8,
     sortOrder: 3,
     weatherSensitive: false,
     requiresApproval: true,

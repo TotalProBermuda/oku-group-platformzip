@@ -6,6 +6,39 @@ import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
 
 type Tab = "overview" | "roles" | "profiles" | "activity";
 
+type AccountProfileLink = {
+  id: string;
+  relationshipType: string;
+  isPrimary: boolean;
+  profile: {
+    profileType: string;
+    avatarUrl: string | null;
+    logoUrl: string | null;
+    displayName: string;
+    primaryCategory: string | null;
+  } | null;
+};
+type AccountAuditLog = {
+  id: string;
+  action: string;
+  createdAt: string;
+  performedBy: { name: string | null; email: string | null } | null;
+};
+type AccountRecord = {
+  id: string;
+  name: string | null;
+  email: string;
+  imageUrl: string | null;
+  status: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  internalNotes: string | null;
+  roles: Array<{ roleKey: string }>;
+  accountProfileLinks: AccountProfileLink[];
+  auditLogs: AccountAuditLog[];
+  _count: { accountProfileLinks: number; orders: number };
+};
+
 interface AccountDrawerProps {
   accountId: string;
   onClose: () => void;
@@ -16,7 +49,7 @@ export default function AccountDrawer({ accountId, onClose, onRefresh }: Account
   const t = useTranslation();
   const locale = useLocale();
   const dateLocale = locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
-  const [account, setAccount] = useState<any>(null);
+  const [account, setAccount] = useState<AccountRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
   const [actioning, setActioning] = useState(false);
@@ -25,8 +58,8 @@ export default function AccountDrawer({ accountId, onClose, onRefresh }: Account
     setLoading(true);
     try {
       const res = await fetch(`/api/v1/admin/accounts/${accountId}`);
-      const data = await res.json();
-      setAccount(data.account);
+      const data = await res.json() as { account?: AccountRecord | null };
+      setAccount(data.account ?? null);
     } finally {
       setLoading(false);
     }
@@ -182,11 +215,11 @@ export default function AccountDrawer({ accountId, onClose, onRefresh }: Account
                     <div style={{ color: "#9ca3af", fontSize: 14, textAlign: "center", padding: "32px 0" }}>{t("admin", "noLinkedProfiles")}</div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {account.accountProfileLinks.map((link: any) => (
+                      {account.accountProfileLinks.map((link) => (
                         <div key={link.id} className="data-row" style={{ padding: "12px 16px" }}>
                           <div style={{ width: 36, height: 36, borderRadius: link.profile?.profileType === "COMPANY" ? 8 : "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                             {link.profile?.avatarUrl || link.profile?.logoUrl ? (
-                              <img src={link.profile.avatarUrl ?? link.profile.logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
+                              <img src={link.profile.avatarUrl ?? link.profile.logoUrl ?? undefined} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
                             ) : (
                               <span style={{ fontSize: 13, fontWeight: 700, color: "#9ca3af" }}>{link.profile?.displayName?.[0]}</span>
                             )}
@@ -215,7 +248,7 @@ export default function AccountDrawer({ accountId, onClose, onRefresh }: Account
                   <div className="dash-eyebrow" style={{ marginBottom: 16 }}>{t("admin", "recentActivity")}</div>
                   {!account.auditLogs?.length ? (
                     <div style={{ color: "#9ca3af", fontSize: 14 }}>{t("admin", "noActivity")}</div>
-                  ) : account.auditLogs.slice(0, 20).map((log: any) => (
+                  ) : account.auditLogs.slice(0, 20).map((log) => (
                     <div key={log.id} style={{ padding: "10px 0", borderBottom: "1px solid #f3f4f6", display: "flex", gap: 10, alignItems: "flex-start" }}>
                       <Clock size={14} color="#9ca3af" style={{ marginTop: 2, flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>

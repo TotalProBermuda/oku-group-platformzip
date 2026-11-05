@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  if (!session?.user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const adminRoles = ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"];
+  if (!session?.user?.roles?.some((role) => adminRoles.includes(role))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const registrants = await prisma.eventRegistrant.findMany({
     where: { seriesId: id },

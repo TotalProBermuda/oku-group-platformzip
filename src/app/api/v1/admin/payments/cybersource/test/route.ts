@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { testCybersourceConnection } from "@/server/cybersource/client";
@@ -16,12 +17,12 @@ export async function POST(req: Request) {
     let result;
     try {
       result = await testCybersourceConnection();
-    } catch (e: any) {
+    } catch (e: unknown) {
       result = {
         ok: false,
         env: "test" as const,
         status: null,
-        message: e?.message || "Cybersource is not configured.",
+        message: e instanceof Error ? e.message : "Cybersource is not configured.",
       };
     }
 
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
           lastTestedAt: now,
         },
       });
-    } catch (persistErr: any) {
+    } catch (persistErr: unknown) {
       // Audit the live probe outcome even though the test state cannot be saved.
       try {
         await prisma.auditLog.create({
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
               httpStatus: result.status,
               liveOk: result.ok,
               message: result.message.slice(0, 500),
-              persistenceError: persistErr?.message ?? "unknown",
+              persistenceError: persistErr instanceof Error ? persistErr.message : "unknown",
               timestamp: now.toISOString(),
             },
           },
@@ -124,10 +125,11 @@ export async function POST(req: Request) {
         gateway: toSafeCybersourceView(persistedCred),
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
     return NextResponse.json(
-      { ok: false, error: e.message },
-      { status: e.status || 500 }
+      { ok: false, error: error.message },
+      { status: error.status }
     );
   }
 }

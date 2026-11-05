@@ -469,8 +469,8 @@ function PlanFormModal({
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "Failed to save");
       onSaved({ ...json.data, _count: plan?._count ?? { referrers: 0 } });
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -1007,10 +1007,10 @@ export default function CompensationDashboard({ data }: Props) {
               userId={selected.userId ?? selected.user?.id ?? null}
               currentPlanId={selected.compensationPlan?.id ?? null}
               currentPlanName={selected.compensationPlan?.name ?? null}
-              plans={data.plans as any}
+              plans={data.plans}
               onSaved={(newPlanId) => {
-                const newPlan = newPlanId ? (data.plans.find((p: any) => p.id === newPlanId) ?? null) : null;
-                setSelected((prev) => prev ? { ...prev, compensationPlan: newPlan as any } : prev);
+                const newPlan = newPlanId ? (data.plans.find((plan) => plan.id === newPlanId) ?? null) : null;
+                setSelected((prev) => prev ? { ...prev, compensationPlan: newPlan } : prev);
                 router.refresh();
               }}
             />

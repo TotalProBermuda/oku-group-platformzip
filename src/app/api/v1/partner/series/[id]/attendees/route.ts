@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePartnerForSeries, PartnerAuthError, hasFullSeriesAccess, accessibleSessionIds } from "@/lib/partnerAuth";
 
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const fullAccess = hasFullSeriesAccess(auth);
     const allowedSessions = accessibleSessionIds(auth);
 
-    const where: any = { order: { seriesId: id, status: "PAID" } };
+    const where: Prisma.TicketWhereInput = { order: { seriesId: id, status: "PAID" } };
     if (sessionId) {
       where.sessionId = sessionId;
     } else if (!fullAccess) {
@@ -38,9 +39,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json({ ok: true, tickets });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (e instanceof Error && e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/attendees] GET", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

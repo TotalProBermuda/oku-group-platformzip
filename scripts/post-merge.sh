@@ -2,16 +2,14 @@
 set -e
 
 echo "==> Installing dependencies..."
-npm install --legacy-peer-deps
+npm ci
 
 echo "==> Generating Prisma client..."
 npx prisma generate
 
-echo "==> Applying database migrations..."
-npx prisma migrate deploy || echo "No migration files found, skipping."
-
-echo "==> Syncing schema to database (db push)..."
-npx prisma db push --accept-data-loss
+# Pulling source must not mutate the connected database. Apply reviewed
+# migrations separately after verifying the target, backup, and rollback plan.
+echo "==> Database migrations require a separate reviewed release step."
 
 echo "==> Verifying i18n parity across en/es/pt..."
 npm run i18n:check

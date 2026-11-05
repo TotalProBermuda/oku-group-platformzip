@@ -58,9 +58,15 @@ function bankReadyProfile(userId: string) {
  */
 function seedDraftBatch(
   id: string,
-  opts: { status?: string; totalCents?: number; lineCount?: number;
-          submittedAt?: Date | null; submittedById?: string | null;
-          approvedAt?: Date | null; approvedById?: string | null } = {},
+  opts: {
+    status?: string;
+    totalCents?: number;
+    lineCount?: number;
+    submittedAt?: Date | null;
+    submittedById?: string | null;
+    approvedAt?: Date | null;
+    approvedById?: string | null;
+  } = {},
 ) {
   return mp.seedBatch({
     id,
@@ -128,7 +134,9 @@ describe("B — Same row cannot be attached to a second batch while payoutBatchI
     ).rejects.toThrow(/no longer eligible/i);
 
     // Row is still owned by batch_first — not silently moved
-    expect(mp.store.subCommissions.get("sc_b")?.payoutBatchId).toBe("batch_first");
+    expect(mp.store.subCommissions.get("sc_b")?.payoutBatchId).toBe(
+      "batch_first",
+    );
   });
 
   it("throws when the row is already claimed by the same batch (idempotent double-call)", async () => {
@@ -173,7 +181,12 @@ describe("C — Discarding a draft releases payoutBatchId back to null", () => {
     // Also seed a ledger entry so discardDraft's updateMany doesn't error
     mp.seedInfluencer({ id: "inf_c", userId: "u_c" });
     bankReadyProfile("u_c");
-    mp.seedLedgerEntry({ id: "le_c", influencerId: "inf_c", amountCents: 100, payoutBatchId: "batch_c" });
+    mp.seedLedgerEntry({
+      id: "le_c",
+      influencerId: "inf_c",
+      amountCents: 100,
+      payoutBatchId: "batch_c",
+    });
 
     await discardDraft({ batchId: "batch_c", userId: "admin" });
 
@@ -195,7 +208,9 @@ describe("C — Discarding a draft releases payoutBatchId back to null", () => {
     ).rejects.toThrow(/DRAFT/i);
 
     // Row stays claimed — no side-effect from a failed discard
-    expect(mp.store.subCommissions.get("sc_nod")?.payoutBatchId).toBe("batch_submitted");
+    expect(mp.store.subCommissions.get("sc_nod")?.payoutBatchId).toBe(
+      "batch_submitted",
+    );
   });
 });
 
@@ -207,7 +222,12 @@ describe("D — After discard, a new draft can attach the row once again", () =>
     mp.seedSubCommission({ id: "sc_d", payoutBatchId: "batch_d1" });
     mp.seedInfluencer({ id: "inf_d", userId: "u_d" });
     bankReadyProfile("u_d");
-    mp.seedLedgerEntry({ id: "le_d", influencerId: "inf_d", amountCents: 100, payoutBatchId: "batch_d1" });
+    mp.seedLedgerEntry({
+      id: "le_d",
+      influencerId: "inf_d",
+      amountCents: 100,
+      payoutBatchId: "batch_d1",
+    });
 
     // Discard the first batch — releases sc_d
     await discardDraft({ batchId: "batch_d1", userId: "admin" });
@@ -239,9 +259,18 @@ describe("E — Rejecting a PENDING_APPROVAL batch releases payoutBatchId back t
     mp.seedSubCommission({ id: "sc_e2", payoutBatchId: "batch_e" });
     mp.seedInfluencer({ id: "inf_e", userId: "u_e" });
     bankReadyProfile("u_e");
-    mp.seedLedgerEntry({ id: "le_e", influencerId: "inf_e", amountCents: 200, payoutBatchId: "batch_e" });
+    mp.seedLedgerEntry({
+      id: "le_e",
+      influencerId: "inf_e",
+      amountCents: 200,
+      payoutBatchId: "batch_e",
+    });
 
-    await reject({ batchId: "batch_e", userId: "checker", reason: "Wrong period" });
+    await reject({
+      batchId: "batch_e",
+      userId: "checker",
+      reason: "Wrong period",
+    });
 
     // Batch still exists (forensic record) but is REJECTED
     expect(mp.store.batches.get("batch_e")?.status).toBe("REJECTED");
@@ -254,14 +283,19 @@ describe("E — Rejecting a PENDING_APPROVAL batch releases payoutBatchId back t
 
   it("cannot reject a DRAFT batch (reject is strictly for PENDING_APPROVAL)", async () => {
     seedDraftBatch("batch_draft_rej", { status: "DRAFT" });
-    mp.seedSubCommission({ id: "sc_draft_rej", payoutBatchId: "batch_draft_rej" });
+    mp.seedSubCommission({
+      id: "sc_draft_rej",
+      payoutBatchId: "batch_draft_rej",
+    });
 
     await expect(
       reject({ batchId: "batch_draft_rej", userId: "checker", reason: "No" }),
     ).rejects.toThrow(/PENDING_APPROVAL/i);
 
     // Row stays claimed
-    expect(mp.store.subCommissions.get("sc_draft_rej")?.payoutBatchId).toBe("batch_draft_rej");
+    expect(mp.store.subCommissions.get("sc_draft_rej")?.payoutBatchId).toBe(
+      "batch_draft_rej",
+    );
   });
 
   it("requires a non-empty rejection reason", async () => {
@@ -285,9 +319,18 @@ describe("E — Rejecting a PENDING_APPROVAL batch releases payoutBatchId back t
     mp.seedSubCommission({ id: "sc_rej_reuse", payoutBatchId: "batch_e_rej" });
     mp.seedInfluencer({ id: "inf_er", userId: "u_er" });
     bankReadyProfile("u_er");
-    mp.seedLedgerEntry({ id: "le_er", influencerId: "inf_er", amountCents: 300, payoutBatchId: "batch_e_rej" });
+    mp.seedLedgerEntry({
+      id: "le_er",
+      influencerId: "inf_er",
+      amountCents: 300,
+      payoutBatchId: "batch_e_rej",
+    });
 
-    await reject({ batchId: "batch_e_rej", userId: "checker", reason: "Bad data" });
+    await reject({
+      batchId: "batch_e_rej",
+      userId: "checker",
+      reason: "Bad data",
+    });
 
     // Re-attach to a new draft
     seedDraftBatch("batch_e_new");
@@ -297,7 +340,9 @@ describe("E — Rejecting a PENDING_APPROVAL batch releases payoutBatchId back t
       actorId: "admin",
     });
     expect(attached).toBe(1);
-    expect(mp.store.subCommissions.get("sc_rej_reuse")?.payoutBatchId).toBe("batch_e_new");
+    expect(mp.store.subCommissions.get("sc_rej_reuse")?.payoutBatchId).toBe(
+      "batch_e_new",
+    );
   });
 });
 
@@ -326,15 +371,23 @@ describe("F — markExported does not flip payoutStatus to PAID on sub-commissio
     // Attach a sub-commission row to the same batch
     mp.seedSubCommission({ id: "sc_f", payoutBatchId: "batch_f" });
 
-    await markExported({ batchId: "batch_f", userId: "exporter", format: "CSV_GENERIC" });
+    await expect(
+      markExported({
+        batchId: "batch_f",
+        userId: "exporter",
+        format: "CSV_GENERIC",
+      }),
+    ).rejects.toThrow(
+      /confirmed Banesco transfer specification and renderer are not ready/i,
+    );
 
     // Batch transitions to EXPORTED
-    expect(mp.store.batches.get("batch_f")?.status).toBe("EXPORTED");
+    expect(mp.store.batches.get("batch_f")?.status).toBe("APPROVED");
 
     // Sub-commission row must still be PENDING — "batched" is NOT "paid"
     const row = mp.store.subCommissions.get("sc_f");
-    expect(row?.payoutBatchId).toBe("batch_f");  // still attached (batch is now closed/EXPORTED)
-    expect(row?.payoutStatus).toBe("PENDING");   // NOT flipped to PAID
+    expect(row?.payoutBatchId).toBe("batch_f"); // still attached (batch is now closed/EXPORTED)
+    expect(row?.payoutStatus).toBe("PENDING"); // NOT flipped to PAID
   });
 });
 
@@ -350,22 +403,24 @@ describe("G — Race-condition guard: partial stamp is detected and rejected", (
     // AFTER the eligibility findMany but BEFORE our updateMany by directly
     // flipping it in the store, which is what the payoutBatchId: null filter
     // in updateMany will silently skip, triggering the count mismatch guard.
-    const original_updateMany = mp.client.influencerSubCommissionLedger.updateMany.bind(
-      mp.client.influencerSubCommissionLedger,
-    );
+    const original_updateMany =
+      mp.client.influencerSubCommissionLedger.updateMany.bind(
+        mp.client.influencerSubCommissionLedger,
+      );
     let callCount = 0;
-    vi.spyOn(mp.client.influencerSubCommissionLedger, "updateMany").mockImplementation(
-      async (args) => {
-        callCount++;
-        if (callCount === 1) {
-          // Simulate concurrent claim: stamp sc_g2 with another batch before our updateMany
-          const sc2row = mp.store.subCommissions.get(sc2.id)!;
-          sc2row.payoutBatchId = "batch_concurrent";
-          mp.store.subCommissions.set(sc2.id, sc2row);
-        }
-        return original_updateMany(args);
-      },
-    );
+    vi.spyOn(
+      mp.client.influencerSubCommissionLedger,
+      "updateMany",
+    ).mockImplementation(async (args) => {
+      callCount++;
+      if (callCount === 1) {
+        // Simulate concurrent claim: stamp sc_g2 with another batch before our updateMany
+        const sc2row = mp.store.subCommissions.get(sc2.id)!;
+        sc2row.payoutBatchId = "batch_concurrent";
+        mp.store.subCommissions.set(sc2.id, sc2row);
+      }
+      return original_updateMany(args);
+    });
 
     await expect(
       attachSubCommissionsToBatch({
@@ -381,7 +436,9 @@ describe("G — Race-condition guard: partial stamp is detected and rejected", (
     // have been partially stamped. The guard throws, ensuring the caller retries
     // with a fresh eligible list rather than silently accepting a partial claim.
     // What matters is: sc_g2 is NOT owned by batch_g.
-    expect(mp.store.subCommissions.get(sc2.id)?.payoutBatchId).not.toBe("batch_g");
+    expect(mp.store.subCommissions.get(sc2.id)?.payoutBatchId).not.toBe(
+      "batch_g",
+    );
   });
 });
 
@@ -403,7 +460,9 @@ describe("H — Non-eligible and non-DRAFT guard rails", () => {
       }),
     ).rejects.toThrow(/no longer eligible/i);
 
-    expect(mp.store.subCommissions.get("sc_influencer_resp")?.payoutBatchId).toBeNull();
+    expect(
+      mp.store.subCommissions.get("sc_influencer_resp")?.payoutBatchId,
+    ).toBeNull();
   });
 
   it("rejects rows with payoutStatus other than PENDING (e.g. PAID)", async () => {
@@ -456,7 +515,9 @@ describe("H — Non-eligible and non-DRAFT guard rails", () => {
     ).rejects.toThrow(/DRAFT/i);
 
     // Row stays claimed
-    expect(mp.store.subCommissions.get("sc_h5")?.payoutBatchId).toBe("batch_h5");
+    expect(mp.store.subCommissions.get("sc_h5")?.payoutBatchId).toBe(
+      "batch_h5",
+    );
   });
 });
 
@@ -468,9 +529,21 @@ describe("I — listEligibleSubCommissionLines excludes batched and non-PENDING 
     const outOfRange = new Date("2025-03-01");
 
     mp.seedSubCommission({ id: "sc_eligible", createdAt: inRange });
-    mp.seedSubCommission({ id: "sc_batched", payoutBatchId: "some_batch", createdAt: inRange });
-    mp.seedSubCommission({ id: "sc_paid", payoutStatus: "PAID", createdAt: inRange });
-    mp.seedSubCommission({ id: "sc_influencer", payoutResponsibility: "INFLUENCER", createdAt: inRange });
+    mp.seedSubCommission({
+      id: "sc_batched",
+      payoutBatchId: "some_batch",
+      createdAt: inRange,
+    });
+    mp.seedSubCommission({
+      id: "sc_paid",
+      payoutStatus: "PAID",
+      createdAt: inRange,
+    });
+    mp.seedSubCommission({
+      id: "sc_influencer",
+      payoutResponsibility: "INFLUENCER",
+      createdAt: inRange,
+    });
     mp.seedSubCommission({ id: "sc_old", createdAt: outOfRange });
 
     const lines = await listEligibleSubCommissionLines({
@@ -478,7 +551,7 @@ describe("I — listEligibleSubCommissionLines excludes batched and non-PENDING 
       to: new Date("2025-06-30"),
     });
 
-    const ids = lines.map(l => l.id);
+    const ids = lines.map((l) => l.id);
     expect(ids).toContain("sc_eligible");
     expect(ids).not.toContain("sc_batched");
     expect(ids).not.toContain("sc_paid");

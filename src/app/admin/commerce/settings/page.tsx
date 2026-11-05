@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CommerceSettingsPage() {
   const session = await getServerSession(authOptions);
-  const roles = ((session?.user as any)?.roles ?? []) as string[];
+  const roles = session?.user?.roles ?? [];
   if (!session?.user || !roles.includes("SUPERADMIN")) {
     redirect("/login?callbackUrl=/admin/commerce/settings");
   }

@@ -29,7 +29,8 @@ export async function POST() {
         eventReferrers: eventRefResult,
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
+  } catch (e: unknown) {
+    const status = typeof e === "object" && e !== null && "status" in e && typeof e.status === "number" ? e.status : 500;
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Internal error" }, { status });
   }
 }

@@ -35,15 +35,16 @@ const STATIC_DATA: Record<SlugType, {
     logoNeedsWhiteBox: false,
     heroPhoto: "/images/oku/dsc08707.jpg",
     gallery: [
-      { src: "/images/oku/dsc08708.jpg", alt: "OKÜ dining room — full view with ambient lighting", pos: "center 30%" },
-      { src: "/images/oku/dsc08700.jpg", alt: "Intimate table set for two at OKÜ", pos: "center center" },
-      { src: "/images/oku/dsc08697.jpg", alt: "Signature pendant lights against iridescent blue fish-scale wall", pos: "center 60%" },
-      { src: "/images/oku/optimized/cocktail-floral-06.jpg", alt: "OKÜ Botanica cocktail — white foam coupe with edible violet, dehydrated citrus", pos: "center 25%" },
-      { src: "/images/oku/dsc08712.jpg", alt: "Fresh tuna and salmon sashimi in OKÜ sushi display", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-01.webp", alt: "OKÜ Asian Fusion sushi with fresh fish and herbs", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-03.webp", alt: "A selection of sushi prepared at OKÜ", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-05.webp", alt: "Asian-inspired noodles with vegetables from the OKÜ kitchen", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-07.webp", alt: "A salmon and vegetable entree from the OKÜ kitchen", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-06.webp", alt: "Lamb chops prepared at OKÜ", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-09.webp", alt: "A colorful fried rice dish from the OKÜ kitchen", pos: "center center" },
     ],
     sushiBarPhotos: [
-      { src: "/images/oku/dsc08709.jpg", alt: "OKÜ sushi bar counter with illuminated display case" },
-      { src: "/images/oku/dsc08710.jpg", alt: "Octopus, tuna and nigiri in the OKÜ sushi display" },
+      { src: "/images/oku/new-rotation/oku-02.webp", alt: "A composed sushi roll from the OKÜ sushi counter" },
+      { src: "/images/oku/new-rotation/oku-04.webp", alt: "An OKÜ chef carefully plating a dish" },
     ],
     accent: "#1a1614", accentLight: "#f5f2ef", accentMid: "rgba(26,22,20,0.85)",
     phone: "+507 6000 0001", email: "reservations@okugroup.com",
@@ -81,6 +82,15 @@ const STATIC_DATA: Record<SlugType, {
     logoLight: "/images/logo-catch.webp",
     logoDark: "/images/logo-catch.webp",
     logoNeedsWhiteBox: false,
+    heroPhoto: "/images/catch/dining-room.jpg",
+    gallery: [
+      { src: "/images/catch/carrusel-1.jpg", alt: "CATCH dining experience in Casco Viejo", pos: "center center" },
+      { src: "/images/catch/carrusel-2.jpg", alt: "CATCH restaurant atmosphere and design", pos: "center center" },
+      { src: "/images/catch/carrusel-3.jpg", alt: "An evening at CATCH Panama", pos: "center center" },
+      { src: "/images/catch/cocktail.jpg", alt: "Signature cocktail served at CATCH", pos: "center center" },
+      { src: "/images/catch/sushi-burger.jpg", alt: "CATCH sushi burger signature dish", pos: "center center" },
+      { src: "/images/catch/grill.jpg", alt: "A dish prepared on the CATCH grill", pos: "center center" },
+    ],
     accent: "#1e3a5f", accentLight: "#f0f4f8", accentMid: "rgba(30,58,95,0.88)",
     phone: "+507 6000 0002", email: "catch@okugroup.com",
     address: "Gold House, Casco Viejo, Panama City",
@@ -117,6 +127,15 @@ const STATIC_DATA: Record<SlugType, {
     logoLight: "/images/logo-terrace-cream.png",
     logoDark: "/images/logo-terrace-green.png",
     logoNeedsWhiteBox: false,
+    heroPhoto: "/images/terrace/terrace-hero.jpg",
+    gallery: [
+      { src: "/images/terrace/terrace-seating.jpg", alt: "Open-air Terrace tables and seating", pos: "center center" },
+      { src: "/images/terrace/functions/corporate-dinner.webp", alt: "Guests sharing dinner at a Terrace event", pos: "center center" },
+      { src: "/images/terrace/functions/wedding-reception.webp", alt: "Guests celebrating at a wedding reception on the Terrace", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-01.webp", alt: "OKÜ Asian Fusion sushi available to order on the Terrace", pos: "center center" },
+      { src: "/images/oku/new-rotation/oku-06.webp", alt: "A lamb dish from the OKÜ Asian Fusion menu, available to Terrace guests", pos: "center center" },
+      { src: "/images/catch/sushi-burger.jpg", alt: "A CATCH Caribbean Fusion dish available to order on the Terrace", pos: "center center" },
+    ],
     accent: "#2d4a1e", accentLight: "#f2f5f0", accentMid: "rgba(45,74,30,0.88)",
     phone: "+507 6000 0003", email: "terrace@okugroup.com",
     address: "Gold House (Rooftop), Casco Viejo, Panama City",
@@ -146,6 +165,30 @@ const STATIC_DATA: Record<SlugType, {
         { name: "Terrace Sunset",  desc: "Rum, mango, passion fruit, lime, basil, sparkling wine", price: "$15" },
       ]},
     ],
+  },
+};
+
+const TERRACE_SHARED_MENU_COPY: Record<Locale, { title: string; intro: string; oku: string; catch: string; availability: string }> = {
+  en: {
+    title: "Two kitchens. One terrace.",
+    intro: "Enjoy dishes from both OKÜ Asian Fusion and CATCH Caribbean Fusion while dining on the Terrace.",
+    oku: "OKÜ · Asian Fusion menu",
+    catch: "CATCH · Caribbean Fusion menu",
+    availability: "Menu items and prices are subject to availability and may change.",
+  },
+  es: {
+    title: "Dos cocinas. Una terraza.",
+    intro: "Disfruta en la Terraza de los platos de OKÜ Fusión Asiática y de CATCH Fusión Caribeña.",
+    oku: "OKÜ · Menú de fusión asiática",
+    catch: "CATCH · Menú de fusión caribeña",
+    availability: "Los platos y precios están sujetos a disponibilidad y pueden cambiar.",
+  },
+  pt: {
+    title: "Duas cozinhas. Um terraço.",
+    intro: "Desfrute no Terraço de pratos do menu de Fusão Asiática do OKÜ e do menu de Fusão Caribenha do CATCH.",
+    oku: "OKÜ · Menu de Fusão Asiática",
+    catch: "CATCH · Menu de Fusão Caribenha",
+    availability: "Os pratos e preços estão sujeitos à disponibilidade e podem mudar.",
   },
 };
 
@@ -198,8 +241,15 @@ export default async function LocaleRestaurantSlugPage({
   const vd: Record<string, unknown> = { ...((v[safeSlug] as Record<string, unknown>) || {}), ...(venueCopy(websiteContent, safeSlug, safeLocale) as unknown as Record<string, unknown>) };
   const sd = { ...STATIC_DATA[safeSlug], hours: operatingHoursRows(websiteContent, safeLocale).map((entry) => ({ day: entry.days, time: entry.time })) };
 
-  const foodMenu = await getFoodMenuByVenueDb(safeSlug);
-  const drinksMenu = await getDrinksMenuByVenueDb(safeSlug);
+  const [foodMenu, drinksMenu, okuFoodMenu, okuDrinksMenu, catchFoodMenu, catchDrinksMenu] = await Promise.all([
+    getFoodMenuByVenueDb(safeSlug),
+    getDrinksMenuByVenueDb(safeSlug),
+    safeSlug === "terrace" ? getFoodMenuByVenueDb("oku") : Promise.resolve(null),
+    safeSlug === "terrace" ? getDrinksMenuByVenueDb("oku") : Promise.resolve(null),
+    safeSlug === "terrace" ? getFoodMenuByVenueDb("catch") : Promise.resolve(null),
+    safeSlug === "terrace" ? getDrinksMenuByVenueDb("catch") : Promise.resolve(null),
+  ]);
+  const terraceMenuCopy = TERRACE_SHARED_MENU_COPY[safeLocale];
 
   const sectionLabel: React.CSSProperties = {
     fontSize: 10, fontWeight: 700, letterSpacing: "0.2em",
@@ -279,7 +329,6 @@ export default async function LocaleRestaurantSlugPage({
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
               {[
                 { label: v.cuisine as string,  value: vd.cuisine as string },
-                { label: v.covers as string,   value: `${safeSlug === "oku" ? 27 : safeSlug === "catch" ? 24 : 42} ${v.seats as string}` },
                 { label: v.hours as string,    value: sd.hours.map((row) => `${row.day}: ${row.time}`).join(" · ") },
                 { label: v.dress as string,    value: vd.dresscode as string },
               ].map(item => (
@@ -314,14 +363,16 @@ export default async function LocaleRestaurantSlugPage({
 
       {/* ── GALLERY ──────────────────────────────────────────────────────────── */}
       <div style={{ background: sd.accentLight, padding: "0" }}>
-        <div className="venue-detail-gallery" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gridTemplateRows: "300px 300px", gap: 3 }}>
+        <div className="venue-detail-gallery" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gridTemplateRows: sd.gallery && sd.gallery.length > 5 ? "300px 300px 360px" : "300px 300px", gap: 3 }}>
           {(() => {
             const cells = [
               { row: "1 / 3", col: "1 / 2" }, { row: "1 / 2", col: "2 / 3" },
               { row: "1 / 2", col: "3 / 4" }, { row: "2 / 3", col: "2 / 3" },
               { row: "2 / 3", col: "3 / 4" },
+              { row: "3 / 4", col: "1 / 4" },
             ];
-            return cells.map((cell, i) => {
+            const cellCount = Math.max(5, sd.gallery?.length ?? 0);
+            return cells.slice(0, cellCount).map((cell, i) => {
               const photo = sd.gallery?.[i];
               return (
                 <div key={i} style={{ gridRow: cell.row, gridColumn: cell.col, background: sd.accent, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
@@ -499,6 +550,45 @@ export default async function LocaleRestaurantSlugPage({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {safeSlug === "terrace" && (
+            <div style={{ marginTop: 56, paddingTop: 40, borderTop: "1px solid #e8e2dd" }}>
+              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(28px, 4vw, 42px)", color: "#1f1a17", letterSpacing: "-0.03em", margin: "0 0 12px" }}>
+                {terraceMenuCopy.title}
+              </h2>
+              <p style={{ maxWidth: 720, fontSize: 15, lineHeight: 1.75, color: "#6f655e", margin: "0 0 24px" }}>
+                {terraceMenuCopy.intro}
+              </p>
+              <div style={{ display: "grid", gap: 12 }}>
+                {[
+                  { key: "oku", label: terraceMenuCopy.oku, food: okuFoodMenu, drinks: okuDrinksMenu },
+                  { key: "catch", label: terraceMenuCopy.catch, food: catchFoodMenu, drinks: catchDrinksMenu },
+                ].map((menu) => (
+                  <details key={menu.key} style={{ background: "#fff", border: "1px solid #e8e2dd", borderRadius: 14, overflow: "hidden" }}>
+                    <summary style={{ cursor: "pointer", listStyle: "none", padding: "20px 24px", color: menu.key === "oku" ? "#1a1614" : "#1e3a5f", fontSize: 16, fontWeight: 700 }}>
+                      {menu.label}
+                    </summary>
+                    <div style={{ borderTop: "1px solid #eee8e2" }}>
+                      <MenuView
+                        venueSlug={menu.key as "oku" | "catch"}
+                        locale={safeLocale}
+                        variant="embedded"
+                        accent={menu.key === "oku" ? "#1a1614" : "#1e3a5f"}
+                        accentLight={menu.key === "oku" ? "#f5f2ef" : "#f0f4f8"}
+                        background="transparent"
+                        drinksLabel={v.drinkMenu as string}
+                        foodMenu={menu.food ?? undefined}
+                        drinksMenu={menu.drinks ?? undefined}
+                      />
+                    </div>
+                  </details>
+                ))}
+              </div>
+              <p style={{ fontSize: 12, lineHeight: 1.6, color: "#8a8078", margin: "16px 0 0" }}>
+                {terraceMenuCopy.availability}
+              </p>
             </div>
           )}
         </div>

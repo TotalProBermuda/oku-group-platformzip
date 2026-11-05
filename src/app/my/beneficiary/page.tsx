@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 export default async function MyBeneficiaryPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login?callbackUrl=/my/beneficiary");
-  const userId = (session.user as any).id as string;
+  const userId = session.user.id;
+  if (!userId) redirect("/login?callbackUrl=/my/beneficiary");
   const [profile, documents] = await Promise.all([
     getOwnProfile(userId),
     listOwnDocuments(userId),

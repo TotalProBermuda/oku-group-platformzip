@@ -301,7 +301,7 @@ function TrustPill({ score }: { score: number }) {
   );
 }
 
-function SourceLabel({ invu, t }: { invu: boolean; t: Function }) {
+function SourceLabel({ invu, t }: { invu: boolean; t: ReturnType<typeof useTranslation> }) {
   return (
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 12, background: invu ? "#e3f2fd" : "#f3f4f6", color: invu ? "#0d47a1" : "#6b7280", fontWeight: 600 }}>
       {invu ? (t("admin", "revenue.sourceLabel.invuVerified") || "INVU-Verified") : (t("admin", "revenue.sourceLabel.manual") || "Manual Entry")}

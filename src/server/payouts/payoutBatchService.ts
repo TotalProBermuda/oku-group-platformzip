@@ -5,6 +5,7 @@ import { logPayoutBatchAction } from "./payoutAudit";
 import {
   type PayoutExportFormat,
   assertSupportedPayoutExportFormat,
+  isPayoutExportFormatRenderable,
 } from "./exportFormats";
 import { assertPayoutReadyMany } from "@/server/beneficiaries/beneficiaryService";
 
@@ -15,7 +16,8 @@ import { assertPayoutReadyMany } from "@/server/beneficiaries/beneficiaryService
  * approvalStatus is APPROVED. Anything else makes the influencer
  * ineligible to be paid out, regardless of accrued commissions.
  */
-export type InfluencerEligibility = "ACTIVE" | "PENDING" | "REJECTED" | "MISSING";
+export type InfluencerEligibility =
+  "ACTIVE" | "PENDING" | "REJECTED" | "MISSING";
 
 export type EligibleLine = {
   ledgerEntryId: string;
@@ -33,7 +35,9 @@ export type EligibleLine = {
   note: string | null;
 };
 
-function deriveInfluencerEligibility(infl: { approved: boolean; approvalStatus: string } | null): InfluencerEligibility {
+function deriveInfluencerEligibility(
+  infl: { approved: boolean; approvalStatus: string } | null,
+): InfluencerEligibility {
   if (!infl) return "MISSING";
   if (infl.approvalStatus === "REJECTED") return "REJECTED";
   if (infl.approved && infl.approvalStatus === "APPROVED") return "ACTIVE";
@@ -63,7 +67,7 @@ async function resolveInfluencerUserIds(
     where: { id: { in: influencerIds } },
     select: { id: true, userId: true },
   });
-  const byId = new Map(rows.map(r => [r.id, r.userId]));
+  const byId = new Map(rows.map((r) => [r.id, r.userId]));
   for (const id of influencerIds) out.set(id, byId.get(id) ?? null);
   return out;
 }
@@ -90,7 +94,7 @@ export async function assertBeneficiaryReadinessForInfluencers(
     select: { id: true, displayName: true, handle: true },
   });
   const nameByInfluencer = new Map(
-    profiles.map(p => [p.id, p.displayName ?? p.handle ?? p.id]),
+    profiles.map((p) => [p.id, p.displayName ?? p.handle ?? p.id]),
   );
 
   for (const influencerId of influencerIds) {
@@ -100,7 +104,9 @@ export async function assertBeneficiaryReadinessForInfluencers(
       !!uid,
     );
     if (reason) {
-      blocked.push(`${nameByInfluencer.get(influencerId) ?? influencerId} (${reason})`);
+      blocked.push(
+        `${nameByInfluencer.get(influencerId) ?? influencerId} (${reason})`,
+      );
     }
   }
   if (blocked.length > 0) {
@@ -111,12 +117,15 @@ export async function assertBeneficiaryReadinessForInfluencers(
 }
 
 function beneficiaryBlockReasonFor(
-  result: { ready: boolean; status: string; blockingReasons: string[] } | undefined,
+  result:
+    { ready: boolean; status: string; blockingReasons: string[] } | undefined,
   hasUserId: boolean,
 ): BlockingReason | undefined {
   if (!hasUserId) return "BENEFICIARY_PROFILE_MISSING";
-  if (!result || result.status === "MISSING_INFO") return "BENEFICIARY_PROFILE_MISSING";
-  if (result.status === "REJECTED" || result.status === "ON_HOLD") return "COMPLIANCE_HOLD";
+  if (!result || result.status === "MISSING_INFO")
+    return "BENEFICIARY_PROFILE_MISSING";
+  if (result.status === "REJECTED" || result.status === "ON_HOLD")
+    return "COMPLIANCE_HOLD";
   if (!result.ready) return "BANK_NOT_READY";
   return undefined;
 }
@@ -169,7 +178,13 @@ export async function listEligibleLedgerEntries(opts: {
       influencerId: true,
       orderId: true,
       influencer: {
-        select: { id: true, displayName: true, handle: true, approved: true, approvalStatus: true },
+        select: {
+          id: true,
+          displayName: true,
+          handle: true,
+          approved: true,
+          approvalStatus: true,
+        },
       },
       order: {
         select: { id: true, orderNumber: true, totalCents: true },
@@ -178,7 +193,7 @@ export async function listEligibleLedgerEntries(opts: {
     orderBy: { createdAt: "asc" },
   });
 
-  return rows.map(r => ({
+  return rows.map((r) => ({
     ledgerEntryId: r.id,
     influencerId: r.influencerId,
     influencerDisplayName: r.influencer?.displayName ?? "(missing)",
@@ -244,7 +259,8 @@ export async function previewBatch(opts: {
     const net = g.gross - g.reversed;
     let blockReason: BlockingReason | undefined;
     if (g.influencerStatus === "MISSING") blockReason = "INFLUENCER_MISSING";
-    else if (g.influencerStatus !== "ACTIVE") blockReason = "INFLUENCER_INACTIVE";
+    else if (g.influencerStatus !== "ACTIVE")
+      blockReason = "INFLUENCER_INACTIVE";
     else {
       const uid = userIdByInfluencer.get(influencerId) ?? null;
       const benReason = beneficiaryBlockReasonFor(
@@ -273,10 +289,12 @@ export async function previewBatch(opts: {
     }
   }
 
-  byInfluencer.sort((a, b) => a.influencerDisplayName.localeCompare(b.influencerDisplayName));
+  byInfluencer.sort((a, b) =>
+    a.influencerDisplayName.localeCompare(b.influencerDisplayName),
+  );
 
   const eligibleNetCents = byInfluencer
-    .filter(b => !b.isBlocked)
+    .filter((b) => !b.isBlocked)
     .reduce((s, b) => s + b.netCents, 0);
   const blockedCents = blockedLines.reduce((s, b) => s + b.amountCents, 0);
 
@@ -302,7 +320,10 @@ export type IntegrityResult = {
   storedLineCount: number;
   recomputedTotalCents: number;
   recomputedLineCount: number;
-  ineligibleInfluencers: Array<{ influencerId: string; reason: InfluencerEligibility }>;
+  ineligibleInfluencers: Array<{
+    influencerId: string;
+    reason: InfluencerEligibility;
+  }>;
   driftReasons: string[];
 };
 
@@ -324,7 +345,7 @@ export async function revalidateBatchIntegrity(
 
   const stored = await client.payoutBatch.findUnique({
     where: { id: batchId },
-    select: { totalCents: true, lineCount: true, currency: true },
+    select: { totalCents: true, lineCount: true, currency: true, from: true, to: true },
   });
   if (!stored) {
     return {
@@ -346,14 +367,22 @@ export async function revalidateBatchIntegrity(
       amountCents: true,
       currency: true,
       influencerId: true,
+      createdAt: true,
       influencer: {
-        select: { id: true, displayName: true, approved: true, approvalStatus: true },
+        select: {
+          id: true,
+          displayName: true,
+          approved: true,
+          approvalStatus: true,
+        },
       },
     },
   });
 
   const recomputedTotal = lines.reduce((s, l) => {
-    return s + (l.type === "COMMISSION_EARNED" ? l.amountCents : -l.amountCents);
+    return (
+      s + (l.type === "COMMISSION_EARNED" ? l.amountCents : -l.amountCents)
+    );
   }, 0);
   const recomputedCount = lines.length;
 
@@ -364,26 +393,39 @@ export async function revalidateBatchIntegrity(
     seen.add(l.influencerId);
     const eligibility = deriveInfluencerEligibility(l.influencer);
     if (eligibility !== "ACTIVE") {
-      ineligibleInfluencers.push({ influencerId: l.influencerId, reason: eligibility });
+      ineligibleInfluencers.push({
+        influencerId: l.influencerId,
+        reason: eligibility,
+      });
     }
   }
 
   const driftReasons: string[] = [];
+  if (stored.from > stored.to) {
+    driftReasons.push("Batch period is invalid");
+  }
+  if (lines.some((line) => line.createdAt < stored.from || line.createdAt > stored.to)) {
+    driftReasons.push("Batch contains ledger entries outside its payout period");
+  }
   if (recomputedTotal !== stored.totalCents) {
     driftReasons.push(
       `Total drift: stored ${stored.totalCents} ${stored.currency}, recomputed ${recomputedTotal} ${stored.currency}`,
     );
   }
   if (recomputedCount !== stored.lineCount) {
-    driftReasons.push(`Line count drift: stored ${stored.lineCount}, recomputed ${recomputedCount}`);
+    driftReasons.push(
+      `Line count drift: stored ${stored.lineCount}, recomputed ${recomputedCount}`,
+    );
   }
-  if (lines.some(l => l.currency !== stored.currency)) {
+  if (lines.some((l) => l.currency !== stored.currency)) {
     driftReasons.push("Mixed-currency lines found in batch");
   }
   if (ineligibleInfluencers.length > 0) {
     driftReasons.push(
       `${ineligibleInfluencers.length} influencer(s) no longer eligible: ` +
-        ineligibleInfluencers.map(x => `${x.influencerId}=${x.reason}`).join(", "),
+        ineligibleInfluencers
+          .map((x) => `${x.influencerId}=${x.reason}`)
+          .join(", "),
     );
   }
   if (recomputedCount === 0) {
@@ -453,9 +495,15 @@ export async function buildExportPayload(
   const batch = await client.payoutBatch.findUnique({
     where: { id: batchId },
     select: {
-      id: true, name: true, currency: true, from: true, to: true,
-      submittedAt: true, submittedById: true,
-      approvedAt: true, approvedById: true,
+      id: true,
+      name: true,
+      currency: true,
+      from: true,
+      to: true,
+      submittedAt: true,
+      submittedById: true,
+      approvedAt: true,
+      approvedById: true,
     },
   });
   if (!batch) throw new Error("Batch not found while building export payload");
@@ -463,7 +511,9 @@ export async function buildExportPayload(
   const lines = await client.ledgerEntry.findMany({
     where: { payoutBatchId: batchId },
     select: {
-      id: true, type: true, amountCents: true,
+      id: true,
+      type: true,
+      amountCents: true,
       influencerId: true,
       influencer: { select: { id: true, displayName: true, handle: true } },
     },
@@ -488,7 +538,7 @@ export async function buildExportPayload(
   }
 
   const recipients = Array.from(byInfluencer.values())
-    .map(r => ({ ...r, ledgerEntryIds: [...r.ledgerEntryIds].sort() }))
+    .map((r) => ({ ...r, ledgerEntryIds: [...r.ledgerEntryIds].sort() }))
     .sort((a, b) => a.influencerId.localeCompare(b.influencerId));
   const totalCents = recipients.reduce((s, r) => s + r.netCents, 0);
 
@@ -511,7 +561,10 @@ export async function buildExportPayload(
   };
 }
 
-export function hashExportPayload(payload: ExportPayload): { canonicalJson: string; sha256: string } {
+export function hashExportPayload(payload: ExportPayload): {
+  canonicalJson: string;
+  sha256: string;
+} {
   // Deterministic key ordering via JSON.stringify with explicit sorted
   // shape — `recipients` is already sorted, and the top-level keys are
   // explicitly listed below in fixed order.
@@ -554,7 +607,7 @@ export async function createDraft(opts: {
 }): Promise<{ batchId: string; lineCount: number; totalCents: number }> {
   const currency = opts.currency ?? "USD";
 
-  return prisma.$transaction(async tx => {
+  return prisma.$transaction(async (tx) => {
     // Re-validate selected entries inside the tx: must be unbatched and in
     // an active status. Locks against the create-create race the same way
     // the create-entity handler does in the org resolver.
@@ -563,8 +616,15 @@ export async function createDraft(opts: {
         id: { in: opts.ledgerEntryIds },
         payoutBatchId: null,
         type: { in: ["COMMISSION_EARNED", "COMMISSION_REVERSED"] },
+        createdAt: { gte: opts.from, lte: opts.to },
       },
-      select: { id: true, amountCents: true, type: true, currency: true, influencerId: true },
+      select: {
+        id: true,
+        amountCents: true,
+        type: true,
+        currency: true,
+        influencerId: true,
+      },
     });
 
     if (entries.length === 0) {
@@ -575,17 +635,21 @@ export async function createDraft(opts: {
         `Some selected entries are no longer eligible (${entries.length}/${opts.ledgerEntryIds.length} valid)`,
       );
     }
-    const wrongCurrency = entries.find(e => e.currency !== currency);
+    const wrongCurrency = entries.find((e) => e.currency !== currency);
     if (wrongCurrency) {
-      throw new Error(`Mixed currencies in batch: expected ${currency}, found ${wrongCurrency.currency}`);
+      throw new Error(
+        `Mixed currencies in batch: expected ${currency}, found ${wrongCurrency.currency}`,
+      );
     }
 
     await assertBeneficiaryReadinessForInfluencers(
-      Array.from(new Set(entries.map(e => e.influencerId))),
+      Array.from(new Set(entries.map((e) => e.influencerId))),
     );
 
     const totalCents = entries.reduce((s, e) => {
-      return s + (e.type === "COMMISSION_EARNED" ? e.amountCents : -e.amountCents);
+      return (
+        s + (e.type === "COMMISSION_EARNED" ? e.amountCents : -e.amountCents)
+      );
     }, 0);
 
     const batch = await tx.payoutBatch.create({
@@ -602,10 +666,15 @@ export async function createDraft(opts: {
       },
     });
 
-    await tx.ledgerEntry.updateMany({
-      where: { id: { in: entries.map(e => e.id) } },
+    const claimed = await tx.ledgerEntry.updateMany({
+      where: { id: { in: entries.map((e) => e.id) }, payoutBatchId: null },
       data: { payoutBatchId: batch.id },
     });
+    if (claimed.count !== entries.length) {
+      throw new Error(
+        "Concurrent payout batch claim detected. Refresh the preview and try again.",
+      );
+    }
 
     await logPayoutBatchAction(
       {
@@ -632,7 +701,7 @@ export async function submitForApproval(opts: {
   batchId: string;
   userId: string;
 }): Promise<void> {
-  await prisma.$transaction(async tx => {
+  await prisma.$transaction(async (tx) => {
     const batch = await tx.payoutBatch.findUnique({
       where: { id: opts.batchId },
       select: { id: true, status: true, lineCount: true, totalCents: true },
@@ -650,7 +719,7 @@ export async function submitForApproval(opts: {
       select: { influencerId: true },
     });
     await assertBeneficiaryReadinessForInfluencers(
-      Array.from(new Set(lines.map(l => l.influencerId))),
+      Array.from(new Set(lines.map((l) => l.influencerId))),
     );
 
     await tx.payoutBatch.update({
@@ -679,7 +748,7 @@ export async function approve(opts: {
   batchId: string;
   userId: string;
 }): Promise<void> {
-  await prisma.$transaction(async tx => {
+  await prisma.$transaction(async (tx) => {
     const batch = await tx.payoutBatch.findUnique({
       where: { id: opts.batchId },
       select: { id: true, status: true, submittedById: true },
@@ -690,7 +759,9 @@ export async function approve(opts: {
     }
     // Maker/checker rule.
     if (batch.submittedById && batch.submittedById === opts.userId) {
-      throw new Error("Maker/checker violation: submitter cannot approve their own batch");
+      throw new Error(
+        "Maker/checker violation: submitter cannot approve their own batch",
+      );
     }
 
     // Re-validate against source of truth INSIDE the transaction. If lines
@@ -708,7 +779,7 @@ export async function approve(opts: {
       select: { influencerId: true },
     });
     await assertBeneficiaryReadinessForInfluencers(
-      Array.from(new Set(approveLines.map(l => l.influencerId))),
+      Array.from(new Set(approveLines.map((l) => l.influencerId))),
     );
 
     await tx.payoutBatch.update({
@@ -725,7 +796,10 @@ export async function approve(opts: {
         actorId: opts.userId,
         action: "APPROVE",
         payoutBatchId: batch.id,
-        before: { status: "PENDING_APPROVAL", submittedById: batch.submittedById },
+        before: {
+          status: "PENDING_APPROVAL",
+          submittedById: batch.submittedById,
+        },
         after: {
           status: "APPROVED",
           integrity: {
@@ -746,7 +820,7 @@ export async function reject(opts: {
 }): Promise<void> {
   if (!opts.reason?.trim()) throw new Error("Rejection reason required");
 
-  await prisma.$transaction(async tx => {
+  await prisma.$transaction(async (tx) => {
     const batch = await tx.payoutBatch.findUnique({
       where: { id: opts.batchId },
       select: { id: true, status: true },
@@ -757,7 +831,9 @@ export async function reject(opts: {
     // boundary between "the maker walking away" and "the checker formally
     // denying".
     if (batch.status !== "PENDING_APPROVAL") {
-      throw new Error(`Cannot reject batch in status ${batch.status} (must be PENDING_APPROVAL)`);
+      throw new Error(
+        `Cannot reject batch in status ${batch.status} (must be PENDING_APPROVAL)`,
+      );
     }
 
     // Release all included LedgerEntry rows so they become eligible to be
@@ -806,29 +882,38 @@ export async function markExported(opts: {
    * implicit default. Marking the batch as exported is a workflow
    * commitment ("we are paying these recipients via this channel"),
    * so we refuse to make that commitment for the operator.
-   *
-   * POLICY: All registered formats are accepted here, including those
-   * whose adapter status is `PENDING_SPEC` or `PLANNED` (e.g.
-   * `BANESCO_PANAMA_PENDING_SPEC`). This is intentional. The state
-   * transition to EXPORTED records the operator's *commitment* to a
-   * channel and locks the canonical payload + SHA-256. Rendering an
-   * actual bank-acceptable file is a downstream concern handled by
-   * `renderPayoutFile(format, payload)` and may legitimately fail with
-   * NotImplemented while we wait on a bank's spec. The UI surfaces the
-   * format's status so the operator knows when no renderable file
-   * exists yet for the format they're committing to.
+   * POLICY: Only formats with an implemented renderer may be exported.
+   * Pending-spec and planned formats remain disabled.
+   * EXPORTED means a file was rendered; it does not mean funds were submitted or settled.
+   * Banesco submission and settlement require separate, bank-evidenced steps.
    */
   format: string;
 }): Promise<void> {
   const validatedFormat = assertSupportedPayoutExportFormat(opts.format);
-  await prisma.$transaction(async tx => {
+  if (
+    validatedFormat !== "BANESCO_PANAMA_PENDING_SPEC" ||
+    !isPayoutExportFormatRenderable(validatedFormat)
+  ) {
+    throw new Error(
+      "Cannot export this batch for Banesco payment: the confirmed Banesco transfer specification and renderer are not ready. Generic reports and other-bank formats are not payment instructions. No bank file was created or submitted.",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
     const batch = await tx.payoutBatch.findUnique({
       where: { id: opts.batchId },
-      select: { id: true, status: true, approvedById: true, submittedById: true },
+      select: {
+        id: true,
+        status: true,
+        approvedById: true,
+        submittedById: true,
+      },
     });
     if (!batch) throw new Error("Batch not found");
     if (batch.status !== "APPROVED") {
-      throw new Error(`Cannot export batch in status ${batch.status} (must be APPROVED)`);
+      throw new Error(
+        `Cannot export batch in status ${batch.status} (must be APPROVED)`,
+      );
     }
 
     // Re-validate AGAIN at export time. Even though approval re-validated,
@@ -848,7 +933,12 @@ export async function markExported(opts: {
     // diffed against it. The chosen `format` is recorded but does NOT
     // alter the canonical payload shape; format-specific rendering is
     // handled separately by adapters in `./exportFormats`.
-    const payload = await buildExportPayload(batch.id, opts.userId, validatedFormat, tx);
+    const payload = await buildExportPayload(
+      batch.id,
+      opts.userId,
+      validatedFormat,
+      tx,
+    );
     const { canonicalJson, sha256 } = hashExportPayload(payload);
 
     await tx.payoutBatch.update({
@@ -909,14 +999,16 @@ export async function discardDraft(opts: {
   batchId: string;
   userId: string;
 }): Promise<void> {
-  await prisma.$transaction(async tx => {
+  await prisma.$transaction(async (tx) => {
     const batch = await tx.payoutBatch.findUnique({
       where: { id: opts.batchId },
       select: { id: true, status: true },
     });
     if (!batch) throw new Error("Batch not found");
     if (batch.status !== "DRAFT") {
-      throw new Error(`Can only discard DRAFT batches (current: ${batch.status})`);
+      throw new Error(
+        `Can only discard DRAFT batches (current: ${batch.status})`,
+      );
     }
 
     // Release main ledger lines so they can be re-batched.
@@ -954,7 +1046,12 @@ export async function discardDraft(opts: {
 
 export async function listBatches(opts: { status?: string }) {
   const where: Prisma.PayoutBatchWhereInput = opts.status
-    ? { status: opts.status as Prisma.PayoutBatchWhereInput["status"] extends infer T ? T : never }
+    ? {
+        status:
+          opts.status as Prisma.PayoutBatchWhereInput["status"] extends infer T
+            ? T
+            : never,
+      }
     : {};
   return prisma.payoutBatch.findMany({
     where,
@@ -1086,7 +1183,7 @@ export async function listEligibleSubCommissionLines(opts: {
     orderBy: { createdAt: "asc" },
   });
 
-  return rows.map(r => ({
+  return rows.map((r) => ({
     id: r.id,
     orderId: r.orderId,
     orderNumber: r.order?.orderNumber ?? null,
@@ -1120,14 +1217,16 @@ export async function attachSubCommissionsToBatch(opts: {
 }): Promise<{ attached: number }> {
   if (opts.subCommissionLedgerIds.length === 0) return { attached: 0 };
 
-  return prisma.$transaction(async tx => {
+  return prisma.$transaction(async (tx) => {
     const batch = await tx.payoutBatch.findUnique({
       where: { id: opts.batchId },
       select: { id: true, status: true },
     });
     if (!batch) throw new Error("Batch not found");
     if (batch.status !== "DRAFT") {
-      throw new Error(`Sub-commissions can only be attached to DRAFT batches (current: ${batch.status})`);
+      throw new Error(
+        `Sub-commissions can only be attached to DRAFT batches (current: ${batch.status})`,
+      );
     }
 
     // Enforce the same eligibility constraints as listEligibleSubCommissionLines:
@@ -1144,12 +1243,12 @@ export async function attachSubCommissionsToBatch(opts: {
     });
     if (eligible.length !== opts.subCommissionLedgerIds.length) {
       throw new Error(
-        `Some sub-commission rows are no longer eligible (${eligible.length}/${opts.subCommissionLedgerIds.length} valid — must be unbatched, PENDING, and PLATFORM responsibility)`
+        `Some sub-commission rows are no longer eligible (${eligible.length}/${opts.subCommissionLedgerIds.length} valid — must be unbatched, PENDING, and PLATFORM responsibility)`,
       );
     }
 
     const result = await tx.influencerSubCommissionLedger.updateMany({
-      where: { id: { in: eligible.map(r => r.id) }, payoutBatchId: null },
+      where: { id: { in: eligible.map((r) => r.id) }, payoutBatchId: null },
       data: { payoutBatchId: opts.batchId },
     });
 
@@ -1161,8 +1260,8 @@ export async function attachSubCommissionsToBatch(opts: {
     if (result.count !== eligible.length) {
       throw new Error(
         `Sub-commission stamp collision: expected to claim ${eligible.length} rows, ` +
-        `but only ${result.count} were stamped. A concurrent operation may have ` +
-        `claimed the same rows. Refresh the eligible list and retry.`
+          `but only ${result.count} were stamped. A concurrent operation may have ` +
+          `claimed the same rows. Refresh the eligible list and retry.`,
       );
     }
 
@@ -1208,7 +1307,7 @@ export async function detachSubCommissionsFromBatch(
     if (batch.status !== "DRAFT") {
       throw new Error(
         `Sub-commissions can only be detached from DRAFT batches (current: ${batch.status}). ` +
-        "Modifying approved or exported batches would break payout auditability."
+          "Modifying approved or exported batches would break payout auditability.",
       );
     }
 
@@ -1255,11 +1354,22 @@ export async function getBatchDetail(id: string) {
           note: true,
           influencerId: true,
           influencer: {
-            select: { id: true, displayName: true, handle: true, approved: true, approvalStatus: true },
+            select: {
+              id: true,
+              displayName: true,
+              handle: true,
+              approved: true,
+              approvalStatus: true,
+            },
           },
           orderId: true,
           order: {
-            select: { id: true, orderNumber: true, totalCents: true, attributionSource: true },
+            select: {
+              id: true,
+              orderNumber: true,
+              totalCents: true,
+              attributionSource: true,
+            },
           },
         },
       },
@@ -1286,7 +1396,7 @@ export async function getBatchDetail(id: string) {
   });
   if (!batch) return null;
 
-  const lines = batch.entries.map(e => ({
+  const lines = batch.entries.map((e) => ({
     ledgerEntryId: e.id,
     type: e.type,
     amountCents: e.amountCents,
@@ -1307,12 +1417,13 @@ export async function getBatchDetail(id: string) {
   // distinguish LedgerEntry-based commissions from ISCL-based referrer shares.
   // IMPORTANT: batch.totalCents does NOT include these; the bank export must
   // account for both figures separately to avoid reconciliation drift.
-  const subCommissionLines = batch.subCommissions.map(sc => ({
+  const subCommissionLines = batch.subCommissions.map((sc) => ({
     id: sc.id,
     referrerShareCents: sc.referrerShareCents,
     currency: sc.currency,
     parentInfluencerId: sc.parentInfluencerId,
-    parentInfluencerDisplayName: sc.parentInfluencer?.displayName ?? "(missing)",
+    parentInfluencerDisplayName:
+      sc.parentInfluencer?.displayName ?? "(missing)",
     eventReferrerAssignmentId: sc.eventReferrerAssignmentId,
     assignmentDisplayName: sc.eventReferrerAssignment?.displayName ?? null,
     orderId: sc.orderId,
@@ -1320,7 +1431,10 @@ export async function getBatchDetail(id: string) {
     payoutStatus: sc.payoutStatus,
     createdAt: sc.createdAt,
   }));
-  const subCommissionTotalCents = subCommissionLines.reduce((s, l) => s + l.referrerShareCents, 0);
+  const subCommissionTotalCents = subCommissionLines.reduce(
+    (s, l) => s + l.referrerShareCents,
+    0,
+  );
   const subCommissionLineCount = subCommissionLines.length;
 
   const { entries: _omit, subCommissions: _omitSc, ...header } = batch;

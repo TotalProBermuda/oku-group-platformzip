@@ -52,7 +52,7 @@ export async function requirePartnerForSeries(seriesId: string): Promise<Partner
 
   // Resolve sessions on this series where caller is a CO_HOST (legacy path).
   let coHostSessionIds = new Set<string>();
-  let delegateSessionIds = new Set<string>();
+  const delegateSessionIds = new Set<string>();
   let isSeriesDelegate = false;
 
   if (!isSeriesPartner) {

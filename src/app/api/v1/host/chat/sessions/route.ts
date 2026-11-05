@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getHostApiErrorDetails } from "@/app/api/v1/host/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireHostChatAccess } from "@/server/auth/hostChatGuard";
 import { gatePublicPostAsync } from "@/server/rateLimit";
@@ -28,8 +29,9 @@ export async function GET() {
     });
 
     return NextResponse.json({ ok: true, data: sessions });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -73,7 +75,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, data: session }, { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getHostApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

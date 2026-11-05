@@ -8,9 +8,11 @@ import { InviteAudienceMode } from "@prisma/client";
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
   const isAdmin = roles.some((r) => ["SUPERADMIN", "FB_DIRECTOR", "ADMIN_IR", "ADMIN_HR"].includes(r));
   if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const actorId = session?.user?.id;
+  if (!actorId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const { audienceMode, resendToNonResponders, emailConfig } = body;
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { created, invitations } = await createInvitationsForSegment(
     id,
     audienceMode,
-    session.user.id,
+    actorId,
     { resendToNonResponders: !!resendToNonResponders }
   );
 

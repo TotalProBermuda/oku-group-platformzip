@@ -41,7 +41,7 @@ export default async function ApplicationSuccessPage({ params }: Props) {
         </p>
 
         <p style={{ fontSize: 15, lineHeight: 1.65, color: "var(--color-text-muted)", margin: "0 0 36px" }}>
-          Our team reviews applications carefully. If your profile is a strong match, we'll reach out within a few business days to discuss next steps.
+          Our team reviews applications carefully. If your profile is a strong match, we&apos;ll reach out within a few business days to discuss next steps.
         </p>
 
         {/* Details chip */}

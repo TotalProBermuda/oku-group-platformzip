@@ -61,8 +61,8 @@ export default function IssueTicketModal({
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to issue ticket");
       onIssued(`Comp ticket ${data.data.ticketCode} issued.`);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to issue ticket");
     } finally {
       setSubmitting(false);
     }

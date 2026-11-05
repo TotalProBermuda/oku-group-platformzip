@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useTranslation, useLocale } from "@/components/i18n/LocaleProvider";
+import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -391,7 +392,7 @@ export function PayoutDashboard() {
           <p style={{ color: "var(--color-text-secondary)", marginBottom: 28, fontSize: 14 }}>
             {t("admin", "sessionExpiredDesc")}
           </p>
-          <a href="/api/auth/signout?callbackUrl=/login" className="btn btn-primary">{t("admin", "signOutRelogin")}</a>
+          <button type="button" onClick={() => window.location.assign("/api/auth/signout?callbackUrl=/login")} className="btn btn-primary">{t("admin", "signOutRelogin")}</button>
         </div>
       </div>
     </div>
@@ -422,7 +423,7 @@ export function PayoutDashboard() {
             <div className="dash-eyebrow" style={{ marginBottom: 4, marginTop: 12 }}>{t("admin", "referrerAccountsLabel")}</div>
             <div style={{ fontSize: 13 }}>ana@oku.local · sophie@oku.local · carlos@oku.local</div>
           </div>
-          <a href="/api/auth/signout?callbackUrl=/login" className="btn btn-primary">{t("admin", "signOutRelogin")}</a>
+          <button type="button" onClick={() => window.location.assign("/api/auth/signout?callbackUrl=/login")} className="btn btn-primary">{t("admin", "signOutRelogin")}</button>
         </div>
       </div>
     </div>
@@ -468,12 +469,12 @@ export function PayoutDashboard() {
                 <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: 500 }}>{actorName}</span>
               </div>
             </div>
-            <a
+            <Link
               href="/login"
               style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, textDecoration: "none", marginTop: 6 }}
             >
               ← {t("common", "back") || "Back"}
-            </a>
+            </Link>
           </div>
 
           {/* KPI strip inside header */}

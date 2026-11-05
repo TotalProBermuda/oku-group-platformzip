@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireAdminRoles } from "@/server/auth/adminGuard";
 import { logAdminAction } from "@/lib/adminAudit";
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     let referrer:
-      | (typeof referrerBase & {
+      | (NonNullable<typeof referrerBase> & {
           commissions: Awaited<ReturnType<typeof prisma.commissionEntry.findMany>>;
           _count: { attributions: number; commissions: number };
         })
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         ...referrerBase,
         commissions,
         _count: { ...referrerBase._count, commissions: commissionsCount },
-      } as typeof referrer;
+      };
     }
 
     const influencerProfile = await prisma.influencerProfile.findUnique({
@@ -145,8 +146,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         plans,
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -176,8 +178,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
 
     return NextResponse.json({ ok: true, message: "Compensation plan updated" });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }
 
@@ -256,7 +259,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     return NextResponse.json({ ok: true, message: previouslyLinked ? "Commercial persona changed" : "Commercial persona linked" });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

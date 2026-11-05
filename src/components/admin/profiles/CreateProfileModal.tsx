@@ -31,6 +31,8 @@ interface FormState {
   bio: string;
   email: string;
   phone: string;
+  websiteUrl: string;
+  avatarUrl: string;
   publicVisible: boolean;
   compensationEligible: boolean;
   assignableToSeries: boolean;
@@ -47,6 +49,8 @@ export default function CreateProfileModal({ onClose, onCreated }: Props) {
     bio: "",
     email: "",
     phone: "",
+    websiteUrl: "",
+    avatarUrl: "",
     publicVisible: false,
     compensationEligible: false,
     assignableToSeries: true,
@@ -78,6 +82,8 @@ export default function CreateProfileModal({ onClose, onCreated }: Props) {
           bio: form.bio || null,
           email: form.email || null,
           phone: form.phone || null,
+          websiteUrl: form.websiteUrl || null,
+          avatarUrl: form.avatarUrl || null,
         }),
       });
       const data = await res.json();
@@ -190,6 +196,17 @@ export default function CreateProfileModal({ onClose, onCreated }: Props) {
                       {cat.label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label className="form-label">Public website (optional)</label>
+                  <input className="form-input" style={{ margin: 0 }} type="url" placeholder="https://" value={form.websiteUrl} onChange={e => set("websiteUrl", e.target.value)} />
+                </div>
+                <div>
+                  <label className="form-label">Profile photo URL (optional)</label>
+                  <input className="form-input" style={{ margin: 0 }} type="url" placeholder="https:// or /media/…" value={form.avatarUrl} onChange={e => set("avatarUrl", e.target.value)} />
                 </div>
               </div>
 

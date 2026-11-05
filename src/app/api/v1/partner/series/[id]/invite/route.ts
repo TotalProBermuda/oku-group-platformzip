@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     // Send the email through the existing pipeline (best-effort).
-    let sendResult: any = { sent: 0, failed: 0 };
+    let sendResult: Awaited<ReturnType<typeof sendInvitationEmails>> = { sent: 0, skipped: 0, errors: [] };
     try {
       sendResult = await sendInvitationEmails(id, [invitation.id], {});
     } catch (err) {
@@ -61,9 +61,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     return NextResponse.json({ ok: true, invitation, send: sendResult }, { status: 201 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (e instanceof Error && e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/invite] POST", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
@@ -88,9 +88,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     return NextResponse.json({ ok: true, invitations });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof PartnerAuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (e instanceof Error && e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     console.error("[partner/invite] GET", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

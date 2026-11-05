@@ -97,8 +97,8 @@ export async function GET() {
       })),
       referrals,
     });
-  } catch (err: any) {
-    if (err.message === "Unauthorized") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

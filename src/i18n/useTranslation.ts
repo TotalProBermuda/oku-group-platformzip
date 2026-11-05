@@ -1,12 +1,19 @@
 "use client";
 
-import { useLocale } from "./LocaleProvider";
+import { useContext } from "react";
+import { LocaleContext as SiteLocaleContext } from "@/components/i18n/LocaleProvider";
+import { useLocale as useLegacyLocale } from "./LocaleProvider";
 import { translations, type Translations } from "./translationsData";
 export type { Translations };
 export { getTranslations } from "./translationsData";
 
+export function resolveTranslationLocale(siteLocale: import("@/types/i18n").Locale | undefined, fallbackLocale: import("@/types/i18n").Locale) {
+  return siteLocale ?? fallbackLocale;
+}
+
 export function useTranslation() {
-  const locale = useLocale();
+  const siteLocale = useContext(SiteLocaleContext)?.locale;
+  const locale = resolveTranslationLocale(siteLocale, useLegacyLocale());
   const t = translations[locale] || translations.en;
 
   function tr(namespace: keyof Translations, key: string): string {

@@ -7,14 +7,16 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { emitLedgerEvent } from "@/server/services/ledger/ledgerEventService";
 import { ensureAnchorWrites } from "@/../worker/jobs/attribution-anchor-retry";
 import type { Prisma } from "@prisma/client";
+import type { RoleKey } from "@/types/roles";
 
-function isAdmin(session: any): boolean {
-  return session?.user?.roles?.some((r: string) => ["SUPERADMIN"].includes(r)) ?? false;
+function isAdmin(session: Session | null): boolean {
+  return session?.user?.roles?.some((role: RoleKey) => role === "SUPERADMIN") ?? false;
 }
 
 export async function GET(req: NextRequest) {
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const adminUserId: string = (session.user as any).id ?? "unknown";
+  const adminUserId = session.user.id ?? "unknown";
 
   const body = await req.json();
   const { action, attributionSessionId } = body as {
@@ -127,7 +129,7 @@ export async function POST(req: NextRequest) {
         const { handleAttributionAnchorRetryJob } = await import(
           "@/../worker/jobs/attribution-anchor-retry"
         );
-        await handleAttributionAnchorRetryJob({ data: { attributionSessionId } } as any);
+        await handleAttributionAnchorRetryJob({ data: { attributionSessionId } });
       }
     } catch (err) {
       console.error("[admin/attribution-anchor] retry enqueue failed", err);

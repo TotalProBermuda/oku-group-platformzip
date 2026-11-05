@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
@@ -149,7 +149,11 @@ async function main() {
   for (const slot of slots) {
     const { benefits, deliverables, ...rest } = slot;
     await prisma.sponsorshipSlot.create({
-      data: { ...rest, benefits: benefits ?? null, deliverables: deliverables ?? null },
+      data: {
+        ...rest,
+        benefits: benefits ?? Prisma.DbNull,
+        deliverables: deliverables ?? Prisma.DbNull,
+      },
     });
     count++;
     console.log(`  ✓ ${slot.title}`);

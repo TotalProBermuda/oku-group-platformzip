@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
 import { resolveTicketSalesWindow } from "@/server/commerce/ticketSalesWindow";
+import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
+import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
+
+type CheckoutQuoteLineItem = {
+  ticketTypeId?: string;
+  addonId?: string;
+  nameSnapshot: string;
+  itemType: "ticket" | "addon";
+  qty: number;
+  unitPriceCents: number;
+  totalCents: number;
+};
+
+function readMembershipBenefits(value: Prisma.JsonValue | null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const discountBps = "discountBps" in value && typeof value.discountBps === "number" ? value.discountBps : undefined;
+  const earlyAccess = "earlyAccess" in value && typeof value.earlyAccess === "boolean" ? value.earlyAccess : undefined;
+  return { discountBps, earlyAccess };
+}
 
 export async function POST(req: NextRequest) {
   const auth = await getOptionalSession();
@@ -22,7 +43,7 @@ export async function POST(req: NextRequest) {
     include: {
       ticketTypes: { include: { pricingRules: { where: { isActive: true }, orderBy: { priority: "asc" } } } },
       addons: { where: { isActive: true } },
-      sessions: { where: { id: sessionId } },
+      sessions: { where: { id: sessionId }, include: { ticketPrices: true } },
     },
   });
 
@@ -30,22 +51,34 @@ export async function POST(req: NextRequest) {
   if (!series.sessions.length) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const sess = series.sessions[0];
+  const now = new Date();
+  if (series.status !== "PUBLISHED" || sess.status !== "SCHEDULED" || (!sess.allowLateSales && sess.startsAt <= now) || sess.endsAt <= now) {
+    return NextResponse.json({ error: "This event is no longer available for purchase." }, { status: 409 });
+  }
 
   // Load user membership
-  let userMembership: any = null;
+  let userMembership = null;
   if (auth) {
-    userMembership = await prisma.membership.findUnique({
-      where: { userId: auth.userId, status: "ACTIVE" } as any,
+    userMembership = await prisma.membership.findFirst({
+      where: { userId: auth.userId, status: "ACTIVE" },
     });
   }
 
-  const lineItems: any[] = [];
+  const lineItems: CheckoutQuoteLineItem[] = [];
   let subtotalCents = 0;
 
   for (const item of items) {
     if (item.ticketTypeId) {
       const tt = series.ticketTypes.find((t) => t.id === item.ticketTypeId);
       if (!tt) return NextResponse.json({ error: `Ticket type ${item.ticketTypeId} not found` }, { status: 400 });
+      if (tt.ticketStatus !== "ACTIVE") return NextResponse.json({ error: "This ticket is not available." }, { status: 409 });
+      if (!sessionProductEnabled(sess, series, tt.id)) return NextResponse.json({ error: "This ticket is not available for this session." }, { status: 409 });
+      if (!Number.isInteger(item.qty) || item.qty < tt.minPerOrder || item.qty > tt.maxPerOrder) {
+        return NextResponse.json({ error: `Ticket quantity for ${tt.name} is outside its order limits.` }, { status: 400 });
+      }
+      if (tt.typeCapacity !== null && tt.soldCount + item.qty > tt.typeCapacity) {
+        return NextResponse.json({ error: `${tt.name} is sold out.` }, { status: 409 });
+      }
 
       // Access control
       const tierRank: Record<string, number> = { EXPLORER: 0, INSIDER: 1, PATRON: 2, FOUNDER: 3 };
@@ -79,7 +112,8 @@ export async function POST(req: NextRequest) {
       const effectiveWindow = resolveTicketSalesWindow(tt, sess);
       const beforeSaleStart = Boolean(effectiveWindow.startsAt && now < effectiveWindow.startsAt);
       const afterSaleEnd = Boolean(effectiveWindow.endsAt && now > effectiveWindow.endsAt);
-      const hasEarlyAccess = Boolean(beforeSaleStart && userMembership?.benefitsJson?.earlyAccess);
+      const membershipBenefits = readMembershipBenefits(userMembership?.benefitsJson ?? null);
+      const hasEarlyAccess = Boolean(beforeSaleStart && membershipBenefits.earlyAccess);
       if (afterSaleEnd || (beforeSaleStart && !hasEarlyAccess)) {
         return NextResponse.json({
           error: effectiveWindow.startsAt && now < effectiveWindow.startsAt ? "NOT_YET_ON_SALE" : "TICKET_OUTSIDE_SALE_WINDOW",
@@ -91,27 +125,12 @@ export async function POST(req: NextRequest) {
       }
 
       // Dynamic pricing
-      let unitPrice = tt.priceCents;
-      const remaining = Math.max(0, (tt.typeCapacity ?? 9999) - tt.soldCount);
-      const remainingPct = remaining / (tt.typeCapacity ?? 1);
-
-      for (const rule of tt.pricingRules) {
-        const cond = rule.conditionJson as any;
-        const action = rule.actionJson as any;
-        let matches = false;
-
-        if (cond.field === "remainingPct" && cond.operator === "lt") {
-          matches = remainingPct < cond.value / 100;
-        }
-        if (matches && action.type === "price_increase_pct") {
-          unitPrice = Math.round(unitPrice * (1 + action.value / 100));
-        }
-      }
-
-      // Member discount
-      if (userMembership?.benefitsJson?.discountBps && series.membershipRuleMode === "MEMBERS_DISCOUNT") {
-        unitPrice = Math.round(unitPrice * (1 - userMembership.benefitsJson.discountBps / 10000));
-      }
+      const unitPrice = calculateTicketUnitPrice({
+        ticket: tt,
+        sessionPriceCents: sess.ticketPrices.find((price) => price.ticketTypeId === tt.id)?.priceCents,
+        membershipDiscountBps: membershipBenefits.discountBps,
+        applyMembershipDiscount: series.membershipRuleMode === "MEMBERS_DISCOUNT",
+      });
 
       lineItems.push({ ticketTypeId: tt.id, nameSnapshot: tt.name, itemType: "ticket", qty: item.qty, unitPriceCents: unitPrice, totalCents: unitPrice * item.qty });
       subtotalCents += unitPrice * item.qty;
@@ -126,9 +145,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const feesCents  = Math.round(subtotalCents * 0.05);
-  const taxCents   = Math.round(subtotalCents * 0.084);
-  const totalCents = subtotalCents + feesCents + taxCents;
+  const { feesCents, taxCents, totalCents, financeRule } = await priceCheckoutCharges(subtotalCents);
 
   return NextResponse.json({
     seriesId: series.id,
@@ -136,6 +153,7 @@ export async function POST(req: NextRequest) {
     lineItems,
     subtotalCents,
     feesCents,
+    financeRule,
     taxCents,
     totalCents,
     currency: "USD",

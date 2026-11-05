@@ -35,7 +35,7 @@ export function MyOrdersContent({ orders }: { orders: Order[] }) {
   }
 
   return (
-    <div className="dashboard-canvas">
+    <div className="dashboard-canvas account-purchases">
       {/* Header band */}
       <div style={{ background: "var(--layer-2)", borderBottom: "1px solid var(--color-border)", padding: "36px 0 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>

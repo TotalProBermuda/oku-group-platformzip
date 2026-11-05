@@ -3,10 +3,34 @@ import { notFound } from "next/navigation";
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:5000";
 
-async function getProfile(slug: string) {
+interface PublicInfluencerProfile {
+  displayName: string | null;
+  handle: string | null;
+  isVerified: boolean;
+  headline: string | null;
+  location: string | null;
+  shortBio: string | null;
+  longBio: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
+  youtubeUrl: string | null;
+  websiteUrl: string | null;
+  series: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    description: string | null;
+    venue: string;
+    city: string | null;
+    ticketTypes: Array<{ priceCents: number }>;
+  }>;
+}
+
+async function getProfile(slug: string): Promise<PublicInfluencerProfile | null> {
   const res = await fetch(`${BASE}/api/v1/influencers/${encodeURIComponent(slug)}`, { cache: "no-store" });
   if (!res.ok) return null;
-  return (await res.json()).profile ?? null;
+  const body = await res.json() as { profile?: PublicInfluencerProfile | null };
+  return body.profile ?? null;
 }
 
 const venueGrad: Record<string, string> = {
@@ -19,7 +43,7 @@ export default async function InfluencerProfilePage({ params }: { params: Promis
   const profile  = await getProfile(slug);
   if (!profile) notFound();
 
-  const initials = (profile.displayName ?? profile.handle ?? "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = (profile.displayName ?? profile.handle ?? "?").split(" ").map((word) => word[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div>
@@ -57,8 +81,8 @@ export default async function InfluencerProfilePage({ params }: { params: Promis
             <section>
               <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 400, color: "#1a1614", marginBottom: 20 }}>Experiences by {profile.displayName?.split(" ")[0]}</h2>
               <div className="card-grid">
-                {profile.series.map((s: any) => {
-                  const minPrice = s.ticketTypes?.length ? Math.min(...s.ticketTypes.map((t: any) => t.priceCents)) : null;
+                {profile.series.map((s) => {
+                  const minPrice = s.ticketTypes?.length ? Math.min(...s.ticketTypes.map((t) => t.priceCents)) : null;
                   return (
                     <Link key={s.id} href={`/experiences/${s.slug}`} className="series-card" style={{ textDecoration: "none" }}>
                       <div className="series-card-image" style={{ background: venueGrad[s.venue] ?? venueGrad.OKU }}>

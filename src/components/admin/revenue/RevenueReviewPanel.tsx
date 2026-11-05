@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 
 interface Venue {
   id: string;
@@ -147,9 +148,9 @@ export default function RevenueReviewPanel({ venues }: { venues: Venue[] }) {
         </h1>
         <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4, marginBottom: 0 }}>
           Commission-level financial exceptions. For sync-anomaly review, use{" "}
-          <a href="/admin/review-queue" style={{ color: "inherit", textDecoration: "underline" }}>
+          <Link href="/admin/review-queue" style={{ color: "inherit", textDecoration: "underline" }}>
             Review Queue
-          </a>
+          </Link>
           .
         </p>
       </header>

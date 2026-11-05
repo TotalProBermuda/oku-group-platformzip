@@ -19,20 +19,20 @@
   "theSpace": "The Space",
   "seats": "seats",
   "oku": {
-    "headline": "Intimate Fine Dining",
-    "tagline": "White linen. Candlelight. Structured service for 27.",
-    "tag": "Fine Dining",
-    "description": "OKÜ is our flagship dining room — an intimate, chef-driven experience rooted in modern Mediterranean cuisine. The room seats 27 and every table feels like a private affair.",
+    "headline": "OKÜ: Asian Fusion",
+    "tagline": "Thoughtful food. Warm hospitality. A sushi counter at the heart of the room.",
+    "tag": "Asian Fusion",
+    "description": "OKÜ is our Asian Fusion restaurant at Gold House, with a dedicated sushi station and a dining room designed for thoughtful meals and warm hospitality.",
     "heroLine1": "Intimate.",
     "heroLine2": "Deliberate.",
-    "heroLine3": "27 covers.",
-    "cuisine": "Modern Mediterranean",
+    "heroLine3": "",
+    "cuisine": "Asian Fusion",
     "setting": "Indoor · Air-conditioned",
     "dresscode": "Smart casual to formal",
     "about": [
-      "Named after the group it anchors, OKÜ is a study in restraint. Crisp white linen, hand-blown glassware, and a kitchen that believes simplicity is the highest form of sophistication.",
-      "The menu changes with the season — drawing from producers across the Mediterranean. Iberian cured meats, Sicilian citrus, Aegean olive oils — composed into tasting menus that feel inevitable rather than constructed.",
-      "The dining room holds 27. The lighting is always exactly right."
+      "OKÜ is its own restaurant space, with a sushi station at the centre of the experience.",
+      "Its Asian Fusion menu and considered hospitality make it a destination for dinner, celebrations, and time together.",
+      "The OKÜ dining room is its own restaurant space, separate from the Private Dining Room."
     ],
     "sushiBarHeading": "The Sushi Counter",
     "sushiBarBody": "At the heart of OKÜ sits an intimate sushi counter. Each day the chefs prepare fresh cuts from whole fish selected by our suppliers — tuna, salmon, octopus — displayed in the illuminated case for guests to see before they order.",
@@ -49,7 +49,7 @@
     "heroLine1": "Gather.",
     "heroLine2": "Share.",
     "heroLine3": "",
-    "cuisine": "Caribbean-inspired sharing plates",
+    "cuisine": "Caribbean Fusion",
     "setting": "Indoor / Outdoor hybrid",
     "dresscode": "Smart casual",
     "about": [
@@ -62,7 +62,7 @@
     "headline": "Open-Air Rooftop Dining",
     "tagline": "Patterned tile. Evening breeze. The city below.",
     "tag": "Rooftop",
-    "description": "The Terrace is Gold House's open-air crown — 42 covers beneath the Panama sky, surrounded by hand-painted tile and lantern light. Pan-American sharing plates, crafted cocktails, and uninterrupted sunset views.",
+    "description": "The Terrace is Gold House’s rooftop setting for open-air dining, food, drinks, and gatherings.",
     "heroLine1": "The city",
     "heroLine2": "at your feet.",
     "heroLine3": "",
@@ -72,7 +72,7 @@
     "about": [
       "The Terrace sits on the roof of Gold House and opens every evening to the Panama sky. Hand-painted Moroccan tile runs underfoot. Wrought-iron lanterns line the perimeter. Bougainvillea climbs the south wall.",
       "The kitchen sends out Pan-American sharing plates — ceviches, anticuchos, wood-fired flatbreads — designed to be eaten slowly, over conversation, as the city transitions from day to night below.",
-      "At 42 covers, it is our largest space, and also our most beloved."
+      "An open-air restaurant space for food, drinks, and time together above Casco Viejo."
     ]
   }
 }

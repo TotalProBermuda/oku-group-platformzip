@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { requirePermission } from "@/lib/rbac";
@@ -8,10 +8,10 @@ import { releaseCapacity } from "@/server/commerce/capacity";
 import { getProviderAdapterSafe } from "@/server/payments/providers";
 
 const Body = z.object({
-  orderId: z.string(),
-  amountCents: z.number().int().positive(),
+  orderId: z.string().trim().min(1),
+  amountCents: z.number().int().positive().safe(),
   reason: z.string().max(500).optional(),
-});
+}).strict();
 
 export async function POST(req: Request) {
   const { userId, roles } = await requireSession();
@@ -140,6 +140,7 @@ export async function POST(req: Request) {
   const isAuthNet = adapter.provider === "AUTHORIZE_NET";
 
   await prisma.$transaction(async (tx) => {
+    if (isFullRefund) await tx.ticket.updateMany({ where: { orderId: order.id }, data: { ticketStatus: "REFUNDED" } });
     await tx.order.update({
       where: { id: order.id },
       data: {

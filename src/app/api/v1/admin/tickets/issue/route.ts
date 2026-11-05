@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "zod/v3";
+import { Prisma } from "@prisma/client";
+import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/server/auth/session";
 import { hasPermission } from "@/lib/permissions";
 import type { RoleKey } from "@/types/roles";
+import { lockSessionInventory, safeInventoryFloor } from "@/server/commerce/sessionInventory";
+import { purchasedEntitlements, sessionProductEnabled } from "@/server/commerce/sessionProducts";
 
 export const dynamic = "force-dynamic";
 
@@ -34,20 +38,21 @@ export async function POST(req: Request) {
     let body: z.infer<typeof IssueBody>;
     try {
       body = IssueBody.parse(await req.json());
-    } catch (zerr: any) {
+    } catch (zerr: unknown) {
       return NextResponse.json(
-        { ok: false, error: "Invalid request", issues: zerr.issues ?? [] },
+        { ok: false, error: "Invalid request", issues: zerr instanceof z.ZodError ? zerr.issues : [] },
         { status: 400 }
       );
     }
 
-    const session = await prisma.session.findUnique({
+    const foundSession = await prisma.session.findUnique({
       where: { id: body.sessionId },
       include: { series: { select: { id: true } } },
     });
-    if (!session) {
+    if (!foundSession) {
       return NextResponse.json({ ok: false, error: "Session not found" }, { status: 404 });
     }
+    const session = foundSession;
 
     if (body.ticketTypeId) {
       const tt = await prisma.ticketType.findUnique({ where: { id: body.ticketTypeId } });
@@ -85,7 +90,7 @@ export async function POST(req: Request) {
     let attempts = 0;
     const MAX_ATTEMPTS = 4;
     let created: { ticket: { id: string; code: string }; order: { id: string; orderNumber: string | null } } | null = null;
-    let lastErr: any = null;
+    let lastErr: unknown = null;
 
     while (attempts < MAX_ATTEMPTS && !created) {
       attempts += 1;
@@ -93,8 +98,8 @@ export async function POST(req: Request) {
       const orderNumber = generateOrderNumber();
       try {
         created = await issueOnce({ code, orderNumber });
-      } catch (e: any) {
-        if (e?.code === "P2002") {
+      } catch (e: unknown) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
           lastErr = e;
           continue;
         }
@@ -121,6 +126,23 @@ export async function POST(req: Request) {
 
     async function issueOnce({ code, orderNumber }: { code: string; orderNumber: string }) {
       return prisma.$transaction(async (tx) => {
+      await lockSessionInventory(tx, session.id);
+      const current = await tx.session.findUnique({ where: { id: session.id }, include: { series: true } });
+      if (!current || !["SCHEDULED", "SOLD_OUT"].includes(current.status)) throw Object.assign(new Error("This session is not open for admission issuance."), { status: 409 });
+      const floor = await safeInventoryFloor(tx, current.id, current.soldCount);
+      if (floor >= current.capacity) throw Object.assign(new Error("This session has no uncommitted capacity."), { status: 409 });
+      if (body.ticketTypeId && !sessionProductEnabled(current, current.series, body.ticketTypeId)) throw Object.assign(new Error("This product is disabled for this session."), { status: 409 });
+      if (body.ticketTypeId) {
+        await tx.$queryRaw`SELECT "id" FROM "TicketType" WHERE "id" = ${body.ticketTypeId} FOR UPDATE`;
+        const product = await tx.ticketType.findUnique({ where: { id: body.ticketTypeId } });
+        if (!product || product.seriesId !== current.seriesId || product.ticketStatus !== "ACTIVE") throw Object.assign(new Error("This ticket product is unavailable."), { status: 409 });
+        if (product.typeCapacity !== null) {
+          const changed = await tx.ticketType.updateMany({ where: { id: product.id, soldCount: product.soldCount, typeCapacity: { gt: product.soldCount } }, data: { soldCount: { increment: 1 } } });
+          if (changed.count !== 1) throw Object.assign(new Error("This ticket product has no capacity."), { status: 409 });
+        }
+      }
+      await tx.session.update({ where: { id: current.id }, data: { soldCount: floor + 1, ...(floor + 1 === current.capacity ? { status: "SOLD_OUT" } : {}) } });
+      const rights = purchasedEntitlements(current);
       const order = await tx.order.create({
         data: {
           userId: attendeeUserId,
@@ -128,7 +150,9 @@ export async function POST(req: Request) {
           sessionId: session.id,
           status: "PAID",
           orderType: "TICKET",
-          channel: "DIRECT",
+          channel: "ADMIN",
+          entitlementSnapshot: rights,
+          checkoutLocale: "en",
           orderNumber,
           subtotalCents: 0,
           totalCents: 0,
@@ -149,6 +173,7 @@ export async function POST(req: Request) {
           attendeeEmail: body.attendeeEmail?.trim().toLowerCase() ?? null,
           attendeeEmailNormalized: body.attendeeEmail?.trim().toLowerCase() ?? null,
           ticketStatus: "ISSUED",
+          entitlementSnapshot: rights,
           checkInNotes: body.note ?? null,
         },
       });
@@ -181,7 +206,8 @@ export async function POST(req: Request) {
         return { ticket, order };
       });
     }
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: e.status || 500 });
+  } catch (e: unknown) {
+    const error = getAdminApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
 }

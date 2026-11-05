@@ -367,7 +367,7 @@ export async function provisionHostPersonalReferrer(
       return created;
     });
     return { ok: true, assignment };
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof HostMergeRequiredError) {
       // Re-write the canonical audit non-transactionally — the version the
       // dedupe service wrote inside the tx was rolled back with the tx.
@@ -391,7 +391,7 @@ export async function provisionHostPersonalReferrer(
     // Concurrent /me from the same host racing us — the unique
     // constraint kicks in. Re-read and return whatever the winning
     // request just inserted instead of failing the caller.
-    if (err?.code === "P2002") {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       const winner = await prisma.eventReferrerAssignment.findUnique({
         where: { parentHostProfileId: host.id },
         select: { id: true, referralCode: true, status: true },
@@ -471,11 +471,6 @@ export async function createEventReferrer(
   // the tx. Because these exit paths leave no actor mutations to roll back
   // (merge_required means a pre-existing actor was found; blocked means no actor
   // was touched), the tx commits cleanly and the outer function surfaces the error.
-  type TxResult =
-    | { type: "ok"; assignment: Awaited<ReturnType<typeof prisma.eventReferrerAssignment.create>> }
-    | { type: "merge_required"; candidateActorId: string; candidateActorUserId: string | null; matchField: MatchField }
-    | { type: "blocked"; reason: string };
-
   const txResult = await prisma.$transaction(async (tx) => {
     let provisionedActorId: string | null = null;
 

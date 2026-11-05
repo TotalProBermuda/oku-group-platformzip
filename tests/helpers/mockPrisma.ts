@@ -455,9 +455,18 @@ export function createMockPrisma() {
     },
   };
 
-  const $transaction = async <T,>(fn: (tx: typeof client) => Promise<T>): Promise<T> => fn(client);
+  interface MockTransactionClient {
+    beneficiaryProfile: typeof beneficiaryProfile;
+    auditLog: typeof auditLog;
+    influencerProfile: typeof influencerProfile;
+    ledgerEntry: typeof ledgerEntry;
+    influencerSubCommissionLedger: typeof influencerSubCommissionLedger;
+    payoutBatch: typeof payoutBatch;
+    $transaction: <T>(fn: (tx: MockTransactionClient) => Promise<T>) => Promise<T>;
+  }
+  const $transaction: MockTransactionClient["$transaction"] = async (fn) => fn(client);
 
-  const client = {
+  const client: MockTransactionClient = {
     beneficiaryProfile,
     auditLog,
     influencerProfile,

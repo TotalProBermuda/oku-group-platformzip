@@ -15,11 +15,19 @@ export const TRANSLATABLE_FIELDS = {
     "agenda",
     "faq",
     "hostNotes",
+    "countdownLabel",
+    "seoTitle",
+    "seoDescription",
   ],
   EventSession: [
     "title",
+    "subtitle",
+    "description",
     "notes",
   ],
+  SeriesSessionDefaults: ["title", "subtitle", "description"],
+  TicketType: ["name", "description"],
+  ExperienceAddon: ["name", "description"],
   Venue: [
     "name",
     "shortDescription",
@@ -28,6 +36,11 @@ export const TRANSLATABLE_FIELDS = {
   UserProfile: [
     "bio",
     "headline",
+  ],
+  Profile: [
+    "displayName",
+    "bio",
+    "shortDescription",
   ],
   InvitationTemplate: [
     "subject",

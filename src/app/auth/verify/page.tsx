@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { getSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useTranslation } from "@/components/i18n/LocaleProvider";
+import { exchangePasswordlessLink } from "@/lib/passwordlessExchange";
 
 export default function VerifyMagicLinkPage() {
   const t = useTranslation();
@@ -12,8 +13,12 @@ export default function VerifyMagicLinkPage() {
   const [ready, setReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const exchangeInFlight = useRef(false);
+  const fragmentRead = useRef(false);
 
   useEffect(() => {
+    if (fragmentRead.current) return;
+    fragmentRead.current = true;
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     setToken(fragment.get("token") ?? "");
     setEmail(fragment.get("email") ?? "");
@@ -23,31 +28,29 @@ export default function VerifyMagicLinkPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (exchangeInFlight.current) return;
     if (!token) {
       setError(t("auth", "magicLinkInvalid"));
       return;
     }
+    exchangeInFlight.current = true;
     setSubmitting(true);
     setError("");
 
     // Clear any prior browser session before exchanging the one-time bearer
     // credential. NextAuth will then mint a fresh signed JWT session.
-    await signOut({ redirect: false });
-    const result = await signIn("passwordless", {
-      token,
-      email,
-      callbackUrl: "/",
-      redirect: false,
+    const result = await exchangePasswordlessLink({
+      signOut: () => signOut({ redirect: false }),
+      signIn: () => signIn("passwordless", { token, email, callbackUrl: "/", redirect: false }),
+      getSession,
     });
+    exchangeInFlight.current = false;
     setSubmitting(false);
-    if (!result?.ok || !result.url) {
-      setError(t("auth", "magicLinkInvalid"));
+    if (!result.ok) {
+      setError(t("auth", result.reason === "CONNECTION" ? "magicLinkConnectionError" : "magicLinkInvalid"));
       return;
     }
-    const session = await getSession();
-    const destination =
-      (session?.user as { passwordlessDestination?: string } | undefined)?.passwordlessDestination ?? "/";
-    window.location.assign(destination);
+    window.location.assign(result.destination);
   }
 
   return (

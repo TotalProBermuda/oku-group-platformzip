@@ -11,7 +11,7 @@ import type { Locale } from "@/types/i18n";
 
 export default async function PartnerLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  const roles: string[] = (session?.user as any)?.roles ?? [];
+  const roles = session?.user?.roles ?? [];
 
   if (!session || (!roles.includes("PARTNER") && !roles.includes("PARTNER_SELLER") && !roles.includes("SUPERADMIN"))) {
     redirect("/login?callbackUrl=/partner/dashboard");

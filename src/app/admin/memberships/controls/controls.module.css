@@ -1,0 +1,12 @@
+.page { max-width: 880px; margin: auto; padding: 24px 16px; overflow-wrap: anywhere; }
+.page section { border: 1px solid var(--color-border, #ddd); border-radius: 16px; padding: 20px; margin-block: 20px; }
+.page h1 { font-size: clamp(1.5rem, 5vw, 2rem); }
+.page h2 { font-size: 1.25rem; }
+.page label { display: grid; gap: 8px; margin-block: 16px; min-width: 0; }
+.page input:not([type=checkbox]), .page select, .page button { box-sizing: border-box; width: 100%; min-height: 44px; min-width: 0; padding: 10px; font: inherit; border: 1px solid #888; border-radius: 8px; background: var(--color-surface, white); color: var(--color-text, #222); }
+.page .check { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.page input[type=checkbox] { width: 24px; height: 24px; flex-shrink: 0; }
+.page button { cursor: pointer; font-weight: 600; }
+.page :focus-visible { outline: 3px solid #b91c3c; outline-offset: 3px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 20px; }
+@media (min-width: 640px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

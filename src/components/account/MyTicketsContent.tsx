@@ -54,10 +54,10 @@ export function MyTicketsContent({ tickets, userName }: { tickets: Ticket[]; use
   const dateLocale = locale === "es" ? "es-PA" : locale === "pt" ? "pt-BR" : "en-US";
 
   function fmtDate(d: Date | string) {
-    return new Date(d).toLocaleDateString(dateLocale, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    return new Date(d).toLocaleDateString(dateLocale, { timeZone: "America/Panama", weekday: "short", month: "short", day: "numeric", year: "numeric" });
   }
   function fmtTime(d: Date | string) {
-    return new Date(d).toLocaleTimeString(dateLocale, { hour: "numeric", minute: "2-digit" });
+    return new Date(d).toLocaleTimeString(dateLocale, { timeZone: "America/Panama", hour: "numeric", minute: "2-digit" });
   }
 
   const upcoming = tickets.filter((tk) => tk.session?.startsAt && new Date(tk.session.startsAt) >= new Date());
@@ -69,7 +69,7 @@ export function MyTicketsContent({ tickets, userName }: { tickets: Ticket[]; use
     const checked = tk.ticketStatus === "CHECKED_IN";
     const statusLabel = checked
       ? t("common", "checkedInStatus")
-      : isPast ? t("common", "attendedStatus")
+      : isPast ? t("common", "past")
       : t("common", "confirmedStatus");
 
     const headerBg = checked
@@ -110,7 +110,7 @@ export function MyTicketsContent({ tickets, userName }: { tickets: Ticket[]; use
             </div>
             {tk.session?.startsAt && (
               <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 3 }} suppressHydrationWarning>
-                {mounted ? `${fmtDate(tk.session.startsAt)} · ${fmtTime(tk.session.startsAt)}` : "—"}
+                {mounted ? `${fmtDate(tk.session.startsAt)} · ${fmtTime(tk.session.startsAt)} (Panama)` : "—"}
               </div>
             )}
             {series?.city && <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{series.city}</div>}
@@ -139,7 +139,7 @@ export function MyTicketsContent({ tickets, userName }: { tickets: Ticket[]; use
   }
 
   return (
-    <div className="dashboard-canvas">
+    <div className="dashboard-canvas account-purchases">
       {/* Header band */}
       <div style={{ background: "var(--layer-2)", borderBottom: "1px solid var(--color-border)", padding: "36px 0 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>

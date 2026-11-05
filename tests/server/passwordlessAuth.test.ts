@@ -184,6 +184,38 @@ describe("passwordless authentication security", () => {
     expect(mocks.tx.user.upsert).not.toHaveBeenCalled();
   });
 
+  it.each(["response", "exception"])("revokes only the failed email attempt on %s failure", async failure => {
+    mocks.tx.user.findFirst.mockResolvedValue(activeUser("REFERRER"));
+    if (failure === "response") mocks.send.mockResolvedValue({ error: { message: "provider rejected" } });
+    else mocks.send.mockRejectedValue(new Error("network outcome unknown"));
+    await expect(issuePasswordlessToken({ email: "guest@example.com", purpose: "REFERRER_INVITE" })).rejects.toThrow();
+    const issuedHash = mocks.tx.passwordlessToken.create.mock.calls[0][0].data.tokenHash;
+    expect(mocks.tx.passwordlessToken.updateMany).toHaveBeenLastCalledWith({
+      where: { tokenHash: issuedHash, consumedAt: null, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+  });
+
+  it("does not revoke a successful delivery attempt", async () => {
+    mocks.tx.user.findFirst.mockResolvedValue(activeUser());
+    await expect(issuePasswordlessToken({ email: "guest@example.com" })).resolves.toEqual({ issued: true });
+    // Only the existing same-purpose tokens are revoked during issuance.
+    expect(mocks.tx.passwordlessToken.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("resend revokes only previous links of the same purpose and keeps login lifetime short", async () => {
+    mocks.tx.user.findFirst.mockResolvedValue(activeUser());
+    const started = Date.now();
+    await issuePasswordlessToken({ email: "guest@example.com", purpose: "SIGN_IN" });
+    expect(mocks.tx.passwordlessToken.updateMany).toHaveBeenCalledWith({
+      where: { email: "guest@example.com", purpose: "SIGN_IN", consumedAt: null, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    const expiresAt = mocks.tx.passwordlessToken.create.mock.calls[0][0].data.expiresAt.getTime();
+    expect(expiresAt).toBeGreaterThanOrEqual(started + 15 * 60_000);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 15 * 60_000);
+  });
+
   it("refuses to issue an unlinked referrer invitation", async () => {
     mocks.tx.user.findFirst.mockResolvedValue(null);
 

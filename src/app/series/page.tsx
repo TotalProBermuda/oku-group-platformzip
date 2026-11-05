@@ -1,15 +1,24 @@
 import Link from "next/link";
 import { seriesLocationLabel } from "@/lib/locations";
 
+interface SeriesListItem {
+  id: string; slug: string; title: string; description: string | null; venue: string | null; hostType: string | null;
+  seriesVisibilityMode?: string | null; startsAt?: string | null;
+  ticketTypes: Array<{ priceCents: number }>;
+  sessions: Array<{ id: string }>;
+  operationalVenue?: { name: string; slug: string } | null;
+  eventSpace?: { name: string; conceptKey: string | null } | null;
+}
+
 async function getSeries() {
   const base = process.env.APP_BASE_URL || "http://localhost:5000";
   const res = await fetch(`${base}/api/v1/series`, { cache: "no-store" });
-  return res.json();
+  return res.json() as Promise<{ data?: SeriesListItem[] }>;
 }
 
-function getPriceRange(ticketTypes: any[]) {
+function getPriceRange(ticketTypes: SeriesListItem["ticketTypes"]) {
   if (!ticketTypes?.length) return null;
-  const prices = ticketTypes.map((t: any) => t.priceCents);
+  const prices = ticketTypes.map((ticketType) => ticketType.priceCents);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const fmt = (c: number) => `$${(c / 100).toFixed(0)}`;
@@ -24,8 +33,8 @@ const venueGradients: Record<string, string> = {
 export default async function SeriesPage() {
   const { data } = await getSeries();
 
-  const okuSeries = (data || []).filter((s: any) => s.venue !== "CATCH");
-  const catchSeries = (data || []).filter((s: any) => s.venue === "CATCH");
+  const okuSeries = (data || []).filter((series) => series.venue !== "CATCH");
+  const catchSeries = (data || []).filter((series) => series.venue === "CATCH");
 
   return (
     <div>
@@ -73,7 +82,7 @@ export default async function SeriesPage() {
                   <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
                 </div>
                 <div className="card-grid">
-                  {okuSeries.map((s: any) => (
+                  {okuSeries.map((s) => (
                     <SeriesCard key={s.id} series={s} />
                   ))}
                 </div>
@@ -89,7 +98,7 @@ export default async function SeriesPage() {
                   <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
                 </div>
                 <div className="card-grid">
-                  {catchSeries.map((s: any) => (
+                  {catchSeries.map((s) => (
                     <SeriesCard key={s.id} series={s} />
                   ))}
                 </div>
@@ -102,7 +111,7 @@ export default async function SeriesPage() {
   );
 }
 
-function PrivateShellCard({ series: s }: { series: any }) {
+function PrivateShellCard({ series: s }: { series: SeriesListItem }) {
   const locationLabel = seriesLocationLabel(s);
   return (
     <div
@@ -166,7 +175,7 @@ function PrivateShellCard({ series: s }: { series: any }) {
   );
 }
 
-function SeriesCard({ series: s }: { series: any }) {
+function SeriesCard({ series: s }: { series: SeriesListItem }) {
   if (s.seriesVisibilityMode === "PRIVATE_SHELL") {
     return <PrivateShellCard series={s} />;
   }

@@ -143,8 +143,8 @@ export default function BeneficiaryDocumentsUploader({
       if (!confirmJson.ok) throw new Error(confirmJson.error || "Confirm failed");
 
       setDocs((prev) => [confirmJson.data as DocumentView, ...prev]);
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setBusyType(null);
       const ref = inputRefs.current[docType];
@@ -159,8 +159,8 @@ export default function BeneficiaryDocumentsUploader({
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Could not open document");
       window.open(json.data.url, "_blank", "noopener,noreferrer");
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Could not open document");
     }
   }
 
@@ -172,8 +172,8 @@ export default function BeneficiaryDocumentsUploader({
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Delete failed");
       setDocs((prev) => prev.filter((d) => d.id !== doc.id));
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Delete failed");
     }
   }
 

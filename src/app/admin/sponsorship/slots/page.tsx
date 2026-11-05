@@ -26,9 +26,20 @@ const BLANK_FORM = {
   benefits: "", deliverables: "",
 };
 
+type SlotForm = typeof BLANK_FORM;
+interface SponsorshipSlot {
+  id: string; title: string; category: string; scopeType: string; status: string; isPublished: boolean;
+  description: string | null; audienceProfile: string | null; exclusivityNote: string | null; isExclusive: boolean;
+  maxSponsors: number; askPriceCents: number | null; floorPriceCents: number | null; seriesId: string | null;
+  sessionId: string | null; sortOrder: number; internalNotes: string | null;
+  series: { id: string; title: string } | null;
+  _count: { applications: number; deals: number };
+}
+interface SeriesOption { id: string; title: string }
+
 export default function AdminSponsorshipSlotsPage() {
   const t = useTranslation();
-  const [slots, setSlots]           = useState<any[]>([]);
+  const [slots, setSlots]           = useState<SponsorshipSlot[]>([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState("");
@@ -39,8 +50,8 @@ export default function AdminSponsorshipSlotsPage() {
   );
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId]         = useState<string | null>(null);
-  const [form, setForm]             = useState<any>({ ...BLANK_FORM });
-  const [seriesList, setSeriesList] = useState<any[]>([]);
+  const [form, setForm]             = useState<SlotForm>({ ...BLANK_FORM });
+  const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,7 +59,7 @@ export default function AdminSponsorshipSlotsPage() {
     if (filterStatus)   qs.set("status",   filterStatus);
     if (filterCategory) qs.set("category", filterCategory);
     const r = await fetch(`/api/v1/admin/sponsorship/slots?${qs}`);
-    const d = await r.json();
+    const d = await r.json() as { ok: boolean; slots: SponsorshipSlot[] };
     if (d.ok) setSlots(d.slots);
     setLoading(false);
   }, [filterStatus, filterCategory]);
@@ -56,14 +67,15 @@ export default function AdminSponsorshipSlotsPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    fetch("/api/v1/admin/series").then((r) => r.json()).then((d) => { if (d.ok) setSeriesList(d.series ?? []); });
+    fetch("/api/v1/admin/series").then((r) => r.json()).then((d: { ok: boolean; series?: SeriesOption[] }) => { if (d.ok) setSeriesList(d.series ?? []); });
   }, []);
 
-  function fld(key: string, label: string, type = "text", opts?: string[]) {
+  function fld(key: keyof SlotForm, label: string, type = "text", opts?: string[]) {
+    const value = typeof form[key] === "string" || typeof form[key] === "number" ? form[key] : "";
     if (opts) return (
       <div className="form-group">
         <label className="form-label">{label}</label>
-        <select className="form-select" value={form[key] ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, [key]: e.target.value }))}>
+        <select className="form-select" value={value} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.value }))}>
           {opts.map((o) => <option key={o} value={o}>{o.replace("_", " ")}</option>)}
         </select>
       </div>
@@ -71,19 +83,19 @@ export default function AdminSponsorshipSlotsPage() {
     if (type === "textarea") return (
       <div className="form-group">
         <label className="form-label">{label}</label>
-        <textarea className="form-input" rows={3} value={form[key] ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, [key]: e.target.value }))} />
+        <textarea className="form-input" rows={3} value={value} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.value }))} />
       </div>
     );
     if (type === "checkbox") return (
       <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <input type="checkbox" id={key} checked={!!form[key]} onChange={(e) => setForm((f: any) => ({ ...f, [key]: e.target.checked }))} />
+        <input type="checkbox" id={key} checked={!!form[key]} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.checked }))} />
         <label htmlFor={key} className="form-label" style={{ margin: 0, cursor: "pointer" }}>{label}</label>
       </div>
     );
     return (
       <div className="form-group">
         <label className="form-label">{label}</label>
-        <input className="form-input" type={type} value={form[key] ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, [key]: e.target.value }))} />
+        <input className="form-input" type={type} value={value} onChange={(e) => setForm((previous) => ({ ...previous, [key]: e.target.value }))} />
       </div>
     );
   }
@@ -93,7 +105,7 @@ export default function AdminSponsorshipSlotsPage() {
     setSaving(true); setError(""); setSuccess("");
     const url    = editId ? `/api/v1/admin/sponsorship/slots/${editId}` : "/api/v1/admin/sponsorship/slots";
     const method = editId ? "PATCH" : "POST";
-    const body: any = {
+    const body = {
       ...form,
       askPriceCents:   form.askPriceCents   ? Number(form.askPriceCents)   : null,
       floorPriceCents: form.floorPriceCents ? Number(form.floorPriceCents) : null,
@@ -113,7 +125,7 @@ export default function AdminSponsorshipSlotsPage() {
     }
   }
 
-  async function togglePublish(slot: any) {
+  async function togglePublish(slot: SponsorshipSlot) {
     await fetch(`/api/v1/admin/sponsorship/slots/${slot.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -128,7 +140,7 @@ export default function AdminSponsorshipSlotsPage() {
     load();
   }
 
-  function startEdit(slot: any) {
+  function startEdit(slot: SponsorshipSlot) {
     setEditId(slot.id);
     setForm({
       ...BLANK_FORM,
@@ -192,9 +204,9 @@ export default function AdminSponsorshipSlotsPage() {
             {fld("scopeType","Scope Type", "text", SCOPE_TYPES)}
             <div className="form-group">
               <label className="form-label">Series (optional)</label>
-              <select className="form-select" value={form.seriesId ?? ""} onChange={(e) => setForm((f: any) => ({ ...f, seriesId: e.target.value }))}>
+              <select className="form-select" value={form.seriesId ?? ""} onChange={(e) => setForm((previous) => ({ ...previous, seriesId: e.target.value }))}>
                 <option value="">None</option>
-                {seriesList.map((s: any) => <option key={s.id} value={s.id}>{s.title}</option>)}
+                {seriesList.map((seriesOption) => <option key={seriesOption.id} value={seriesOption.id}>{seriesOption.title}</option>)}
               </select>
             </div>
             {fld("askPriceCents",   "Ask Price (cents)", "number")}

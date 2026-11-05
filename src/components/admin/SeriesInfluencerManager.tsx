@@ -294,7 +294,7 @@ export default function SeriesInfluencerManager({ seriesId, isSuperAdmin }: Prop
                 />
                 <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#9ca3af" }}>%</span>
               </div>
-              <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>This will update the influencer's commission rate.</p>
+              <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>This will update the influencer&apos;s commission rate.</p>
             </div>
           )}
 
@@ -312,7 +312,7 @@ export default function SeriesInfluencerManager({ seriesId, isSuperAdmin }: Prop
       {showInvite && (
         <div style={{ background: "#f8f5f3", border: "1px solid #e5e0d8", borderRadius: 12, padding: 20, marginTop: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 16, fontSize: 15 }}>Invite New Influencer</div>
-          <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>They'll receive a branded onboarding email with a link to set up their creator profile.</p>
+          <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>They&apos;ll receive a branded onboarding email with a link to set up their creator profile.</p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
             <div>

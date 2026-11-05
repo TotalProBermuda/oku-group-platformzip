@@ -82,7 +82,7 @@ export default function AdminMembershipsPage() {
       .finally(() => setLoadingApps(false));
   }, []);
 
-  async function updateMembership(id: string, data: any) {
+  async function updateMembership(id: string, data: { status?: string; tier?: string }) {
     setPatchState((s) => ({ ...s, [id]: "loading" }));
     const res = await fetch(`/api/v1/admin/memberships/${id}`, {
       method: "PATCH",
@@ -124,6 +124,7 @@ export default function AdminMembershipsPage() {
         <Link href="/admin" style={{ fontSize: 13, color: "var(--color-text-muted)", textDecoration: "none" }}>← {t("admin", "adminPanel")}</Link>
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 400, margin: "12px 0 4px" }}>{t("admin", "memberships")}</h1>
         <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>{t("admin", "cardMembershipsDesc")}</p>
+        <Link href="/admin/memberships/controls" style={{ display: "inline-block", paddingBlock: 12 }}>Membership controls — draft review</Link>
       </div>
 
       <div style={{ display: "flex", gap: 0, borderBottom: "2px solid var(--color-border)", marginBottom: 28 }}>

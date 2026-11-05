@@ -335,7 +335,7 @@ function BookingCard({ booking, onUpdateStatus, onBindUpdated, isOperational }: 
         }}>
           {booking.notes && (
             <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 12 }}>
-              "{booking.notes}"
+              &quot;{booking.notes}&quot;
             </div>
           )}
 
@@ -1028,8 +1028,8 @@ export default function StreetsideHostPage() {
       setActiveTab("active");
       loadBookings();
       setTimeout(() => setSuccess(""), 4000);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to submit booking");
     }
     setSubmitting(false);
   }

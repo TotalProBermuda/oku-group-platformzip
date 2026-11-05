@@ -26,21 +26,34 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Only active referrers can be invited" }, { status: 409 });
     }
 
+    await prisma.beneficiaryProfile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        proofOfAddressStatus: "NOT_REQUIRED",
+        identificationStatus: "NOT_REQUIRED",
+        taxOrRucStatus: "NOT_REQUIRED",
+        sourceOfFundsStatus: "NOT_REQUIRED",
+        bankReadinessStatus: "MISSING_INFO",
+      },
+      // Never overwrite Finance review/hold decisions on an existing profile.
+      update: {},
+    });
+
     const result = await issuePasswordlessToken({
       email: user.email,
       purpose: "REFERRER_INVITE",
       requireExistingUserId: user.id,
-      callbackUrl: "/referrer/dashboard",
+      callbackUrl: "/my/beneficiary",
     });
     if (!result.issued) {
       return NextResponse.json({ ok: false, error: "Invitation could not be issued" }, { status: 409 });
     }
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    const status = error?.status || 500;
-    return NextResponse.json(
-      { ok: false, error: status === 500 ? "Failed to send invitation" : error.message },
-      { status },
-    );
+  } catch (error: unknown) {
+    const detail = error && typeof error === "object" ? error as { status?: unknown; message?: unknown } : {};
+    const status = typeof detail.status === "number" && detail.status >= 400 && detail.status <= 599 ? detail.status : 500;
+    const message = status === 500 ? "Failed to send invitation" : typeof detail.message === "string" ? detail.message : "Invitation could not be issued";
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

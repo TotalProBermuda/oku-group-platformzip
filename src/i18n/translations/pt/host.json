@@ -60,7 +60,8 @@
     "confirmed": "Confirmado",
     "acknowledged": "Anfitrião ciente",
     "arrived": "Chegou",
-    "seated": "Sentado"
+    "seated": "Sentado",
+    "upcoming": "Próximas"
   },
   "card": {
     "occasion": "Ocasião",

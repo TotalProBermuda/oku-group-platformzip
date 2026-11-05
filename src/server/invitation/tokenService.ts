@@ -15,6 +15,9 @@ export async function validateToken(token: string) {
           slug: true,
           title: true,
           heroImageUrl: true,
+          heroImageUrlEn: true,
+          heroImageUrlEs: true,
+          heroImageUrlPt: true,
           inviteFlyerImageUrl: true,
           inviteRequiresRegistration: true,
           startsAt: true,
@@ -28,12 +31,12 @@ export async function validateToken(token: string) {
     },
   });
 
-  if (!invitation) return { valid: false, reason: "NOT_FOUND" as const };
-  if (invitation.status === "REVOKED") return { valid: false, reason: "REVOKED" as const };
-  if (invitation.status === "EXPIRED") return { valid: false, reason: "EXPIRED" as const };
-  if (invitation.status === "DECLINED") return { valid: false, reason: "DECLINED" as const };
+  if (!invitation) return { valid: false, reason: "NOT_FOUND" } as const;
+  if (invitation.status === "REVOKED") return { valid: false, reason: "REVOKED" } as const;
+  if (invitation.status === "EXPIRED") return { valid: false, reason: "EXPIRED" } as const;
+  if (invitation.status === "DECLINED") return { valid: false, reason: "DECLINED" } as const;
 
-  return { valid: true, invitation };
+  return { valid: true, invitation } as const;
 }
 
 export async function markOpened(token: string) {

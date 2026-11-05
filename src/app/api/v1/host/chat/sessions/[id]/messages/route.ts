@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getHostApiErrorDetails } from "@/app/api/v1/host/errorDetails";
 import { prisma } from "@/lib/prisma";
 import {
   assertHostCanManageChatSession,
@@ -26,9 +27,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json({ ok: true, data: messages });
-  } catch (e: any) {
-    const statusCode = e.status ?? 500;
-    return NextResponse.json({ ok: false, error: statusCode >= 500 ? "Internal error" : e.message }, { status: statusCode });
+  } catch (e: unknown) {
+    const { message, status: statusCode } = getHostApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: statusCode >= 500 ? "Internal error" : message }, { status: statusCode });
   }
 }
 
@@ -64,8 +65,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     return NextResponse.json({ ok: true, data: message }, { status: 201 });
-  } catch (e: any) {
-    const statusCode = e.status ?? 500;
-    return NextResponse.json({ ok: false, error: statusCode >= 500 ? "Internal error" : e.message }, { status: statusCode });
+  } catch (e: unknown) {
+    const { message, status: statusCode } = getHostApiErrorDetails(e);
+    return NextResponse.json({ ok: false, error: statusCode >= 500 ? "Internal error" : message }, { status: statusCode });
   }
 }

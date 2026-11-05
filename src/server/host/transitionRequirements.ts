@@ -29,6 +29,15 @@ export function assertTransitionOperationalRequirements(
   toStatus: ReservationStatus,
   options?: TransitionOptions,
 ) {
+  // Seating is the boundary between reservation control and service/POS
+  // close. Once seated, a host must not cancel or mark a party no-show; the
+  // only normal status transition is a close. (A guarded COMPLETED→SEATED
+  // recovery remains in hostService for an accidental early close without
+  // any POS evidence.)
+  if (existing.status === "SEATED" && toStatus !== "COMPLETED") {
+    throw operationalError("A seated reservation can only be closed. Use the close outcome that matches service.");
+  }
+
   if (existing.status === "PENDING_APPROVAL" && toStatus === "CONFIRMED") {
     if (!(options?.assignedSpaceId || existing.assignedSpaceId || existing.requestedSpaceId)) {
       throw operationalError("Choose a final dining space before confirming this request");
