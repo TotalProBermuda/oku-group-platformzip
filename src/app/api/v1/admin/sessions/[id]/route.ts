@@ -9,6 +9,12 @@ import { legacySessionWriteBlocked, managedWriteMessage } from "@/server/series/
 import { lockSessionInventory } from "@/server/commerce/sessionInventory";
 import { getAdminApiErrorDetails } from "@/app/api/v1/admin/errorDetails";
 
+function parseSaleDate(value: unknown): Date | null | "INVALID" {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? "INVALID" : date;
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { roles } = await requireSession();
@@ -19,7 +25,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const session = await prisma.session.findUnique({
       where: { id },
-      select: { id: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true },
+      select: {
+        id: true, seriesId: true, title: true, subtitle: true, description: true,
+        flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true,
+        flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true,
+        startsAt: true, endsAt: true, allowLateSales: true,
+        giftBagEnabled: true, streetsideEnabled: true,
+        ticketSalesMode: true, ticketSalesStartAt: true, ticketSalesEndAt: true,
+      },
     });
 
     if (!session) {
@@ -45,6 +58,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (await legacySessionWriteBlocked(id)) return NextResponse.json({ ok: false, error: managedWriteMessage }, { status: 409 });
     if (body.giftBagEnabled === false && await prisma.ticket.count({ where: { sessionId: id, entitlementSnapshot: { equals: Prisma.DbNull } } }) > 0)
       return NextResponse.json({ ok: false, error: "Existing ticket rights require owner review before disabling gift bags." }, { status: 409 });
+
+    const current = await prisma.session.findUnique({
+      where: { id },
+      select: { id: true, ticketSalesStartAt: true, ticketSalesEndAt: true },
+    });
+    if (!current) return NextResponse.json({ ok: false, error: "Session not found" }, { status: 404 });
 
     const update: Prisma.SessionUpdateInput = {};
     let ticketPriceOverrides: Array<{ ticketTypeId: string; priceCents: number }> | null = null;
@@ -73,14 +92,40 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if (body.giftBagEnabled !== undefined) update.giftBagEnabled = Boolean(body.giftBagEnabled);
     if (body.streetsideEnabled !== undefined) update.streetsideEnabled = Boolean(body.streetsideEnabled);
+    if (body.ticketSalesMode !== undefined) {
+      if (!["INHERIT", "OVERRIDE"].includes(body.ticketSalesMode)) {
+        return NextResponse.json({ ok: false, error: "ticketSalesMode must be INHERIT or OVERRIDE" }, { status: 400 });
+      }
+      update.ticketSalesMode = body.ticketSalesMode;
+    }
+    const startsAt = body.ticketSalesStartAt === undefined ? current.ticketSalesStartAt : parseSaleDate(body.ticketSalesStartAt);
+    const endsAt = body.ticketSalesEndAt === undefined ? current.ticketSalesEndAt : parseSaleDate(body.ticketSalesEndAt);
+    if (startsAt === "INVALID") {
+      return NextResponse.json({ ok: false, error: "Invalid ticket sale start date" }, { status: 400 });
+    }
+    if (endsAt === "INVALID") {
+      return NextResponse.json({ ok: false, error: "Invalid ticket sale end date" }, { status: 400 });
+    }
+    if (startsAt && endsAt && endsAt <= startsAt) {
+      return NextResponse.json({ ok: false, error: "Ticket sale end must be after its start" }, { status: 400 });
+    }
+    if (body.ticketSalesStartAt !== undefined) update.ticketSalesStartAt = startsAt;
+    if (body.ticketSalesEndAt !== undefined) update.ticketSalesEndAt = endsAt;
 
     const session = await prisma.$transaction(async tx => {
       await lockSessionInventory(tx, id);
       if (await legacySessionWriteBlocked(id, tx)) throw Object.assign(new Error(managedWriteMessage), { status: 409 });
       const updated = await tx.session.update({
-      where: { id },
-      data: update,
-      select: { id: true, seriesId: true, title: true, subtitle: true, description: true, flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true, flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true, startsAt: true, giftBagEnabled: true, streetsideEnabled: true, allowLateSales: true },
+        where: { id },
+        data: update,
+        select: {
+          id: true, seriesId: true, title: true, subtitle: true, description: true,
+          flyerImageUrl: true, flyerImageUrlEn: true, flyerImageUrlEs: true, flyerImageUrlPt: true,
+          flyerImageUrlMobileEn: true, flyerImageUrlMobileEs: true, flyerImageUrlMobilePt: true,
+          startsAt: true, endsAt: true, allowLateSales: true,
+          giftBagEnabled: true, streetsideEnabled: true,
+          ticketSalesMode: true, ticketSalesStartAt: true, ticketSalesEndAt: true,
+        },
       });
       if (ticketPriceOverrides) {
         await tx.sessionTicketPrice.deleteMany({ where: { sessionId: id } });

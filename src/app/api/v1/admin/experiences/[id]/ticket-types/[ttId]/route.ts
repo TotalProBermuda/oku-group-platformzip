@@ -15,6 +15,12 @@ function isAdmin(session: Session | null) {
   );
 }
 
+function parseSaleDate(value: unknown): Date | null | "INVALID" {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? "INVALID" : date;
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; ttId: string }> }
@@ -48,6 +54,15 @@ export async function PATCH(
     ticketStatus,
   } = body;
 
+  const requestedStart = saleStartsAt === undefined ? existing.saleStartsAt : parseSaleDate(saleStartsAt);
+  const requestedEnd = saleEndsAt === undefined ? existing.saleEndsAt : parseSaleDate(saleEndsAt);
+  if (requestedStart === "INVALID" || requestedEnd === "INVALID") {
+    return NextResponse.json({ error: "Sale window dates must be valid." }, { status: 400 });
+  }
+  if (requestedStart && requestedEnd && requestedEnd <= requestedStart) {
+    return NextResponse.json({ error: "Sale end must be after sale start." }, { status: 400 });
+  }
+
   const ticketType = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Series" WHERE "id" = ${id} FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "TicketType" WHERE "id" = ${ttId} FOR UPDATE`;
@@ -65,25 +80,25 @@ export async function PATCH(
     ]);
     if (body.typeCapacity !== undefined && body.typeCapacity !== null && (!Number.isSafeInteger(Number(body.typeCapacity)) || Number(body.typeCapacity) < Math.max(current.soldCount, committed._sum.qty ?? 0, issued + (held._sum.qty ?? 0)))) return null;
     const updated = await tx.ticketType.update({
-    where: { id: ttId },
-    data: {
-      ...(name !== undefined && { name }),
-      ...(description !== undefined && { description: description || null }),
-      ...(tierCode !== undefined && { tierCode: tierCode || null }),
-      ...(priceCents !== undefined && { priceCents: Number(priceCents) }),
-      ...(currency !== undefined && { currency }),
-      ...(maxPerOrder !== undefined && { maxPerOrder: Number(maxPerOrder) }),
-      ...(minPerOrder !== undefined && { minPerOrder: Number(minPerOrder) }),
-      ...(typeCapacity !== undefined && { typeCapacity: typeCapacity ? Number(typeCapacity) : null }),
-      ...(displayOrder !== undefined && { displayOrder: Number(displayOrder) }),
-      ...(saleStartsAt !== undefined && { saleStartsAt: saleStartsAt ? new Date(saleStartsAt) : null }),
-      ...(saleEndsAt !== undefined && { saleEndsAt: saleEndsAt ? new Date(saleEndsAt) : null }),
-      ...(visibilityMode !== undefined && { visibilityMode: z.nativeEnum(TicketVisibilityMode).parse(visibilityMode) }),
-      ...(requiresMembership !== undefined && { requiresMembership: Boolean(requiresMembership) }),
-      ...(earlyAccessOnly !== undefined && { earlyAccessOnly: Boolean(earlyAccessOnly) }),
-      ...(ticketStatus !== undefined && { ticketStatus: z.nativeEnum(TicketTypeStatus).parse(ticketStatus) }),
-    },
-  });
+      where: { id: ttId },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description: description || null }),
+        ...(tierCode !== undefined && { tierCode: tierCode || null }),
+        ...(priceCents !== undefined && { priceCents: Number(priceCents) }),
+        ...(currency !== undefined && { currency }),
+        ...(maxPerOrder !== undefined && { maxPerOrder: Number(maxPerOrder) }),
+        ...(minPerOrder !== undefined && { minPerOrder: Number(minPerOrder) }),
+        ...(typeCapacity !== undefined && { typeCapacity: typeCapacity ? Number(typeCapacity) : null }),
+        ...(displayOrder !== undefined && { displayOrder: Number(displayOrder) }),
+        ...(saleStartsAt !== undefined && { saleStartsAt: requestedStart }),
+        ...(saleEndsAt !== undefined && { saleEndsAt: requestedEnd }),
+        ...(visibilityMode !== undefined && { visibilityMode: z.nativeEnum(TicketVisibilityMode).parse(visibilityMode) }),
+        ...(requiresMembership !== undefined && { requiresMembership: Boolean(requiresMembership) }),
+        ...(earlyAccessOnly !== undefined && { earlyAccessOnly: Boolean(earlyAccessOnly) }),
+        ...(ticketStatus !== undefined && { ticketStatus: z.nativeEnum(TicketTypeStatus).parse(ticketStatus) }),
+      },
+    });
     await syncTranslations(tx, "TicketType", ttId, { name: updated.name, description: updated.description });
     return updated;
   });

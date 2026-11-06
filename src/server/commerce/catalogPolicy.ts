@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isWithinTicketSalesWindow } from "@/server/commerce/ticketSalesWindow";
 import { sessionProductEnabled } from "./sessionProducts";
 import type { Prisma } from "@prisma/client";
 
@@ -115,7 +116,7 @@ export async function assertCheckoutCatalogPolicy(input: {
     }
     if (ticket.ticketStatus !== "ACTIVE") throw new CatalogPolicyError("TICKET_INACTIVE", "This ticket is not available.");
     if (!sessionProductEnabled(session, session.series, ticket.id)) throw new CatalogPolicyError("SESSION_PRODUCT_DISABLED", "This ticket is not available for this session.");
-    if ((ticket.saleStartsAt && now < ticket.saleStartsAt) || (ticket.saleEndsAt && now > ticket.saleEndsAt)) {
+    if (!isWithinTicketSalesWindow(ticket, session, now)) {
       throw new CatalogPolicyError("TICKET_OUTSIDE_SALE_WINDOW", "This ticket is not currently on sale.");
     }
     if (qty < ticket.minPerOrder || qty > ticket.maxPerOrder) {

@@ -14,6 +14,12 @@ function isAdmin(session: Session | null) {
   );
 }
 
+function parseSaleDate(value: unknown): Date | null | "INVALID" {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? "INVALID" : date;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -64,30 +70,39 @@ export async function POST(
     return NextResponse.json({ error: "name and priceCents are required" }, { status: 400 });
   }
 
-  const ticketType = await prisma.$transaction(async tx => {
-  const created = await tx.ticketType.create({
-    data: {
-      seriesId: id,
-      name,
-      description: description || null,
-      tierCode: tierCode || null,
-      priceCents: Number(priceCents),
-      currency,
-      maxPerOrder: Number(maxPerOrder),
-      minPerOrder: Number(minPerOrder),
-      typeCapacity: typeCapacity ? Number(typeCapacity) : null,
-      displayOrder: Number(displayOrder),
-      saleStartsAt: saleStartsAt ? new Date(saleStartsAt) : null,
-      saleEndsAt: saleEndsAt ? new Date(saleEndsAt) : null,
-      visibilityMode: z.nativeEnum(TicketVisibilityMode).parse(visibilityMode),
-      requiresMembership: Boolean(requiresMembership),
-      earlyAccessOnly: Boolean(earlyAccessOnly),
-      ticketStatus: z.nativeEnum(TicketTypeStatus).parse(ticketStatus),
-    },
-  });
+  const parsedSaleStart = parseSaleDate(saleStartsAt);
+  const parsedSaleEnd = parseSaleDate(saleEndsAt);
+  if (parsedSaleStart === "INVALID" || parsedSaleEnd === "INVALID") {
+    return NextResponse.json({ error: "Sale window dates must be valid." }, { status: 400 });
+  }
+  if (parsedSaleStart && parsedSaleEnd && parsedSaleEnd <= parsedSaleStart) {
+    return NextResponse.json({ error: "Sale end must be after sale start." }, { status: 400 });
+  }
 
-  await syncTranslations(tx, "TicketType", created.id, { name: created.name, description: created.description });
-  return created;
+  const ticketType = await prisma.$transaction(async tx => {
+    const created = await tx.ticketType.create({
+      data: {
+        seriesId: id,
+        name,
+        description: description || null,
+        tierCode: tierCode || null,
+        priceCents: Number(priceCents),
+        currency,
+        maxPerOrder: Number(maxPerOrder),
+        minPerOrder: Number(minPerOrder),
+        typeCapacity: typeCapacity ? Number(typeCapacity) : null,
+        displayOrder: Number(displayOrder),
+        saleStartsAt: parsedSaleStart,
+        saleEndsAt: parsedSaleEnd,
+        visibilityMode: z.nativeEnum(TicketVisibilityMode).parse(visibilityMode),
+        requiresMembership: Boolean(requiresMembership),
+        earlyAccessOnly: Boolean(earlyAccessOnly),
+        ticketStatus: z.nativeEnum(TicketTypeStatus).parse(ticketStatus),
+      },
+    });
+
+    await syncTranslations(tx, "TicketType", created.id, { name: created.name, description: created.description });
+    return created;
   });
   return finishEventSave(id, { ticketType }, req, 201);
 }

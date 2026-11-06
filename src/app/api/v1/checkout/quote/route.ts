@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { sessionProductEnabled } from "@/server/commerce/sessionProducts";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/server/auth/session";
+import { resolveTicketSalesWindow } from "@/server/commerce/ticketSalesWindow";
 import { calculateTicketUnitPrice } from "@/server/commerce/ticketPricing";
 import { priceCheckoutCharges } from "@/server/commerce/checkoutFinance";
 
@@ -72,9 +73,6 @@ export async function POST(req: NextRequest) {
       if (!tt) return NextResponse.json({ error: `Ticket type ${item.ticketTypeId} not found` }, { status: 400 });
       if (tt.ticketStatus !== "ACTIVE") return NextResponse.json({ error: "This ticket is not available." }, { status: 409 });
       if (!sessionProductEnabled(sess, series, tt.id)) return NextResponse.json({ error: "This ticket is not available for this session." }, { status: 409 });
-      if ((tt.saleStartsAt && now < tt.saleStartsAt) || (tt.saleEndsAt && now > tt.saleEndsAt)) {
-        return NextResponse.json({ error: "This ticket is not currently on sale." }, { status: 409 });
-      }
       if (!Number.isInteger(item.qty) || item.qty < tt.minPerOrder || item.qty > tt.maxPerOrder) {
         return NextResponse.json({ error: `Ticket quantity for ${tt.name} is outside its order limits.` }, { status: 400 });
       }
@@ -110,12 +108,19 @@ export async function POST(req: NextRequest) {
         }, { status: 403 });
       }
 
+      const now = new Date();
+      const effectiveWindow = resolveTicketSalesWindow(tt, sess);
+      const beforeSaleStart = Boolean(effectiveWindow.startsAt && now < effectiveWindow.startsAt);
+      const afterSaleEnd = Boolean(effectiveWindow.endsAt && now > effectiveWindow.endsAt);
       const membershipBenefits = readMembershipBenefits(userMembership?.benefitsJson ?? null);
-      if (tt.saleStartsAt && new Date() < tt.saleStartsAt && !membershipBenefits.earlyAccess) {
+      const hasEarlyAccess = Boolean(beforeSaleStart && membershipBenefits.earlyAccess);
+      if (afterSaleEnd || (beforeSaleStart && !hasEarlyAccess)) {
         return NextResponse.json({
-          error: "NOT_YET_ON_SALE",
-          message: `This ticket is not yet on sale. Members get early access.`,
-          gating: { reason: "early_access", saleStartsAt: tt.saleStartsAt, upgradeUrl: "/membership" },
+          error: effectiveWindow.startsAt && now < effectiveWindow.startsAt ? "NOT_YET_ON_SALE" : "TICKET_OUTSIDE_SALE_WINDOW",
+          message: effectiveWindow.startsAt && now < effectiveWindow.startsAt
+            ? "This ticket is not yet on sale. Members get early access."
+            : "This ticket is not currently on sale.",
+          gating: { reason: effectiveWindow.startsAt && now < effectiveWindow.startsAt ? "early_access" : "sale_window", saleStartsAt: effectiveWindow.startsAt, saleEndsAt: effectiveWindow.endsAt, upgradeUrl: "/membership" },
         }, { status: 400 });
       }
 
