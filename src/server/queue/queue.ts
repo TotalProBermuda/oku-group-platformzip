@@ -82,6 +82,7 @@ export type CommerceJob =
   | { name: "send_order_email"; data: { orderId: string } }
   | { name: "send_ticket_operational_alert"; data: { orderId: string } }
   | { name: "send_reservation_operational_alert"; data: { reservationId: string } }
+  | { name: "send_chat_alert_email"; data: { to: string; subject: string; body: string } }
   | { name: "sync_monday_lead"; data: { entity: string; entityId: string } }
   | { name: "post_payment_event"; data: { orderId: string } };
 
@@ -127,7 +128,8 @@ export type InvuSyncJob = {
  */
 export async function safeEnqueue(
   name: CommerceJob["name"] | InvuSyncJob["name"],
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  jobId?: string,
 ): Promise<void> {
   const isInvuJob = name === "invu_sync";
 
@@ -141,6 +143,7 @@ export async function safeEnqueue(
       await queue.add(name, data, {
         attempts: 3,
         backoff: { type: "exponential", delay: 5000 },
+        ...(jobId ? { jobId } : {}),
       });
       return;
     } catch (err) {
@@ -189,6 +192,9 @@ export async function safeEnqueue(
       // See ticket alerts above. This is the Redis-quota fallback for the
       // four operational reservation recipients.
       await sendNewReservationOperationalAlerts((data as { reservationId: string }).reservationId);
+    } else if (name === "send_chat_alert_email") {
+      const { sendChatAlertEmail } = await import("@/server/host/chatAlerts");
+      await sendChatAlertEmail(data as { to: string; subject: string; body: string });
     } else if (name === "post_payment_event") {
       console.log("[inline-job] post_payment_event (stub) for order:", (data as { orderId?: string | null }).orderId);
     } else if (name === "sync_monday_lead") {

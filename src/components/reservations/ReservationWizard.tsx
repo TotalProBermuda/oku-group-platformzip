@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { HoneypotField } from "@/components/HoneypotField";
 import { panamaReservationIso } from "@/lib/reservationDate";
 import { reservationConceptFromQuery } from "@/lib/reservationConcept";
+import { getLocal5ConceptCapacity } from "@/lib/operatingLocation";
+import { openGroupBookingChat } from "@/lib/publicChatEvents";
 
 type Zone = { id: string; name: string; conceptKey: string; zoneType: string; description?: string | null; capacityCovers: number };
 type Step = "concept" | "details" | "addons" | "contact" | "review" | "confirmed";
@@ -110,6 +112,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
   } | null>(null);
   const [referrerLoading, setReferrerLoading] = useState(false);
   const [errors, setErrors]                   = useState<Record<string, string>>({});
+  const [groupInquiry, setGroupInquiry]       = useState(false);
   const [submitting, setSubmitting]           = useState(false);
   const [confirmationCode, setConfirmationCode] = useState("");
   const [requestPending, setRequestPending] = useState(false);
@@ -214,9 +217,9 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
   const STEP_LABELS = [t.stepExperience, t.stepDetails, t.stepExtras, t.stepContact, t.stepReview, t.stepDone];
 
   const zones: Zone[] = [
-    { id: "oku",     name: t.zoneOkuName,     conceptKey: "oku",     zoneType: "FINE_DINING", description: null, capacityCovers: 27 },
-    { id: "catch",   name: t.zoneCatchName,   conceptKey: "catch",   zoneType: "NIGHTLIFE",   description: null, capacityCovers: 24 },
-    { id: "terrace", name: t.zoneTerraceName, conceptKey: "terrace", zoneType: "TERRACE",     description: null, capacityCovers: 42 },
+    { id: "oku",     name: t.zoneOkuName,     conceptKey: "oku",     zoneType: "FINE_DINING", description: null, capacityCovers: getLocal5ConceptCapacity("OKU") ?? 30 },
+    { id: "catch",   name: t.zoneCatchName,   conceptKey: "catch",   zoneType: "NIGHTLIFE",   description: null, capacityCovers: getLocal5ConceptCapacity("CATCH") ?? 50 },
+    { id: "terrace", name: t.zoneTerraceName, conceptKey: "terrace", zoneType: "TERRACE",     description: null, capacityCovers: getLocal5ConceptCapacity("TERRACE") ?? 75 },
     { id: "vip",     name: t.zoneVipName,     conceptKey: "vip",     zoneType: "PRIVATE",     description: null, capacityCovers: 10 },
   ];
 
@@ -244,7 +247,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
     if (step === "concept" && !selectedConcept) e.concept = t.errorSelectExperience;
     if (step === "details") {
       if (!date) e.date = t.errorSelectDate;
-      if (partySize < 1 || partySize > 50) e.partySize = t.errorPartySize;
+      if (partySize < 1 || partySize > 100) e.partySize = t.errorPartySize;
     }
     if (step === "contact") {
       if (!contactName.trim()) e.contactName = t.errorNameRequired;
@@ -260,6 +263,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
 
   async function submit() {
     if (!validate()) return;
+    setGroupInquiry(false);
     setSubmitting(true);
     try {
       const res = await fetch("/api/reservations", {
@@ -276,7 +280,10 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
         setRequestPending(Boolean(data.pendingApproval || data.paymentRequired));
         setStep("confirmed");
       }
-      else setErrors({ submit: data.error || t.errorSomethingWrong });
+      else {
+        setGroupInquiry(data.code === "GROUP_SIZE_REQUIRES_CONTACT");
+        setErrors({ submit: data.error || t.errorSomethingWrong });
+      }
     } catch { setErrors({ submit: t.errorNetwork }); }
     finally { setSubmitting(false); }
   }
@@ -400,7 +407,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <button type="button" onClick={() => setPartySize(p => Math.max(1, p - 1))} style={{ width: 40, height: 40, borderRadius: 8, border: "1.5px solid rgba(255,255,255,0.2)", background: "transparent", color: "#fff", fontSize: 20, cursor: "pointer" }}>−</button>
               <span style={{ fontSize: 24, fontWeight: 700, minWidth: 32, textAlign: "center" }}>{partySize}</span>
-              <button type="button" onClick={() => setPartySize(p => Math.min(50, p + 1))} style={{ width: 40, height: 40, borderRadius: 8, border: "1.5px solid rgba(255,255,255,0.2)", background: "transparent", color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
+              <button type="button" onClick={() => setPartySize(p => Math.min(100, p + 1))} style={{ width: 40, height: 40, borderRadius: 8, border: "1.5px solid rgba(255,255,255,0.2)", background: "transparent", color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
             </div>
           </WizardInput>
           <WizardInput label={t.occasion}>
@@ -541,7 +548,28 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
               <span style={{ fontSize: 14, fontWeight: 500, textAlign: "right", maxWidth: "60%" }}>{row.value}</span>
             </div>
           ))}
-          {errors.submit && <div style={{ color: "#f87171", textAlign: "center", marginTop: 16, fontSize: 13 }}>{errors.submit}</div>}
+          {errors.submit && (
+            <div style={{ color: "#f87171", textAlign: "center", marginTop: 16, fontSize: 13 }}>
+              {errors.submit}
+              {groupInquiry && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const venueName = zones.find((zone) => zone.conceptKey === selectedConcept)?.name ?? selectedConcept;
+                    const localized = locale === "es"
+                      ? `Solicitud de grupo: ${venueName}; ${partySize} personas; ${fmtDate(date, time)}. Nombre: ${contactName}. Correo: ${contactEmail}. Teléfono: ${contactPhone}. Esta solicitud excede el límite de reserva en línea; por favor, ayúdennos a coordinarla.`
+                      : locale === "pt"
+                        ? `Solicitação de grupo: ${venueName}; ${partySize} pessoas; ${fmtDate(date, time)}. Nome: ${contactName}. E-mail: ${contactEmail}. Telefone: ${contactPhone}. Este pedido excede o limite de reserva online; por favor, ajude-nos a organizá-lo.`
+                        : `Group reservation request: ${venueName}; ${partySize} guests; ${fmtDate(date, time)}. Name: ${contactName}. Email: ${contactEmail}. Phone: ${contactPhone}. This is above the online booking limit; please help us arrange it.`;
+                    openGroupBookingChat({ context: localized, guestName: contactName, guestPhone: contactPhone });
+                  }}
+                  style={{ display: "block", margin: "12px auto 0", padding: "10px 16px", borderRadius: 10, border: "1px solid rgba(200,169,110,0.55)", background: "rgba(200,169,110,0.16)", color: "#f2d9a5", fontWeight: 700, cursor: "pointer" }}
+                >
+                  {locale === "es" ? "Coordinar una reserva de grupo por chat" : locale === "pt" ? "Organizar reserva de grupo pelo chat" : "Arrange this group reservation in chat"}
+                </button>
+              )}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
             <button type="button" onClick={back} style={{ flex: 1, padding: "14px", background: "rgba(255,255,255,0.08)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.12)", borderRadius: 12, fontSize: 15, cursor: "pointer" }}>{t.back}</button>
             <button type="button" onClick={submit} disabled={submitting} style={{ flex: 2, padding: "14px", background: submitting ? "rgba(180,35,47,0.5)" : "#c41e3a", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: submitting ? "wait" : "pointer", letterSpacing: "0.05em" }}>

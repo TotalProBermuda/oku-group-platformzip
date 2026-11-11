@@ -125,7 +125,7 @@ function UsersPageContent() {
     {
       key: "activate",
       label: t("admin", "activate"),
-      hidden: u.status === "ACTIVE",
+      hidden: u.status === "ACTIVE" || u.status === "ARCHIVED",
       onClick: async () => {
         await fetch(`/api/v1/admin/users/${u.id}/status`, {
           method: "POST",
@@ -146,6 +146,57 @@ function UsersPageContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "SUSPENDED" }),
         });
+        fetchUsers();
+      },
+    },
+    {
+      key: "delete-recoverable",
+      label: t("admin", "deleteUserRecoverable"),
+      hidden: u.status === "ARCHIVED",
+      danger: true,
+      onClick: async () => {
+        const impactResponse = await fetch(`/api/v1/admin/users/${u.id}/impact`, { cache: "no-store" });
+        const impactPayload = await impactResponse.json();
+        if (!impactResponse.ok || !impactPayload.ok) {
+          window.alert(impactPayload.error || t("admin", "userLifecycleError"));
+          return;
+        }
+        const impact = impactPayload.data;
+        const referrer = impact.referrer
+          ? `\nReferrer: ${impact.referrer.type}; ${impact.referrer.attributions} attributions; ${impact.referrer.legacyCommissions + impact.referrer.actorCommissions} commission entries; ${impact.referrer.links} links; actor ${impact.referrer.referralActorStatus || "none"}.`
+          : "";
+        const beneficiary = impact.beneficiary
+          ? `\nPayout beneficiary: ${impact.beneficiary.bankName || "bank not specified"} (${impact.beneficiary.readinessStatus}).`
+          : "";
+        const summary = `${impact.name || "Unnamed user"} <${impact.email}>\nStatus: ${impact.status}\nRoles: ${impact.roles.join(", ") || "none"}\nOrders: ${impact.orders}; tickets: ${impact.tickets}${impact.membership ? `\nMembership: ${impact.membership.tier} (${impact.membership.status})` : ""}${referrer}${beneficiary}\n\nThis is a recoverable archive. Financial, ticket, referral and audit records are retained.`;
+        if (!window.confirm(`${t("admin", "deleteUserConfirm").replace("{name}", impact.name || impact.email)}\n\n${summary}`)) return;
+        const reason = window.prompt(t("admin", "deleteUserReason"));
+        if (!reason?.trim()) return;
+        const response = await fetch(`/api/v1/admin/users/${u.id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "ARCHIVED", reason }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) window.alert(result.error || t("admin", "userLifecycleError"));
+        fetchUsers();
+      },
+    },
+    {
+      key: "restore-user",
+      label: t("admin", "restoreUser"),
+      hidden: u.status !== "ARCHIVED",
+      onClick: async () => {
+        if (!window.confirm(t("admin", "restoreUserConfirm").replace("{name}", u.name || u.email))) return;
+        const reason = window.prompt(t("admin", "restoreUserReason"));
+        if (!reason?.trim()) return;
+        const response = await fetch(`/api/v1/admin/users/${u.id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "ACTIVE", reason }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) window.alert(result.error || t("admin", "userLifecycleError"));
         fetchUsers();
       },
     },
