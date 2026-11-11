@@ -11,6 +11,7 @@ import { handleCapacityExpirySweepJob } from "./jobs/capacity-expiry-sweep";
 import { handleLedgerOutboxDrainJob } from "./jobs/ledger-outbox-drain";
 import { getQueueRedisUrl } from "../src/server/redis/config";
 import { sendNewReservationOperationalAlerts, sendPaidTicketOperationalAlerts } from "../src/server/notifications/operationalCommerceAlerts";
+import { sendChatAlertEmail } from "../src/server/host/chatAlerts";
 
 if (!getQueueRedisUrl()) {
   // Redis unavailable — start a polling-based drain so PENDING outbox rows are
@@ -157,6 +158,11 @@ const worker = new Worker(
 
       case "sync_monday_lead": {
         console.log("Sync to Monday (stub)", job.data);
+        return true;
+      }
+
+      case "send_chat_alert_email": {
+        await sendChatAlertEmail(job.data as { to: string; subject: string; body: string });
         return true;
       }
 

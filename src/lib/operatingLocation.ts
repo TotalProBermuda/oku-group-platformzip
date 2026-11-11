@@ -24,7 +24,7 @@ export const LOCAL5_SPACE_SPECS = [
     conceptKey: "OKU",
     name: "OKU Dining Room",
     legacyNames: ["OKU", "OKÜ Dining Room"],
-    capacity: 27,
+    capacity: 30,
     sortOrder: 0,
     weatherSensitive: false,
     requiresApproval: false,
@@ -33,7 +33,7 @@ export const LOCAL5_SPACE_SPECS = [
     conceptKey: "CATCH",
     name: "CATCH Dining Room",
     legacyNames: ["CATCH", "Catch Experience"],
-    capacity: 24,
+    capacity: 50,
     sortOrder: 1,
     weatherSensitive: false,
     requiresApproval: false,
@@ -42,7 +42,7 @@ export const LOCAL5_SPACE_SPECS = [
     conceptKey: "TERRACE",
     name: "Terrace",
     legacyNames: ["THE TERRACE"],
-    capacity: 42,
+    capacity: 75,
     sortOrder: 2,
     weatherSensitive: true,
     requiresApproval: false,
@@ -57,3 +57,10 @@ export const LOCAL5_SPACE_SPECS = [
     requiresApproval: true,
   },
 ] as const;
+
+/** Maximum covers for a public reservation in a named dining concept. */
+export function getLocal5ConceptCapacity(conceptKey: string): number | null {
+  const normalized = conceptKey.trim().toLocaleUpperCase("en-US");
+  const spec = LOCAL5_SPACE_SPECS.find((space) => space.conceptKey === normalized);
+  return spec?.capacity ?? null;
+}

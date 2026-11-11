@@ -130,6 +130,7 @@ export async function resolveActorFromCode(code: string) {
     include: {
       referralActor: {
         include: {
+          user: { select: { status: true } },
           legacyReferrer: { select: { id: true, compensationPlanId: true, referrerType: true } },
           legacyEventReferrerAssignment: { select: { id: true, parentInfluencerId: true, commissionShareBps: true } },
           assignments: { where: { isActive: true }, take: 1 },
@@ -143,7 +144,7 @@ export async function resolveActorFromCode(code: string) {
     const assignmentUnavailable = link.referralAssignment
       ? !link.referralAssignment.isActive || link.referralAssignment.status !== "ACTIVE"
       : false;
-    if (!link.isActive || link.referralActor.status !== "ACTIVE" || assignmentUnavailable) {
+    if (!link.isActive || link.referralActor.status !== "ACTIVE" || (link.referralActor.user && link.referralActor.user.status !== "ACTIVE") || assignmentUnavailable) {
       return null;
     }
     return {
@@ -160,12 +161,14 @@ export async function resolveActorFromCode(code: string) {
   const legacyReferrer = await prisma.referrer.findUnique({
     where: { referralCode: code },
     include: {
+      user: { select: { status: true } },
       referralActor: true,
       compensationPlan: true,
     },
   });
 
   if (legacyReferrer) {
+    if (legacyReferrer.user && legacyReferrer.user.status !== "ACTIVE") return null;
     return {
       source: "LEGACY_REFERRER" as const,
       referralActorId: legacyReferrer.referralActor?.id ?? null,
@@ -179,11 +182,12 @@ export async function resolveActorFromCode(code: string) {
   const legacyEventRef = await prisma.eventReferrerAssignment.findUnique({
     where: { referralCode: code },
     include: {
-      referralActor: true,
+      referralActor: { include: { user: { select: { status: true } } } },
     },
   });
 
   if (legacyEventRef) {
+    if (legacyEventRef.referralActor?.user && legacyEventRef.referralActor.user.status !== "ACTIVE") return null;
     return {
       source: "LEGACY_EVENT_REFERRER" as const,
       referralActorId: legacyEventRef.referralActor?.id ?? null,

@@ -12,6 +12,7 @@ import { getCommerceSettings } from "@/server/commerce/commerceSettings";
 import { getWebsiteContent } from "@/server/content/websiteContent";
 import { reservationIsWithinOperatingHours } from "@/server/reservations/serviceWindow";
 import { ReservationAddonType } from "@prisma/client";
+import { getLocal5ConceptCapacity } from "@/lib/operatingLocation";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -71,6 +72,14 @@ export async function POST(req: NextRequest) {
     if (!reservationIsWithinOperatingHours(websiteContent, reservationStartAt)) {
       return NextResponse.json(
         { error: "The requested time is outside the current reservation service window." },
+        { status: 400 }
+      );
+    }
+
+    const conceptCapacity = getLocal5ConceptCapacity(String(conceptKey));
+    if (conceptCapacity !== null && parsedPartySize > conceptCapacity) {
+      return NextResponse.json(
+        { error: `Online reservations for this venue are limited to ${conceptCapacity} guests. Please contact us about larger groups.`, code: "GROUP_SIZE_REQUIRES_CONTACT", maxPartySize: conceptCapacity },
         { status: 400 }
       );
     }
