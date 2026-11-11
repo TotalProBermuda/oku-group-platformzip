@@ -144,7 +144,7 @@ export async function resolveActorFromCode(code: string) {
     const assignmentUnavailable = link.referralAssignment
       ? !link.referralAssignment.isActive || link.referralAssignment.status !== "ACTIVE"
       : false;
-    if (!link.isActive || link.referralActor.status !== "ACTIVE" || link.referralActor.user?.status !== "ACTIVE" || assignmentUnavailable) {
+    if (!link.isActive || link.referralActor.status !== "ACTIVE" || (link.referralActor.user && link.referralActor.user.status !== "ACTIVE") || assignmentUnavailable) {
       return null;
     }
     return {
