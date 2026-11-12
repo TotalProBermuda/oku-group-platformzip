@@ -92,8 +92,10 @@ export async function POST(req: NextRequest) {
       QR_CODE: "QR_CODE",
       UMBRELLA_SITE: "UMBRELLA_SITE",
       REFERRER_LINK: "UMBRELLA_SITE",
+      GOOGLE_BUSINESS_PROFILE: "UMBRELLA_SITE",
     };
     const persistedSource = (SOURCE_MAP[source as string] ?? "UMBRELLA_SITE") as import("@prisma/client").ReservationSource;
+    const sourceContext = source === "GOOGLE_BUSINESS_PROFILE" ? "GOOGLE_BUSINESS_PROFILE" : null;
 
     const venue = await prisma.venue.findFirst({ where: { slug: "gold-house" } });
     if (!venue) return NextResponse.json({ error: "Venue not found." }, { status: 500 });
@@ -229,6 +231,7 @@ export async function POST(req: NextRequest) {
             zoneId: zone?.id ?? null,
             guestProfileId: guestProfile.id,
             source: persistedSource,
+            sourceContext,
             // Deposit-required reservations start PENDING_PAYMENT; spaces that
             // require host approval start PENDING_APPROVAL; all others go straight
             // to CONFIRMED (host can still override later).
