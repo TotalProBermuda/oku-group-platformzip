@@ -99,6 +99,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
   const [contactEmail, setContactEmail]       = useState("");
   const [contactPhone, setContactPhone]       = useState("");
   const [referralCode, setReferralCode]       = useState("");
+  const [bookingSource, setBookingSource] = useState("");
   // Referrer captured from the URL (?ref=CARLOS01). When present we replace
   // the manual entry with a read-only "Referred by" pill — diners shouldn't
   // have to copy or remember a code that originated from the link they
