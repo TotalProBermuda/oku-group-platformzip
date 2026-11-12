@@ -149,6 +149,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
     const params = new URLSearchParams(window.location.search);
     const concept = reservationConceptFromQuery(window.location.search);
     if (concept) setSelectedConcept(concept);
+    if (params.get("source") === "GOOGLE_BUSINESS_PROFILE") setBookingSource("GOOGLE_BUSINESS_PROFILE");
 
     // Pre-fill date from ?date= param (set by streetside host QR panel).
     const dateParam = params.get("date") ?? "";
@@ -269,7 +270,7 @@ export default function ReservationWizard({ t, locale = "en" }: Props) {
       const res = await fetch("/api/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conceptKey: selectedConcept, reservationDate: panamaReservationIso(date, time), partySize, occasion, seatingPreference: seatingPref, notes, addons, contactName, contactEmail, contactPhone, referralCode, _company: company }),
+        body: JSON.stringify({ conceptKey: selectedConcept, reservationDate: panamaReservationIso(date, time), partySize, occasion, seatingPreference: seatingPref, notes, addons, contactName, contactEmail, contactPhone, referralCode, source: bookingSource || undefined, _company: company }),
       });
       const data = await res.json();
       if (data.confirmationCode) {
