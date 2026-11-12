@@ -6,6 +6,7 @@ import type { Locale } from "@/types/i18n";
 import type { Metadata } from "next";
 import { SUPPORTED_LOCALES } from "@/types/i18n";
 import { getWebsiteContent, operatingHoursRows, venueCopy } from "@/server/content/websiteContent";
+import { getLocal5ConceptCapacity } from "@/lib/operatingLocation";
 
 // Website copy and operating hours are edited by Superadmin and must be read
 // from the production database at request time, not during the Replit build.
@@ -41,7 +42,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
       slug: "oku",
       name: "OKÜ",
       data: { ...(v.oku as Record<string, unknown>), ...(venueCopy(websiteContent, "oku", safeLocale) as unknown as Record<string, unknown>) },
-      covers: 27,
+      covers: getLocal5ConceptCapacity("OKU") ?? 30,
       hours: operatingHoursRows(websiteContent, safeLocale),
       accent: "#1a1614",
       lightAccent: "#f5f2ef",
@@ -54,7 +55,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
       slug: "catch",
       name: "CATCH",
       data: { ...(v.catch as Record<string, unknown>), ...(venueCopy(websiteContent, "catch", safeLocale) as unknown as Record<string, unknown>) },
-      covers: 24,
+      covers: getLocal5ConceptCapacity("CATCH") ?? 50,
       hours: operatingHoursRows(websiteContent, safeLocale),
       accent: "#1e3a5f",
       lightAccent: "#f0f4f8",
@@ -67,7 +68,7 @@ export default async function LocaleRestaurantsPage({ params }: { params: Promis
       slug: "terrace",
       name: "TERRACE",
       data: { ...(v.terrace as Record<string, unknown>), ...(venueCopy(websiteContent, "terrace", safeLocale) as unknown as Record<string, unknown>) },
-      covers: 42,
+      covers: getLocal5ConceptCapacity("TERRACE") ?? 75,
       hours: operatingHoursRows(websiteContent, safeLocale),
       accent: "#2d4a1e",
       lightAccent: "#f2f5f0",
